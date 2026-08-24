@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pilates-movement-analysis"
+version = "0.1.0"
+description = "Multi-person movement analysis for Pilates and yoga classes"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "opencv-python-headless>=4.8",
+    "onnxruntime>=1.16",
+    "rtmlib>=0.0.13",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4"]
+
+[project.scripts]
+pilates = "pilates.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["pilates*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

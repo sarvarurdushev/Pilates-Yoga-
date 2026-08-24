@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Model weights are downloaded on first run and cached outside the repo.
+*.onnx
+*.zip
+
+# Analysis output
+*.jsonl
+probe_frame.jpg
+out/

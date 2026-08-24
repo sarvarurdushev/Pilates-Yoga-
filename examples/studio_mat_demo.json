@@ -1,0 +1,19 @@
+{
+  "name": "mat_class_demo",
+  "keypoint_threshold": 0.4,
+  "min_visible_keypoints": 8,
+  "duplicate_iou": 0.55,
+  "exclusion_zones": [
+    {"name": "left_mirror_wall", "box": [0, 0, 500, 1080], "min_overlap": 0.6},
+    {"name": "right_mirror_panel", "box": [1560, 0, 1730, 1080], "min_overlap": 0.6}
+  ],
+  "tracker": {
+    "iou_threshold": 0.3,
+    "max_misses": 30,
+    "min_hits": 3,
+    "keypoint_threshold": 0.4
+  },
+  "model_size": "m",
+  "device": "cpu",
+  "frame_stride": 5
+}
