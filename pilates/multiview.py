@@ -1,8 +1,9 @@
 """Two cameras: associating students between views, and fusing their features.
 
-A back bend leans towards a front-facing camera and barely moves in its image,
-which is why it is confusable with a side bend. A second camera at an angle
-sees that lean directly. Using it requires two things: knowing which student in
+A back bend and a side bend make nearly the same silhouette when each is seen
+from a single view -- a torso tilted off vertical with the arms overhead. What
+separates them is which plane the tilt happens in, which one camera cannot
+record. Two views at an angle to each other see both planes at once. Using it requires two things: knowing which student in
 view A is which student in view B, and combining what both views say.
 
 Association is done through a **floor-plane homography** rather than full 3D

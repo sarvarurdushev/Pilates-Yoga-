@@ -11,14 +11,26 @@ capacity. It is geometry:
 | `standing_back_bend` | 0.310 | **75.8 deg** |
 | `standing_side_bend` | 0.480 | **76.0 deg** |
 
-The trunk angles are identical. A backward arch leans mostly *towards the
-camera*, and that component barely projects into image coordinates, so in 2D
-the torso reads as upright. Only lateral spread separates the two, weakly.
+The trunk angles are identical, and the reason is more specific than "depth is
+invisible". In this footage the two exercises were filmed from **different
+camera angles**: the back bend side-on, where the arch shows fully in profile,
+and the side bend front-on, where the lateral lean shows fully. Each was shot
+from the angle that flatters it.
 
-No quantity of training data fixes this. The information is not in the pixels.
+A back bend in profile and a side bend head-on produce **nearly the same
+silhouette** -- a torso tilted about 76 degrees off vertical with the arms
+overhead. The image cannot tell them apart because, from those two viewpoints,
+they genuinely look the same. What distinguishes them is which *plane* the
+tilt happens in, and a single view does not record that.
 
-Two ways out: estimate depth from one view, or add a view that sees the missing
-axis directly.
+(An earlier version of this note said a backward arch "leans towards the camera
+and barely projects". That is true of a back bend filmed from the front, and it
+is not what happened here -- this one was filmed from the side. The measurement
+stands; the explanation was wrong.)
+
+No quantity of training data fixes it, because one view cannot say which plane
+a tilt is in. Two ways out: estimate depth from one view, or add a second view
+so the same movement is seen in two planes at once.
 
 ## Option A: 3D pose estimation
 
