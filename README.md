@@ -304,6 +304,59 @@ The build reports which exercises are still too thin to train on. Around 20
 windows per exercise is where a class becomes learnable at all; several hundred
 is where it gets good.
 
+## Exercise recognition
+
+```bash
+python -m pilates train data.npz --out model.joblib
+```
+
+The model is deliberately modest: a window is reduced to summary statistics
+(mean, spread, extremes, endpoints, and frame-to-frame motion) and classified
+with a regularised linear model. At a few hundred labelled windows that is the
+right size of tool. A temporal network has far more capacity than this data can
+constrain -- it would memorise the students and report a beautiful score.
+
+### The evaluation is the important part
+
+This data leaks three ways at once, and a naive split hides all of them:
+windows overlap so neighbours share frames; one student appears in many
+windows, so a model can learn to recognise *them*; and everything comes from
+one room, camera and teacher.
+
+So training reports both numbers:
+
+```
+Always guessing the most common exercise: 52.4%
+
+Random split (LEAKY, for comparison only): 96.9% accuracy over 5 folds
+Held-out students (honest):                77.8% accuracy over 5 folds
+
+Leak gap: +19.1 points. That is how much the random split flatters this model.
+```
+
+Those are real numbers from 508 windows of one 720p studio class. **96.9% is
+the number a naive pipeline would report, and it is wrong by nineteen points.**
+77.8% against a 52.4% baseline is the honest result: the model has learned
+something substantial, and it is nowhere near the headline.
+
+The per-class breakdown is where the useful detail is. Under honest evaluation
+`upward_salute` recall falls to 55%, largely confused with `standing_side_bend`
+-- which makes sense, because a side bend begins from arms-overhead and the two
+share their opening. That is a labelling and window-length question, not a
+model-capacity one.
+
+### What is still not measured
+
+Every window above comes from one session. Nothing there measures transfer to
+another room, camera or teacher. For that, label a second class and hold it out
+entirely -- the code takes group ids, so session-level holdout is the same call
+with a different grouping.
+
+The training command also refuses to flatter itself in the obvious ways: it
+prints the majority-class baseline first, warns when there are too few distinct
+students for the grouped score to mean anything, and warns when two classes
+make a coin flip look competent.
+
 ## Camera specification
 
 The obvious hypothesis for why the packed hall failed was resolution: students

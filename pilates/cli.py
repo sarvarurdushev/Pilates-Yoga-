@@ -7,6 +7,7 @@
     python -m pilates label   VIDEO --out labels.json # scaffold labels at the cuts
     python -m pilates check   labels.json             # validate a label file
     python -m pilates dataset VIDEO --labels l.json   # build training windows
+    python -m pilates train   data.npz --out model.joblib  # train a recogniser
 """
 from __future__ import annotations
 
@@ -334,6 +335,63 @@ def cmd_dataset(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_train(args: argparse.Namespace) -> int:
+    """Train an exercise recogniser and report honestly on what it learned."""
+    import numpy as np
+
+    from .classifier import ExerciseClassifier, evaluate, featurise, majority_baseline
+
+    data = np.load(args.dataset, allow_pickle=False)
+    windows = data["features"]
+    labels = data["labels"]
+    names = [str(n) for n in data["label_names"]]
+    tracks = data["track_ids"]
+
+    print(f"{len(windows)} windows, {len(names)} exercises, "
+          f"{len(np.unique(tracks))} distinct students")
+    counts = np.bincount(labels, minlength=len(names))
+    for i, name in enumerate(names):
+        print(f"  {name:28s} {counts[i]:5d}")
+    baseline = majority_baseline(labels)
+    print(f"\nAlways guessing the most common exercise: {baseline * 100:.1f}%")
+    print("Any model that does not clear that has learned nothing.\n")
+
+    features = featurise(windows)
+
+    random_split = evaluate(features, labels, names, groups=None,
+                            protocol="Random split (LEAKY, for comparison only)",
+                            kind=args.model, seed=args.seed)
+    random_split.note = ("Overlapping windows and the same students appear on both "
+                         "sides. Treat this as an upper bound, not a result.")
+    print(random_split.format())
+    print()
+
+    grouped = evaluate(features, labels, names, groups=tracks,
+                       protocol="Held-out students (honest)",
+                       kind=args.model, seed=args.seed)
+    print(grouped.format())
+
+    if not np.isnan(random_split.accuracy) and not np.isnan(grouped.accuracy):
+        gap = (random_split.accuracy - grouped.accuracy) * 100
+        print(f"\nLeak gap: {gap:+.1f} points. That is how much the random split "
+              f"flatters this model.")
+
+    if len(np.unique(tracks)) < 5:
+        print("\nToo few distinct students for the grouped score to mean much.")
+    if len(names) < 3:
+        print("Only two exercises: a coin flip scores 50%.")
+    print("\nEvery window here comes from one session. Nothing above measures "
+          "\ntransfer to another room, camera or teacher -- for that, label a "
+          "\nsecond class and hold it out entirely.")
+
+    if args.out:
+        classifier = ExerciseClassifier(kind=args.model, seed=args.seed)
+        classifier.fit(windows, labels, names)
+        classifier.save(args.out)
+        print(f"\nmodel -> {args.out}")
+    return 0
+
+
 def _round(value: float | None) -> float | None:
     return None if value is None else round(value, 1)
 
@@ -411,6 +469,13 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument("--include-non-exercise", action="store_true",
                    help="also emit windows for transition/instruction/rest")
     d.set_defaults(func=cmd_dataset)
+
+    t = sub.add_parser("train", help="train an exercise recogniser from a dataset")
+    t.add_argument("dataset", help=".npz produced by the dataset command")
+    t.add_argument("--out", default=None, help="save the fitted model here")
+    t.add_argument("--model", choices=("linear", "forest"), default="linear")
+    t.add_argument("--seed", type=int, default=0)
+    t.set_defaults(func=cmd_train)
 
     args = parser.parse_args(argv)
     return args.func(args)

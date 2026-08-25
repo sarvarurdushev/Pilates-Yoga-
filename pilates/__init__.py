@@ -9,6 +9,8 @@ Pipeline order::
 """
 from __future__ import annotations
 
+from .classifier import (Evaluation, ExerciseClassifier, evaluate,
+                         featurise, majority_baseline, window_features)
 from .config import StudioConfig
 from .dataset import Example, build_from_video, feature_vector, normalise_keypoints
 from .labels import VOCABULARY, LabelError, LabelSet, Segment, scaffold
@@ -26,7 +28,8 @@ from .types import Detection, FrameResult, TrackedPerson
 __version__ = "0.1.0"
 
 __all__ = [
-    "StudioConfig", "ExclusionZone", "LabelSet", "Segment", "LabelError", "VOCABULARY",
+    "StudioConfig", "ExclusionZone", "ExerciseClassifier", "Evaluation", "evaluate",
+    "featurise", "window_features", "majority_baseline", "LabelSet", "Segment", "LabelError", "VOCABULARY",
     "scaffold", "Shot", "detect_shots", "Example", "build_from_video",
     "feature_vector", "normalise_keypoints", "Pipeline", "PipelineStats", "VideoSource",
     "RTMOBackend", "StubBackend", "TiledBackend", "IoUTracker", "TrackerConfig",
