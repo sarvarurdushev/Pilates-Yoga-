@@ -157,7 +157,10 @@ def cmd_session(args: argparse.Namespace) -> int:
         keypoint_threshold=config.keypoint_threshold, min_range=args.min_range
     )
 
-    with VideoSource(args.video, stride=config.frame_stride) as source:
+    with VideoSource(
+        args.video, stride=config.frame_stride,
+        start_frame=args.start, end_frame=args.end,
+    ) as source:
         for result in pipeline.run(source):
             recorder.observe(result)
 
@@ -176,8 +179,12 @@ def cmd_session(args: argparse.Namespace) -> int:
     for s in summaries:
         print(f"\nStudent #{s.track_id}")
         print(f"  tracked          : {s.duration:.1f}s over {s.samples} frames")
-        if s.signal is None:
+        if s.kind == "held":
             print("  movement         : held a position - no repetitions detected")
+        elif s.kind == "sequence":
+            print(f"  movement         : a sequence of poses, not a repeated exercise")
+            print(f"  measured on      : {s.signal} "
+                  f"(keypoint confidence {s.signal_confidence:.2f})")
         else:
             print(f"  measured on      : {s.signal} "
                   f"(keypoint confidence {s.signal_confidence:.2f})")
@@ -207,7 +214,8 @@ def cmd_session(args: argparse.Namespace) -> int:
     if args.out:
         payload = [
             {
-                "track_id": s.track_id, "signal": s.signal, "samples": s.samples,
+                "track_id": s.track_id, "signal": s.signal, "kind": s.kind,
+                "samples": s.samples,
                 "signal_confidence": _round(s.signal_confidence),
                 "duration_s": round(s.duration, 2), "repetitions": s.repetitions,
                 "mean_range_deg": _round(s.mean_range),
@@ -270,6 +278,9 @@ def main(argv: list[str] | None = None) -> int:
                    help="smallest angular excursion counted as a repetition, in degrees")
     n.add_argument("--min-samples", type=int, default=10,
                    help="frames a student must be tracked for before reporting")
+    n.add_argument("--start", type=int, default=0,
+                   help="first frame to analyse (use one continuous shot)")
+    n.add_argument("--end", type=int, default=None, help="last frame to analyse")
     n.add_argument("--force", action="store_true",
                    help="print per-student reports even when tracking is too unstable "
                         "for them to describe real people")

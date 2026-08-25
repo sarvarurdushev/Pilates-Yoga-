@@ -325,3 +325,97 @@ class TestSessionQuality:
         frames = [[i // 2] for i in range(20)]
         quality = self._record(frames).quality()
         assert quality.coverage < 0.2
+
+
+class TestRhythm:
+    """Repetition counting cannot tell a set from a flow on its own: given a
+    60-second sequence it finds the one broad rise and fall spanning the whole
+    thing and calls it a single 40-second repetition."""
+
+    def test_repeated_movement_is_rhythmic(self):
+        from pilates.movement import MIN_RHYTHM, rhythm_regularity
+        _, values = wave(cycles=5, amplitude=60)
+        assert rhythm_regularity(values) > MIN_RHYTHM
+
+    def test_a_pose_sequence_is_not(self):
+        from pilates.movement import MIN_RHYTHM, rhythm_regularity
+        values = []
+        for level, hold in ((90, 12), (130, 30), (60, 8), (150, 40), (100, 15), (40, 25)):
+            values.extend([float(level)] * hold)
+        assert rhythm_regularity(values) < MIN_RHYTHM
+
+    def test_a_one_way_ramp_is_not(self):
+        """Autocorrelation scored this 0.99, indistinguishable from a clean set."""
+        from pilates.movement import MIN_RHYTHM, rhythm_regularity
+        assert rhythm_regularity([90.0 + i * 0.5 for i in range(120)]) < MIN_RHYTHM
+
+    def test_short_series_has_no_rhythm(self):
+        from pilates.movement import rhythm_regularity
+        assert rhythm_regularity([90.0, 100.0, 90.0]) == 0.0
+
+    def test_flat_signal_has_no_rhythm(self):
+        from pilates.movement import rhythm_regularity
+        assert rhythm_regularity([90.0] * 60) == 0.0
+
+
+class TestMovementKind:
+    def _history_from(self, values, signal="left_knee"):
+        history = TrackHistory(track_id=1)
+        det = make_detection(x=100, y=100)
+        for i, v in enumerate(values):
+            history.add(i * 0.1, det, 0.4)
+            history.samples[-1].angles[signal] = v
+            history.samples[-1].angles["right_knee"] = v
+        return history
+
+    def test_a_set_is_reported_as_repetitive(self):
+        _, values = wave(cycles=5, amplitude=60)
+        summary = summarise(self._history_from(values))
+        assert summary.kind == "repetitive"
+        assert summary.repetitions >= 3
+
+    def _flow(self):
+        values = []
+        for level, hold in ((90, 12), (130, 30), (60, 8), (150, 40), (100, 15), (40, 25)):
+            values.extend([float(level)] * hold)
+        return values
+
+    def test_a_flow_is_reported_as_a_sequence(self):
+        summary = summarise(self._history_from(self._flow()))
+        assert summary.kind == "sequence"
+
+    def test_a_sequence_gets_no_invented_repetitions(self):
+        summary = summarise(self._history_from(self._flow()))
+        assert summary.repetitions == 0
+        assert summary.control_ratio is None
+        assert summary.mean_rep_duration is None
+
+
+class TestSingleCycleIsNotASet:
+    """Two turning points can look evenly spaced by accident, so rhythm alone
+    let a whole 60-second flow through as 'one 40-second repetition'."""
+
+    def test_one_cycle_is_reported_as_a_sequence(self):
+        history = TrackHistory(track_id=1)
+        det = make_detection(x=100, y=100)
+        _, values = wave(cycles=1, amplitude=60, samples_per_cycle=120)
+        for i, v in enumerate(values):
+            history.add(i * 0.1, det, 0.4)
+            history.samples[-1].angles["left_knee"] = v
+            history.samples[-1].angles["right_knee"] = v
+        summary = summarise(history)
+        assert summary.kind == "sequence"
+        assert summary.repetitions == 0
+        assert summary.mean_rep_duration is None
+
+    def test_several_cycles_are_still_a_set(self):
+        history = TrackHistory(track_id=1)
+        det = make_detection(x=100, y=100)
+        _, values = wave(cycles=5, amplitude=60)
+        for i, v in enumerate(values):
+            history.add(i * 0.1, det, 0.4)
+            history.samples[-1].angles["left_knee"] = v
+            history.samples[-1].angles["right_knee"] = v
+        summary = summarise(history)
+        assert summary.kind == "repetitive"
+        assert summary.repetitions >= 2

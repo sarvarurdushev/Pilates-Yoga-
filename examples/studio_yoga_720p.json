@@ -1,0 +1,14 @@
+{
+  "name": "yoga_studio_720p",
+  "keypoint_threshold": 0.4,
+  "min_visible_keypoints": 8,
+  "duplicate_iou": 0.55,
+  "exclusion_zones": [],
+  "tracker": {
+    "iou_threshold": 0.3, "max_misses": 30, "min_hits": 3,
+    "keypoint_threshold": 0.4, "appearance_weight": 0.3,
+    "min_iou_gate": 0.1, "appearance_learning_rate": 0.1
+  },
+  "model_size": "m", "device": "cpu", "frame_stride": 4,
+  "tile_cols": 1, "tile_rows": 1, "tile_scale": 2.0, "tile_overlap": 0.25
+}

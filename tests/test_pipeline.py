@@ -173,3 +173,15 @@ class TestTiling:
             TiledBackend(StubBackend([]), scale=0)
         with pytest.raises(ValueError):
             TiledBackend(StubBackend([]), overlap=0.5)
+
+
+class TestFrameWindow:
+    """Session numbers only mean something across one continuous shot, so the
+    source has to be able to analyse a slice of an edited video."""
+
+    def test_defaults_cover_the_whole_video(self):
+        from pilates.pipeline import VideoSource
+        import inspect
+        params = inspect.signature(VideoSource.__init__).parameters
+        assert params["start_frame"].default == 0
+        assert params["end_frame"].default is None

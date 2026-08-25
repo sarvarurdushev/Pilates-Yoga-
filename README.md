@@ -135,6 +135,49 @@ Three decisions worth knowing about:
   instead -- the first version of this -- made a student doing fast repetitions
   look less controlled than a slow one when both were equally smooth.
 
+### Sets, sequences and holds are different things
+
+A Pilates set repeats one movement. A yoga flow moves through different poses.
+An isometric hold does not move at all. Repetition counting cannot tell them
+apart on its own -- given a 60-second flow it finds the single broad rise and
+fall spanning the whole sequence, calls it one 40-second repetition, and
+divides the control score by it. Every number that follows is then wrong in a
+way that looks plausible.
+
+So each student is classified before being measured, and repetition, tempo and
+control are reported only for a genuine set:
+
+| Kind | What it means | What is reported |
+|---|---|---|
+| `repetitive` | A countable set of one movement | Repetitions, range, tempo, control |
+| `sequence` | A flow through different poses | Holds, symmetry, the joint that led |
+| `held` | An isometric position | Hold duration, symmetry |
+
+Classification is on **turning-point regularity**: a set turns around at even
+intervals, a flow at irregular ones, a one-way movement barely at all.
+Autocorrelation was the obvious first choice and is wrong here -- any signal
+with a trend correlates strongly with itself, so a steady one-way ramp scored
+0.99, indistinguishable from a clean five-rep set. A set also needs at least
+two repetitions: two turning points can look evenly spaced by accident, which
+is how a whole flow slipped through as "one 40-second repetition".
+
+Run on 61 continuous seconds of a real 720p studio class, seven students on
+mats:
+
+```
+Tracking is sound: 1.46 identities per student, each followed for 81% of the class.
+
+Student #4
+  tracked          : 61.2s over 368 frames
+  movement         : a sequence of poses, not a repeated exercise
+  measured on      : right_hip (keypoint confidence 1.00)
+  longest hold     : 21.0s
+  left/right gap   : knee 3deg, hip 3deg, elbow 6deg
+```
+
+Three students were followed for every frame of the shot. All seven were
+correctly read as flowing rather than repeating.
+
 ### The session layer refuses when it cannot tell students apart
 
 Run against the packed hall, this layer will happily build **58 confident

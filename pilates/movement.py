@@ -133,6 +133,44 @@ def _extrema(values: list[float], prominence: float) -> list[tuple[int, str]]:
     return points
 
 
+def rhythm_regularity(values: list[float], prominence: float = 7.5) -> float:
+    """How evenly spaced a signal's turning points are, 0..1.
+
+    A set of repetitions turns around at regular intervals. A yoga flow -- a
+    sequence of different poses -- turns around at irregular ones, and a
+    one-way movement barely turns around at all.
+
+    Autocorrelation was tried first and does not work here: any signal with a
+    trend correlates strongly with itself at short lags, so a steady one-way
+    ramp scored 0.99, indistinguishable from a clean five-rep set. What
+    separates them is not self-similarity but *recurrence at a steady period*,
+    which is exactly what evenly spaced turning points are.
+
+    Returns 0 when there are too few turning points to have a rhythm at all.
+    """
+    turns = _extrema(smooth(values, 5), prominence=prominence)
+    if len(turns) < 4:
+        return 0.0
+    gaps = [b[0] - a[0] for a, b in zip(turns, turns[1:])]
+    gaps = [g for g in gaps if g > 0]
+    if len(gaps) < 3:
+        return 0.0
+    mean_gap = statistics.mean(gaps)
+    if mean_gap <= 0:
+        return 0.0
+    # Coefficient of variation, inverted: even spacing scores near 1.
+    spread = statistics.pstdev(gaps) / mean_gap
+    return max(0.0, min(1.0, 1.0 - spread))
+
+
+#: Turning-point regularity below which a signal is a sequence of poses
+#: rather than a set of repetitions.
+MIN_RHYTHM = 0.5
+
+#: Repetitions required before a movement counts as a set at all.
+MIN_REPETITIONS = 2
+
+
 @dataclass
 class Repetition:
     """One complete out-and-back cycle of a movement."""
@@ -262,6 +300,10 @@ class MovementSummary:
     #: Angle the movement numbers were measured on, or None when the student
     #: held a position rather than repeating one.
     signal: str | None
+    #: "repetitive" (a countable set), "sequence" (a flow of different poses),
+    #: or "held" (an isometric position). Repetition, tempo and control
+    #: numbers are only meaningful for "repetitive".
+    kind: str
     samples: int
     duration: float
     repetitions: int
@@ -350,6 +392,7 @@ def summarise(
         # Nothing moved enough, or nothing that moved was tracked confidently.
         # That is a real and common answer -- half of mat work is isometric --
         # so report the hold rather than inventing repetitions from noise.
+        kind = "held"
         times, values = history.series("trunk")
         reps: list[Repetition] = []
         holds = hold_durations(times, values) if len(values) >= 2 else []
@@ -357,8 +400,23 @@ def summarise(
         times, values = history.series(chosen)
         if len(values) < 5:
             return None
-        reps = find_repetitions(times, values, min_range=min_range)
         holds = hold_durations(times, values)
+        if rhythm_regularity(values, prominence=min_range / 2.0) < MIN_RHYTHM:
+            # A flow, not a set. Counting repetitions here would report the
+            # single rise and fall spanning the whole sequence as one very
+            # slow repetition, and divide the control score by it.
+            kind = "sequence"
+            reps = []
+        else:
+            reps = find_repetitions(times, values, min_range=min_range)
+            # A rhythm needs something to repeat against. One cycle spanning
+            # most of the clip is the whole sequence read as a single very slow
+            # repetition -- the exact artefact the rhythm check exists to catch,
+            # slipping through because two turning points can look evenly
+            # spaced by accident.
+            kind = "repetitive" if len(reps) >= MIN_REPETITIONS else "sequence"
+            if kind == "sequence":
+                reps = []
 
     ranges = [r.range_of_motion for r in reps]
     durations = [r.duration for r in reps]
@@ -377,6 +435,7 @@ def summarise(
     return MovementSummary(
         track_id=history.track_id,
         signal=chosen,
+        kind=kind,
         samples=len(history.samples),
         duration=history.duration,
         repetitions=len(reps),
@@ -386,7 +445,7 @@ def summarise(
         range_consistency=statistics.pstdev(ranges) if len(ranges) > 1 else None,
         mean_rep_duration=statistics.mean(durations) if durations else None,
         mean_tempo_ratio=statistics.mean(ratios) if ratios else None,
-        control_ratio=control_ratio(values, len(reps)) if chosen else None,
+        control_ratio=control_ratio(values, len(reps)) if kind == "repetitive" else None,
         signal_confidence=history.confidence(chosen) if chosen else 0.0,
         longest_hold=max(holds) if holds else None,
         mean_symmetry=symmetry,

@@ -18,11 +18,19 @@ from .types import FrameResult
 class VideoSource:
     """Frames from a file or an RTSP stream, with optional striding."""
 
-    def __init__(self, path: str | Path, stride: int = 1):
+    def __init__(
+        self,
+        path: str | Path,
+        stride: int = 1,
+        start_frame: int = 0,
+        end_frame: int | None = None,
+    ):
         import cv2
 
         self.path = str(path)
         self.stride = max(1, stride)
+        self.start_frame = max(0, start_frame)
+        self.end_frame = end_frame
         self._cap = cv2.VideoCapture(self.path)
         if not self._cap.isOpened():
             raise IOError(f"could not open video source: {self.path}")
@@ -32,12 +40,18 @@ class VideoSource:
         self.height = int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     def __iter__(self) -> Iterator[tuple[int, float, np.ndarray]]:
-        index = 0
+        import cv2
+
+        if self.start_frame:
+            self._cap.set(cv2.CAP_PROP_POS_FRAMES, self.start_frame)
+        index = self.start_frame
         while True:
+            if self.end_frame is not None and index > self.end_frame:
+                break
             ok, frame = self._cap.read()
             if not ok:
                 break
-            if index % self.stride == 0:
+            if (index - self.start_frame) % self.stride == 0:
                 yield index, index / self.fps, frame
             index += 1
 
