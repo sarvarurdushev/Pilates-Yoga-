@@ -15,6 +15,13 @@ class Detection:
 
     keypoints: np.ndarray  # (17, 2) float32, pixel coordinates
     scores: np.ndarray     # (17,)   float32, per-joint confidence 0..1
+    #: Optional clothing-colour histogram, attached by the pipeline when
+    #: appearance matching is enabled. None means "no evidence", which the
+    #: tracker treats differently from a mismatch.
+    appearance: np.ndarray | None = None
+
+    def with_appearance(self, descriptor: np.ndarray | None) -> "Detection":
+        return Detection(self.keypoints, self.scores, descriptor)
 
     def __post_init__(self) -> None:
         if self.keypoints.shape != (kp.NUM_KEYPOINTS, 2):

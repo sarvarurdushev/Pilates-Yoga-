@@ -7,6 +7,7 @@ from typing import Iterator
 
 import numpy as np
 
+from .appearance import describe
 from .config import StudioConfig
 from .filters import apply_exclusion_zones, drop_sparse, suppress_duplicates
 from .pose import PoseBackend, RTMOBackend, TiledBackend
@@ -109,6 +110,13 @@ class Pipeline:
         detections, duplicates = suppress_duplicates(
             detections, cfg.keypoint_threshold, cfg.duplicate_iou
         )
+        if cfg.tracker.appearance_weight > 0.0:
+            # Only survivors are described: a reflection or a duplicate would
+            # pay for a histogram it never uses.
+            detections = [
+                det.with_appearance(describe(frame, det, cfg.keypoint_threshold))
+                for det in detections
+            ]
         people = self.tracker.update(detections)
 
         self.stats.frames += 1

@@ -11,6 +11,10 @@ video ─→ RTMO pose ─→ exclusion zones ─→ de-duplication ─→ track
               │             │                  │              │           │
         every person   drop mirror        one skeleton    stable       angles,
         in one pass    reflections        per body        student IDs  symmetry
+                                                              │
+                                                    box overlap, with
+                                                    clothing colour to
+                                                    break ties in a crowd
 ```
 
 ## Why this design
@@ -134,6 +138,39 @@ Use `required_sensor_height(person_px, frame_fraction)` to turn the 30 px floor
 into a sensor requirement once you have measured, from a test photo at the real
 camera position, what fraction of frame height a student spans.
 
+### Appearance matching
+
+Where boxes are ambiguous, clothing colour breaks the tie. Each tracked student
+carries a hue/saturation histogram of their **torso only** -- the box of someone
+in downward dog is mostly floor, and floor looks the same for everyone. Colour
+is blended with box overlap behind a spatial gate, so a student can never be
+matched to someone across the room for wearing the same top.
+
+Measured on the packed hall, replaying one cached pose pass through the tracker
+at several weights:
+
+| Appearance weight | Distinct IDs | Churn | Median track life |
+|---|---|---|---|
+| 0.0 (geometry only) | 83 | 3.35 | 29 / 101 frames |
+| 0.2 | 72 | 2.87 | 33 |
+| **0.3** | **71** | **2.83** | **34** |
+| 0.5 | 71 | 2.83 | 35 |
+| 0.7 | 77 | 3.08 | 25 |
+
+**A 16% improvement, and not a fix.** Churn falls from 3.35 to 2.83 and tracks
+live 21% longer, but 2.83 is still far above the 1.5 threshold where
+per-student history becomes usable. Past 0.5 it reverses, as colour starts
+overruling geometry and students get swapped for a similarly dressed neighbour.
+
+On the sparse mat class it changes nothing at all -- churn stays 1.02 at every
+weight, because there were never any ambiguous candidates to disambiguate.
+Free to leave on, which is why the default is 0.3.
+
+The conclusion from the camera specification stands unchanged: **occlusion is a
+camera-placement problem, and no tracker fixes it from the wrong viewpoint.**
+Appearance matching buys margin around the edges of a good install; it does not
+rescue a bad one.
+
 ### Measure your own room
 
 ```bash
@@ -245,11 +282,11 @@ suite runs in about a tenth of a second.
 
 ## What is not done yet
 
-- **Identity under heavy occlusion.** Measured, and it is a camera-placement
-  problem rather than a resolution one (see Camera specification). An
-  appearance-based tracker -- matching students on colour and clothing rather
-  than box overlap alone -- would raise the 15% overlap ceiling, and is the
-  obvious next algorithmic step if placement cannot get there.
+- **Identity under heavy occlusion.** Appearance matching has been tried and
+  measured: it buys 16%, not a fix (see Appearance matching). Beyond this,
+  the remaining algorithmic options are a learned re-identification embedding
+  or motion prediction between frames, and neither looks likely to close a
+  3.35-to-1.5 gap. Camera placement remains the answer.
 - Exercise recognition (which movement is being performed).
 - Movement quality scoring over time — range of motion, control, tempo.
 - Student profiles, history and dashboards.

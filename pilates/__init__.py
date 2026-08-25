@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from .config import StudioConfig
 from .filters import ExclusionZone
+from .appearance import describe, similarity
 from .geometry import posture, standard_angles, symmetry, trunk_angle
 from .pipeline import Pipeline, PipelineStats, VideoSource
 from .pose import RTMOBackend, StubBackend, TiledBackend
@@ -24,4 +25,5 @@ __all__ = [
     "RTMOBackend", "StubBackend", "TiledBackend", "IoUTracker", "TrackerConfig",
     "Detection", "FrameResult", "TrackedPerson",
     "trunk_angle", "posture", "standard_angles", "symmetry",
+    "describe", "similarity",
 ]

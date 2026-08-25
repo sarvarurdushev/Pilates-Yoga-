@@ -101,3 +101,88 @@ class TestLifecycle:
         det = make_detection(x=100)
         out = run(tracker, [[det]] * 5)
         assert out[-1][0].hits == 5
+
+
+import numpy as np
+
+from pilates.appearance import DESCRIPTOR_SIZE
+
+
+def wearing(colour: int):
+    """A one-hot appearance descriptor standing in for a distinct outfit."""
+    d = np.zeros(DESCRIPTOR_SIZE, dtype=np.float32)
+    d[colour] = 1.0
+    return d
+
+
+def dressed(colour: int, **kw):
+    return make_detection(**kw).with_appearance(wearing(colour))
+
+
+APPEARANCE = TrackerConfig(min_hits=1, max_misses=5, appearance_weight=0.5, min_iou_gate=0.1)
+GEOMETRY_ONLY = TrackerConfig(min_hits=1, max_misses=5, appearance_weight=0.0)
+
+
+def ids_by_colour(people, tracker_view):
+    return {tracker_view[p.track_id]: p.track_id for p in people}
+
+
+class TestAppearanceMatching:
+    """Box overlap alone cannot separate students standing shoulder to
+    shoulder; clothing colour breaks the tie."""
+
+    def test_crossing_students_keep_their_own_ids(self):
+        tracker = IoUTracker(APPEARANCE)
+        # Establish: red on the left, blue on the right, boxes close enough
+        # that each will overlap the other's next position.
+        first = tracker.update([
+            dressed(0, x=100, y=100, width=80, height=180),
+            dressed(9, x=150, y=100, width=80, height=180),
+        ])
+        red_id = [p.track_id for p in first if p.detection.appearance[0] == 1.0][0]
+        blue_id = [p.track_id for p in first if p.detection.appearance[9] == 1.0][0]
+        assert red_id != blue_id
+
+        # They swap places. Geometry alone would hand each ID to the other.
+        second = tracker.update([
+            dressed(0, x=150, y=100, width=80, height=180),
+            dressed(9, x=100, y=100, width=80, height=180),
+        ])
+        now_red = [p.track_id for p in second if p.detection.appearance[0] == 1.0][0]
+        now_blue = [p.track_id for p in second if p.detection.appearance[9] == 1.0][0]
+        assert now_red == red_id
+        assert now_blue == blue_id
+
+    def test_colour_alone_cannot_match_across_the_room(self):
+        """The spatial gate: same outfit, opposite ends of the studio."""
+        tracker = IoUTracker(APPEARANCE)
+        run(tracker, [[dressed(0, x=100, y=100)]] * 3)
+        people = tracker.update([dressed(0, x=1400, y=100)])
+        # A brand-new track, not the original teleported across the frame.
+        assert [p.track_id for p in people] == [] or people[0].track_id != 1
+
+    def test_missing_descriptors_fall_back_to_geometry(self):
+        tracker = IoUTracker(APPEARANCE)
+        det = make_detection(x=100, y=100)  # no appearance attached
+        out = run(tracker, [[det]] * 5)
+        assert {p.track_id for frame in out for p in frame} == {1}
+
+    def test_weight_zero_ignores_clothing_entirely(self):
+        tracker = IoUTracker(GEOMETRY_ONLY)
+        out = run(tracker, [[dressed(0, x=100, y=100)], [dressed(9, x=100, y=100)]])
+        # Same position, opposite outfits: pure geometry keeps one identity.
+        assert {p.track_id for frame in out for p in frame} == {1}
+
+    def test_appearance_model_is_seeded_on_creation(self):
+        tracker = IoUTracker(APPEARANCE)
+        tracker.update([dressed(3, x=100, y=100)])
+        assert tracker.active_tracks[0].appearance is not None
+
+    def test_sparse_room_is_unaffected_by_the_default(self):
+        """Two well-separated students track identically with and without
+        appearance -- the measured no-regression result."""
+        for config in (APPEARANCE, GEOMETRY_ONLY):
+            tracker = IoUTracker(config)
+            frames = [[dressed(0, x=100, y=100), dressed(9, x=900, y=100)] for _ in range(6)]
+            out = run(tracker, frames)
+            assert all({p.track_id for p in f} == {1, 2} for f in out)
