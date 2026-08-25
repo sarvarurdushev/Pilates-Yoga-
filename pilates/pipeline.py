@@ -9,7 +9,7 @@ import numpy as np
 
 from .config import StudioConfig
 from .filters import apply_exclusion_zones, drop_sparse, suppress_duplicates
-from .pose import PoseBackend, RTMOBackend
+from .pose import PoseBackend, RTMOBackend, TiledBackend
 from .tracking import IoUTracker
 from .types import FrameResult
 
@@ -79,9 +79,17 @@ class Pipeline:
 
     def __init__(self, config: StudioConfig | None = None, backend: PoseBackend | None = None):
         self.config = config or StudioConfig()
-        self.backend = backend or RTMOBackend(
-            size=self.config.model_size, device=self.config.device
-        )
+        if backend is None:
+            backend = RTMOBackend(size=self.config.model_size, device=self.config.device)
+            if self.config.tiling_enabled:
+                backend = TiledBackend(
+                    backend,
+                    cols=self.config.tile_cols,
+                    rows=self.config.tile_rows,
+                    scale=self.config.tile_scale,
+                    overlap=self.config.tile_overlap,
+                )
+        self.backend = backend
         self.tracker = IoUTracker(self.config.tracker)
         self.stats = PipelineStats()
 

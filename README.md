@@ -48,6 +48,38 @@ Lying down, which was the main feasibility worry, is **not** a problem:
 | Lying on a mat | 0.76 | 13.3 / 17 |
 | Standing | 0.80 | 13.7 / 17 |
 
+### Measured on a packed hall (the hard case)
+
+A 2-minute wide shot of a large studio hall at 848x464, well over 60 students in
+dense receding rows, everyone in downward dog.
+
+| | Full frame | Tiled 3x3 @ 2x |
+|---|---|---|
+| People found per frame | 10.1 | **20.2** |
+| Distinct IDs created | 92 over 240 frames | 134 over 120 frames |
+| New IDs per frame | 0.4 | **1.1** |
+| Median track lifetime | 11 frames | 10 frames |
+| Tracks surviving half the clip | 2 | 11 |
+| Speed | 5.9 fps | 0.8 fps |
+
+**Tiling doubles detection. It does not fix identity.** At roughly 1.1 new IDs
+per analysed frame the tracker is inventing a fresh student almost every frame,
+so per-student history -- the entire point of the product -- does not hold in a
+hall this size. Compare the mat class above, where 3 IDs held across all 95
+frames without a single swap.
+
+The limit is pixels, not the model. RTMO's exported ONNX graph has a **fixed
+640x640 input**, so a wide shot is downsampled until back-row students are a
+few pixels tall. Tiling raises effective resolution and recovers the middle
+distance; the back rows stay out of reach, and the students it does find are
+too small and too occluded to hold an identity through a crossing.
+
+What this means in practice: this pipeline is sound for a **studio-sized class
+in a normally framed shot**, and is not yet suitable for a wide shot of a
+packed hall. If large classes matter, the fix is more pixels on each student --
+a closer or higher camera, a second camera, or a higher-resolution sensor --
+not a better tracker.
+
 ## Licensing
 
 Every dependency is Apache-2.0, MIT or BSD, so this codebase can stay closed.
@@ -150,9 +182,10 @@ suite runs in about a tenth of a second.
 
 ## What is not done yet
 
-- **Class density.** Everything here was validated on 3 people. A real class is
-  10–20. Occlusion, duplicates and ID swaps all get harder as the room fills,
-  and that is the main remaining unknown.
+- **Identity in large classes.** Detection scales with tiling; identity does
+  not (see the packed-hall numbers above). Holding a stable ID for 20+ small,
+  overlapping students is the main open problem, and it is likely a camera
+  problem before it is an algorithm problem.
 - Exercise recognition (which movement is being performed).
 - Movement quality scoring over time — range of motion, control, tempo.
 - Student profiles, history and dashboards.

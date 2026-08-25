@@ -34,6 +34,18 @@ class StudioConfig:
     device: str = "cpu"
     #: Analyse every Nth frame. Mat work is slow; 24fps is rarely necessary.
     frame_stride: int = 1
+    #: Split each frame into a grid of overlapping, upscaled tiles before pose
+    #: estimation. Needed for wide shots of large classes, where distant
+    #: students are too few pixels to survive the model's fixed 640x640 input.
+    #: ``1 x 1`` disables tiling. Costs roughly one inference per tile.
+    tile_cols: int = 1
+    tile_rows: int = 1
+    tile_scale: float = 2.0
+    tile_overlap: float = 0.25
+
+    @property
+    def tiling_enabled(self) -> bool:
+        return self.tile_cols > 1 or self.tile_rows > 1
 
     def __post_init__(self) -> None:
         # Keep the tracker's notion of visibility in step with the studio's.

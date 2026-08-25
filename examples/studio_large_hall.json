@@ -1,0 +1,15 @@
+{
+  "name": "large_hall_wide_shot",
+  "keypoint_threshold": 0.35,
+  "min_visible_keypoints": 6,
+  "duplicate_iou": 0.5,
+  "exclusion_zones": [],
+  "tracker": {"iou_threshold": 0.3, "max_misses": 45, "min_hits": 3, "keypoint_threshold": 0.35},
+  "model_size": "m",
+  "device": "cpu",
+  "frame_stride": 30,
+  "tile_cols": 3,
+  "tile_rows": 3,
+  "tile_scale": 2.0,
+  "tile_overlap": 0.25
+}

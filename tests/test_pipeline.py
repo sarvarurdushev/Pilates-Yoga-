@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from pilates.config import StudioConfig
 from pilates.filters import ExclusionZone
@@ -119,3 +120,56 @@ class TestConfigRoundTrip:
     def test_tracker_threshold_follows_studio_threshold(self):
         config = StudioConfig(keypoint_threshold=0.55)
         assert config.tracker.keypoint_threshold == 0.55
+
+
+class TestTiling:
+    """Tiling exists because RTMO's ONNX input is fixed at 640x640, so distant
+    students in a wide shot of a full class are downsampled out of existence."""
+
+    def test_disabled_by_default(self):
+        assert StudioConfig().tiling_enabled is False
+
+    def test_enabled_when_a_grid_is_set(self):
+        assert StudioConfig(tile_cols=3, tile_rows=3).tiling_enabled is True
+
+    def test_tiles_cover_the_whole_frame(self):
+        from pilates.pose import TiledBackend
+        tiled = TiledBackend(StubBackend([]), cols=3, rows=3, overlap=0.0)
+        tiles = list(tiled._tiles(900, 600))
+        assert len(tiles) == 9
+        assert min(t[0] for t in tiles) == 0
+        assert max(t[2] for t in tiles) == 900
+        assert max(t[3] for t in tiles) == 600
+
+    def test_overlap_widens_tiles(self):
+        from pilates.pose import TiledBackend
+        plain = list(TiledBackend(StubBackend([]), cols=2, rows=1, overlap=0.0)._tiles(800, 400))
+        lapped = list(TiledBackend(StubBackend([]), cols=2, rows=1, overlap=0.25)._tiles(800, 400))
+        assert (lapped[0][2] - lapped[0][0]) > (plain[0][2] - plain[0][0])
+
+    def test_keypoints_are_mapped_back_to_frame_coordinates(self):
+        from pilates.pose import TiledBackend
+
+        class OneCentredDetection:
+            """Returns a detection at a fixed spot inside whatever crop it is given."""
+            def __call__(self, crop):
+                return [make_detection(x=10, y=10, width=20, height=40)]
+
+        tiled = TiledBackend(OneCentredDetection(), cols=2, rows=1, scale=2.0, overlap=0.0)
+        out = tiled(np.zeros((400, 800, 3), dtype=np.uint8))
+        assert len(out) == 2
+        # Whatever the local box is, tile 0 sits at x=0 and tile 1 at x=400,
+        # and scale 2 halves the local offset before the tile origin is added.
+        local_x0 = make_detection(x=10, y=10, width=20, height=40).bbox(0.4)[0]
+        xs = sorted(d.bbox(0.4)[0] for d in out)
+        assert xs[0] == pytest.approx(local_x0 / 2.0)
+        assert xs[1] == pytest.approx(local_x0 / 2.0 + 400.0)
+
+    def test_rejects_bad_parameters(self):
+        from pilates.pose import TiledBackend
+        with pytest.raises(ValueError):
+            TiledBackend(StubBackend([]), cols=0)
+        with pytest.raises(ValueError):
+            TiledBackend(StubBackend([]), scale=0)
+        with pytest.raises(ValueError):
+            TiledBackend(StubBackend([]), overlap=0.5)
