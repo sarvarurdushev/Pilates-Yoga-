@@ -19,6 +19,8 @@ from .shots import Shot, detect_shots
 from .filters import ExclusionZone
 from .appearance import describe, similarity
 from .geometry import posture, standard_angles, symmetry, trunk_angle
+from .multiview import (Association, CalibrationError, FloorHomography,
+                        associate, floor_point, fuse_frame, fuse_window)
 from .movement import (MovementSummary, Repetition, SessionQuality, SessionRecorder,
                        TrackHistory, find_repetitions, summarise)
 from .pipeline import Pipeline, PipelineStats, VideoSource
@@ -36,7 +38,8 @@ __all__ = [
     "RTMOBackend", "StubBackend", "TiledBackend", "IoUTracker", "TrackerConfig",
     "Detection", "FrameResult", "TrackedPerson",
     "MovementSummary", "Repetition", "SessionQuality", "SessionRecorder", "TrackHistory",
-    "find_repetitions", "summarise",
+    "find_repetitions", "summarise", "FloorHomography", "Association",
+    "CalibrationError", "associate", "floor_point", "fuse_frame", "fuse_window",
     "trunk_angle", "posture", "standard_angles", "symmetry",
     "describe", "similarity",
 ]

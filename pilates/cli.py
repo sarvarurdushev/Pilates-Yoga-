@@ -9,6 +9,7 @@
     python -m pilates dataset VIDEO --labels l.json   # build training windows
     python -m pilates preview labels.json --video V   # contact sheets to verify labels
     python -m pilates train   data.npz --out model.joblib  # train a recogniser
+    python -m pilates calibrate points.json --out floor.json  # link two cameras
 """
 from __future__ import annotations
 
@@ -389,6 +390,48 @@ def cmd_preview(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_calibrate(args: argparse.Namespace) -> int:
+    """Fit the floor homography linking two camera views.
+
+    ``points.json`` holds matching floor points read off both views, e.g. mat
+    corners. Get the coordinates with `pilates probe` on each video, which
+    writes a frame with a pixel grid over it.
+
+        {"primary":   [[120, 640], [510, 620], ...],
+         "secondary": [[300, 700], [640, 690], ...]}
+    """
+    import numpy as np
+
+    from .multiview import CalibrationError, FloorHomography
+
+    payload = json.loads(Path(args.points).read_text())
+    try:
+        primary = np.asarray(payload["primary"], dtype=np.float32)
+        secondary = np.asarray(payload["secondary"], dtype=np.float32)
+    except KeyError as exc:
+        print(f"{args.points} needs both 'primary' and 'secondary' point lists "
+              f"(missing {exc})", file=sys.stderr)
+        return 1
+
+    try:
+        homography = FloorHomography.fit(primary, secondary, max_residual=args.max_residual)
+    except CalibrationError as exc:
+        print(f"Calibration failed: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"Fitted from {homography.points_used} floor points.")
+    print(f"  mean reprojection error: {homography.residual:.1f} px")
+    if homography.validated:
+        print("  the fit is over-determined, so that error is a real check")
+    else:
+        print("  WARNING: four points always fit exactly, so this error checks")
+        print("  nothing. Add two more points before trusting the association.")
+    if args.out:
+        Path(args.out).write_text(json.dumps(homography.to_dict(), indent=2) + "\n")
+        print(f"\nhomography -> {args.out}")
+    return 0
+
+
 def cmd_train(args: argparse.Namespace) -> int:
     """Train an exercise recogniser and report honestly on what it learned."""
     import numpy as np
@@ -549,6 +592,13 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("--exercise", default=None, help="only this exercise")
     v.add_argument("--include-non-exercise", action="store_true")
     v.set_defaults(func=cmd_preview)
+
+    k = sub.add_parser("calibrate", help="fit the floor homography linking two views")
+    k.add_argument("points", help="JSON with matching floor points from both views")
+    k.add_argument("--out", default=None)
+    k.add_argument("--max-residual", type=float, default=25.0,
+                   help="reject a fit with a mean error above this, in pixels")
+    k.set_defaults(func=cmd_calibrate)
 
     t = sub.add_parser("train", help="train an exercise recogniser from a dataset")
     t.add_argument("dataset", nargs="+",

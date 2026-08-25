@@ -408,6 +408,69 @@ prints the majority-class baseline first, warns when there are too few distinct
 students for the grouped score to mean anything, and warns when two classes
 make a coin flip look competent.
 
+## Two cameras
+
+A back bend leans towards a front-facing camera and barely moves in its image;
+a camera at an angle sees that lean directly. Using a second view needs two
+things: knowing which student in view A is which in view B, and combining what
+both views say.
+
+### Association: a floor-plane homography, not 3D
+
+Every student is on the floor, so their feet lie on one plane, and a plane maps
+between two views by a homography. That is fitted once at install from points
+visible in both views -- mat corners are ideal. No camera intrinsics, no stereo
+calibration, no synchronised shutter beyond frame-level alignment.
+
+```bash
+python -m pilates probe front.mov --grid 100 --out front_grid.jpg   # read coordinates
+python -m pilates probe side.mov  --grid 100 --out side_grid.jpg
+python -m pilates calibrate points.json --out floor.json
+```
+
+**Use six points, not four.** Any four points map exactly onto any other four,
+so a four-point fit reports zero error however badly the points are ordered --
+and clicking them in a different order in each view is the commonest
+installation mistake. From five points the fit is over-determined and the error
+becomes a real check; `calibrate` says explicitly whether it validated
+anything:
+
+```
+Fitted from 6 floor points.
+  mean reprojection error: 0.0 px
+  the fit is over-determined, so that error is a real check
+```
+
+and refuses a bad one:
+
+```
+Calibration failed: points map with 55px mean error, which is too large to
+associate students. The usual cause is the points being listed in a different
+order in the two views.
+```
+
+Association uses the **ankle midpoint** rather than the body centre, because
+hips are a metre above the floor for a standing student and on the floor for
+one lying down -- the hip is not a plane point and its mapping would drift with
+posture. A student whose feet are hidden, or whose nearest candidate is too far
+after projection, is left unmatched rather than forced into a pair: a wrong
+association fuses two people's movement into one record, which is worse than a
+missing one.
+
+### Fusion: each view summarised separately, with validity flags
+
+A missing view contributes zeros **and a flag saying it was missing**. Without
+that flag a model cannot tell "this student was upright" from "this camera
+could not see this student", and will learn the second as if it were the first.
+
+Windows are summarised per view and then concatenated, rather than summarising
+fused frames: statistics of a channel that is zero half the time are
+meaningless, statistics of each view plus how much of the window that view saw
+are not.
+
+See `docs/depth-ambiguity.md` for why this was chosen over 3D pose, with
+measured costs.
+
 ## Camera specification
 
 The obvious hypothesis for why the packed hall failed was resolution: students
