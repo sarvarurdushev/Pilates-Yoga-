@@ -271,3 +271,57 @@ class TestSignalConfidence:
             history.add(i * 0.1, det, 0.4)
             history.samples[-1].angles["left_knee"] = 90 + 40 * math.sin(2 * math.pi * i / 20)
         assert dominant_signal(history) is None
+
+
+class TestSessionQuality:
+    """Without this gate the session layer returns confident report cards for a
+    room it never tracked -- output that looks plausible and describes nobody."""
+
+    class _Result:
+        def __init__(self, timestamp, people):
+            self.timestamp = timestamp
+            self.people = people
+
+    def _person(self, track_id):
+        from pilates.types import TrackedPerson
+        return TrackedPerson(track_id=track_id, detection=make_detection(x=100, y=100))
+
+    def _record(self, frames_of_ids):
+        from pilates.movement import SessionRecorder
+        recorder = SessionRecorder()
+        for i, ids in enumerate(frames_of_ids):
+            recorder.observe(self._Result(i * 0.1, [self._person(t) for t in ids]))
+        return recorder
+
+    def test_stable_class_is_reliable(self):
+        quality = self._record([[1, 2, 3]] * 40).quality()
+        assert quality.churn == pytest.approx(1.0)
+        assert quality.coverage == pytest.approx(1.0)
+        assert quality.reliable
+
+    def test_churning_class_is_not_reliable(self):
+        # Three people present, but a fresh identity every frame.
+        frames = [[i * 3, i * 3 + 1, i * 3 + 2] for i in range(1, 41)]
+        quality = self._record(frames).quality()
+        assert quality.churn > 1.5
+        assert not quality.reliable
+
+    def test_explanation_names_the_problem(self):
+        frames = [[i * 3, i * 3 + 1, i * 3 + 2] for i in range(1, 41)]
+        text = self._record(frames).quality().explain()
+        assert "too unstable" in text
+        assert "fragment" in text
+
+    def test_explanation_is_positive_when_sound(self):
+        assert "sound" in self._record([[1, 2]] * 30).quality().explain()
+
+    def test_empty_session_does_not_divide_by_zero(self):
+        from pilates.movement import SessionRecorder
+        quality = SessionRecorder().quality()
+        assert quality.churn == 0.0 and quality.coverage == 0.0
+
+    def test_coverage_reflects_short_tracks(self):
+        # Each identity lives two frames of a twenty-frame clip.
+        frames = [[i // 2] for i in range(20)]
+        quality = self._record(frames).quality()
+        assert quality.coverage < 0.2

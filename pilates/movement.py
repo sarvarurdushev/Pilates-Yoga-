@@ -393,24 +393,88 @@ def summarise(
     )
 
 
+#: Identities per tracked student above which per-student reports are not
+#: trustworthy. Derived from measurement: a well-framed studio class runs at
+#: 1.02, a packed hall at 3.35.
+MAX_TRUSTWORTHY_CHURN = 1.5
+
+
+@dataclass
+class SessionQuality:
+    """Whether this class was tracked well enough to report on individuals."""
+
+    frames: int
+    mean_people: float
+    distinct_tracks: int
+    median_track_frames: float
+
+    @property
+    def churn(self) -> float:
+        """Identities issued per student actually present. 1.0 is perfect."""
+        return self.distinct_tracks / self.mean_people if self.mean_people else 0.0
+
+    @property
+    def coverage(self) -> float:
+        """Fraction of the class each track was followed for, on average."""
+        return self.median_track_frames / self.frames if self.frames else 0.0
+
+    @property
+    def reliable(self) -> bool:
+        return self.churn <= MAX_TRUSTWORTHY_CHURN
+
+    def explain(self) -> str:
+        if self.reliable:
+            return (
+                f"Tracking is sound: {self.churn:.2f} identities per student, "
+                f"each followed for {self.coverage * 100:.0f}% of the class."
+            )
+        return (
+            f"Tracking is too unstable to report on individuals: "
+            f"{self.churn:.2f} identities per student (needs {MAX_TRUSTWORTHY_CHURN}), "
+            f"each followed for only {self.coverage * 100:.0f}% of the class. "
+            f"Every per-student number below would describe a fragment of somebody, "
+            f"not a person. Fix the camera view before trusting any of it."
+        )
+
+
 class SessionRecorder:
     """Accumulates per-student history across a whole class.
 
     Fed :class:`~pilates.types.FrameResult` objects as the pipeline produces
-    them; produces one :class:`MovementSummary` per student at the end.
+    them; produces one :class:`MovementSummary` per student at the end, plus a
+    :class:`SessionQuality` saying whether those summaries mean anything.
+
+    The quality check exists because the failure is otherwise silent. Run
+    against a packed hall this class will cheerfully return 58 confident
+    report cards for 60 students, each built from a third of one person's
+    time -- output that looks entirely plausible and is worthless. A teacher
+    reading it would have no way to tell.
     """
 
     def __init__(self, keypoint_threshold: float = 0.4, min_range: float = 15.0) -> None:
         self.keypoint_threshold = keypoint_threshold
         self.min_range = min_range
         self.histories: dict[int, TrackHistory] = {}
+        self._frames = 0
+        self._people_seen = 0
 
     def observe(self, result) -> None:
+        self._frames += 1
+        self._people_seen += len(result.people)
         for person in result.people:
             history = self.histories.setdefault(
                 person.track_id, TrackHistory(track_id=person.track_id)
             )
             history.add(result.timestamp, person.detection, self.keypoint_threshold)
+
+    def quality(self) -> SessionQuality:
+        lengths = [len(h.samples) for h in self.histories.values()]
+        return SessionQuality(
+            frames=self._frames,
+            mean_people=self._people_seen / self._frames if self._frames else 0.0,
+            distinct_tracks=len(self.histories),
+            median_track_frames=statistics.median(lengths) if lengths else 0.0,
+        )
 
     def summaries(self, min_samples: int = 10) -> list[MovementSummary]:
         """One summary per student with enough data to say anything about.

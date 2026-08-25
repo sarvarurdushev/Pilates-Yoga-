@@ -161,10 +161,17 @@ def cmd_session(args: argparse.Namespace) -> int:
         for result in pipeline.run(source):
             recorder.observe(result)
 
+    quality = recorder.quality()
     summaries = recorder.summaries(min_samples=args.min_samples)
     if not summaries:
         print("No student was tracked long enough to report on.")
         return 1
+
+    print(quality.explain())
+    if not quality.reliable and not args.force:
+        print("\nRefusing to print per-student reports. Re-run with --force to see "
+              "them anyway, but do not act on them.")
+        return 2
 
     for s in summaries:
         print(f"\nStudent #{s.track_id}")
@@ -263,6 +270,9 @@ def main(argv: list[str] | None = None) -> int:
                    help="smallest angular excursion counted as a repetition, in degrees")
     n.add_argument("--min-samples", type=int, default=10,
                    help="frames a student must be tracked for before reporting")
+    n.add_argument("--force", action="store_true",
+                   help="print per-student reports even when tracking is too unstable "
+                        "for them to describe real people")
     n.set_defaults(func=cmd_session)
 
     args = parser.parse_args(argv)

@@ -135,6 +135,34 @@ Three decisions worth knowing about:
   instead -- the first version of this -- made a student doing fast repetitions
   look less controlled than a slow one when both were equally smooth.
 
+### The session layer refuses when it cannot tell students apart
+
+Run against the packed hall, this layer will happily build **58 confident
+report cards** for a room whose identities turn over 2.9 times per student.
+Each card is assembled from about a third of one person's time, spliced with
+fragments of others. The output looks entirely plausible, describes nobody, and
+a teacher reading it has no way to tell.
+
+So a session now reports its own tracking quality first, and refuses by default
+when identity is too unstable to attribute movement to individuals:
+
+```
+Tracking is too unstable to report on individuals: 2.86 identities per student
+(needs 1.5), each followed for only 34% of the class. Every per-student number
+below would describe a fragment of somebody, not a person. Fix the camera view
+before trusting any of it.
+
+Refusing to print per-student reports. Re-run with --force to see them anyway,
+but do not act on them.
+```
+
+On the mat class the same check reads: *"Tracking is sound: 1.02 identities per
+student, each followed for 98% of the class."*
+
+This is the difference between a system that is wrong and a system that is
+wrong **and says so**. Everything downstream of here -- scoring, history,
+coaching feedback -- inherits its trustworthiness from this gate.
+
 ### What this layer needs from footage
 
 Session numbers only mean something across **one continuous shot of one
