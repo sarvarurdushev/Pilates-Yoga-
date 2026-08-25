@@ -3,6 +3,7 @@
     python -m pilates probe   VIDEO                  # inspect a source, plan zones
     python -m pilates analyse VIDEO --out out.jsonl  # run the pipeline
     python -m pilates sweep   VIDEO --expect 12      # find the resolution limit
+    python -m pilates session VIDEO --out report.json # per-student movement report
 """
 from __future__ import annotations
 
@@ -144,6 +145,79 @@ def cmd_sweep(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_session(args: argparse.Namespace) -> int:
+    """Analyse a class and report what each student actually did."""
+    from .movement import SessionRecorder
+
+    config = _load_config(args.config)
+    if args.stride is not None:
+        config.frame_stride = args.stride
+    pipeline = Pipeline(config)
+    recorder = SessionRecorder(
+        keypoint_threshold=config.keypoint_threshold, min_range=args.min_range
+    )
+
+    with VideoSource(args.video, stride=config.frame_stride) as source:
+        for result in pipeline.run(source):
+            recorder.observe(result)
+
+    summaries = recorder.summaries(min_samples=args.min_samples)
+    if not summaries:
+        print("No student was tracked long enough to report on.")
+        return 1
+
+    for s in summaries:
+        print(f"\nStudent #{s.track_id}")
+        print(f"  tracked          : {s.duration:.1f}s over {s.samples} frames")
+        if s.signal is None:
+            print("  movement         : held a position - no repetitions detected")
+        else:
+            print(f"  measured on      : {s.signal} "
+                  f"(keypoint confidence {s.signal_confidence:.2f})")
+            print(f"  repetitions      : {s.repetitions}")
+        if s.mean_range is not None:
+            spread = f" (varying by {s.range_consistency:.0f}deg)" if s.range_consistency else ""
+            print(f"  range of motion  : {s.mean_range:.0f}deg{spread}")
+        if s.mean_rep_duration is not None:
+            print(f"  seconds per rep  : {s.mean_rep_duration:.1f}")
+        if s.mean_tempo_ratio is not None:
+            if s.mean_tempo_ratio < 0.9:
+                verdict = "return faster than lift"
+            elif s.mean_tempo_ratio <= 2.0:
+                verdict = "controlled return"
+            else:
+                verdict = "very uneven - check the phases were segmented correctly"
+            print(f"  tempo ratio      : {s.mean_tempo_ratio:.2f}  ({verdict})")
+        if s.control_ratio is not None:
+            verdict = "smooth" if s.control_ratio <= 1.5 else "wobbly"
+            print(f"  control          : {s.control_ratio:.2f}  ({verdict}, 1.0 is ideal)")
+        if s.longest_hold is not None:
+            print(f"  longest hold     : {s.longest_hold:.1f}s")
+        pairs = {k: v for k, v in s.mean_symmetry.items() if v is not None}
+        if pairs:
+            print("  left/right gap   : " + ", ".join(f"{k} {v:.0f}deg" for k, v in pairs.items()))
+
+    if args.out:
+        payload = [
+            {
+                "track_id": s.track_id, "signal": s.signal, "samples": s.samples,
+                "signal_confidence": _round(s.signal_confidence),
+                "duration_s": round(s.duration, 2), "repetitions": s.repetitions,
+                "mean_range_deg": _round(s.mean_range),
+                "range_consistency_deg": _round(s.range_consistency),
+                "mean_rep_duration_s": _round(s.mean_rep_duration),
+                "mean_tempo_ratio": _round(s.mean_tempo_ratio),
+                "control_ratio": _round(s.control_ratio),
+                "longest_hold_s": _round(s.longest_hold),
+                "mean_symmetry_deg": {k: _round(v) for k, v in s.mean_symmetry.items()},
+            }
+            for s in summaries
+        ]
+        Path(args.out).write_text(json.dumps(payload, indent=2) + "\n")
+        print(f"\nreport -> {args.out}")
+    return 0
+
+
 def _round(value: float | None) -> float | None:
     return None if value is None else round(value, 1)
 
@@ -179,6 +253,17 @@ def main(argv: list[str] | None = None) -> int:
     w.add_argument("--end", type=int, default=None)
     w.add_argument("--stride", type=int, default=10)
     w.set_defaults(func=cmd_sweep)
+
+    n = sub.add_parser("session", help="per-student movement report for a class")
+    n.add_argument("video")
+    n.add_argument("--config", default=None)
+    n.add_argument("--out", default=None, help="write the report as JSON")
+    n.add_argument("--stride", type=int, default=None)
+    n.add_argument("--min-range", type=float, default=15.0,
+                   help="smallest angular excursion counted as a repetition, in degrees")
+    n.add_argument("--min-samples", type=int, default=10,
+                   help="frames a student must be tracked for before reporting")
+    n.set_defaults(func=cmd_session)
 
     args = parser.parse_args(argv)
     return args.func(args)

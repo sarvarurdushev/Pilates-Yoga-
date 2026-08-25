@@ -7,7 +7,7 @@ This is the foundation layer: **video in, tracked people with joint angles
 out.** Scoring, coaching feedback and dashboards sit on top of it later.
 
 ```
-video ─→ RTMO pose ─→ exclusion zones ─→ de-duplication ─→ tracking ─→ geometry
+video ─→ RTMO pose ─→ exclusion zones ─→ de-duplication ─→ tracking ─→ geometry ─→ movement
               │             │                  │              │           │
         every person   drop mirror        one skeleton    stable       angles,
         in one pass    reflections        per body        student IDs  symmetry
@@ -83,6 +83,66 @@ in a normally framed shot**, and is not yet suitable for a wide shot of a
 packed hall. If large classes matter, the fix is more pixels on each student --
 a closer or higher camera, a second camera, or a higher-resolution sensor --
 not a better tracker.
+
+## Movement over time
+
+A frame says where a body is; Pilates is about how it moves. The movement layer
+turns per-frame geometry into per-student time series and then into
+repetition-level measurements: repetitions, range of motion, seconds per rep,
+tempo ratio (whether the return was controlled or dropped), a control score,
+hold durations, and left/right symmetry.
+
+```bash
+python -m pilates session class.mp4 --config studio.json --out report.json
+```
+
+```
+Student #1  (15.4s, 155 frames)
+   measured on right_elbow (confidence 1.00)
+   repetitions 4, range 59deg, 2.2s each
+   control 4.75
+   longest hold 3.0s
+   left/right gap: knee 1deg, hip 17deg, elbow 18deg
+
+Student #3  (15.4s, 155 frames)
+   held a position - no repetitions detected
+   longest hold 1.3s
+```
+
+That third student is the instructor, standing and talking. Reporting zero
+repetitions for her is the correct answer, and getting it required deciding
+that **a held position is a real result rather than a failure**. Half of mat
+work is isometric, so a student who holds is reported as holding, never dropped
+and never given repetitions invented from keypoint noise.
+
+This is signal processing, not machine learning. No training data is needed,
+every number traces back to an angle in a frame, and an instructor can check
+any of it by eye. Naming the exercise being performed is a separate problem
+that does need labelled data; this layer produces the input such a classifier
+would consume.
+
+Three decisions worth knowing about:
+
+- **The measured joint is chosen, not configured.** Whichever angle shows the
+  most purposeful movement -- smooth motion relative to jitter, weighted by how
+  confident the underlying keypoints were -- drives the report. A knee-led
+  movement and a hip-led one each get measured on the joint that did the work.
+- **Repetitions need real excursion.** Turning points only commit once the
+  signal reverses by more than half the minimum range, so postural sway and
+  keypoint jitter cannot manufacture repetitions.
+- **Control is normalised per repetition.** A clean repetition reverses
+  direction exactly twice, so 1.0 is ideal. Measuring reversals per *sample*
+  instead -- the first version of this -- made a student doing fast repetitions
+  look less controlled than a slow one when both were equally smooth.
+
+### What this layer needs from footage
+
+Session numbers only mean something across **one continuous shot of one
+exercise**. Run against an edited multi-shot video and a single track spans
+several different exercises, so range of motion varies wildly and tempo reads
+as erratic -- not because the student was inconsistent, but because the numbers
+are averaging across unrelated movements. Continuous single-camera studio
+footage, which is what a real installation produces, is the valid input.
 
 ## Camera specification
 
@@ -287,10 +347,13 @@ suite runs in about a tenth of a second.
   the remaining algorithmic options are a learned re-identification embedding
   or motion prediction between frames, and neither looks likely to close a
   3.35-to-1.5 gap. Camera placement remains the answer.
-- Exercise recognition (which movement is being performed).
-- Movement quality scoring over time — range of motion, control, tempo.
-- Student profiles, history and dashboards.
-- Natural-language coaching feedback.
+- **Exercise recognition** (naming which movement is being performed). Needs
+  labelled footage; the movement layer produces the time series it would train
+  on.
+- Student profiles and history across sessions.
+- Natural-language coaching feedback, generated from the movement summaries
+  rather than from video.
+- Teacher and student dashboards.
 
 ## Note on data
 
