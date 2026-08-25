@@ -345,6 +345,57 @@ The per-class breakdown is where the useful detail is. Under honest evaluation
 share their opening. That is a labelling and window-length question, not a
 model-capacity one.
 
+### Held-out classes
+
+Pass several datasets and the real question gets asked -- can this recognise a
+class it has never seen:
+
+```bash
+python -m pilates dataset tuesday.mov --labels tuesday.json --session tuesday --out t.npz
+python -m pilates dataset thursday.mov --labels thursday.json --session thursday --out th.npz
+python -m pilates train t.npz th.npz
+```
+
+Merging datasets has two traps, both silent. Label indices are per-file, so
+index 0 means a different exercise in each and concatenating them scrambles
+every label; indices are remapped onto a shared vocabulary instead. And track 1
+of one class is not the same person as track 1 of another, so student ids are
+namespaced by session -- without that, a "held-out student" is quietly sitting
+in the training set.
+
+### Where the errors actually came from
+
+Two investigations, both of which changed what to work on next.
+
+**The first confusion was a labelling error, not a model defect.** Under honest
+evaluation one class scored 55% recall, and the natural assumption was model
+capacity. It was not: a 31-second shot had been labelled from a single frame,
+and the exercise was a **standing back bend**, not the upward salute it was
+recorded as. Both have the arms overhead; the frame that got checked was the
+upright one at the start.
+
+That is why `pilates preview` exists. It writes a contact sheet per labelled
+segment, sampled across the segment rather than at one point, so this specific
+mistake is visible before it reaches a training set.
+
+**Correcting the label did not fix the confusion, and the reason is the
+camera.** Measured across the two classes:
+
+| | Lateral spread | Trunk angle |
+|---|---|---|
+| `standing_back_bend` | 0.310 | **75.8 deg** |
+| `standing_side_bend` | 0.480 | **76.0 deg** |
+
+The trunk angles are identical. A backward arch leans mostly *towards the
+camera*, and that component barely projects into image coordinates, so in 2D it
+looks like an upright torso. Only lateral spread separates them, and weakly.
+
+This is a limitation of single-view 2D pose, not of the labels or the
+classifier, and no amount of training data removes it. Movements that differ
+mainly in the camera's depth axis need either a second camera or 3D pose
+estimation. It is worth knowing which confusions are worth chasing and which
+are geometry.
+
 ### What is still not measured
 
 Every window above comes from one session. Nothing there measures transfer to

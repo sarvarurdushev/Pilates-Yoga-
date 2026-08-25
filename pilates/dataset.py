@@ -146,13 +146,24 @@ def summarise_dataset(examples: list[Example]) -> dict[str, int]:
     return dict(sorted(counts.items(), key=lambda kv: -kv[1]))
 
 
-def save_dataset(examples: list[Example], path: str, labels: LabelSet | None = None) -> None:
-    """Write examples as a compressed .npz with their label vocabulary."""
+def save_dataset(
+    examples: list[Example],
+    path: str,
+    labels: LabelSet | None = None,
+    session: str | None = None,
+) -> None:
+    """Write examples as a compressed .npz with their label vocabulary.
+
+    ``session`` names the class these windows came from. It is what makes
+    session-level holdout possible later: the question "can this recognise a
+    class it has never seen" needs to know which class each window belongs to.
+    """
     if not examples:
         raise ValueError("no examples to save")
     features = np.stack([e.features for e in examples])
     names = sorted({e.label for e in examples})
     index = {name: i for i, name in enumerate(names)}
+    source = session or (labels.video if labels else "unknown")
     np.savez_compressed(
         path,
         features=features,
@@ -160,7 +171,67 @@ def save_dataset(examples: list[Example], path: str, labels: LabelSet | None = N
         label_names=np.array(names),
         track_ids=np.array([e.track_id for e in examples], dtype=np.int64),
         starts=np.array([e.start for e in examples], dtype=np.float32),
-        source=np.array([labels.video if labels else ""]),
+        source=np.array([source]),
+    )
+
+
+@dataclass
+class LoadedDataset:
+    """One or more dataset files merged, with grouping ready for evaluation."""
+
+    windows: np.ndarray
+    labels: np.ndarray
+    names: list[str]
+    #: Student identity, namespaced by session. Track 1 of one class is not
+    #: the same person as track 1 of another, and merging them without
+    #: namespacing would let a "held-out student" appear in training.
+    student_groups: np.ndarray
+    session_groups: np.ndarray
+    sessions: list[str]
+
+    @property
+    def n_sessions(self) -> int:
+        return len(set(self.session_groups.tolist()))
+
+    @property
+    def n_students(self) -> int:
+        return len(set(self.student_groups.tolist()))
+
+
+def load_datasets(paths: list[str]) -> LoadedDataset:
+    """Merge dataset files, reconciling their label vocabularies.
+
+    Each file indexes its own labels from zero, so the same integer means
+    different exercises in different files. Indices are remapped onto a shared
+    vocabulary rather than concatenated blindly.
+    """
+    if not paths:
+        raise ValueError("no dataset paths given")
+
+    loaded = [np.load(p, allow_pickle=False) for p in paths]
+    names = sorted({str(n) for d in loaded for n in d["label_names"]})
+    index = {name: i for i, name in enumerate(names)}
+
+    windows, labels, students, sessions_idx = [], [], [], []
+    sessions: list[str] = []
+    for session_number, (path, data) in enumerate(zip(paths, loaded)):
+        source = str(data["source"][0]) if "source" in data else Path(path).stem
+        sessions.append(source)
+        local_names = [str(n) for n in data["label_names"]]
+        windows.append(data["features"])
+        labels.append(np.array([index[local_names[i]] for i in data["labels"]], dtype=np.int64))
+        students.append(np.array(
+            [f"{session_number}:{t}" for t in data["track_ids"].tolist()]
+        ))
+        sessions_idx.append(np.full(len(data["labels"]), session_number, dtype=np.int64))
+
+    return LoadedDataset(
+        windows=np.concatenate(windows),
+        labels=np.concatenate(labels),
+        names=names,
+        student_groups=np.concatenate(students),
+        session_groups=np.concatenate(sessions_idx),
+        sessions=sessions,
     )
 
 

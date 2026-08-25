@@ -175,3 +175,64 @@ class TestDatasetIO:
     def test_empty_dataset_is_refused(self, tmp_path):
         with pytest.raises(ValueError):
             save_dataset([], str(tmp_path / "d.npz"))
+
+
+class TestSessionMerging:
+    """Held-out-class evaluation needs several datasets merged correctly. Two
+    things go wrong silently here: label indices mean different exercises in
+    different files, and track 1 of one class is not track 1 of another."""
+
+    def _write(self, tmp_path, name, labels, names, tracks, session):
+        from pilates.dataset import save_dataset
+        examples = [
+            Example(np.full((24, FEATURE_SIZE), float(i), dtype=np.float32),
+                    names[labels[i]], tracks[i], 0.0, 3.0)
+            for i in range(len(labels))
+        ]
+        path = str(tmp_path / name)
+        save_dataset(examples, path, None, session=session)
+        return path
+
+    def test_label_indices_are_remapped_not_concatenated(self, tmp_path):
+        from pilates.dataset import load_datasets
+        # File A knows two exercises, file B knows a different pair. Index 0
+        # means something different in each.
+        a = self._write(tmp_path, "a.npz", [0, 1], ["mountain", "teaser"], [1, 2], "class_a")
+        b = self._write(tmp_path, "b.npz", [0, 1], ["plank", "teaser"], [1, 2], "class_b")
+        merged = load_datasets([a, b])
+        assert merged.names == ["mountain", "plank", "teaser"]
+        by_name = [merged.names[i] for i in merged.labels]
+        assert by_name == ["mountain", "teaser", "plank", "teaser"]
+
+    def test_students_are_namespaced_by_session(self, tmp_path):
+        """Without this, track 1 of class B counts as the same person as track
+        1 of class A, and a 'held-out student' is quietly in the training set."""
+        from pilates.dataset import load_datasets
+        a = self._write(tmp_path, "a.npz", [0, 1], ["mountain", "teaser"], [1, 1], "class_a")
+        b = self._write(tmp_path, "b.npz", [0, 1], ["mountain", "teaser"], [1, 1], "class_b")
+        merged = load_datasets([a, b])
+        assert merged.n_students == 2
+        assert len(set(merged.student_groups[:2])) == 1
+        assert set(merged.student_groups[:2]).isdisjoint(set(merged.student_groups[2:]))
+
+    def test_sessions_are_identified(self, tmp_path):
+        from pilates.dataset import load_datasets
+        a = self._write(tmp_path, "a.npz", [0], ["mountain"], [1], "tuesday")
+        b = self._write(tmp_path, "b.npz", [0], ["mountain"], [1], "thursday")
+        merged = load_datasets([a, b])
+        assert merged.n_sessions == 2
+        assert merged.sessions == ["tuesday", "thursday"]
+        assert merged.session_groups.tolist() == [0, 1]
+
+    def test_a_single_file_still_loads(self, tmp_path):
+        from pilates.dataset import load_datasets
+        a = self._write(tmp_path, "a.npz", [0, 1], ["mountain", "teaser"], [1, 2], "solo")
+        merged = load_datasets([a])
+        assert merged.n_sessions == 1
+        assert merged.n_students == 2
+        assert len(merged.windows) == 2
+
+    def test_no_paths_is_an_error(self):
+        from pilates.dataset import load_datasets
+        with pytest.raises(ValueError):
+            load_datasets([])

@@ -36,7 +36,7 @@ VOCABULARY: frozenset[str] = frozenset({
     "warrior_two", "warrior_three", "reverse_warrior", "extended_side_angle",
     "triangle", "half_moon", "chair", "tree", "eagle", "pigeon", "bridge",
     "camel", "cobra", "locust", "boat", "seated_twist", "childs_pose",
-    "savasana", "cat_cow", "standing_side_bend",
+    "savasana", "cat_cow", "standing_side_bend", "standing_back_bend",
     # Structural, not exercises -- but they must be labellable or they end up
     # mislabelled as whatever came before.
     "transition", "instruction", "rest", "setup",
@@ -209,3 +209,21 @@ def scaffold(video: str, shots, fps: float, duration: float, size_bytes: int) ->
             for shot in shots
         ],
     )
+
+
+def contact_sheet_times(segment: Segment, count: int = 6) -> list[float]:
+    """Evenly spaced timestamps inside a segment, for visual verification.
+
+    Labelling a thirty-second shot from a single frame is how a standing back
+    bend gets recorded as an upward salute: both have the arms overhead, and
+    the frame that was checked happened to be the upright one at the start.
+    Sampling across the segment makes that mistake visible before it reaches
+    the training set.
+    """
+    if count < 1:
+        raise ValueError("count must be at least 1")
+    if count == 1:
+        return [segment.start + segment.duration / 2]
+    span = segment.duration
+    return [segment.start + span * i / (count - 1) * 0.98 + span * 0.01
+            for i in range(count)]

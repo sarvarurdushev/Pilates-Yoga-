@@ -7,6 +7,7 @@
     python -m pilates label   VIDEO --out labels.json # scaffold labels at the cuts
     python -m pilates check   labels.json             # validate a label file
     python -m pilates dataset VIDEO --labels l.json   # build training windows
+    python -m pilates preview labels.json --video V   # contact sheets to verify labels
     python -m pilates train   data.npz --out model.joblib  # train a recogniser
 """
 from __future__ import annotations
@@ -330,8 +331,61 @@ def cmd_dataset(args: argparse.Namespace) -> int:
         print("Around 20 windows per exercise is the point where a class starts")
         print("being learnable at all; several hundred is where it gets good.")
     if args.out:
-        save_dataset(examples, args.out, labels)
+        save_dataset(examples, args.out, labels, session=args.session)
         print(f"\ndataset -> {args.out}")
+    return 0
+
+
+def cmd_preview(args: argparse.Namespace) -> int:
+    """Write a contact sheet per labelled segment, so labels can be eyeballed."""
+    import cv2
+    import numpy as np
+
+    from .labels import LabelSet, contact_sheet_times
+
+    labels = LabelSet.load(args.labels)
+    out_dir = Path(args.out or "label_preview")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    cap = cv2.VideoCapture(args.video)
+    if not cap.isOpened():
+        print(f"could not open {args.video}", file=sys.stderr)
+        return 1
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+
+    written = 0
+    for index, segment in enumerate(labels.segments, 1):
+        if args.exercise and segment.exercise != args.exercise:
+            continue
+        if not args.include_non_exercise and not segment.is_exercise:
+            continue
+        tiles = []
+        for timestamp in contact_sheet_times(segment, args.frames):
+            cap.set(cv2.CAP_PROP_POS_FRAMES, int(timestamp * fps))
+            ok, frame = cap.read()
+            if not ok:
+                continue
+            frame = cv2.resize(frame, (426, 240))
+            for colour, thickness in (((0, 0, 0), 4), ((0, 255, 255), 2)):
+                cv2.putText(frame, f"{timestamp:.0f}s", (8, 26),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, colour, thickness)
+            tiles.append(frame)
+        if len(tiles) < 2:
+            continue
+        half = (len(tiles) + 1) // 2
+        top, bottom = tiles[:half], tiles[half:]
+        while len(bottom) < len(top):
+            bottom.append(np.zeros_like(top[0]))
+        sheet = np.vstack([np.hstack(top), np.hstack(bottom)])
+        path = out_dir / f"{index:02d}_{segment.exercise}_{segment.start:.0f}s.jpg"
+        cv2.imwrite(str(path), sheet, [cv2.IMWRITE_JPEG_QUALITY, 90])
+        written += 1
+    cap.release()
+
+    print(f"{written} contact sheet(s) -> {out_dir}")
+    print("Check that every frame in a sheet really is the exercise it is named.")
+    print("A label taken from one frame of a long shot is how a standing back bend")
+    print("ends up recorded as an upward salute.")
     return 0
 
 
@@ -341,14 +395,15 @@ def cmd_train(args: argparse.Namespace) -> int:
 
     from .classifier import ExerciseClassifier, evaluate, featurise, majority_baseline
 
-    data = np.load(args.dataset, allow_pickle=False)
-    windows = data["features"]
-    labels = data["labels"]
-    names = [str(n) for n in data["label_names"]]
-    tracks = data["track_ids"]
+    from .dataset import load_datasets
+
+    dataset = load_datasets(args.dataset)
+    windows, labels, names = dataset.windows, dataset.labels, dataset.names
+    tracks = dataset.student_groups
 
     print(f"{len(windows)} windows, {len(names)} exercises, "
-          f"{len(np.unique(tracks))} distinct students")
+          f"{dataset.n_students} distinct students, "
+          f"{dataset.n_sessions} session(s)")
     counts = np.bincount(labels, minlength=len(names))
     for i, name in enumerate(names):
         print(f"  {name:28s} {counts[i]:5d}")
@@ -376,13 +431,26 @@ def cmd_train(args: argparse.Namespace) -> int:
         print(f"\nLeak gap: {gap:+.1f} points. That is how much the random split "
               f"flatters this model.")
 
-    if len(np.unique(tracks)) < 5:
+    if dataset.n_sessions > 1:
+        print()
+        by_session = evaluate(features, labels, names, groups=dataset.session_groups,
+                              protocol="Held-out classes (the real question)",
+                              kind=args.model, seed=args.seed)
+        print(by_session.format())
+        if not np.isnan(by_session.accuracy) and not np.isnan(grouped.accuracy):
+            drop = (grouped.accuracy - by_session.accuracy) * 100
+            print(f"\nA further {drop:+.1f} points when the whole class is unseen. "
+                  f"That is\nthe number that predicts production behaviour.")
+        print(f"\nsessions: {', '.join(dataset.sessions)}")
+
+    if dataset.n_students < 5:
         print("\nToo few distinct students for the grouped score to mean much.")
     if len(names) < 3:
         print("Only two exercises: a coin flip scores 50%.")
-    print("\nEvery window here comes from one session. Nothing above measures "
-          "\ntransfer to another room, camera or teacher -- for that, label a "
-          "\nsecond class and hold it out entirely.")
+    if dataset.n_sessions < 2:
+        print("\nEvery window here comes from one session. Nothing above measures "
+              "\ntransfer to another room, camera or teacher -- for that, label a "
+              "\nsecond class and pass both datasets to this command.")
 
     if args.out:
         classifier = ExerciseClassifier(kind=args.model, seed=args.seed)
@@ -466,12 +534,26 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument("--hop", type=float, default=1.5, help="seconds between windows")
     d.add_argument("--frames", type=int, default=24, help="frames each window is resampled to")
     d.add_argument("--stride", type=int, default=None)
+    d.add_argument("--session", default=None,
+                   help="name for this class; makes session-level holdout possible "
+                        "once you have more than one")
     d.add_argument("--include-non-exercise", action="store_true",
                    help="also emit windows for transition/instruction/rest")
     d.set_defaults(func=cmd_dataset)
 
+    v = sub.add_parser("preview", help="contact sheets for verifying labels by eye")
+    v.add_argument("labels")
+    v.add_argument("--video", required=True)
+    v.add_argument("--out", default=None)
+    v.add_argument("--frames", type=int, default=6, help="frames sampled per segment")
+    v.add_argument("--exercise", default=None, help="only this exercise")
+    v.add_argument("--include-non-exercise", action="store_true")
+    v.set_defaults(func=cmd_preview)
+
     t = sub.add_parser("train", help="train an exercise recogniser from a dataset")
-    t.add_argument("dataset", help=".npz produced by the dataset command")
+    t.add_argument("dataset", nargs="+",
+                   help="one or more .npz files from the dataset command; pass "
+                        "several to evaluate on held-out classes")
     t.add_argument("--out", default=None, help="save the fitted model here")
     t.add_argument("--model", choices=("linear", "forest"), default="linear")
     t.add_argument("--seed", type=int, default=0)

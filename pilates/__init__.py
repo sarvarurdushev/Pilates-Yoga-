@@ -12,7 +12,8 @@ from __future__ import annotations
 from .classifier import (Evaluation, ExerciseClassifier, evaluate,
                          featurise, majority_baseline, window_features)
 from .config import StudioConfig
-from .dataset import Example, build_from_video, feature_vector, normalise_keypoints
+from .dataset import (Example, LoadedDataset, build_from_video, feature_vector,
+                      load_datasets, normalise_keypoints)
 from .labels import VOCABULARY, LabelError, LabelSet, Segment, scaffold
 from .shots import Shot, detect_shots
 from .filters import ExclusionZone
@@ -31,7 +32,7 @@ __all__ = [
     "StudioConfig", "ExclusionZone", "ExerciseClassifier", "Evaluation", "evaluate",
     "featurise", "window_features", "majority_baseline", "LabelSet", "Segment", "LabelError", "VOCABULARY",
     "scaffold", "Shot", "detect_shots", "Example", "build_from_video",
-    "feature_vector", "normalise_keypoints", "Pipeline", "PipelineStats", "VideoSource",
+    "feature_vector", "normalise_keypoints", "LoadedDataset", "load_datasets", "Pipeline", "PipelineStats", "VideoSource",
     "RTMOBackend", "StubBackend", "TiledBackend", "IoUTracker", "TrackerConfig",
     "Detection", "FrameResult", "TrackedPerson",
     "MovementSummary", "Repetition", "SessionQuality", "SessionRecorder", "TrackHistory",

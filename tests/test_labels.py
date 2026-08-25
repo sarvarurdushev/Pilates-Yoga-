@@ -148,3 +148,30 @@ class TestScaffold:
         labels = scaffold("c.mp4", [self._Shot(0, 30)], 25.0, 30.0, 4242)
         assert labels.size_bytes == 4242
         assert labels.duration == 30.0
+
+
+class TestContactSheetTimes:
+    """Labelling a 31-second shot from one frame is how a standing back bend
+    got recorded as an upward salute in this project's own dataset."""
+
+    def test_samples_across_the_whole_segment(self):
+        from pilates.labels import contact_sheet_times
+        times = contact_sheet_times(Segment(60.0, 90.0, "mountain"), count=6)
+        assert len(times) == 6
+        assert times[0] < 61.0
+        assert times[-1] > 89.0
+        assert times == sorted(times)
+
+    def test_stays_inside_the_segment(self):
+        from pilates.labels import contact_sheet_times
+        for t in contact_sheet_times(Segment(10.0, 20.0, "mountain"), count=8):
+            assert 10.0 <= t <= 20.0
+
+    def test_single_frame_takes_the_middle(self):
+        from pilates.labels import contact_sheet_times
+        assert contact_sheet_times(Segment(10.0, 20.0, "mountain"), count=1) == [15.0]
+
+    def test_rejects_a_silly_count(self):
+        from pilates.labels import contact_sheet_times
+        with pytest.raises(ValueError):
+            contact_sheet_times(Segment(10.0, 20.0, "mountain"), count=0)
