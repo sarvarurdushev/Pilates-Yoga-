@@ -215,6 +215,95 @@ as erratic -- not because the student was inconsistent, but because the numbers
 are averaging across unrelated movements. Continuous single-camera studio
 footage, which is what a real installation produces, is the valid input.
 
+## Labelling and training data
+
+Exercise recognition needs footage annotated with what was performed. The
+workflow is three commands.
+
+**1. Scaffold, split at the cuts.** Real class footage is edited, and finding
+the cuts is work a person should not do by hand:
+
+```bash
+python -m pilates label class.mov --out class.labels.json
+```
+
+```
+12 shots found across 262.9s
+    2.     1.8s -    54.7s  ( 52.9s)
+   10.   181.3s -   242.9s  ( 61.6s)
+   ...
+```
+
+Every segment starts as `transition` -- a real label meaning "not an exercise"
+rather than a blank. An untouched scaffold therefore validates cleanly and
+contributes nothing to training, instead of failing or training on placeholder
+text.
+
+**2. Fill in the names, then check.** Plain JSON, times in seconds, because the
+person who knows what a movement was called is an instructor with a text
+editor, not an engineer.
+
+```bash
+python -m pilates check class.labels.json
+```
+
+Two things are enforced rather than left to discipline, because both quietly
+ruin a dataset:
+
+- **A controlled vocabulary.** `downward dog`, `Down Dog` and
+  `downward-facing dog` are one pose to a teacher and three classes to a
+  classifier, none with enough data. Unknown names are rejected with a
+  suggestion (`'downward_dg' is not in the vocabulary. Did you mean
+  'downward_dog'?`), and a studio can declare its own names in
+  `extra_vocabulary`.
+- **A video fingerprint.** Labels record the size and duration of the footage
+  they were written against, so a re-encoded or swapped file is caught instead
+  of silently mislabelling every frame.
+
+Overlapping segments, backwards times and segments running past the end of the
+video are all reported -- all of them at once, so one file is fixed in one pass.
+
+**3. Build the windows.**
+
+```bash
+python -m pilates dataset class.mov --labels class.labels.json --out data.npz
+```
+
+```
+508 windows of 3.0s from 3 exercises
+
+  standing_side_bend             266
+  upward_salute                  133
+  mountain                       109
+```
+
+That is one four-minute video with three shots labelled, producing 508
+examples across twenty tracked students. Labelling multiplies: every student
+in shot contributes their own view of the same exercise.
+
+### What a training window is
+
+A fixed-length sequence of pose features for **one student** inside **one
+labelled segment**. Two properties matter more than anything else:
+
+- **Features are invariant to where the student is and how big they appear.**
+  Keypoints are centred on the hips and scaled by torso length. Raw pixel
+  coordinates encode mat position and distance from the camera, so a model
+  trained on them learns the room and fails the moment a camera is nudged or a
+  student picks a different mat.
+- **A window never straddles a boundary.** One spanning the end of one exercise
+  and the start of the next carries both and is labelled as one.
+
+Each frame is 41 numbers: 17 normalised (x, y) pairs, six joint angles and the
+trunk angle. The angles are derivable from the coordinates, but a small model
+learns much faster when the quantity an instructor actually coaches on is
+handed to it directly. Windows are resampled to a fixed frame count, since
+detections arrive unevenly.
+
+The build reports which exercises are still too thin to train on. Around 20
+windows per exercise is where a class becomes learnable at all; several hundred
+is where it gets good.
+
 ## Camera specification
 
 The obvious hypothesis for why the packed hall failed was resolution: students

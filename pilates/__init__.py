@@ -10,6 +10,9 @@ Pipeline order::
 from __future__ import annotations
 
 from .config import StudioConfig
+from .dataset import Example, build_from_video, feature_vector, normalise_keypoints
+from .labels import VOCABULARY, LabelError, LabelSet, Segment, scaffold
+from .shots import Shot, detect_shots
 from .filters import ExclusionZone
 from .appearance import describe, similarity
 from .geometry import posture, standard_angles, symmetry, trunk_angle
@@ -23,7 +26,9 @@ from .types import Detection, FrameResult, TrackedPerson
 __version__ = "0.1.0"
 
 __all__ = [
-    "StudioConfig", "ExclusionZone", "Pipeline", "PipelineStats", "VideoSource",
+    "StudioConfig", "ExclusionZone", "LabelSet", "Segment", "LabelError", "VOCABULARY",
+    "scaffold", "Shot", "detect_shots", "Example", "build_from_video",
+    "feature_vector", "normalise_keypoints", "Pipeline", "PipelineStats", "VideoSource",
     "RTMOBackend", "StubBackend", "TiledBackend", "IoUTracker", "TrackerConfig",
     "Detection", "FrameResult", "TrackedPerson",
     "MovementSummary", "Repetition", "SessionQuality", "SessionRecorder", "TrackHistory",

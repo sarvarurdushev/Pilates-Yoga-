@@ -4,6 +4,9 @@
     python -m pilates analyse VIDEO --out out.jsonl  # run the pipeline
     python -m pilates sweep   VIDEO --expect 12      # find the resolution limit
     python -m pilates session VIDEO --out report.json # per-student movement report
+    python -m pilates label   VIDEO --out labels.json # scaffold labels at the cuts
+    python -m pilates check   labels.json             # validate a label file
+    python -m pilates dataset VIDEO --labels l.json   # build training windows
 """
 from __future__ import annotations
 
@@ -233,6 +236,104 @@ def cmd_session(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_label(args: argparse.Namespace) -> int:
+    """Write a label file pre-split at the shot boundaries."""
+    from .labels import scaffold
+    from .shots import detect_shots
+
+    shots = detect_shots(args.video, min_duration=args.min_shot)
+    with VideoSource(args.video) as source:
+        duration = source.frame_count / source.fps if source.fps else 0.0
+        fps = source.fps
+    size = Path(args.video).stat().st_size
+
+    labels = scaffold(args.video, shots, fps, duration, size)
+    out = Path(args.out or (Path(args.video).stem + ".labels.json"))
+    if out.exists() and not args.overwrite:
+        print(f"{out} already exists. Pass --overwrite to replace it.", file=sys.stderr)
+        return 1
+    labels.save(out)
+
+    print(f"{len(shots)} shots found across {duration:.1f}s")
+    for i, shot in enumerate(shots, 1):
+        print(f"  {i:3d}. {shot.start_seconds:7.1f}s - {shot.end_seconds:7.1f}s  ({shot.duration:5.1f}s)")
+    print(f"\nscaffold -> {out}")
+    print("Fill in the exercise for each segment, splitting any that cover more")
+    print("than one. Leave 'transition' where nothing is being performed.")
+    print(f"Then check it with: python -m pilates check {out}")
+    return 0
+
+
+def cmd_check(args: argparse.Namespace) -> int:
+    """Validate a label file and report what it contains."""
+    from .labels import LabelSet
+
+    labels = LabelSet.load(args.labels)
+    problems = labels.validate()
+    if problems:
+        print(f"{len(problems)} problem(s) in {args.labels}:\n")
+        for problem in problems:
+            print(f"  - {problem}")
+        return 1
+
+    print(f"{args.labels} is valid.")
+    print(f"  segments        : {len(labels.segments)}")
+    print(f"  labelled        : {labels.labelled_seconds:.1f}s of {labels.duration:.1f}s "
+          f"({labels.coverage * 100:.0f}%)")
+    print(f"  actual exercise : {labels.exercise_seconds:.1f}s")
+    counts = labels.counts()
+    if counts:
+        print("\n  seconds per label:")
+        for name, seconds in counts.items():
+            print(f"    {name:28s} {seconds:7.1f}s")
+    return 0
+
+
+def cmd_dataset(args: argparse.Namespace) -> int:
+    """Build training windows from a labelled video."""
+    from .dataset import build_from_video, save_dataset, summarise_dataset
+    from .labels import LabelSet
+
+    labels = LabelSet.load(args.labels)
+    labels.check()
+
+    size = Path(args.video).stat().st_size
+    if labels.size_bytes and labels.size_bytes != size:
+        print(f"Refusing to build: {args.labels} was written against a "
+              f"{labels.size_bytes}-byte video but {args.video} is {size} bytes. "
+              f"Every label would be applied to the wrong footage.", file=sys.stderr)
+        return 1
+
+    config = _load_config(args.config)
+    if args.stride is not None:
+        config.frame_stride = args.stride
+
+    examples = build_from_video(
+        args.video, labels, config,
+        window_seconds=args.window, hop_seconds=args.hop,
+        frames_per_window=args.frames,
+        include_non_exercise=args.include_non_exercise,
+    )
+    if not examples:
+        print("No training windows were produced. Either no segment is labelled "
+              "as an exercise, or no student was tracked through one.", file=sys.stderr)
+        return 1
+
+    counts = summarise_dataset(examples)
+    print(f"{len(examples)} windows of {args.window:.1f}s from {len(counts)} exercises\n")
+    for name, count in counts.items():
+        print(f"  {name:28s} {count:5d}")
+    thin = [n for n, c in counts.items() if c < 20]
+    if thin:
+        print(f"\nToo thin to train on yet: {', '.join(thin)}")
+        print("Around 20 windows per exercise is the point where a class starts")
+        print("being learnable at all; several hundred is where it gets good.")
+    if args.out:
+        save_dataset(examples, args.out, labels)
+        print(f"\ndataset -> {args.out}")
+    return 0
+
+
 def _round(value: float | None) -> float | None:
     return None if value is None else round(value, 1)
 
@@ -285,6 +386,31 @@ def main(argv: list[str] | None = None) -> int:
                    help="print per-student reports even when tracking is too unstable "
                         "for them to describe real people")
     n.set_defaults(func=cmd_session)
+
+    l = sub.add_parser("label", help="scaffold a label file split at the shot cuts")
+    l.add_argument("video")
+    l.add_argument("--out", default=None)
+    l.add_argument("--min-shot", type=float, default=3.0,
+                   help="shots shorter than this are merged into the previous one")
+    l.add_argument("--overwrite", action="store_true")
+    l.set_defaults(func=cmd_label)
+
+    c = sub.add_parser("check", help="validate a label file")
+    c.add_argument("labels")
+    c.set_defaults(func=cmd_check)
+
+    d = sub.add_parser("dataset", help="build training windows from a labelled video")
+    d.add_argument("video")
+    d.add_argument("--labels", required=True)
+    d.add_argument("--config", default=None)
+    d.add_argument("--out", default=None, help="write the dataset as .npz")
+    d.add_argument("--window", type=float, default=3.0, help="window length in seconds")
+    d.add_argument("--hop", type=float, default=1.5, help="seconds between windows")
+    d.add_argument("--frames", type=int, default=24, help="frames each window is resampled to")
+    d.add_argument("--stride", type=int, default=None)
+    d.add_argument("--include-non-exercise", action="store_true",
+                   help="also emit windows for transition/instruction/rest")
+    d.set_defaults(func=cmd_dataset)
 
     args = parser.parse_args(argv)
     return args.func(args)
