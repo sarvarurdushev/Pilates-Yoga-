@@ -2,6 +2,7 @@
 
     python -m pilates probe   VIDEO                  # inspect a source, plan zones
     python -m pilates analyse VIDEO --out out.jsonl  # run the pipeline
+    python -m pilates sweep   VIDEO --expect 12      # find the resolution limit
 """
 from __future__ import annotations
 
@@ -117,6 +118,32 @@ def cmd_analyse(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_sweep(args: argparse.Namespace) -> int:
+    """Downscale the clip in steps and report where detection and identity fail."""
+    from .benchmark import format_table, minimum_person_height, sweep
+
+    config = _load_config(args.config)
+    scales = [float(s) for s in args.scales.split(",")]
+    results = sweep(
+        args.video,
+        scales,
+        expected_people=args.expect,
+        config=config,
+        start_frame=args.start,
+        end_frame=args.end,
+        stride=args.stride,
+    )
+    print(format_table(results))
+    smallest = minimum_person_height(results)
+    if smallest:
+        print(f"\nIdentity still held with students {smallest:.0f} px tall.")
+        print("If that is well below what your camera gives, resolution is not")
+        print("your limiting factor -- check neighbour overlap instead.")
+    else:
+        print("\nIdentity held at no scale. Students are too crowded, not too small.")
+    return 0
+
+
 def _round(value: float | None) -> float | None:
     return None if value is None else round(value, 1)
 
@@ -141,6 +168,17 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("--model-size", choices=("s", "m", "l"), default=None)
     a.add_argument("--verbose", action="store_true")
     a.set_defaults(func=cmd_analyse)
+
+    w = sub.add_parser("sweep", help="find the resolution at which tracking fails")
+    w.add_argument("video")
+    w.add_argument("--expect", type=int, required=True,
+                   help="true number of people in the clip, counted by hand")
+    w.add_argument("--config", default=None)
+    w.add_argument("--scales", default="1.0,0.75,0.5,0.4,0.3,0.25,0.2,0.15,0.125")
+    w.add_argument("--start", type=int, default=0)
+    w.add_argument("--end", type=int, default=None)
+    w.add_argument("--stride", type=int, default=10)
+    w.set_defaults(func=cmd_sweep)
 
     args = parser.parse_args(argv)
     return args.func(args)

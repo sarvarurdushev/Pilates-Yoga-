@@ -80,6 +80,69 @@ packed hall. If large classes matter, the fix is more pixels on each student --
 a closer or higher camera, a second camera, or a higher-resolution sensor --
 not a better tracker.
 
+## Camera specification
+
+The obvious hypothesis for why the packed hall failed was resolution: students
+were only ~47 px tall. That hypothesis is wrong, and the sweep disproves it.
+
+**Experiment.** Take the mat class, where identity is perfect, and downscale it
+in steps. Same scene, same poses, same occlusion -- only pixel count changes.
+
+| Frame | Student height | Recall | Churn | Identity |
+|---|---|---|---|---|
+| 1920x1080 | 151 px | 96% | 1.00 | holds |
+| 960x540 | 76 px | 96% | 1.00 | holds |
+| 480x270 | 37 px | 96% | 1.00 | holds |
+| 384x216 | 29 px | 96% | 1.00 | holds |
+| 240x135 | 18 px | 92% | 1.00 | holds |
+| 192x108 | **15 px** | 88% | 1.00 | **still holds** |
+
+Three well-separated students keep their identities down to **15 px tall**.
+Frame stride makes no difference either: identity held at stride 5, 10, 30 and
+60. Neither resolution nor sampling rate is the constraint.
+
+**What actually separates the two rooms:**
+
+| | Mat class | Packed hall |
+|---|---|---|
+| Student height | 151 px | 47 px |
+| Nearest-neighbour separation | 1.10 body heights | 0.63 |
+| **Overlap with nearest neighbour** | **8%** | **36-42%** |
+| **Churn** (identities per tracked student) | **1.02** | **3.35** |
+| Median track life | 93 of 95 frames | 29 of 101 |
+
+The hall has students at three times the pixel size that provably works, and
+identity still collapses. The variable is **occlusion**, not size.
+
+### The spec
+
+- **Student height: 30 px minimum.** Detection recall is 96% at and above this,
+  and starts falling below it. There is margin -- 15 px still tracked -- but 30
+  px is where recall is unimpaired.
+- **Neighbour overlap: 15% maximum.** This is the binding constraint. At 8%
+  overlap identity is perfect; at 36% it fails outright.
+
+Overlap is the number to design the installation around, and it is a function
+of **camera angle**, not sensor resolution. Buying a 4K camera for the same low,
+across-the-room viewpoint will raise student height and leave overlap
+untouched, so it will not fix identity. What lowers overlap is height and
+angle: mount higher, look down the rows rather than across them, or split the
+room between two cameras. A 1080p camera in the right position beats a 4K
+camera in the wrong one.
+
+Use `required_sensor_height(person_px, frame_fraction)` to turn the 30 px floor
+into a sensor requirement once you have measured, from a test photo at the real
+camera position, what fraction of frame height a student spans.
+
+### Measure your own room
+
+```bash
+python -m pilates sweep class.mp4 --expect 12
+```
+
+Counts people, downscales in steps, and reports where detection and identity
+break for your camera and your class.
+
 ## Licensing
 
 Every dependency is Apache-2.0, MIT or BSD, so this codebase can stay closed.
@@ -182,10 +245,11 @@ suite runs in about a tenth of a second.
 
 ## What is not done yet
 
-- **Identity in large classes.** Detection scales with tiling; identity does
-  not (see the packed-hall numbers above). Holding a stable ID for 20+ small,
-  overlapping students is the main open problem, and it is likely a camera
-  problem before it is an algorithm problem.
+- **Identity under heavy occlusion.** Measured, and it is a camera-placement
+  problem rather than a resolution one (see Camera specification). An
+  appearance-based tracker -- matching students on colour and clothing rather
+  than box overlap alone -- would raise the 15% overlap ceiling, and is the
+  obvious next algorithmic step if placement cannot get there.
 - Exercise recognition (which movement is being performed).
 - Movement quality scoring over time — range of motion, control, tempo.
 - Student profiles, history and dashboards.
