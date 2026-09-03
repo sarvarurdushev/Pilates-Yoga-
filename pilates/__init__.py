@@ -22,7 +22,7 @@ from .config import StudioConfig
 from .diagnostics import (Check, VideoFacts, check_environment, environment_ready,
                           inspect_video, quickstart)
 from .dataset import (Example, LoadedDataset, build_from_video, feature_vector,
-                      load_datasets, normalise_keypoints)
+                      load_datasets, normalise_keypoints, window_for)
 from .history import (HistoryStore, Measurement, SessionRecord, Trend,
                       measure_session, progress_report)
 from .interaction import (Adjustment, Contact, ContactLog, EquipmentDeclaration,
@@ -61,7 +61,7 @@ __all__ = [
     "Roster", "ClassResult", "ClassPattern", "StudentResult", "CoverageCheck",
     "check_coverage", "class_patterns", "run_class",
     "StudentReport", "build_report", "render", "write_report", "Example", "build_from_video",
-    "feature_vector", "normalise_keypoints", "LoadedDataset", "load_datasets", "Pipeline", "PipelineStats", "VideoSource",
+    "feature_vector", "normalise_keypoints", "window_for", "LoadedDataset", "load_datasets", "Pipeline", "PipelineStats", "VideoSource",
     "RTMOBackend", "StubBackend", "TiledBackend", "IoUTracker", "TrackerConfig",
     "Detection", "FrameResult", "TrackedPerson",
     "Adjustment", "Contact", "ContactLog", "EquipmentDeclaration", "EQUIPMENT_EFFECT",

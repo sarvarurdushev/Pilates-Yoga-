@@ -96,6 +96,27 @@ def _resample(features: list[np.ndarray], length: int) -> np.ndarray:
     return (stacked[lower] * (1 - weight) + stacked[upper] * weight).astype(np.float32)
 
 
+def window_for(
+    detections: list[Detection],
+    frames_per_window: int = 24,
+    keypoint_threshold: float = 0.4,
+) -> np.ndarray | None:
+    """One window of features from a run of frames, for inference.
+
+    Training and inference share this so a window means the same thing on both
+    sides. A recogniser fed windows built even slightly differently from its
+    training data will be confidently wrong, and nothing in its output would
+    show it.
+    """
+    vectors = [
+        v for v in (feature_vector(d, keypoint_threshold) for d in detections)
+        if v is not None
+    ]
+    if len(vectors) < 3:
+        return None
+    return _resample(vectors, frames_per_window)
+
+
 def windows_for_track(
     history: TrackHistory,
     detections: dict[float, Detection],

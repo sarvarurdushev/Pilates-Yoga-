@@ -274,3 +274,96 @@ class TestDescribeFromMeasurements:
         description = describe(self._summary(), LoadReport(), posture="lying")
         assert description.peak_moment is None
         assert "led by the left hip" in description.summarise()
+
+
+class TestCalibration:
+    """How far "far" is depends on how varied the training exercises were. A
+    fixed constant would be wrong for a tight vocabulary and a loose one alike."""
+
+    def _train(self, spread=0.5, n=200, seed=0):
+        rng = np.random.default_rng(seed)
+        return rng.normal(0.0, spread, size=(n, FEATURES * 7))
+
+    def _classifier(self):
+        return FakeClassifier([0.9, 0.05, 0.05], ["hundred", "roll_up", "swan"])
+
+    def test_the_threshold_comes_from_the_training_data(self):
+        from pilates.recognition import MIN_CALIBRATION_WINDOWS
+
+        r = OpenSetRecogniser.fit(self._classifier(), self._train())
+        assert r.calibrated_on >= MIN_CALIBRATION_WINDOWS
+        assert r.max_novelty != MAX_NOVELTY
+
+    def test_a_calibrated_threshold_still_accepts_its_own_training_data(self):
+        train = self._train()
+        r = OpenSetRecogniser.fit(self._classifier(), train)
+        rejected = sum(r.novelty(row) > r.max_novelty for row in train)
+        assert rejected <= len(train) * 0.02
+
+    def test_too_little_data_falls_back_rather_than_trusting_a_quantile(self):
+        r = OpenSetRecogniser.fit(self._classifier(), self._train(n=10))
+        assert r.calibrated_on == 0
+        assert r.max_novelty == MAX_NOVELTY
+
+    def test_an_explicit_threshold_is_never_overridden(self):
+        r = OpenSetRecogniser.fit(self._classifier(), self._train(), max_novelty=2.0)
+        assert r.max_novelty == 2.0
+
+    def test_a_wider_vocabulary_gets_a_wider_threshold(self):
+        """Two spreads of the same shape calibrate to the same z-threshold, but
+        a training set with genuine outliers must not reject them later."""
+        outliers = self._train()
+        outliers[:10] *= 8.0
+        tight = OpenSetRecogniser.fit(self._classifier(), self._train())
+        loose = OpenSetRecogniser.fit(self._classifier(), outliers)
+        assert loose.max_novelty > tight.max_novelty
+
+
+class TestPersistence:
+    def _fitted(self):
+        rng = np.random.default_rng(0)
+        classifier = FakeClassifier([0.9, 0.05, 0.05],
+                                    ["hundred", "roll_up", "swan"])
+        return OpenSetRecogniser.fit(
+            classifier, rng.normal(0.0, 0.5, size=(200, FEATURES * 7)))
+
+    def test_a_saved_recogniser_keeps_its_novelty_statistics(self, tmp_path):
+        """Without them the loaded model silently loses the only test that
+        catches an unseen exercise."""
+        import joblib
+
+        path = tmp_path / "m.joblib"
+        self._fitted().save(str(path))
+        payload = joblib.load(path)
+        assert payload["train_mean"] is not None
+        assert payload["max_novelty"] == pytest.approx(self._fitted().max_novelty)
+
+    def test_the_thresholds_survive_a_round_trip(self, tmp_path):
+        from pilates.recognition import OpenSetRecogniser as R
+
+        path = tmp_path / "m.joblib"
+        original = self._fitted()
+        original.save(str(path))
+        loaded = R.load(str(path))
+        assert loaded.max_novelty == pytest.approx(original.max_novelty)
+        assert loaded.calibrated_on == original.calibrated_on
+        assert loaded.classifier.names == original.classifier.names
+
+    def test_the_file_still_loads_as_a_plain_classifier(self, tmp_path):
+        """So an older reader gets the model and simply no novelty test,
+        rather than an exception."""
+        from pilates.classifier import ExerciseClassifier
+
+        path = tmp_path / "m.joblib"
+        self._fitted().save(str(path))
+        assert ExerciseClassifier.load(str(path)).names[0] == "hundred"
+
+    def test_a_plain_classifier_file_loads_as_a_recogniser_without_novelty(self, tmp_path):
+        import joblib
+
+        path = tmp_path / "m.joblib"
+        joblib.dump({"model": FakeModel([0.9, 0.1]), "names": ["a", "b"],
+                     "kind": "linear"}, path)
+        loaded = OpenSetRecogniser.load(str(path))
+        assert loaded.train_mean is None
+        assert loaded.calibrated_on == 0

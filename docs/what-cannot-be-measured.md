@@ -119,6 +119,61 @@ computable; the forces through the bone are not, from video alone.
 
 ---
 
+## Tier 4 — Computable, but not about this student
+
+A separate category from the three above, and the one that produces the most
+convincing wrong numbers, because nothing about the arithmetic fails.
+
+Every load figure here assumes gravity is the only external force on the body.
+Three situations break that assumption without breaking anything visible:
+
+### Hands-on adjustment
+
+An instructor pressing a student's back or lifting their leg is taking part of
+the moment. The student's hip flexors are no longer producing what holds the
+leg up, and the amount somebody else contributed is not in the image at any
+resolution. The number is not noisy; it is a measurement of two people.
+
+Detected from hands arriving at another person's body rather than from
+overlapping boxes — students on neighbouring mats overlap constantly without
+touching. One camera has no depth, so a hand passing in front of somebody
+further back looks exactly like a hand on their shoulder; duration is what
+separates them, since a correction lasts seconds and a near-miss lasts a frame.
+Affected frames are dropped and counted, never averaged in.
+
+The same signal answers a question that has no visual solution: **which track
+is the instructor**. Whoever circulates putting hands on several different
+people over a class is doing something no student does. It is offered as a
+question — "Instructor? (track #9)" — and settled in the roster by a person,
+because naming the wrong track would quietly discard a real student's
+measurements.
+
+### Props
+
+A block under the hips, a bolster, a ball, a strap, a resistance band: each
+adds an external force of unknown size at an unknown point. Band tension varies
+with stretch and is invisible. These are **declared**, not detected — a block
+under a hip is occluded by the hip, so asking the studio is both more accurate
+and honest about where the knowledge came from.
+
+Declared props invalidate the load estimate. They do not affect geometry:
+range, tempo, symmetry and control are unchanged, and still reported.
+
+### Machines
+
+A reformer, chair or cadillac does not merely add a force. The carriage moves,
+the springs resist along their own axis, and the body's segments are no longer
+a free chain hanging in gravity. This is not an unmeasured term in the right
+model; it is the wrong model. Refused outright.
+
+### The exception
+
+Declared hand or ankle weights are handled properly rather than refused: the
+mass is stated rather than guessed, and it acts at a keypoint the camera can
+already see.
+
+---
+
 ## Why the refusals are the product
 
 Anyone can produce a page of confident numbers. The difficulty is producing
@@ -133,7 +188,9 @@ what it cannot support.
 - **A second camera** moves depth-axis movements from unmeasurable to
   measurable, and improves every Tier 2 estimate. See `docs/depth-ambiguity.md`.
 - **A force plate or pressure mat** makes weight-bearing loads computable,
-  which is most of standing practice.
+  which is most of standing practice. It would also measure the share an
+  instructor's hands were taking, moving Tier 4 adjustments from "dropped" to
+  "accounted for".
 - **EMG** moves individual muscle activation from Tier 3 to Tier 1, for the
   muscles wearing an electrode.
 - **Nothing** moves brain function into range. That one is not a hardware

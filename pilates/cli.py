@@ -18,6 +18,7 @@
     python -m pilates doctor                          # is this machine ready?
     python -m pilates quickstart VIDEO                # the exact steps for your video
     python -m pilates load VIDEO --mass 68 --height 1.68  # joint load, not just shape
+    python -m pilates describe VIDEO --model m.joblib # what each student did
 """
 from __future__ import annotations
 
@@ -591,36 +592,60 @@ def cmd_load(args: argparse.Namespace) -> int:
     import statistics
 
     from .biomechanics import analyse_frame
+    from .interaction import ContactLog, find_contacts, session_validity
     from .movement import SessionRecorder
 
     config = _load_config(args.config)
     if args.stride is not None:
         config.frame_stride = args.stride
+    equipment = _equipment(args.equipment)
+    if equipment.blocks_load:
+        print("No load can be estimated for this class:\n" + equipment.explain())
+        print("\nThese carry part of the load at a point nothing in the image "
+              "shows, so any\nnumber here would be wrong rather than "
+              "imprecise. Geometry is unaffected:\n`pilates session` and "
+              "`pilates describe` still work.", file=sys.stderr)
+        return 1
+
     pipeline = Pipeline(config)
     recorder = SessionRecorder(keypoint_threshold=config.keypoint_threshold)
+    contacts = ContactLog()
 
     peaks: dict[int, dict[str, float]] = {}
     groups: dict[int, dict[str, list[float]]] = {}
     skipped: dict[int, dict[str, str]] = {}
+    observed: list[tuple[int, float, object]] = []
 
     with VideoSource(args.video, stride=config.frame_stride,
                      start_frame=args.start, end_frame=args.end) as source:
         for result in pipeline.run(source):
             recorder.observe(result)
+            contacts.observe(result.timestamp,
+                             find_contacts(result.people, config.keypoint_threshold))
             for person in result.people:
                 if args.student is not None and person.track_id != args.student:
                     continue
-                report = analyse_frame(person.detection, args.mass, args.height,
-                                       config.keypoint_threshold)
-                for load in report.loads:
-                    peaks.setdefault(person.track_id, {})
-                    peaks[person.track_id][load.joint] = max(
-                        peaks[person.track_id].get(load.joint, 0.0), load.moment_nm)
-                    if load.group is not None:
-                        groups.setdefault(person.track_id, {}).setdefault(
-                            load.group.name, []).append(load.moment_nm)
-                for joint, reason in report.skipped.items():
-                    skipped.setdefault(person.track_id, {})[joint] = reason
+                observed.append((person.track_id, result.timestamp, analyse_frame(
+                    person.detection, args.mass, args.height,
+                    config.keypoint_threshold)))
+
+    # Contacts are only known once the whole clip has been read, so the
+    # filtering happens here rather than in the loop above. A moment measured
+    # while an instructor's hands were on a student is a reading of two people.
+    dropped: dict[int, int] = {}
+    for track_id, timestamp, report in observed:
+        if not session_validity(track_id, timestamp, contacts, equipment):
+            dropped[track_id] = dropped.get(track_id, 0) + 1
+            continue
+        for load in report.loads:
+            peaks.setdefault(track_id, {})
+            peaks[track_id][load.joint] = max(
+                peaks[track_id].get(load.joint, 0.0), load.moment_nm)
+            if load.group is not None:
+                groups.setdefault(track_id, {}).setdefault(
+                    load.group.name, []).append(load.moment_nm)
+        for joint, reason in report.skipped.items():
+            skipped.setdefault(track_id, {})[joint] = reason
 
     if not peaks:
         print("No joint load could be estimated. Every limb was either bearing "
@@ -644,6 +669,11 @@ def cmd_load(args: argparse.Namespace) -> int:
                                        key=lambda kv: -max(kv[1])):
                 print(f"    {name:<20} peak {max(values):5.1f} Nm, "
                       f"typical {statistics.median(values):5.1f} Nm")
+        for adjustment in contacts.for_student(track_id):
+            print(f"\n  hands-on: {adjustment.describe()}")
+        if dropped.get(track_id):
+            print(f"\n  {dropped[track_id]} frames dropped: somebody's hands "
+                  f"were on this student,\n  so the load was not theirs alone.")
         for joint, reason in sorted(skipped.get(track_id, {}).items())[:3]:
             print(f"\n  not estimated for {joint}: {reason}")
         print()
@@ -652,6 +682,165 @@ def cmd_load(args: argparse.Namespace) -> int:
           "population\naverages and only gravity is included. See "
           "docs/what-cannot-be-measured.md.")
     return 0
+
+
+def _equipment(declared: list[str] | None):
+    """Parse ``--equipment block --equipment hand_weights=2`` into a declaration.
+
+    Declared rather than detected: a block under a hip is occluded by the hip,
+    so asking is both more accurate and honest about where the knowledge came
+    from.
+    """
+    from .interaction import EquipmentDeclaration
+
+    items: dict[str, float] = {}
+    for entry in declared or []:
+        name, _, mass = entry.partition("=")
+        try:
+            items[name.strip()] = float(mass) if mass else 0.0
+        except ValueError:
+            raise SystemExit(f"--equipment {entry!r}: mass must be a number, "
+                             f"as in --equipment hand_weights=2")
+    return EquipmentDeclaration(items)
+
+
+def cmd_describe(args: argparse.Namespace) -> int:
+    """Say what each student did -- named when it can be, described when not.
+
+    "Unknown exercise" is useless to a student. Posture, load, which joints did
+    the work, symmetry and tempo are all measured directly and do not depend on
+    knowing the name, so this always says something true either way.
+    """
+    from collections import Counter
+
+    from .biomechanics import analyse_frame
+    from .dataset import window_for
+    from .interaction import ContactLog, find_contacts
+    from .movement import SessionRecorder
+    from .recognition import OpenSetRecogniser, describe as describe_movement
+
+    config = _load_config(args.config)
+    if args.stride is not None:
+        config.frame_stride = args.stride
+    equipment = _equipment(args.equipment)
+
+    recogniser = OpenSetRecogniser.load(args.model) if args.model else None
+    pipeline = Pipeline(config)
+    recorder = SessionRecorder(keypoint_threshold=config.keypoint_threshold)
+    contacts = ContactLog()
+
+    postures: dict[int, Counter] = {}
+    frames: dict[int, list] = {}
+    loads: dict[int, list] = {}
+
+    with VideoSource(args.video, stride=config.frame_stride,
+                     start_frame=args.start, end_frame=args.end) as source:
+        for result in pipeline.run(source):
+            recorder.observe(result)
+            contacts.observe(result.timestamp, find_contacts(
+                result.people, config.keypoint_threshold))
+            for person in result.people:
+                if args.student is not None and person.track_id != args.student:
+                    continue
+                postures.setdefault(person.track_id, Counter())[
+                    posture(person.detection, config.keypoint_threshold)] += 1
+                frames.setdefault(person.track_id, []).append(person.detection)
+                if args.mass and args.height:
+                    loads.setdefault(person.track_id, []).append(
+                        (result.timestamp,
+                         analyse_frame(person.detection, args.mass, args.height,
+                                       config.keypoint_threshold)))
+
+    summaries = {s.track_id: s for s in recorder.summaries(min_samples=args.min_samples)}
+    if not summaries:
+        print("No student was tracked long enough to describe.")
+        return 1
+
+    # Behaviour, not appearance: whoever circulated putting hands on several
+    # different people. Nothing here recognises a face or a uniform, and when
+    # the evidence is thin nobody is named.
+    instructor = contacts.likely_instructor()
+    if instructor is not None:
+        touched, seconds = contacts.touch_profile()[instructor]
+        print(f"Track #{instructor} put hands on {touched} different people for "
+              f"{seconds:.0f}s in total,\nwhich is what an instructor "
+              f"circulating looks like. Confirm it in the roster.\n")
+
+    if equipment.items:
+        print("Equipment declared:")
+        print(equipment.explain())
+        print()
+
+    for track_id in sorted(summaries):
+        if args.student is not None and track_id != args.student:
+            continue
+        summary = summaries[track_id]
+        stance = postures.get(track_id, Counter()).most_common(1)
+        report, usable, excluded, why = _best_load(
+            track_id, loads.get(track_id, []), contacts, equipment)
+        description = describe_movement(
+            summary, report, posture=stance[0][0] if stance else "unknown")
+
+        recognition = None
+        if recogniser is not None:
+            window = window_for(frames.get(track_id, []),
+                                keypoint_threshold=config.keypoint_threshold)
+            if window is not None:
+                recognition = recogniser.recognise(window)
+
+        headline = (recognition.headline(description.summarise())
+                    if recognition else description.summarise())
+        who = (f"Instructor? (track #{track_id})" if track_id == instructor
+               else f"Student #{track_id}")
+        print(f"{who} — {headline}")
+        if recognition is not None and recognition.named:
+            print(f"  {description.summarise()}")
+            print(f"  named with {recognition.confidence:.2f} confidence")
+        elif recognition is not None:
+            # The reason is for whoever is tuning the model, not for a student.
+            print(f"  [name withheld: {recognition.withheld_reason}]")
+        for adjustment in contacts.for_student(track_id):
+            print(f"  hands-on: {adjustment.describe()}")
+        if excluded:
+            print(f"  load measured over {usable} frames; {excluded} were "
+                  f"dropped because this load was not the student's alone")
+        if why:
+            print(f"  no load estimated: {why}")
+        print()
+
+    print("Names are withheld rather than guessed. What is printed instead is "
+          "measured\ndirectly and does not depend on knowing the exercise.")
+    return 0
+
+
+def _best_load(track_id, samples, contacts, equipment):
+    """Peak load across frames where the load was actually this student's.
+
+    Returns the frame report holding the peak, how many frames were usable, how
+    many were dropped, and why none survived when that is the answer. A moment measured while an
+    instructor's hands were on a student is a reading of two people; averaging
+    it into that student's history makes the history wrong rather than noisy.
+    """
+    from .interaction import session_validity
+
+    best, usable, excluded, refusal = None, 0, 0, ""
+    for timestamp, report in samples:
+        note = session_validity(track_id, timestamp, contacts, equipment)
+        if not note:
+            excluded += 1
+            refusal = refusal or note.reason
+            continue
+        if not report.loads:
+            continue
+        usable += 1
+        if best is None or (report.hardest and best.hardest
+                            and report.hardest.moment_nm > best.hardest.moment_nm):
+            best = report
+    if usable:
+        refusal = ""
+    elif not refusal and samples:
+        refusal = "no limb was both fully visible and free of the floor"
+    return best, usable, excluded, refusal
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
@@ -964,10 +1153,25 @@ def cmd_train(args: argparse.Namespace) -> int:
               "\nsecond class and pass both datasets to this command.")
 
     if args.out:
+        from .recognition import OpenSetRecogniser
+
         classifier = ExerciseClassifier(kind=args.model, seed=args.seed)
         classifier.fit(windows, labels, names)
-        classifier.save(args.out)
+        recogniser = OpenSetRecogniser.fit(classifier, features)
+        recogniser.save(args.out)
         print(f"\nmodel -> {args.out}")
+        print(f"\nThe saved model will decline to name an exercise it is not "
+              f"sure of, rather\nthan guess: below {recogniser.min_confidence:.2f} "
+              f"confidence, within {recogniser.min_margin:.2f} of the runner-up, "
+              f"or\nmore than {recogniser.max_novelty:.2f} sd from the training "
+              f"distribution.")
+        if recogniser.calibrated_on:
+            print(f"That last threshold was calibrated on "
+                  f"{recogniser.calibrated_on} training windows.")
+        else:
+            print("That last threshold is a default: there was too little data "
+                  "to calibrate one.")
+        print("It still says what it measured. See `pilates describe`.")
     return 0
 
 
@@ -1089,12 +1293,32 @@ def main(argv: list[str] | None = None) -> int:
     ld.add_argument("video")
     ld.add_argument("--mass", type=float, required=True, help="body mass in kg")
     ld.add_argument("--height", type=float, required=True, help="body height in metres")
+    ld.add_argument("--equipment", action="append", default=None,
+                    help="declare a prop, e.g. --equipment block or "
+                         "--equipment hand_weights=2")
     ld.add_argument("--config", default=None)
     ld.add_argument("--student", type=int, default=None)
     ld.add_argument("--start", type=int, default=0)
     ld.add_argument("--end", type=int, default=None)
     ld.add_argument("--stride", type=int, default=None)
     ld.set_defaults(func=cmd_load)
+
+    de = sub.add_parser("describe", help="what each student did, named or not")
+    de.add_argument("video")
+    de.add_argument("--model", default=None,
+                    help="a trained recogniser; without one, nothing is named")
+    de.add_argument("--mass", type=float, default=None, help="body mass in kg")
+    de.add_argument("--height", type=float, default=None, help="height in metres")
+    de.add_argument("--equipment", action="append", default=None,
+                    help="declare a prop, e.g. --equipment block or "
+                         "--equipment hand_weights=2")
+    de.add_argument("--config", default=None)
+    de.add_argument("--student", type=int, default=None)
+    de.add_argument("--min-samples", type=int, default=20)
+    de.add_argument("--start", type=int, default=0)
+    de.add_argument("--end", type=int, default=None)
+    de.add_argument("--stride", type=int, default=None)
+    de.set_defaults(func=cmd_describe)
 
     dr = sub.add_parser("doctor", help="check this machine can run an analysis")
     dr.set_defaults(func=cmd_doctor)

@@ -349,3 +349,59 @@ class TestSessionValidity:
         from pilates.interaction import session_validity
 
         assert session_validity(1, 0.0)
+
+
+class TestFindingTheInstructor:
+    """Behaviour, not appearance. Nothing here recognises a face or a uniform;
+    an instructor is whoever circulates putting hands on several people."""
+
+    def _log(self, spans):
+        from pilates.interaction import ContactLog
+
+        log = ContactLog()
+        for toucher, touched, start, end in spans:
+            t = start
+            while t <= end + 1e-9:
+                log.observe(round(t, 3), [Contact(toucher, touched, 0.2, kp.L_HIP)])
+                t += 0.1
+        return log
+
+    def test_whoever_touched_several_people_is_the_instructor(self):
+        log = self._log([(9, 1, 0.0, 3.0), (9, 2, 5.0, 8.0), (9, 3, 10.0, 13.0)])
+        assert log.likely_instructor() == 9
+
+    def test_one_person_helping_one_other_is_not_enough(self):
+        """Students steady each other. One adjustment proves nothing."""
+        assert self._log([(1, 2, 0.0, 3.0)]).likely_instructor() is None
+
+    def test_a_tie_names_nobody(self):
+        """Naming the wrong person is worse than naming none: their own
+        measurements would be quietly discarded."""
+        log = self._log([(1, 2, 0.0, 3.0), (1, 3, 5.0, 8.0),
+                         (4, 5, 0.0, 3.0), (4, 6, 5.0, 8.0)])
+        assert log.likely_instructor() is None
+
+    def test_longer_contact_breaks_a_near_tie_on_people(self):
+        log = self._log([(9, 1, 0.0, 3.0), (9, 2, 5.0, 8.0), (9, 3, 10.0, 13.0),
+                         (4, 5, 0.0, 3.0), (4, 6, 5.0, 8.0)])
+        assert log.likely_instructor() == 9
+
+    def test_nobody_touching_anybody_names_nobody(self):
+        from pilates.interaction import ContactLog
+
+        assert ContactLog().likely_instructor() is None
+
+    def test_the_bar_is_adjustable(self):
+        log = self._log([(9, 1, 0.0, 3.0)])
+        assert log.likely_instructor(min_people=1) == 9
+
+    def test_the_profile_reports_people_and_seconds(self):
+        log = self._log([(9, 1, 0.0, 3.0), (9, 2, 5.0, 9.0)])
+        people, seconds = log.touch_profile()[9]
+        assert people == 2
+        assert seconds == pytest.approx(7.0)
+
+    def test_brief_contacts_do_not_count_towards_it(self):
+        """Otherwise every crowded frame elects an instructor."""
+        assert self._log([(9, 1, 0.0, 0.2), (9, 2, 5.0, 5.2),
+                          (9, 3, 8.0, 8.2)]).likely_instructor() is None

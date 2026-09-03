@@ -151,7 +151,7 @@ class Adjustment:
         return self.start <= timestamp <= self.end
 
     def describe(self) -> str:
-        return (f"hands-on the {self.region} for {self.duration:.1f}s "
+        return (f"the {self.region}, for {self.duration:.1f}s "
                 f"({self.start:.1f}-{self.end:.1f}s)")
 
 
@@ -197,6 +197,37 @@ class ContactLog:
             if adjustment.contains(timestamp):
                 return adjustment
         return None
+
+    def touch_profile(self) -> dict[int, tuple[int, float]]:
+        """Per track: how many different people they put hands on, for how long."""
+        people: dict[int, set[int]] = {}
+        seconds: dict[int, float] = {}
+        for adjustment in self.adjustments():
+            people.setdefault(adjustment.toucher_id, set()).add(adjustment.touched_id)
+            seconds[adjustment.toucher_id] = (
+                seconds.get(adjustment.toucher_id, 0.0) + adjustment.duration)
+        return {t: (len(who), seconds[t]) for t, who in people.items()}
+
+    def likely_instructor(self, min_people: int = 2) -> int | None:
+        """Whoever moved between students putting hands on them.
+
+        This is behaviour, not appearance: nothing here recognises a face or a
+        uniform. An instructor circulates, and one person laying hands on
+        several different people over a class is a pattern students do not
+        produce. Two students helping each other is why the bar is more than
+        one person rather than more than none.
+
+        Returns None whenever the evidence is thin -- one adjustment, or a tie.
+        Naming the wrong person the instructor is worse than naming nobody,
+        because their measurements would then be quietly discarded.
+        """
+        profile = self.touch_profile()
+        ranked = sorted(profile.items(), key=lambda kv: (-kv[1][0], -kv[1][1]))
+        if not ranked or ranked[0][1][0] < min_people:
+            return None
+        if len(ranked) > 1 and ranked[1][1][0] == ranked[0][1][0]:
+            return None
+        return ranked[0][0]
 
 
 #: Equipment a studio can declare, and what it does to a load estimate.

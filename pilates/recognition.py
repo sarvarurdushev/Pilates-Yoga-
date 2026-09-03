@@ -27,9 +27,18 @@ MIN_CONFIDENCE = 0.55
 #: And the runner-up must be this far behind, or the model is really guessing
 #: between two classes rather than recognising one.
 MIN_MARGIN = 0.15
-#: How far outside the training distribution a window may sit, in standard
-#: deviations, before it is treated as something the model has never seen.
+#: Fallback novelty threshold, in standard deviations, used only when there is
+#: too little training data to calibrate one. A guessed constant here would be
+#: the weakest part of the whole test, so :meth:`OpenSetRecogniser.fit` derives
+#: the real threshold from the training data instead.
 MAX_NOVELTY = 4.0
+#: Training windows this far out are still training windows. The threshold is
+#: set at this quantile of the training set's own novelty, so it adapts to how
+#: varied the exercises actually are.
+NOVELTY_QUANTILE = 0.99
+#: Below this many training windows the quantile is noise, and the constant
+#: above is used instead.
+MIN_CALIBRATION_WINDOWS = 30
 
 
 @dataclass
@@ -141,15 +150,71 @@ class OpenSetRecogniser:
     min_confidence: float = MIN_CONFIDENCE
     min_margin: float = MIN_MARGIN
     max_novelty: float = MAX_NOVELTY
+    #: How many windows the novelty threshold was calibrated on. Zero means the
+    #: fallback constant is in use, which is worth saying out loud.
+    calibrated_on: int = 0
 
     @classmethod
     def fit(cls, classifier, train_features: np.ndarray, **kwargs) -> "OpenSetRecogniser":
-        """Record where the training data sits, so novelty can be measured."""
-        return cls(
+        """Record where the training data sits, and how far out it spreads.
+
+        The threshold is taken from the training set's own novelty scores
+        rather than fixed, because how far "far" is depends entirely on how
+        varied the training exercises were. Forty similar mat exercises give a
+        tight distribution; a mixed vocabulary gives a loose one, and the same
+        constant would be wrong for both.
+        """
+        recogniser = cls(
             classifier=classifier,
             train_mean=train_features.mean(axis=0),
             train_std=train_features.std(axis=0) + 1e-6,
             **kwargs,
+        )
+        if "max_novelty" not in kwargs and len(train_features) >= MIN_CALIBRATION_WINDOWS:
+            scores = [recogniser.novelty(row) for row in train_features]
+            recogniser.max_novelty = float(np.quantile(scores, NOVELTY_QUANTILE))
+            recogniser.calibrated_on = len(train_features)
+        return recogniser
+
+    def save(self, path: str) -> None:
+        """Write the model and the statistics the novelty test needs.
+
+        The payload is a superset of what :meth:`ExerciseClassifier.load`
+        expects, so an older reader still loads the model and simply gets no
+        novelty test.
+        """
+        import joblib
+
+        joblib.dump({
+            "model": self.classifier.model,
+            "names": self.classifier.names,
+            "kind": getattr(self.classifier, "kind", "linear"),
+            "train_mean": self.train_mean,
+            "train_std": self.train_std,
+            "min_confidence": self.min_confidence,
+            "min_margin": self.min_margin,
+            "max_novelty": self.max_novelty,
+            "calibrated_on": self.calibrated_on,
+        }, path)
+
+    @classmethod
+    def load(cls, path: str) -> "OpenSetRecogniser":
+        import joblib
+
+        from .classifier import ExerciseClassifier
+
+        payload = joblib.load(path)
+        classifier = ExerciseClassifier(kind=payload.get("kind", "linear"))
+        classifier.model = payload["model"]
+        classifier.names = payload["names"]
+        return cls(
+            classifier=classifier,
+            train_mean=payload.get("train_mean"),
+            train_std=payload.get("train_std"),
+            min_confidence=payload.get("min_confidence", MIN_CONFIDENCE),
+            min_margin=payload.get("min_margin", MIN_MARGIN),
+            max_novelty=payload.get("max_novelty", MAX_NOVELTY),
+            calibrated_on=payload.get("calibrated_on", 0),
         )
 
     def novelty(self, features: np.ndarray) -> float:

@@ -408,6 +408,103 @@ prints the majority-class baseline first, warns when there are too few distinct
 students for the grouped score to mean anything, and warns when two classes
 make a coin flip look competent.
 
+### Never "unknown exercise"
+
+There are hundreds of Pilates and yoga exercises. A recogniser trained on forty
+meets something else constantly, so the interesting question is not how often it
+is right but what it does when it is not sure.
+
+Printing "unknown exercise" is the obvious answer and the wrong one. It is
+useless to a student, and it is not even true — the system measured plenty, it
+just could not put a name to it.
+
+So a name is withheld rather than guessed, and what was measured is printed
+instead:
+
+```
+Student #4 — A held position, lying, led by the left hip through 40 degrees,
+             loading the hip flexors to 44 Nm, evenly balanced left and right.
+  [name withheld: unlike anything in training (5.2 sd away)]
+```
+
+Every clause there is measured directly and none of it depends on knowing what
+the movement is called. The line in brackets is for whoever tunes the model; a
+student's report shows the sentence.
+
+Three independent tests withhold a name, because they catch different failures:
+
+| Test | Catches |
+|---|---|
+| Confidence below 0.55 | the model is unsure of everything |
+| Margin under 0.15 to the runner-up | the model is sure it is one of *two* things, which is what genuinely similar exercises look like from one camera |
+| Novelty above the calibrated threshold | the movement is not in the training distribution at all |
+
+The third is the one that matters for unseen exercises. A softmax will hand
+0.99 to a movement it has never met — it has no way to express "none of the
+above" — so only distance from the training data catches it. Median rather than
+mean z-distance across features: a couple of unusual features is normal
+variation, most of them being unusual is a new movement.
+
+The threshold is calibrated from the training set's own novelty scores rather
+than fixed, because how far "far" is depends entirely on how varied the
+training exercises were. A constant would be wrong for a tight vocabulary and a
+loose one alike. With fewer than 30 windows the quantile is noise and a default
+is used, and the command says which it did.
+
+```bash
+python -m pilates describe class.mp4 --model model.joblib --mass 65 --height 1.68
+```
+
+## Hands, props and machines
+
+Three things break the assumption every load figure rests on — that gravity is
+the only external force on the body — without breaking anything visible.
+
+**An instructor's hands.** Someone pressing a student's back is taking part of
+the moment. The student's hip flexors are no longer producing what holds the leg
+up, by an amount nothing in the image reveals. Those frames are dropped and
+counted, never averaged into a history.
+
+Contacts are found from a hand arriving at another person's body, not from
+overlapping boxes: students on neighbouring mats overlap constantly without
+touching. That still fires on people who are merely close, because one camera
+has no depth — a hand passing in front of somebody further back is the same
+picture as a hand on their shoulder. Duration resolves it: a correction lasts
+seconds, a near-miss lasts a frame.
+
+**Which track is the instructor** falls out of the same signal, and has no
+visual solution otherwise. Whoever circulates putting hands on several
+different people is doing something no student does:
+
+```
+Track #9 put hands on 2 different people for 7s in total,
+which is what an instructor circulating looks like. Confirm it in the roster.
+```
+
+Offered as a question, not asserted, and settled by a person — naming the wrong
+track would quietly discard a real student's measurements.
+
+**Props.** A block, bolster, ball, strap or band adds an unknown force at an
+unknown point; band tension varies with stretch and is invisible. These are
+*declared*, not detected, because a block under a hip is occluded by the hip:
+
+```bash
+python -m pilates describe class.mp4 --equipment block --equipment strap
+python -m pilates load class.mp4 --mass 65 --height 1.68 --equipment hand_weights=2
+```
+
+Declared props invalidate the load and leave geometry untouched — range, tempo,
+symmetry and control are still reported.
+
+**Machines.** A reformer, chair or cadillac is not an extra force term in the
+right model, it is the wrong model: the carriage moves and the springs resist
+along their own axis. `pilates load` refuses outright rather than producing a
+number, and says which commands still work.
+
+The one case handled properly rather than refused is declared hand or ankle
+weights: the mass is stated rather than guessed, and acts at a keypoint the
+camera can already see.
+
 ## Mechanical load, not just shape
 
 A joint angle says what a position looked like. It says nothing about effort. A
