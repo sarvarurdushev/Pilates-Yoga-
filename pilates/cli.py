@@ -573,10 +573,21 @@ def cmd_report(args: argparse.Namespace) -> int:
         return 1
 
     store = HistoryStore.load(args.history) if args.history else None
+    anatomy = None
+    if args.anatomy:
+        from .anatomy import AnatomyLibrary
+
+        library = (AnatomyLibrary.load(args.anatomy_file) if args.anatomy_file
+                   else AnatomyLibrary.default())
+        anatomy = library.get(standard.exercise)
+        if anatomy is None:
+            print(f"  no reference anatomy on file for {standard.exercise}; "
+                  f"the report will omit that section", file=sys.stderr)
     report = build(
         student=args.name, exercise=standard.exercise,
         assessment=assess(history, standard, config.keypoint_threshold),
         summary=summarise(history), store=store, date=args.date, studio=args.studio,
+        anatomy=anatomy,
     )
     out = write(report, args.out or f"{args.name.replace(' ', '_')}_{report.date}.html")
     print(f"report -> {out}")
@@ -1424,6 +1435,10 @@ def main(argv: list[str] | None = None) -> int:
     cl.set_defaults(func=cmd_class)
 
     rp = sub.add_parser("report", help="write a take-away HTML report for a student")
+    rp.add_argument("--anatomy", action="store_true",
+                    help="include reference anatomy: muscles, nerves, bones")
+    rp.add_argument("--anatomy-file", default=None,
+                    help="import a curated anatomy library (JSON)")
     rp.add_argument("video")
     rp.add_argument("--exercise", required=True)
     rp.add_argument("--name", required=True, help="the student's name, for the page")

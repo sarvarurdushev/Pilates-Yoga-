@@ -40,6 +40,12 @@ class StudentReport:
     trends: list[Trend] | None = None
     sessions_recorded: int = 0
     studio: str = ""
+    #: Reference anatomy for this exercise. Looked up, never inferred, and
+    #: legitimate here because the exercise name came from a human label rather
+    #: than from a recogniser's guess.
+    anatomy: object | None = None
+    #: Joint loads for this student, when mass and height were supplied.
+    load_report: object | None = None
 
 
 def _e(text: object) -> str:
@@ -97,6 +103,43 @@ def _movement_block(summary: MovementSummary) -> str:
     return ("<h2>What you did</h2><table><tbody>" + "".join(rows) + "</tbody></table>")
 
 
+def _anatomy_block(entry, load_report) -> str:
+    """Muscles, nerves and bones, with every line marked measured or reference.
+
+    The visual distinction is the point. On a printed page handed to a
+    student, an unlabelled list of muscles and nerves reads as though a camera
+    saw them, and no amount of small print at the bottom undoes that.
+    """
+    from .anatomy import MEASURED, reconcile
+
+    rows: list[str] = []
+    for provenance, line in reconcile(entry, load_report).describe():
+        css = "measured" if provenance == MEASURED else "reference"
+        rows.append(f"<tr><td><span class='tag {css}'>{_e(provenance)}</span></td>"
+                    f"<td>{_e(line)}</td></tr>")
+
+    supplies = sorted({supply.describe() for _, supply in entry.nerves()})
+    if supplies:
+        rows.append("<tr><td><span class='tag reference'>reference</span></td>"
+                    f"<td>Supplied by {_e(', '.join(supplies))}.</td></tr>")
+    if entry.roots():
+        rows.append("<tr><td><span class='tag reference'>reference</span></td>"
+                    f"<td>Spinal levels {_e(', '.join(entry.roots()))}.</td></tr>")
+    if entry.bones:
+        rows.append("<tr><td><span class='tag reference'>reference</span></td>"
+                    f"<td>At the {_e(', '.join(entry.joints))}; bones involved: "
+                    f"{_e(', '.join(entry.bones))}.</td></tr>")
+    if not rows:
+        return ""
+    return (
+        "<h2>Muscles, nerves and bones</h2>"
+        "<p class='muted'>“Measured” came from your video. “Reference” is "
+        "anatomy — true of everybody, looked up from the name of the exercise. "
+        "Nothing here watched a muscle or a nerve directly.</p>"
+        "<table class='anat'><tbody>" + "".join(rows) + "</tbody></table>"
+    )
+
+
 def _progress_block(trends: list[Trend], sessions: int) -> str:
     moved = [t for t in trends if t.meaningful or t.verdict == "changed"]
     steady = [t for t in trends if t.verdict == "no measurable change"]
@@ -149,6 +192,12 @@ td.num, th.num { text-align:right; white-space:nowrap;
      font-variant-numeric:tabular-nums; padding-left:14px; }
 ul { margin:8px 0; padding-left:20px; } li { margin:5px 0; }
 .muted { color:var(--muted); font-size:14px; }
+.tag { display:inline-block; font-size:10px; text-transform:uppercase;
+       letter-spacing:0.07em; padding:2px 7px; border-radius:9px; white-space:nowrap;
+       font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+.tag.measured { background:#e8f0e9; color:var(--good); }
+.tag.reference { background:#eef2f7; color:var(--accent); }
+.anat td:first-child { width:96px; padding-right:12px; }
 .headline { background:#fff; border:1px solid var(--rule); border-left:3px solid var(--accent);
             padding:14px 16px; margin:22px 0; }
 .headline strong { display:block; font-size:11px; text-transform:uppercase;
@@ -198,6 +247,9 @@ def render(report: StudentReport) -> str:
     if report.summary is not None:
         parts.append(_movement_block(report.summary))
 
+    if report.anatomy is not None:
+        parts.append(_anatomy_block(report.anatomy, report.load_report))
+
     if report.trends:
         parts.append(_progress_block(report.trends, report.sessions_recorded))
 
@@ -208,15 +260,27 @@ def render(report: StudentReport) -> str:
             + "</ul>"
         )
 
-    parts.append(
-        "<footer>These are geometric observations about how the movement looked "
-        "to a camera &mdash; angles measured against a target range. They are not "
+    footer = [
+        "These are geometric observations about how the movement looked to a "
+        "camera &mdash; angles measured against a target range. They are not "
         "health advice, and whether any of them matters for your body is a "
         "question for your instructor."
-        f"<br>Based on {report.assessment.samples} analysed frames "
+    ]
+    if report.load_report is not None:
+        footer.append(
+            "Joint loads are modelled rather than measured: segment masses are "
+            "population averages and only gravity is accounted for."
+        )
+    if report.anatomy is not None:
+        footer.append(
+            "Muscle and nerve entries are anatomical reference looked up from "
+            "the name of the exercise, not something a camera observed."
+        )
+    footer.append(
+        f"Based on {report.assessment.samples} analysed frames "
         f"(pose confidence {report.assessment.confidence:.2f})."
-        "</footer></div></body></html>"
     )
+    parts.append("<footer>" + "<br>".join(footer) + "</footer></div></body></html>")
     return "".join(p for p in parts if p)
 
 
@@ -236,6 +300,8 @@ def build(
     store: HistoryStore | None = None,
     date: str | None = None,
     studio: str = "",
+    anatomy=None,
+    load_report=None,
 ) -> StudentReport:
     """Assemble a report, pulling progress from a history store if there is one."""
     trends = None
@@ -249,6 +315,7 @@ def build(
         date=date or Date.today().isoformat(),
         assessment=assessment, summary=summary,
         trends=trends, sessions_recorded=sessions, studio=studio,
+        anatomy=anatomy, load_report=load_report,
     )
 
 

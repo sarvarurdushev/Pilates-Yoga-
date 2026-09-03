@@ -184,3 +184,98 @@ class TestReadableNames:
     def test_also_in_the_early_sessions_line(self):
         html = render(report_for(store=self._store([175.0, 160.0])))
         assert "left knee" in html and "left_knee" not in html
+
+
+class TestAnatomyInTheReport:
+    """A printed page is read as more authoritative than a terminal, and a
+    student has no way to check it. Every anatomical line must carry a visible
+    label saying it was looked up rather than seen."""
+
+    def _report(self, with_load=True):
+        from pilates.anatomy import DEFAULT_ANATOMY
+        from pilates.biomechanics import JointLoad, LoadReport, MUSCLE_GROUPS
+        from pilates.coaching import Assessment
+        from pilates.report import build
+
+        load = None
+        if with_load:
+            load = LoadReport(loads=[JointLoad(
+                "left_hip", 44.0, "flexion", MUSCLE_GROUPS[("hip", "flexion")],
+                "isometric", 0.21, 10.4)], body_mass_kg=65.0)
+        return build(
+            student="Anna", exercise="the_hundred",
+            assessment=Assessment(exercise="the_hundred", samples=120, confidence=0.8),
+            anatomy=DEFAULT_ANATOMY["the_hundred"], load_report=load,
+        )
+
+    def test_the_muscles_are_listed(self):
+        from pilates.report import render
+
+        assert "rectus abdominis" in render(self._report())
+
+    def test_the_nerves_and_spinal_levels_are_listed(self):
+        from pilates.report import render
+
+        html = render(self._report())
+        assert "intercostal nerves" in html and "Spinal levels" in html
+
+    def test_measured_and_reference_lines_are_visually_tagged(self):
+        from pilates.report import render
+
+        html = render(self._report())
+        assert "tag measured" in html and "tag reference" in html
+
+    def test_the_section_explains_the_two_labels(self):
+        from pilates.report import render
+
+        assert "true of everybody" in render(self._report())
+
+    def test_the_footer_says_anatomy_was_not_observed(self):
+        from pilates.report import render
+
+        assert "not something a camera observed" in render(self._report())
+
+    def test_the_footer_says_load_is_modelled(self):
+        from pilates.report import render
+
+        assert "modelled rather than measured" in render(self._report())
+
+    def test_neither_footer_line_appears_when_neither_section_does(self):
+        from pilates.coaching import Assessment
+        from pilates.report import build, render
+
+        html = render(build(
+            student="Anna", exercise="plank",
+            assessment=Assessment(exercise="plank", samples=50, confidence=0.8)))
+        assert "camera observed" not in html and "modelled rather" not in html
+
+    def test_no_anatomy_section_without_an_entry(self):
+        from pilates.report import render
+
+        assert "Muscles, nerves and bones" not in render(self._report_without())
+
+    def _report_without(self):
+        from pilates.coaching import Assessment
+        from pilates.report import build
+
+        return build(
+            student="Anna", exercise="the_hundred",
+            assessment=Assessment(exercise="the_hundred", samples=120, confidence=0.8))
+
+    def test_anatomy_alone_renders_without_a_load_report(self):
+        from pilates.report import render
+
+        html = render(self._report(with_load=False))
+        assert "rectus abdominis" in html
+        assert "no load measured" in html or "no load report" in html
+
+    def test_the_entry_text_is_escaped(self):
+        from pilates.anatomy import AnatomyEntry
+        from pilates.coaching import Assessment
+        from pilates.report import build, render
+
+        report = build(
+            student="Anna", exercise="x",
+            assessment=Assessment(exercise="x", samples=50, confidence=0.8),
+            anatomy=AnatomyEntry("x", ("<script>alert(1)</script>",), joints=("knee",)))
+        assert "<script>alert(1)</script>" not in render(report)
