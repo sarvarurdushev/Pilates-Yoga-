@@ -821,8 +821,17 @@ here is written from scratch for that reason.
 ## Install
 
 ```bash
-pip install -r requirements.txt
+pip install -e .
+pilates doctor        # checks Python, dependencies, disk, model weights
+pilates quickstart class.mov   # the exact steps for your own video
 ```
+
+**New here? Read [`docs/first-class.md`](docs/first-class.md)** — your first
+class in twenty minutes, written for a studio rather than an engineer.
+
+`doctor` names anything missing and how to fix it. `quickstart` inspects your
+own video, finds its cuts, and prints the command sequence with the real frame
+numbers already filled in — which is the part that is genuinely hard to guess.
 
 RTMO weights (~79 MB) download on first run and cache in `~/.cache/rtmlib`.
 

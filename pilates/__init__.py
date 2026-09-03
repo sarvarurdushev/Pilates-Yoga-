@@ -16,6 +16,8 @@ from .coaching import (DEFAULT_STANDARDS, AngleTarget, Assessment, ExerciseStand
 from .classroom import (ClassPattern, ClassResult, CoverageCheck, Roster,
                         StudentResult, check_coverage, class_patterns, run_class)
 from .config import StudioConfig
+from .diagnostics import (Check, VideoFacts, check_environment, environment_ready,
+                          inspect_video, quickstart)
 from .dataset import (Example, LoadedDataset, build_from_video, feature_vector,
                       load_datasets, normalise_keypoints)
 from .history import (HistoryStore, Measurement, SessionRecord, Trend,
@@ -44,6 +46,8 @@ __all__ = [
     "featurise", "window_features", "majority_baseline", "LabelSet", "Segment", "LabelError", "VOCABULARY",
     "scaffold", "Shot", "detect_shots", "HistoryStore", "SessionRecord",
     "Measurement", "Trend", "measure_session", "progress_report",
+    "Check", "VideoFacts", "check_environment", "environment_ready",
+    "inspect_video", "quickstart",
     "Roster", "ClassResult", "ClassPattern", "StudentResult", "CoverageCheck",
     "check_coverage", "class_patterns", "run_class",
     "StudentReport", "build_report", "render", "write_report", "Example", "build_from_video",

@@ -15,6 +15,8 @@
     python -m pilates report VIDEO --exercise plank --name "Anna"  # take-away page
     python -m pilates roster VIDEO --out roster.json  # who is which track id
     python -m pilates class VIDEO --labels l.json --roster r.json  # the whole class
+    python -m pilates doctor                          # is this machine ready?
+    python -m pilates quickstart VIDEO                # the exact steps for your video
 """
 from __future__ import annotations
 
@@ -583,6 +585,36 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_doctor(args: argparse.Namespace) -> int:
+    """Check this machine can actually run an analysis."""
+    from .diagnostics import check_environment, environment_ready
+
+    checks = check_environment()
+    print("Environment check\n")
+    for check in checks:
+        print(check.format())
+
+    ready = environment_ready(checks)
+    print()
+    if ready:
+        print("Ready to run.")
+        if not all(c.ok for c in checks):
+            print("The pose model has not been downloaded yet; the first "
+                  "analysis will fetch it.")
+        return 0
+    print("Not ready. Fix the failures above and run this again.")
+    return 1
+
+
+def cmd_quickstart(args: argparse.Namespace) -> int:
+    """Inspect a studio's own video and print the exact commands to run."""
+    from .diagnostics import inspect_video, quickstart
+
+    facts = inspect_video(args.video)
+    print(quickstart(facts, stem=Path(args.video).stem))
+    return 0
+
+
 def cmd_roster(args: argparse.Namespace) -> int:
     """Find the students in a class and write a roster stub with reference crops.
 
@@ -983,6 +1015,13 @@ def main(argv: list[str] | None = None) -> int:
     pr.add_argument("--store", required=True, help="history file")
     pr.add_argument("--exercise", default=None, help="default: every exercise recorded")
     pr.set_defaults(func=cmd_progress)
+
+    dr = sub.add_parser("doctor", help="check this machine can run an analysis")
+    dr.set_defaults(func=cmd_doctor)
+
+    qs = sub.add_parser("quickstart", help="the exact steps for your own video")
+    qs.add_argument("video")
+    qs.set_defaults(func=cmd_quickstart)
 
     ro = sub.add_parser("roster", help="find students and write a roster stub")
     ro.add_argument("video")
