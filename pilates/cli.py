@@ -10,6 +10,7 @@
     python -m pilates preview labels.json --video V   # contact sheets to verify labels
     python -m pilates train   data.npz --out model.joblib  # train a recogniser
     python -m pilates calibrate points.json --out floor.json  # link two cameras
+    python -m pilates coach VIDEO --exercise plank    # coaching notes for a student
 """
 from __future__ import annotations
 
@@ -390,6 +391,73 @@ def cmd_preview(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_coach(args: argparse.Namespace) -> int:
+    """Assess students against a standard and write coaching notes."""
+    from .coaching import (
+        DEFAULT_STANDARDS, assess, assess_tempo, load_standards, narrate,
+    )
+    from .movement import SessionRecorder, summarise
+
+    standards = load_standards(args.standards) if args.standards else DEFAULT_STANDARDS
+    standard = standards.get(args.exercise)
+    if standard is None:
+        print(f"No standard for {args.exercise!r}. Known: "
+              f"{', '.join(sorted(standards))}", file=sys.stderr)
+        print("Standards are data -- write your own with --standards.", file=sys.stderr)
+        return 1
+
+    config = _load_config(args.config)
+    if args.stride is not None:
+        config.frame_stride = args.stride
+    pipeline = Pipeline(config)
+    recorder = SessionRecorder(keypoint_threshold=config.keypoint_threshold)
+
+    with VideoSource(args.video, stride=config.frame_stride,
+                     start_frame=args.start, end_frame=args.end) as source:
+        for result in pipeline.run(source):
+            recorder.observe(result)
+
+    quality = recorder.quality()
+    histories = {
+        track_id: history for track_id, history in recorder.histories.items()
+        if len(history.samples) >= args.min_samples
+    }
+    if not histories:
+        print("No student was tracked long enough to assess.")
+        return 1
+    if args.student is not None:
+        histories = {k: v for k, v in histories.items() if k == args.student}
+        if not histories:
+            print(f"Student #{args.student} was not tracked in this clip.", file=sys.stderr)
+            return 1
+
+    if len(histories) > 1 and not quality.reliable:
+        print(quality.explain())
+        print("\nRefusing to write coaching notes: these would mix several people "
+              "together.\nAssess a single student with --student, or fix the camera view.")
+        return 2
+
+    print(f"Exercise: {standard.exercise}")
+    if standard.notes:
+        print(f"  ({standard.notes})")
+
+    for track_id, history in sorted(histories.items()):
+        assessment = assess(history, standard, config.keypoint_threshold)
+        summary = summarise(history)
+        print(f"\n--- Student #{track_id} "
+              f"({history.duration:.0f}s, {len(history.samples)} frames, "
+              f"pose confidence {assessment.confidence:.2f}) ---")
+        if summary is not None:
+            tempo = assess_tempo(summary, standard)
+            if tempo is not None:
+                assessment.findings.append(tempo)
+        print(narrate(assessment, name=f"Student #{track_id}"))
+
+    print("\nThese are geometric observations about movement, not health advice. "
+          "\nWhether any of them matters for a particular body is your call.")
+    return 0
+
+
 def cmd_calibrate(args: argparse.Namespace) -> int:
     """Fit the floor homography linking two camera views.
 
@@ -592,6 +660,18 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("--exercise", default=None, help="only this exercise")
     v.add_argument("--include-non-exercise", action="store_true")
     v.set_defaults(func=cmd_preview)
+
+    ch = sub.add_parser("coach", help="coaching notes for a student, from measurements")
+    ch.add_argument("video")
+    ch.add_argument("--exercise", required=True, help="which standard to assess against")
+    ch.add_argument("--config", default=None)
+    ch.add_argument("--standards", default=None, help="JSON of your own standards")
+    ch.add_argument("--student", type=int, default=None, help="assess only this track id")
+    ch.add_argument("--start", type=int, default=0)
+    ch.add_argument("--end", type=int, default=None)
+    ch.add_argument("--stride", type=int, default=None)
+    ch.add_argument("--min-samples", type=int, default=10)
+    ch.set_defaults(func=cmd_coach)
 
     k = sub.add_parser("calibrate", help="fit the floor homography linking two views")
     k.add_argument("points", help="JSON with matching floor points from both views")

@@ -7,7 +7,7 @@ This is the foundation layer: **video in, tracked people with joint angles
 out.** Scoring, coaching feedback and dashboards sit on top of it later.
 
 ```
-video ─→ RTMO pose ─→ exclusion zones ─→ de-duplication ─→ tracking ─→ geometry ─→ movement
+video ─→ RTMO pose ─→ exclusion zones ─→ de-duplication ─→ tracking ─→ geometry ─→ movement ─→ coaching
               │             │                  │              │           │
         every person   drop mirror        one skeleton    stable       angles,
         in one pass    reflections        per body        student IDs  symmetry
@@ -407,6 +407,69 @@ The training command also refuses to flatter itself in the obvious ways: it
 prints the majority-class baseline first, warns when there are too few distinct
 students for the grouped score to mean anything, and warns when two classes
 make a coin flip look competent.
+
+## Coaching notes
+
+```bash
+python -m pilates coach class.mov --exercise mountain --student 4
+```
+
+Run on a real 720p class, unedited output:
+
+```
+--- Student #1 (29s, 123 frames, pose confidence 0.75) ---
+Going well:
+  - the torso stayed tall and vertical (86deg)
+  - the left leg was straight (174deg)
+  - left and right knee matched closely (3deg)
+Worth working on:
+  - the hips were not level (measured 12deg, target within 8deg)
+
+One thing for next time: the hips were not level.
+```
+
+Three rules hold throughout this layer, because it is the easiest place in the
+system to produce something that sounds authoritative and is not:
+
+- **Nothing is said that was not measured.** Every observation carries the
+  number behind it and the target it was compared against, so an instructor can
+  check it or disagree. A joint that was not visible produces "could not judge",
+  never a guess. A test asserts that no praise or correction can be emitted
+  without a measurement attached.
+- **The wording is generated from the finding, not the reverse.** Templates are
+  filled from structured findings. A language model can phrase these more warmly
+  later; it must never be the thing that decides whether a knee was out of line.
+- **This describes movement, not health.** Findings are geometric: an angle sat
+  outside a range. Whether that matters for a particular body is the
+  instructor's judgement, and the output says so.
+
+Medians are used rather than means, so one badly-estimated frame cannot move a
+verdict — there is a test for exactly that.
+
+### The standards are data
+
+`DEFAULT_STANDARDS` covers mountain, standing side bend, plank, warrior two,
+bridge and the hundred. They are starting points from general movement
+principles, **not received truth**, and they are stored as data so a studio can
+replace them:
+
+```bash
+python -m pilates coach class.mov --exercise my_move --standards our_studio.json
+```
+
+One standard is deliberately incomplete. `standing_side_bend` checks the knees
+and hips but **not** the trunk, because a side bend and a back bend look alike
+from a single camera — a trunk target there would confidently measure the wrong
+thing. The omission is documented in the standard itself.
+
+### Findings are checked against confounds
+
+Two students in the sample above were flagged for uneven hips. Before trusting
+that, it was worth asking whether it was really perspective: students at the
+edge of frame are viewed obliquely. Measured, the flagged students sat at x=615,
+162 and 518 in a 1280-wide frame, while the student at the most extreme edge
+(x=1138) was **not** flagged. No correlation with frame position, so the
+asymmetry is real rather than an artefact of where someone stood.
 
 ## Two cameras
 
