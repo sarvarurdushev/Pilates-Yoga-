@@ -11,6 +11,7 @@
     python -m pilates train   data.npz --out model.joblib  # train a recogniser
     python -m pilates calibrate points.json --out floor.json  # link two cameras
     python -m pilates coach VIDEO --exercise plank    # coaching notes for a student
+    python -m pilates progress "Anna" --exercise plank  # how a student has changed
 """
 from __future__ import annotations
 
@@ -453,8 +454,70 @@ def cmd_coach(args: argparse.Namespace) -> int:
                 assessment.findings.append(tempo)
         print(narrate(assessment, name=f"Student #{track_id}"))
 
+    if args.save_history:
+        from datetime import date as _date
+
+        from .history import HistoryStore, SessionRecord, measure_session
+
+        names = _student_names(args)
+        if not names:
+            print("\nNot saving history: pass --name with --student, or --names "
+                  "to say who each track id is.", file=sys.stderr)
+            return 1
+        store = HistoryStore.load(args.save_history)
+        when = args.date or _date.today().isoformat()
+        saved = 0
+        for track_id, history in sorted(histories.items()):
+            student = names.get(track_id)
+            if student is None:
+                continue
+            assessment = assess(history, standard, config.keypoint_threshold)
+            store.add(SessionRecord(
+                student=student, date=when, exercise=standard.exercise,
+                measurements=measure_session(history, assessment),
+                video=Path(args.video).name, track_id=track_id,
+            ))
+            saved += 1
+        store.save(args.save_history)
+        print(f"\nSaved {saved} session record(s) -> {args.save_history}")
+        unnamed = sorted(set(histories) - set(names))
+        if unnamed:
+            print(f"Not saved (no name given): students {unnamed}")
+
     print("\nThese are geometric observations about movement, not health advice. "
           "\nWhether any of them matters for a particular body is your call.")
+    return 0
+
+
+def _student_names(args: argparse.Namespace) -> dict[int, str]:
+    """Who each track id is. Supplied by a person, never inferred from video."""
+    if args.names:
+        return {int(k): v for k, v in json.loads(args.names).items()}
+    if args.name and args.student is not None:
+        return {args.student: args.name}
+    return {}
+
+
+def cmd_progress(args: argparse.Namespace) -> int:
+    """Show how one student has changed across sessions."""
+    from .history import HistoryStore, progress_report
+
+    store = HistoryStore.load(args.store)
+    if not store.records:
+        print(f"No history in {args.store}. Record some with "
+              f"`pilates coach ... --save-history {args.store}`.", file=sys.stderr)
+        return 1
+
+    if args.student_name not in store.students():
+        print(f"No records for {args.student_name!r}. Known: "
+              f"{', '.join(store.students())}", file=sys.stderr)
+        return 1
+
+    exercises = ([args.exercise] if args.exercise
+                 else store.exercises_for(args.student_name))
+    for exercise in exercises:
+        print(progress_report(store, args.student_name, exercise))
+        print()
     return 0
 
 
@@ -671,7 +734,19 @@ def main(argv: list[str] | None = None) -> int:
     ch.add_argument("--end", type=int, default=None)
     ch.add_argument("--stride", type=int, default=None)
     ch.add_argument("--min-samples", type=int, default=10)
+    ch.add_argument("--save-history", default=None,
+                    help="append these results to a history file")
+    ch.add_argument("--name", default=None, help="who --student is, for history")
+    ch.add_argument("--names", default=None,
+                    help='JSON mapping track ids to names, e.g. \'{"1":"Anna"}\'')
+    ch.add_argument("--date", default=None, help="session date (default: today)")
     ch.set_defaults(func=cmd_coach)
+
+    pr = sub.add_parser("progress", help="how a student has changed across sessions")
+    pr.add_argument("student_name")
+    pr.add_argument("--store", required=True, help="history file")
+    pr.add_argument("--exercise", default=None, help="default: every exercise recorded")
+    pr.set_defaults(func=cmd_progress)
 
     k = sub.add_parser("calibrate", help="fit the floor homography linking two views")
     k.add_argument("points", help="JSON with matching floor points from both views")

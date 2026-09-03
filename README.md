@@ -471,6 +471,58 @@ edge of frame are viewed obliquely. Measured, the flagged students sat at x=615,
 (x=1138) was **not** flagged. No correlation with frame position, so the
 asymmetry is real rather than an artefact of where someone stood.
 
+## Session history
+
+```bash
+python -m pilates coach class.mov --exercise mountain \
+    --student 4 --name "Anna" --save-history studio_history.json
+python -m pilates progress "Anna" --store studio_history.json
+```
+
+Two things make this harder than appending rows to a file.
+
+**Identity across sessions is a human decision, not a computer-vision one.**
+Track ids are per-video: student 4 this week is a different person from student
+4 last week. A session is filed against a name the instructor supplies at
+recording time. That keeps the system out of biometric identification
+altogether, and it is simply more reliable than inferring identity from a wide
+shot. Records are one readable JSON file, so a studio can correct a misfiled
+name or hand a student everything held about them.
+
+**Two sessions is not a trend.** Every stored measurement carries the spread it
+had *within* its own session, and a between-session change must clear that
+spread before it is called a change. It must also clear an absolute floor of
+three degrees, because a very steady student has a tiny noise floor and a
+one-degree drift would otherwise qualify as progress -- true of the arithmetic,
+useless to the person being told.
+
+### Validated by making it fail to find something
+
+One class was split into three windows and filed as three sessions for the same
+student. The correct answer is that nothing changed, and a system fooled by
+noise would say otherwise:
+
+```
+Anna -- mountain
+  3 session(s): 2026-01-06, 2026-01-13, 2026-01-20
+
+Steady:
+  - hip symmetry: 5.8 to 1.7deg, within the 9.3deg it varies inside a single
+    session -- no measurable change
+  - trunk: 85.2 to 86.4deg, under the 3deg worth mentioning -- no measurable change
+
+Nothing has moved by more than this student's own session-to-session variation.
+```
+
+Hip symmetry going from 5.8 to 1.7 degrees looks like a seventy percent
+improvement and would make a lovely progress chart. It is not one: that
+measurement wobbles by 9.3 degrees inside a single class. Refusing to report it
+is the feature.
+
+Asymmetries have a right direction, so they are called improved or worsened. A
+plain joint angle does not -- there is no universal correct knee angle -- so
+those are only ever reported as *changed*, with the size of the change.
+
 ## Two cameras
 
 A back bend leans towards a front-facing camera and barely moves in its image;
