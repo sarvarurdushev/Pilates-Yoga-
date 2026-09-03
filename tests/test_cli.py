@@ -315,3 +315,103 @@ class TestLoad:
         install(monkeypatch, leg_raise())
         main(["load", "clip.mov", "--mass", "65", "--height", "1.68"])
         assert "modelled, not measured" in capsys.readouterr().out
+
+
+class TestAnatomyOutput:
+    """Muscles, nerves and bones -- with the provenance of every line kept
+    visible, because a reader will otherwise assume the nerve was observed."""
+
+    def _named(self, monkeypatch, name="the_hundred"):
+        from pilates.recognition import OpenSetRecogniser, Recognition
+
+        monkeypatch.setattr(OpenSetRecogniser, "recognise",
+                            lambda self, w: Recognition(name, 0.82))
+        monkeypatch.setattr(OpenSetRecogniser, "load",
+                            classmethod(lambda cls, p: cls(classifier=None)))
+
+    def test_a_named_exercise_gets_muscles_and_nerves(self, monkeypatch, capsys):
+        install(monkeypatch, leg_raise())
+        self._named(monkeypatch)
+        main(["describe", "clip.mov", "--mass", "65", "--height", "1.68",
+              "--anatomy", "--model", "m.joblib"])
+        out = capsys.readouterr().out
+        assert "rectus abdominis" in out
+        assert "intercostal nerves" in out
+        assert "spinal levels" in out
+
+    def test_measured_and_reference_lines_are_labelled(self, monkeypatch, capsys):
+        install(monkeypatch, leg_raise())
+        self._named(monkeypatch)
+        main(["describe", "clip.mov", "--mass", "65", "--height", "1.68",
+              "--anatomy", "--model", "m.joblib"])
+        out = capsys.readouterr().out
+        assert "[measured]" in out and "[reference]" in out
+
+    def test_the_footer_explains_what_the_labels_mean(self, monkeypatch, capsys):
+        install(monkeypatch, leg_raise())
+        self._named(monkeypatch)
+        main(["describe", "clip.mov", "--anatomy", "--model", "m.joblib"])
+        out = capsys.readouterr().out
+        assert "Nothing here observed a muscle or a" in out
+
+    def test_no_name_means_no_anatomy_rather_than_a_guess(self, monkeypatch, capsys):
+        """Attaching a real muscle list to a guessed exercise is worse than
+        attaching none."""
+        from pilates.recognition import OpenSetRecogniser, Recognition
+
+        install(monkeypatch, leg_raise())
+        monkeypatch.setattr(OpenSetRecogniser, "recognise",
+                            lambda self, w: Recognition(None, 0.3, "too close"))
+        monkeypatch.setattr(OpenSetRecogniser, "load",
+                            classmethod(lambda cls, p: cls(classifier=None)))
+        main(["describe", "clip.mov", "--anatomy", "--model", "m.joblib"])
+        out = capsys.readouterr().out
+        assert "the name was withheld" in out
+        assert "rectus abdominis" not in out
+
+    def test_without_a_model_it_says_why_not_rather_than_nothing(
+            self, monkeypatch, capsys):
+        install(monkeypatch, leg_raise())
+        main(["describe", "clip.mov", "--anatomy"])
+        assert "no recogniser was" in capsys.readouterr().out
+
+    def test_an_exercise_with_no_entry_says_so(self, monkeypatch, capsys):
+        install(monkeypatch, leg_raise())
+        self._named(monkeypatch, name="moon_salutation")
+        main(["describe", "clip.mov", "--anatomy", "--model", "m.joblib"])
+        assert "no reference anatomy on file" in capsys.readouterr().out
+
+    def test_a_curated_library_can_be_imported(self, monkeypatch, capsys, tmp_path):
+        import json
+
+        path = tmp_path / "a.json"
+        path.write_text(json.dumps({"exercises": [{
+            "exercise": "the_hundred", "prime_movers": ["rectus abdominis"],
+            "joints": ["spine"], "source": "our own reference project",
+        }]}))
+        install(monkeypatch, leg_raise())
+        self._named(monkeypatch)
+        main(["describe", "clip.mov", "--anatomy", "--anatomy-file", str(path),
+              "--model", "m.joblib"])
+        assert "vertebral column" in capsys.readouterr().out
+
+    def test_an_imported_muscle_with_no_nerve_is_named_not_invented(
+            self, monkeypatch, capsys, tmp_path):
+        import json
+
+        path = tmp_path / "a.json"
+        path.write_text(json.dumps({"exercises": [{
+            "exercise": "the_hundred", "prime_movers": ["popliteus"],
+            "joints": ["knee"],
+        }]}))
+        install(monkeypatch, leg_raise())
+        self._named(monkeypatch)
+        main(["describe", "clip.mov", "--anatomy", "--anatomy-file", str(path),
+              "--model", "m.joblib"])
+        assert "no nerve supply recorded for popliteus" in capsys.readouterr().err
+
+    def test_anatomy_is_off_unless_asked_for(self, monkeypatch, capsys):
+        install(monkeypatch, leg_raise())
+        self._named(monkeypatch)
+        main(["describe", "clip.mov", "--model", "m.joblib"])
+        assert "[reference]" not in capsys.readouterr().out

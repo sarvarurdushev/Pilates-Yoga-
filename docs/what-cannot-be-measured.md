@@ -174,6 +174,38 @@ already see.
 
 ---
 
+## Where reference anatomy fits
+
+Everything above concerns what a camera can compute. A second question sits
+alongside it: what can be *looked up*.
+
+Which muscles produce hip flexion, what nerve supplies them, which spinal
+levels that nerve comes from, which bones the hip articulates — these are
+anatomical facts. They are true of everybody, they do not need a camera, and
+refusing to state them would be false modesty rather than rigour.
+
+So they are stated, and labelled `[reference]`. The measurement is labelled
+`[measured]`. The two are never merged, because a reader shown one undivided
+list will assume the nerve was observed.
+
+The rule that keeps this honest: **reference anatomy is keyed by exercise
+name, so it requires a name.** When the recogniser withholds one, no anatomy is
+printed. Attaching a real muscle list to a guessed exercise produces something
+that looks more authoritative than the measurement and is wrong.
+
+Two further rules follow from the tiers above:
+
+- **Absence is not evidence.** A muscle group anatomy expects, where the
+  measurement is silent, is reported with the reason for the silence — usually
+  a weight-bearing limb. Never as "this student did not use them".
+- **Population findings are a third category.** "Slow breathing is associated
+  with increased heart rate variability" is about groups of people in studies.
+  It is labelled `[research]`, it ships without a citation until somebody
+  attaches one, and it is withheld by default rather than printed in a
+  confident tone with nothing behind it.
+
+---
+
 ## Why the refusals are the product
 
 Anyone can produce a page of confident numbers. The difficulty is producing

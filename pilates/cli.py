@@ -19,6 +19,7 @@
     python -m pilates quickstart VIDEO                # the exact steps for your video
     python -m pilates load VIDEO --mass 68 --height 1.68  # joint load, not just shape
     python -m pilates describe VIDEO --model m.joblib # what each student did
+    python -m pilates describe VIDEO --anatomy        # ...with muscles and nerves
 """
 from __future__ import annotations
 
@@ -725,6 +726,17 @@ def cmd_describe(args: argparse.Namespace) -> int:
     equipment = _equipment(args.equipment)
 
     recogniser = OpenSetRecogniser.load(args.model) if args.model else None
+    library = None
+    if args.anatomy:
+        from .anatomy import AnatomyLibrary
+
+        library = (AnatomyLibrary.load(args.anatomy_file) if args.anatomy_file
+                   else AnatomyLibrary.default())
+        unknown = library.unknown_muscles()
+        if unknown:
+            print(f"Note: no nerve supply recorded for {', '.join(unknown)}. "
+                  f"Those muscles\nwill be named without one rather than given "
+                  f"a guess.\n", file=sys.stderr)
     pipeline = Pipeline(config)
     recorder = SessionRecorder(keypoint_threshold=config.keypoint_threshold)
     contacts = ContactLog()
@@ -799,6 +811,8 @@ def cmd_describe(args: argparse.Namespace) -> int:
         elif recognition is not None:
             # The reason is for whoever is tuning the model, not for a student.
             print(f"  [name withheld: {recognition.withheld_reason}]")
+        if args.anatomy:
+            _print_anatomy(library, recognition, report)
         for adjustment in contacts.for_student(track_id):
             print(f"  hands-on: {adjustment.describe()}")
         if excluded:
@@ -810,7 +824,51 @@ def cmd_describe(args: argparse.Namespace) -> int:
 
     print("Names are withheld rather than guessed. What is printed instead is "
           "measured\ndirectly and does not depend on knowing the exercise.")
+    if args.anatomy:
+        print("\n[measured] came from this student's video. [reference] is "
+              "anatomy, true of\neverybody and looked up by exercise name. "
+              "Nothing here observed a muscle or a\nnerve directly; see "
+              "docs/what-cannot-be-measured.md.")
     return 0
+
+
+def _print_anatomy(library, recognition, load_report) -> None:
+    """Reference anatomy for a named exercise, set against what was measured.
+
+    Without a name there is no lookup, and that is the honest outcome rather
+    than a gap: anatomy is keyed by exercise, so guessing one to fill this in
+    would attach a real muscle list to the wrong movement.
+    """
+    from .anatomy import REFERENCE, reconcile
+
+    if recognition is None:
+        print("  no reference anatomy: it is looked up by exercise name, and "
+              "no recogniser was\n  supplied. Pass --model to name the "
+              "exercise, or --labels to say what it was.")
+        return
+    if not recognition.named:
+        print("  no reference anatomy: the name was withheld, and attaching a "
+              "real muscle list\n  to a guessed exercise is worse than "
+              "attaching none.")
+        return
+    entry = library.get(recognition.name)
+    if entry is None:
+        print(f"  no reference anatomy on file for "
+              f"{recognition.name.replace('_', ' ')}")
+        return
+
+    for provenance, line in reconcile(entry, load_report).describe():
+        print(f"  [{provenance}] {line}")
+    supplies = {supply.describe() for _, supply in entry.nerves()}
+    if supplies:
+        print(f"  [{REFERENCE}] supplied by {', '.join(sorted(supplies))}")
+    if entry.roots():
+        print(f"  [{REFERENCE}] spinal levels {', '.join(entry.roots())}")
+    if entry.bones:
+        print(f"  [{REFERENCE}] at the {', '.join(entry.joints)}; bones involved: "
+              f"{', '.join(entry.bones)}")
+    if entry.note:
+        print(f"  [{REFERENCE}] {entry.note}")
 
 
 def _best_load(track_id, samples, contacts, equipment):
@@ -1312,6 +1370,11 @@ def main(argv: list[str] | None = None) -> int:
     de.add_argument("--equipment", action="append", default=None,
                     help="declare a prop, e.g. --equipment block or "
                          "--equipment hand_weights=2")
+    de.add_argument("--anatomy", action="store_true",
+                    help="add reference anatomy: muscles, nerves, spinal levels")
+    de.add_argument("--anatomy-file", default=None,
+                    help="import a curated anatomy library (JSON) instead of "
+                         "the built-in one")
     de.add_argument("--config", default=None)
     de.add_argument("--student", type=int, default=None)
     de.add_argument("--min-samples", type=int, default=20)

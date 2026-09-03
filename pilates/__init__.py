@@ -13,6 +13,10 @@ from .classifier import (Evaluation, ExerciseClassifier, evaluate,
                          featurise, majority_baseline, window_features)
 from .coaching import (DEFAULT_STANDARDS, AngleTarget, Assessment, ExerciseStandard,
                        Finding, SymmetryTarget, assess, assess_tempo, narrate, UNSUITABLE)
+from .anatomy import (DEFAULT_ANATOMY, MEASURED, NERVE_SUPPLY, REFERENCE,
+                      RESEARCH, AnatomyEntry, AnatomyLibrary, Innervation,
+                      Reconciliation, ResearchNote, bones_for, innervation,
+                      reconcile)
 from .biomechanics import (MUSCLE_GROUPS, SEGMENTS, JointLoad, LoadReport,
                            MuscleGroup, NotComputable, analyse_frame,
                            classify_contraction, gravitational_moment)
@@ -54,6 +58,9 @@ __all__ = [
     "featurise", "window_features", "majority_baseline", "LabelSet", "Segment", "LabelError", "VOCABULARY",
     "scaffold", "Shot", "detect_shots", "HistoryStore", "SessionRecord",
     "Measurement", "Trend", "measure_session", "progress_report",
+    "DEFAULT_ANATOMY", "NERVE_SUPPLY", "AnatomyEntry", "AnatomyLibrary",
+    "Innervation", "Reconciliation", "ResearchNote", "bones_for", "innervation",
+    "reconcile", "MEASURED", "REFERENCE", "RESEARCH",
     "JointLoad", "LoadReport", "MuscleGroup", "MUSCLE_GROUPS", "SEGMENTS",
     "analyse_frame", "gravitational_moment", "classify_contraction", "NotComputable",
     "Check", "VideoFacts", "check_environment", "environment_ready",

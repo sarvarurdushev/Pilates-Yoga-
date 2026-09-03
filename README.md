@@ -455,6 +455,117 @@ is used, and the command says which it did.
 python -m pilates describe class.mp4 --model model.joblib --mass 65 --height 1.68
 ```
 
+## Muscles, nerves, bones — and where each fact came from
+
+A joint moment says the hip flexors carried 44 Nm. It does not say which
+muscles those are, what innervates them, or which bones the joint articulates.
+Those are real questions with real answers — they are just answers from
+anatomy rather than from the camera.
+
+Three kinds of statement live in this layer and are never allowed to blur:
+
+| Label | Means | Example |
+|---|---|---|
+| `[measured]` | computed from this student's video | "the hip flexors carried 44 Nm" |
+| `[reference]` | anatomical fact, looked up by exercise name | "supplied by the femoral nerve (L2–L4)" |
+| `[research]` | a population-level finding | "slow breathing is associated with increased HRV" |
+
+A product that shows all three without saying which is which is lying even
+when every individual statement is true, because the reader will assume the
+nerve was observed and the brain effect was measured. Labelling them is what
+makes it honest to show them at all.
+
+```bash
+python -m pilates describe class.mp4 --model model.joblib --anatomy     --mass 65 --height 1.68
+```
+
+```
+Student #1 — the hundred
+  A held position, lying, led by the left hip through 40 degrees, ...
+  [measured]  the hip flexors carried 44 Nm, which is what the hundred asks of them
+  [measured]  no load measured at the shoulder flexors: bearing weight through the
+              floor; the ground reaction force is unmeasured
+  [reference] also working, by anatomy rather than measurement: rectus abdominis,
+              transversus abdominis
+  [reference] supplied by femoral nerve and L1-L3 ventral rami (L1-L4),
+              intercostal nerves (T7-T12), phrenic nerve (C3-C5)
+  [reference] spinal levels C1, C3, C4, C5, C6, T7, T12, L1, L2, L3, L4
+  [reference] at the spine, hip, shoulder; bones involved: vertebral column,
+              pelvis, femur, humerus, scapula, clavicle
+```
+
+### The join is the interesting part
+
+Reference anatomy says which muscles an exercise is *supposed* to work.
+Measurement says which ones actually carried the moment. When they disagree,
+that is compensation — and it is a coaching observation neither source gives
+alone.
+
+Absence is deliberately not treated as evidence. A group anatomy expects and
+the measurement is silent about is reported **with the reason it was silent**,
+almost always a weight-bearing limb, and never as "this student did not use
+them". Most of an anatomy entry — the whole trunk, the scapular stabilisers,
+the deep neck flexors — is outside what a gravitational moment at a limb joint
+can address at all. That is a boundary of the measurement, not a finding, and
+it is printed as `[reference]` rather than as a gap.
+
+### Nerves
+
+Muscle → nerve → spinal level is a fixed anatomical table, not an inference.
+Every muscle named by any entry must appear in it; a test enforces that, so a
+new exercise cannot quietly introduce a muscle whose supply nobody filled in.
+An imported library with an unlisted muscle gets it **named, not invented**:
+
+```
+Note: no nerve supply recorded for popliteus. Those muscles
+will be named without one rather than given a guess.
+```
+
+### No name, no anatomy
+
+Anatomy is keyed by exercise. When the recogniser withholds a name, the lookup
+does not happen:
+
+```
+  no reference anatomy: the name was withheld, and attaching a real muscle list
+  to a guessed exercise is worse than attaching none.
+```
+
+### Brain function
+
+Research notes ship **unsourced on purpose**. A claim about the nervous system
+or the brain is not fit to show a paying customer until somebody has attached
+the paper it came from, and leaving the citation blank makes that visible
+instead of assumed — `[SOURCE NEEDED]` rather than a confident sentence.
+`sourced_research()` filters them out by default.
+
+Nothing here measures a brain effect for a particular student, and nothing
+can. See `docs/what-cannot-be-measured.md`.
+
+### Importing a curated library
+
+A studio — or an existing exercise-reference project — should not have to
+re-enter this:
+
+```bash
+python -m pilates describe class.mp4 --anatomy --anatomy-file our_library.json
+```
+
+```json
+{
+  "exercises": [
+    {"exercise": "the_hundred",
+     "prime_movers": ["rectus abdominis", "transversus abdominis"],
+     "synergists": ["iliopsoas"],
+     "joints": ["spine", "hip"],
+     "source": "our own reference project"}
+  ]
+}
+```
+
+Bones are derived from the joints when a file does not list them, so the two
+cannot drift apart.
+
 ## Hands, props and machines
 
 Three things break the assumption every load figure rests on — that gravity is
