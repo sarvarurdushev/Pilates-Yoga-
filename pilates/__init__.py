@@ -25,6 +25,11 @@ from .dataset import (Example, LoadedDataset, build_from_video, feature_vector,
                       load_datasets, normalise_keypoints)
 from .history import (HistoryStore, Measurement, SessionRecord, Trend,
                       measure_session, progress_report)
+from .interaction import (Adjustment, Contact, ContactLog, EquipmentDeclaration,
+                          EQUIPMENT_EFFECT, ValidityNote, find_contacts,
+                          load_validity, session_validity, touched_ids)
+from .recognition import (MovementDescription, OpenSetRecogniser, Recognition,
+                          describe as describe_movement)
 from .labels import VOCABULARY, LabelError, LabelSet, Segment, scaffold
 from .report import StudentReport, build as build_report, render, write as write_report
 from .shots import Shot, detect_shots
@@ -59,6 +64,9 @@ __all__ = [
     "feature_vector", "normalise_keypoints", "LoadedDataset", "load_datasets", "Pipeline", "PipelineStats", "VideoSource",
     "RTMOBackend", "StubBackend", "TiledBackend", "IoUTracker", "TrackerConfig",
     "Detection", "FrameResult", "TrackedPerson",
+    "Adjustment", "Contact", "ContactLog", "EquipmentDeclaration", "EQUIPMENT_EFFECT",
+    "ValidityNote", "find_contacts", "load_validity", "session_validity", "touched_ids",
+    "MovementDescription", "OpenSetRecogniser", "Recognition", "describe_movement",
     "MovementSummary", "Repetition", "SessionQuality", "SessionRecorder", "TrackHistory",
     "find_repetitions", "summarise", "FloorHomography", "Association",
     "CalibrationError", "associate", "floor_point", "fuse_frame", "fuse_window",
