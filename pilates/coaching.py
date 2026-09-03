@@ -73,6 +73,10 @@ class ExerciseStandard:
     #: Ideal seconds per repetition, if the exercise is a counted set.
     tempo_seconds: tuple[float, float] | None = None
     notes: str = ""
+    #: True where the two sides are *meant* to differ -- a lunge, a single leg
+    #: stretch, any warrior. Flagging asymmetry there would be telling a student
+    #: off for doing the exercise correctly.
+    asymmetric_by_design: bool = False
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -190,7 +194,14 @@ def assess(
                 measured=median, target=f"{target.low:.0f}-{target.high:.0f}deg",
             ))
 
-    for target in standard.symmetry:
+    if standard.asymmetric_by_design:
+        # Belt and braces: a symmetry target on a lunge would tell a student
+        # off for doing the exercise correctly.
+        symmetry_targets: list[SymmetryTarget] = []
+    else:
+        symmetry_targets = standard.symmetry
+
+    for target in symmetry_targets:
         gaps = [
             abs(s.angles[f"left_{target.pair}"] - s.angles[f"right_{target.pair}"])
             for s in history.samples
@@ -298,34 +309,125 @@ def narrate(assessment: Assessment, name: str = "") -> str:
     return "\n".join(lines)
 
 
-#: Starting standards. General movement principles rather than received truth --
-#: a studio should replace these with its own and they are stored as data so it
-#: can. Angles follow geometry.standard_angles: 180 degrees is a straight limb,
-#: and trunk is measured against horizontal so 90 is upright.
+#: Exercises a single camera cannot judge, and why. Named explicitly so that
+#: asking for one gets an explanation rather than "unknown exercise" -- these
+#: are not gaps waiting to be filled, they are measurements a flat image does
+#: not contain.
+UNSUITABLE: dict[str, str] = {
+    "spine_twist": "rotation happens in the camera's depth axis and barely "
+                   "changes the image",
+    "seated_twist": "rotation happens in the camera's depth axis and barely "
+                    "changes the image",
+    "saw": "the rotation that defines it is invisible from a single view",
+    "corkscrew": "the circling is mostly toward and away from the camera",
+    "side_kick": "the leg moves along the depth axis when filmed from the front",
+    "eagle": "the crossed limbs occlude each other, so the joints cannot be "
+             "located reliably",
+    "triangle": "like a side bend, it is confusable with a back bend from one "
+                "camera; the plane of the lean is not recorded",
+    "savasana": "lying still has nothing to measure beyond that it is still",
+}
+
+
+def _straight(joint: str, cue: str, praise: str = "") -> AngleTarget:
+    """A limb that should be extended."""
+    return AngleTarget(joint, 160, 185, cue, praise)
+
+
+#: Starting standards, covering the classical Pilates mat order (Joseph
+#: Pilates, *Return to Life Through Contrology*) and the yoga poses that recur
+#: in almost every class -- the sun salutation and the standing series.
+#:
+#: These encode **pose geometry**, which is definitional: a plank has a straight
+#: line from shoulder to hip, a warrior two has a front knee near a right angle.
+#: They are not clinical judgements, and the tolerances are round numbers chosen
+#: to be generous rather than prescriptive. An instructor should read them
+#: before they are used with students, and they are stored as data so they can
+#: be changed without touching code.
+#:
+#: Conventions: knee, hip and elbow are the interior angles at that joint, so
+#: 180 degrees is straight. Trunk is measured against horizontal, so 90 is
+#: upright and 0 is lying flat.
 DEFAULT_STANDARDS: dict[str, ExerciseStandard] = {
+    # ---- Yoga: sun salutation ----
     "mountain": ExerciseStandard(
         exercise="mountain",
         angles=[
             AngleTarget("trunk", 82, 90, "the torso drifted off vertical",
                         "the torso stayed tall and vertical"),
-            AngleTarget("left_knee", 165, 185, "the left knee stayed bent",
-                        "the left leg was straight"),
-            AngleTarget("right_knee", 165, 185, "the right knee stayed bent",
-                        "the right leg was straight"),
+            _straight("left_knee", "the left knee stayed bent", "the left leg was straight"),
+            _straight("right_knee", "the right knee stayed bent", "the right leg was straight"),
         ],
         symmetry=[SymmetryTarget("knee", 8, "one knee was noticeably more bent than the other"),
                   SymmetryTarget("hip", 8, "the hips were not level")],
     ),
-    "standing_side_bend": ExerciseStandard(
-        exercise="standing_side_bend",
+    "upward_salute": ExerciseStandard(
+        exercise="upward_salute",
         angles=[
-            AngleTarget("left_knee", 165, 185, "the left knee bent as the torso tilted",
-                        "the legs stayed straight through the bend"),
-            AngleTarget("right_knee", 165, 185, "the right knee bent as the torso tilted"),
+            AngleTarget("trunk", 80, 90, "the torso leaned rather than reaching straight up",
+                        "the torso stayed tall"),
+            _straight("left_elbow", "the left arm stayed bent", "the arms reached long"),
+            _straight("right_elbow", "the right arm stayed bent"),
+            _straight("left_knee", "the knees stayed bent"),
+            _straight("right_knee", "the knees stayed bent"),
         ],
-        symmetry=[SymmetryTarget("hip", 12, "the hips shifted rather than staying square")],
-        notes="Trunk angle is not checked: a side bend and a back bend look alike "
-              "from one camera, so a trunk target here would be measuring the wrong thing.",
+        symmetry=[SymmetryTarget("elbow", 12, "one arm reached higher than the other")],
+    ),
+    "forward_fold": ExerciseStandard(
+        exercise="forward_fold",
+        angles=[
+            AngleTarget("left_hip", 20, 70, "the fold did not come from the hips",
+                        "the fold came from the hips"),
+            AngleTarget("right_hip", 20, 70, "the fold did not come from the hips"),
+            _straight("left_knee", "the left knee bent to reach further"),
+            _straight("right_knee", "the right knee bent to reach further"),
+        ],
+        symmetry=[SymmetryTarget("hip", 10, "the fold was deeper on one side")],
+    ),
+    "half_lift": ExerciseStandard(
+        exercise="half_lift",
+        angles=[
+            AngleTarget("left_hip", 70, 110, "the back was not brought to horizontal",
+                        "the back came to a flat, horizontal line"),
+            AngleTarget("right_hip", 70, 110, "the back was not brought to horizontal"),
+            _straight("left_knee", "the knees stayed bent"),
+            _straight("right_knee", "the knees stayed bent"),
+        ],
+    ),
+    "chaturanga": ExerciseStandard(
+        exercise="chaturanga",
+        angles=[
+            AngleTarget("left_elbow", 70, 110, "the elbows did not reach a right angle",
+                        "the elbows bent to about a right angle"),
+            AngleTarget("right_elbow", 70, 110, "the elbows did not reach a right angle"),
+            AngleTarget("left_hip", 160, 185, "the hips dropped or piked out of line",
+                        "the body held one straight line"),
+            AngleTarget("right_hip", 160, 185, "the hips dropped or piked out of line"),
+        ],
+        symmetry=[SymmetryTarget("elbow", 10, "one elbow bent more than the other")],
+    ),
+    "upward_dog": ExerciseStandard(
+        exercise="upward_dog",
+        angles=[
+            _straight("left_elbow", "the arms stayed bent", "the arms were straight"),
+            _straight("right_elbow", "the arms stayed bent"),
+            _straight("left_knee", "the legs were not extended"),
+            _straight("right_knee", "the legs were not extended"),
+        ],
+    ),
+    "downward_dog": ExerciseStandard(
+        exercise="downward_dog",
+        angles=[
+            AngleTarget("left_hip", 45, 100, "the hips were not lifted into a clear pike",
+                        "the hips lifted into a clear inverted V"),
+            AngleTarget("right_hip", 45, 100, "the hips were not lifted into a clear pike"),
+            _straight("left_elbow", "the arms stayed bent", "the arms were straight"),
+            _straight("right_elbow", "the arms stayed bent"),
+            _straight("left_knee", "the left knee stayed bent"),
+            _straight("right_knee", "the right knee stayed bent"),
+        ],
+        symmetry=[SymmetryTarget("hip", 10, "one hip sat higher than the other"),
+                  SymmetryTarget("knee", 10, "one knee was more bent than the other")],
     ),
     "plank": ExerciseStandard(
         exercise="plank",
@@ -333,21 +435,212 @@ DEFAULT_STANDARDS: dict[str, ExerciseStandard] = {
             AngleTarget("left_hip", 160, 185, "the hips dropped or lifted out of line",
                         "the body held a straight line from shoulder to hip"),
             AngleTarget("right_hip", 160, 185, "the hips dropped or lifted out of line"),
-            AngleTarget("left_elbow", 160, 185, "the left arm was not fully supporting"),
-            AngleTarget("right_elbow", 160, 185, "the right arm was not fully supporting"),
+            _straight("left_elbow", "the left arm was not fully supporting"),
+            _straight("right_elbow", "the right arm was not fully supporting"),
         ],
         symmetry=[SymmetryTarget("hip", 8, "one hip sat lower than the other")],
+    ),
+    "cobra": ExerciseStandard(
+        exercise="cobra",
+        angles=[
+            AngleTarget("left_elbow", 90, 165, "the arms locked straight, which is upward "
+                                               "dog rather than cobra"),
+            AngleTarget("right_elbow", 90, 165, "the arms locked straight"),
+            _straight("left_knee", "the legs were not extended"),
+            _straight("right_knee", "the legs were not extended"),
+        ],
+    ),
+    # ---- Yoga: standing series ----
+    "warrior_one": ExerciseStandard(
+        exercise="warrior_one",
+        angles=[
+            AngleTarget("trunk", 75, 95, "the torso leaned forward over the front leg",
+                        "the torso stayed upright"),
+            _straight("left_elbow", "the arms stayed bent"),
+            _straight("right_elbow", "the arms stayed bent"),
+        ],
+        asymmetric_by_design=True,
+        notes="Front and back leg are meant to differ, so the legs are not compared.",
     ),
     "warrior_two": ExerciseStandard(
         exercise="warrior_two",
         angles=[
-            AngleTarget("left_knee", 85, 110, "the front knee was not bent to a right angle",
-                        "the front knee was well bent"),
-            AngleTarget("right_knee", 160, 185, "the back leg was not straight",
-                        "the back leg stayed long"),
             AngleTarget("trunk", 80, 100, "the torso leaned rather than staying upright",
                         "the torso stayed upright over the hips"),
         ],
+        asymmetric_by_design=True,
+        notes="One knee should be near a right angle and the other straight, so "
+              "which is which depends on the side being worked. The legs are "
+              "measured but not compared.",
+    ),
+    "warrior_three": ExerciseStandard(
+        exercise="warrior_three",
+        angles=[
+            AngleTarget("trunk", 0, 25, "the torso was not brought parallel to the floor",
+                        "the torso came parallel to the floor"),
+        ],
+        asymmetric_by_design=True,
+    ),
+    "chair": ExerciseStandard(
+        exercise="chair",
+        angles=[
+            AngleTarget("left_knee", 90, 140, "the knees did not bend into the pose",
+                        "the knees bent well into the pose"),
+            AngleTarget("right_knee", 90, 140, "the knees did not bend into the pose"),
+            _straight("left_elbow", "the arms stayed bent"),
+            _straight("right_elbow", "the arms stayed bent"),
+        ],
+        symmetry=[SymmetryTarget("knee", 8, "one knee bent more than the other")],
+    ),
+    "low_lunge": ExerciseStandard(
+        exercise="low_lunge",
+        angles=[AngleTarget("trunk", 70, 95, "the torso collapsed forward",
+                            "the torso stayed lifted")],
+        asymmetric_by_design=True,
+    ),
+    "high_lunge": ExerciseStandard(
+        exercise="high_lunge",
+        angles=[AngleTarget("trunk", 70, 95, "the torso collapsed forward",
+                            "the torso stayed lifted")],
+        asymmetric_by_design=True,
+    ),
+    "tree": ExerciseStandard(
+        exercise="tree",
+        angles=[AngleTarget("trunk", 82, 90, "the torso tilted to counterbalance",
+                            "the torso stayed vertical")],
+        asymmetric_by_design=True,
+        notes="One leg is standing and the other is folded, so the legs are not compared.",
+    ),
+    "childs_pose": ExerciseStandard(
+        exercise="childs_pose",
+        angles=[
+            AngleTarget("left_knee", 20, 70, "the knees were not fully folded",
+                        "the knees folded in fully"),
+            AngleTarget("right_knee", 20, 70, "the knees were not fully folded"),
+        ],
+        symmetry=[SymmetryTarget("knee", 10, "one knee folded further than the other")],
+    ),
+    "standing_side_bend": ExerciseStandard(
+        exercise="standing_side_bend",
+        angles=[
+            _straight("left_knee", "the left knee bent as the torso tilted",
+                      "the legs stayed straight through the bend"),
+            _straight("right_knee", "the right knee bent as the torso tilted"),
+        ],
+        symmetry=[SymmetryTarget("hip", 12, "the hips shifted rather than staying square")],
+        notes="Trunk angle is deliberately not checked: a side bend and a back "
+              "bend look alike from one camera, so a trunk target here would "
+              "confidently measure the wrong thing.",
+    ),
+    "standing_back_bend": ExerciseStandard(
+        exercise="standing_back_bend",
+        angles=[
+            _straight("left_knee", "the knees bent as the torso arched"),
+            _straight("right_knee", "the knees bent as the torso arched"),
+            _straight("left_elbow", "the arms stayed bent", "the arms reached long overhead"),
+            _straight("right_elbow", "the arms stayed bent"),
+        ],
+        notes="Trunk angle is deliberately not checked, for the same reason as "
+              "the side bend.",
+    ),
+    # ---- Pilates mat, in the classical order ----
+    "the_hundred": ExerciseStandard(
+        exercise="the_hundred",
+        angles=[
+            _straight("left_knee", "the legs were not fully extended", "the legs stayed long"),
+            _straight("right_knee", "the legs were not fully extended"),
+            AngleTarget("left_hip", 30, 90, "the legs were not held at a steady angle"),
+            AngleTarget("right_hip", 30, 90, "the legs were not held at a steady angle"),
+        ],
+        symmetry=[SymmetryTarget("knee", 8, "one leg was more bent than the other"),
+                  SymmetryTarget("hip", 8, "one leg was held higher than the other")],
+    ),
+    "roll_up": ExerciseStandard(
+        exercise="roll_up",
+        angles=[
+            _straight("left_knee", "the knees bent to help the roll up",
+                      "the legs stayed straight throughout"),
+            _straight("right_knee", "the knees bent to help the roll up"),
+        ],
+        symmetry=[SymmetryTarget("knee", 8, "one knee bent more than the other")],
+        tempo_seconds=(4.0, 8.0),
+    ),
+    "single_leg_circle": ExerciseStandard(
+        exercise="single_leg_circle",
+        angles=[AngleTarget("trunk", 0, 20, "the torso lifted off the mat",
+                            "the torso stayed settled on the mat")],
+        asymmetric_by_design=True,
+        notes="One leg circles while the other stays down, so the legs are not compared.",
+    ),
+    "rolling_like_a_ball": ExerciseStandard(
+        exercise="rolling_like_a_ball",
+        angles=[
+            AngleTarget("left_knee", 20, 80, "the tuck opened up during the roll",
+                        "the tuck stayed tight"),
+            AngleTarget("right_knee", 20, 80, "the tuck opened up during the roll"),
+        ],
+        symmetry=[SymmetryTarget("knee", 10, "the tuck was uneven")],
+        tempo_seconds=(2.0, 5.0),
+    ),
+    "single_leg_stretch": ExerciseStandard(
+        exercise="single_leg_stretch",
+        angles=[AngleTarget("trunk", 5, 45, "the head and chest dropped back to the mat",
+                            "the curl was held throughout")],
+        asymmetric_by_design=True,
+        notes="One knee is drawn in while the other extends, so the legs "
+              "differing is the exercise working, not a fault.",
+        tempo_seconds=(1.0, 3.0),
+    ),
+    "double_leg_stretch": ExerciseStandard(
+        exercise="double_leg_stretch",
+        angles=[
+            _straight("left_knee", "the legs did not fully extend", "the legs reached long"),
+            _straight("right_knee", "the legs did not fully extend"),
+            AngleTarget("trunk", 5, 45, "the curl was lost as the legs extended",
+                        "the curl held as the legs extended"),
+        ],
+        symmetry=[SymmetryTarget("knee", 8, "one leg extended further than the other")],
+        tempo_seconds=(2.0, 5.0),
+    ),
+    "spine_stretch_forward": ExerciseStandard(
+        exercise="spine_stretch_forward",
+        angles=[
+            _straight("left_knee", "the knees bent during the reach",
+                      "the legs stayed straight"),
+            _straight("right_knee", "the knees bent during the reach"),
+            AngleTarget("left_hip", 30, 90, "the fold did not come from the hips"),
+            AngleTarget("right_hip", 30, 90, "the fold did not come from the hips"),
+        ],
+        symmetry=[SymmetryTarget("hip", 10, "the reach was further on one side")],
+        tempo_seconds=(4.0, 8.0),
+    ),
+    "swan": ExerciseStandard(
+        exercise="swan",
+        angles=[
+            AngleTarget("left_hip", 160, 190, "the hips lifted off the mat",
+                        "the hips stayed down as the chest lifted"),
+            AngleTarget("right_hip", 160, 190, "the hips lifted off the mat"),
+            _straight("left_knee", "the legs were not held long"),
+            _straight("right_knee", "the legs were not held long"),
+        ],
+        symmetry=[SymmetryTarget("elbow", 12, "the arms pressed unevenly")],
+    ),
+    "single_leg_kick": ExerciseStandard(
+        exercise="single_leg_kick",
+        angles=[AngleTarget("left_hip", 150, 190, "the hips lifted off the mat",
+                            "the hips stayed down")],
+        asymmetric_by_design=True,
+        notes="The legs alternate, so they are not compared.",
+        tempo_seconds=(1.0, 3.0),
+    ),
+    "neck_pull": ExerciseStandard(
+        exercise="neck_pull",
+        angles=[
+            _straight("left_knee", "the knees bent to assist", "the legs stayed straight"),
+            _straight("right_knee", "the knees bent to assist"),
+        ],
+        symmetry=[SymmetryTarget("knee", 8, "one knee bent more than the other")],
+        tempo_seconds=(4.0, 8.0),
     ),
     "bridge": ExerciseStandard(
         exercise="bridge",
@@ -358,17 +651,72 @@ DEFAULT_STANDARDS: dict[str, ExerciseStandard] = {
             AngleTarget("left_knee", 80, 110, "the feet were too far from the hips"),
             AngleTarget("right_knee", 80, 110, "the feet were too far from the hips"),
         ],
-        symmetry=[SymmetryTarget("hip", 8, "one hip lifted higher than the other")],
+        symmetry=[SymmetryTarget("hip", 8, "one hip lifted higher than the other"),
+                  SymmetryTarget("knee", 8, "the feet were not level")],
         tempo_seconds=(3.0, 6.0),
     ),
-    "the_hundred": ExerciseStandard(
-        exercise="the_hundred",
+    "teaser": ExerciseStandard(
+        exercise="teaser",
         angles=[
-            AngleTarget("left_knee", 160, 185, "the legs were not fully extended",
-                        "the legs stayed long"),
-            AngleTarget("right_knee", 160, 185, "the legs were not fully extended"),
+            _straight("left_knee", "the knees bent to reach the position",
+                      "the legs stayed straight in the V"),
+            _straight("right_knee", "the knees bent to reach the position"),
+            AngleTarget("left_hip", 40, 100, "the V shape was not reached"),
+            AngleTarget("right_hip", 40, 100, "the V shape was not reached"),
         ],
         symmetry=[SymmetryTarget("knee", 8, "one leg was more bent than the other")],
+        tempo_seconds=(4.0, 9.0),
+    ),
+    "swimming": ExerciseStandard(
+        exercise="swimming",
+        angles=[
+            _straight("left_knee", "the legs were not held long"),
+            _straight("right_knee", "the legs were not held long"),
+        ],
+        asymmetric_by_design=True,
+        notes="Opposite arm and leg lift together, so the sides are meant to differ.",
+        tempo_seconds=(0.5, 2.0),
+    ),
+    "leg_pull_front": ExerciseStandard(
+        exercise="leg_pull_front",
+        angles=[
+            AngleTarget("left_hip", 160, 185, "the hips dropped out of the plank line",
+                        "the plank line held as the leg lifted"),
+            AngleTarget("right_hip", 160, 185, "the hips dropped out of the plank line"),
+            _straight("left_elbow", "the supporting arms bent"),
+            _straight("right_elbow", "the supporting arms bent"),
+        ],
+        asymmetric_by_design=True,
+        notes="One leg lifts at a time, so the legs are not compared.",
+    ),
+    "side_plank": ExerciseStandard(
+        exercise="side_plank",
+        angles=[
+            _straight("left_knee", "the legs were not held straight",
+                      "the legs stayed long"),
+            _straight("right_knee", "the legs were not held straight"),
+        ],
+        asymmetric_by_design=True,
+        notes="Only one arm supports, so the arms are not compared.",
+    ),
+    "seal": ExerciseStandard(
+        exercise="seal",
+        angles=[
+            AngleTarget("left_knee", 30, 90, "the tuck opened up during the roll"),
+            AngleTarget("right_knee", 30, 90, "the tuck opened up during the roll"),
+        ],
+        symmetry=[SymmetryTarget("knee", 12, "the tuck was uneven")],
+        tempo_seconds=(2.0, 5.0),
+    ),
+    "push_up": ExerciseStandard(
+        exercise="push_up",
+        angles=[
+            AngleTarget("left_hip", 160, 185, "the hips dropped or piked",
+                        "the body held one line"),
+            AngleTarget("right_hip", 160, 185, "the hips dropped or piked"),
+        ],
+        symmetry=[SymmetryTarget("elbow", 10, "one arm bent more than the other")],
+        tempo_seconds=(1.5, 4.0),
     ),
 }
 

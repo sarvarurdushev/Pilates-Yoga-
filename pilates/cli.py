@@ -400,8 +400,16 @@ def cmd_coach(args: argparse.Namespace) -> int:
     from .movement import SessionRecorder, summarise
 
     standards = load_standards(args.standards) if args.standards else DEFAULT_STANDARDS
+    from .coaching import UNSUITABLE
+
     standard = standards.get(args.exercise)
     if standard is None:
+        if args.exercise in UNSUITABLE:
+            print(f"{args.exercise} is not assessed from a single camera: "
+                  f"{UNSUITABLE[args.exercise]}.", file=sys.stderr)
+            print("This is not a missing feature. A second camera at an angle "
+                  "would be needed.", file=sys.stderr)
+            return 1
         print(f"No standard for {args.exercise!r}. Known: "
               f"{', '.join(sorted(standards))}", file=sys.stderr)
         print("Standards are data -- write your own with --standards.", file=sys.stderr)

@@ -446,21 +446,54 @@ system to produce something that sounds authoritative and is not:
 Medians are used rather than means, so one badly-estimated frame cannot move a
 verdict — there is a test for exactly that.
 
-### The standards are data
+### What is covered
 
-`DEFAULT_STANDARDS` covers mountain, standing side bend, plank, warrior two,
-bridge and the hundred. They are starting points from general movement
-principles, **not received truth**, and they are stored as data so a studio can
-replace them:
+**36 standards**, covering the classical Pilates mat order from Joseph Pilates'
+*Return to Life Through Contrology* -- the hundred, roll up, single leg circle,
+rolling like a ball, single and double leg stretch, spine stretch forward, swan,
+single leg kick, neck pull, bridge, teaser, swimming, leg pull front, seal --
+and the yoga poses that recur in nearly every class: the sun salutation
+(mountain, upward salute, forward fold, half lift, chaturanga, upward dog,
+downward dog, plank, cobra) and the standing series (warriors one to three,
+chair, lunges, tree, child's pose).
+
+They encode **pose geometry**, which is definitional: a plank has a straight
+line from shoulder to hip, a chaturanga bends the elbows to about a right angle.
+They are not clinical judgements, the tolerances are deliberately generous, and
+an instructor should read them before they are used with students. They are
+data, so that is an edit rather than a code change:
 
 ```bash
 python -m pilates coach class.mov --exercise my_move --standards our_studio.json
 ```
 
-One standard is deliberately incomplete. `standing_side_bend` checks the knees
-and hips but **not** the trunk, because a side bend and a back bend look alike
-from a single camera — a trunk target there would confidently measure the wrong
-thing. The omission is documented in the standard itself.
+### Two kinds of deliberate gap
+
+**Exercises one camera cannot judge.** Eight are named and refused with a
+reason rather than left as unknowns, because they are not features waiting to
+be built -- the measurement is not in a flat image:
+
+```
+$ python -m pilates coach class.mov --exercise spine_twist
+spine_twist is not assessed from a single camera: rotation happens in the
+camera's depth axis and barely changes the image.
+This is not a missing feature. A second camera at an angle would be needed.
+```
+
+That list is `spine_twist`, `seated_twist`, `saw`, `corkscrew`, `side_kick`,
+`eagle`, `triangle` and `savasana`. Triangle is there for the reason measured
+earlier: like a side bend, it is confusable with a back bend from one view.
+`standing_side_bend` and `standing_back_bend` do have standards, but neither
+checks the trunk, and both say so in their own notes.
+
+**Exercises where the two sides are meant to differ.** Twelve are flagged
+`asymmetric_by_design` -- every warrior, both lunges, tree, single leg stretch,
+single leg kick, single leg circle, leg pull front, side plank, swimming.
+Symmetry is never reported for these, because telling a student their knees do
+not match during a lunge is telling them off for doing the exercise correctly.
+The flag is enforced in the assessment code, not merely respected by the data,
+so a symmetry target added to one of them by mistake is ignored rather than
+obeyed.
 
 ### Findings are checked against confounds
 

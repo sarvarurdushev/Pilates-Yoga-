@@ -12,7 +12,7 @@ from __future__ import annotations
 from .classifier import (Evaluation, ExerciseClassifier, evaluate,
                          featurise, majority_baseline, window_features)
 from .coaching import (DEFAULT_STANDARDS, AngleTarget, Assessment, ExerciseStandard,
-                       Finding, SymmetryTarget, assess, assess_tempo, narrate)
+                       Finding, SymmetryTarget, assess, assess_tempo, narrate, UNSUITABLE)
 from .config import StudioConfig
 from .dataset import (Example, LoadedDataset, build_from_video, feature_vector,
                       load_datasets, normalise_keypoints)
@@ -37,7 +37,7 @@ __version__ = "0.1.0"
 __all__ = [
     "StudioConfig", "ExclusionZone", "ExerciseStandard", "AngleTarget",
     "SymmetryTarget", "Assessment", "Finding", "assess", "assess_tempo",
-    "narrate", "DEFAULT_STANDARDS", "ExerciseClassifier", "Evaluation", "evaluate",
+    "narrate", "DEFAULT_STANDARDS", "UNSUITABLE", "ExerciseClassifier", "Evaluation", "evaluate",
     "featurise", "window_features", "majority_baseline", "LabelSet", "Segment", "LabelError", "VOCABULARY",
     "scaffold", "Shot", "detect_shots", "HistoryStore", "SessionRecord",
     "Measurement", "Trend", "measure_session", "progress_report", "Example", "build_from_video",

@@ -50,12 +50,13 @@ class TestAssess:
         assert not result.improve
 
     def test_a_bent_knee_is_flagged_with_its_number(self):
-        angles = dict(STRAIGHT, left_knee=140.0)
-        result = assess(history(angles), DEFAULT_STANDARDS["mountain"])
+        standard = DEFAULT_STANDARDS["mountain"]
+        target = next(t for t in standard.angles if t.joint == "left_knee")
+        result = assess(history(dict(STRAIGHT, left_knee=140.0)), standard)
         knee = [f for f in result.improve if f.subject == "left_knee"]
         assert knee
         assert knee[0].measured == pytest.approx(140.0)
-        assert knee[0].deviation == pytest.approx(25.0)
+        assert knee[0].deviation == pytest.approx(target.deviation(140.0))
 
     def test_nothing_is_said_without_a_measurement(self):
         """Every claim must carry the number it came from."""
@@ -143,9 +144,11 @@ class TestNarration:
         assert "Going well" in text and "Worth working on" in text
 
     def test_includes_the_measurement(self):
-        angles = dict(STRAIGHT, left_knee=140.0)
-        text = narrate(assess(history(angles), DEFAULT_STANDARDS["mountain"]))
-        assert "140" in text and "165-185" in text
+        standard = DEFAULT_STANDARDS["mountain"]
+        target = next(t for t in standard.angles if t.joint == "left_knee")
+        text = narrate(assess(history(dict(STRAIGHT, left_knee=140.0)), standard))
+        assert "140" in text
+        assert f"{target.low:.0f}-{target.high:.0f}" in text
 
     def test_says_so_when_nothing_is_wrong(self):
         text = narrate(assess(history(STRAIGHT), DEFAULT_STANDARDS["mountain"]))
@@ -187,3 +190,95 @@ class TestStandardsAreData:
         joints = {a.joint for a in DEFAULT_STANDARDS["standing_side_bend"].angles}
         assert "trunk" not in joints
         assert DEFAULT_STANDARDS["standing_side_bend"].notes
+
+
+class TestStandardsCoverage:
+    def test_covers_the_classical_pilates_mat_order(self):
+        for name in ("the_hundred", "roll_up", "single_leg_circle",
+                     "rolling_like_a_ball", "single_leg_stretch",
+                     "double_leg_stretch", "spine_stretch_forward", "swan",
+                     "single_leg_kick", "neck_pull", "bridge", "teaser",
+                     "swimming", "leg_pull_front", "seal"):
+            assert name in DEFAULT_STANDARDS, name
+
+    def test_covers_the_sun_salutation(self):
+        for name in ("mountain", "upward_salute", "forward_fold", "half_lift",
+                     "chaturanga", "upward_dog", "downward_dog", "plank"):
+            assert name in DEFAULT_STANDARDS, name
+
+    def test_every_standard_names_its_own_exercise(self):
+        for name, standard in DEFAULT_STANDARDS.items():
+            assert standard.exercise == name
+
+    def test_every_target_uses_a_real_signal(self):
+        from pilates.movement import CANDIDATE_SIGNALS
+        for standard in DEFAULT_STANDARDS.values():
+            for target in standard.angles:
+                assert target.joint in CANDIDATE_SIGNALS, target.joint
+
+    def test_every_cue_is_written_for_a_person(self):
+        for standard in DEFAULT_STANDARDS.values():
+            for target in standard.angles:
+                assert len(target.cue.split()) >= 3, target.cue
+                assert not target.cue.endswith("."), target.cue
+
+    def test_ranges_are_the_right_way_round(self):
+        for standard in DEFAULT_STANDARDS.values():
+            for target in standard.angles:
+                assert target.low < target.high, f"{standard.exercise}/{target.joint}"
+
+
+class TestAsymmetricByDesign:
+    """A lunge, a single leg stretch and any warrior are meant to be uneven.
+    Flagging that would be telling a student off for doing it correctly."""
+
+    def test_one_sided_exercises_are_marked(self):
+        for name in ("warrior_two", "low_lunge", "tree", "single_leg_stretch",
+                     "single_leg_kick", "single_leg_circle", "leg_pull_front"):
+            assert DEFAULT_STANDARDS[name].asymmetric_by_design, name
+
+    def test_two_sided_exercises_are_not(self):
+        for name in ("mountain", "plank", "bridge", "the_hundred", "downward_dog"):
+            assert not DEFAULT_STANDARDS[name].asymmetric_by_design, name
+
+    def test_no_symmetry_finding_is_produced_for_them(self):
+        angles = dict(STRAIGHT, left_knee=90.0, right_knee=175.0)   # a lunge shape
+        result = assess(history(angles, trunk=88.0), DEFAULT_STANDARDS["warrior_two"])
+        assert not any("symmetry" in f.subject for f in result.findings)
+
+    def test_the_same_shape_is_flagged_where_it_should_be(self):
+        angles = dict(STRAIGHT, left_knee=90.0, right_knee=175.0)
+        result = assess(history(angles), DEFAULT_STANDARDS["mountain"])
+        assert any("symmetry" in f.subject for f in result.improve)
+
+    def test_a_symmetry_target_is_ignored_if_wrongly_added(self):
+        from pilates.coaching import ExerciseStandard, SymmetryTarget
+        standard = ExerciseStandard(
+            exercise="x", symmetry=[SymmetryTarget("knee", 2, "uneven")],
+            asymmetric_by_design=True,
+        )
+        angles = dict(STRAIGHT, left_knee=90.0, right_knee=175.0)
+        assert assess(history(angles), standard).findings == []
+
+
+class TestUnsuitable:
+    """Some exercises are not gaps waiting to be filled: the measurement is not
+    in a flat image."""
+
+    def test_rotation_exercises_are_excluded(self):
+        from pilates.coaching import UNSUITABLE
+        for name in ("spine_twist", "seated_twist", "saw", "corkscrew"):
+            assert name in UNSUITABLE
+
+    def test_exclusions_are_not_also_standards(self):
+        from pilates.coaching import UNSUITABLE
+        assert not set(UNSUITABLE) & set(DEFAULT_STANDARDS)
+
+    def test_every_exclusion_gives_a_reason(self):
+        from pilates.coaching import UNSUITABLE
+        for name, reason in UNSUITABLE.items():
+            assert len(reason.split()) >= 5, name
+
+    def test_triangle_is_excluded_for_the_measured_reason(self):
+        from pilates.coaching import UNSUITABLE
+        assert "back bend" in UNSUITABLE["triangle"]
