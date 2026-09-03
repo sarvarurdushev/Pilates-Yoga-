@@ -7,7 +7,7 @@ This is the foundation layer: **video in, tracked people with joint angles
 out.** Scoring, coaching feedback and dashboards sit on top of it later.
 
 ```
-video ─→ RTMO pose ─→ exclusion zones ─→ de-duplication ─→ tracking ─→ geometry ─→ movement ─→ coaching ─→ report
+video ─→ RTMO pose ─→ exclusion zones ─→ de-duplication ─→ tracking ─→ geometry ─→ movement ─→ load ─→ coaching ─→ report
               │             │                  │              │           │
         every person   drop mirror        one skeleton    stable       angles,
         in one pass    reflections        per body        student IDs  symmetry
@@ -407,6 +407,68 @@ The training command also refuses to flatter itself in the obvious ways: it
 prints the majority-class baseline first, warns when there are too few distinct
 students for the grouped score to mean anything, and warns when two classes
 make a coin flip look competent.
+
+## Mechanical load, not just shape
+
+A joint angle says what a position looked like. It says nothing about effort. A
+leg held at 45 degrees by someone tall and heavy is a different demand from the
+same angle on someone small, and no angle can tell them apart.
+
+```bash
+python -m pilates load class.mov --mass 62 --height 1.68 --student 2
+```
+
+```
+--- Student #2 (155 frames) ---
+  joint           peak moment
+  right_hip           43.9 Nm
+  right_shoulder       8.7 Nm
+  right_knee           6.6 Nm
+
+  carried by:
+    hip flexors          peak  43.9 Nm, typical  33.1 Nm
+    shoulder extensors   peak   8.7 Nm, typical   7.6 Nm
+    knee flexors         peak   6.6 Nm, typical   5.1 Nm
+```
+
+Joint moments come from inverse dynamics over Winter's segment masses. This is
+standard biomechanics and it is validated: [OpenCap](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10586693/)
+reports joint-moment errors of 1.34% of body mass times height from smartphone
+video against force plates.
+
+**Which muscle group** follows from the moment by mechanics rather than
+inference: a net knee-extension moment must be produced by the knee extensors,
+because nothing else crosses that joint in that direction.
+
+### Where this refuses
+
+- **A weight-bearing limb.** Once a foot is on the floor an unmeasured ground
+  reaction force dominates, so the joint is reported as not estimable rather
+  than given a number wrong by an unknown amount.
+- **Individual muscles.** Splitting load between synergists needs static
+  optimisation, which [correlates with measured EMG at 0.26 to 0.48](https://jneuroengrehab.biomedcentral.com/articles/10.1186/s12984-024-01490-y).
+  "Your gluteus maximus was at 62%" would be invention with a decimal point.
+- **Nerves and cognitive effect.** Not observable from video by any method.
+
+`docs/what-cannot-be-measured.md` sets out all three tiers and what would move
+a line.
+
+### Two bugs this layer caught on real footage
+
+Both produced confident, plausible, wrong numbers, which is the failure mode
+that matters here.
+
+**Scale.** The first version divided body height by the skeleton's vertical
+extent — which silently assumes the person is standing. On a mat the vertical
+extent collapses and the scale inflates: it reported **354 Nm at the hip** of a
+62 kg student, which would need a four-metre thigh. Scale now comes from limb
+lengths, which do not change with posture.
+
+**Direction.** The first version read flexion or extension from which side of
+the joint the weight sat. That is not enough: a supine leg raise and a prone leg
+lift put the weight on opposite sides of the hip and load *opposite* muscle
+groups. It now perturbs the limb the way gravity pulls and sees which way the
+joint angle moves.
 
 ## Coaching notes
 

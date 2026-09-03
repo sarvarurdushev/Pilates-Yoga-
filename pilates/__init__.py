@@ -13,6 +13,9 @@ from .classifier import (Evaluation, ExerciseClassifier, evaluate,
                          featurise, majority_baseline, window_features)
 from .coaching import (DEFAULT_STANDARDS, AngleTarget, Assessment, ExerciseStandard,
                        Finding, SymmetryTarget, assess, assess_tempo, narrate, UNSUITABLE)
+from .biomechanics import (MUSCLE_GROUPS, SEGMENTS, JointLoad, LoadReport,
+                           MuscleGroup, NotComputable, analyse_frame,
+                           classify_contraction, gravitational_moment)
 from .classroom import (ClassPattern, ClassResult, CoverageCheck, Roster,
                         StudentResult, check_coverage, class_patterns, run_class)
 from .config import StudioConfig
@@ -46,6 +49,8 @@ __all__ = [
     "featurise", "window_features", "majority_baseline", "LabelSet", "Segment", "LabelError", "VOCABULARY",
     "scaffold", "Shot", "detect_shots", "HistoryStore", "SessionRecord",
     "Measurement", "Trend", "measure_session", "progress_report",
+    "JointLoad", "LoadReport", "MuscleGroup", "MUSCLE_GROUPS", "SEGMENTS",
+    "analyse_frame", "gravitational_moment", "classify_contraction", "NotComputable",
     "Check", "VideoFacts", "check_environment", "environment_ready",
     "inspect_video", "quickstart",
     "Roster", "ClassResult", "ClassPattern", "StudentResult", "CoverageCheck",

@@ -17,6 +17,7 @@
     python -m pilates class VIDEO --labels l.json --roster r.json  # the whole class
     python -m pilates doctor                          # is this machine ready?
     python -m pilates quickstart VIDEO                # the exact steps for your video
+    python -m pilates load VIDEO --mass 68 --height 1.68  # joint load, not just shape
 """
 from __future__ import annotations
 
@@ -585,6 +586,74 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_load(args: argparse.Namespace) -> int:
+    """Report mechanical load at each joint, and which muscle group carries it."""
+    import statistics
+
+    from .biomechanics import analyse_frame
+    from .movement import SessionRecorder
+
+    config = _load_config(args.config)
+    if args.stride is not None:
+        config.frame_stride = args.stride
+    pipeline = Pipeline(config)
+    recorder = SessionRecorder(keypoint_threshold=config.keypoint_threshold)
+
+    peaks: dict[int, dict[str, float]] = {}
+    groups: dict[int, dict[str, list[float]]] = {}
+    skipped: dict[int, dict[str, str]] = {}
+
+    with VideoSource(args.video, stride=config.frame_stride,
+                     start_frame=args.start, end_frame=args.end) as source:
+        for result in pipeline.run(source):
+            recorder.observe(result)
+            for person in result.people:
+                if args.student is not None and person.track_id != args.student:
+                    continue
+                report = analyse_frame(person.detection, args.mass, args.height,
+                                       config.keypoint_threshold)
+                for load in report.loads:
+                    peaks.setdefault(person.track_id, {})
+                    peaks[person.track_id][load.joint] = max(
+                        peaks[person.track_id].get(load.joint, 0.0), load.moment_nm)
+                    if load.group is not None:
+                        groups.setdefault(person.track_id, {}).setdefault(
+                            load.group.name, []).append(load.moment_nm)
+                for joint, reason in report.skipped.items():
+                    skipped.setdefault(person.track_id, {})[joint] = reason
+
+    if not peaks:
+        print("No joint load could be estimated. Every limb was either bearing "
+              "weight\nthrough the floor or not fully visible.", file=sys.stderr)
+        for track_id, reasons in list(skipped.items())[:1]:
+            for joint, reason in list(reasons.items())[:3]:
+                print(f"  {joint}: {reason}", file=sys.stderr)
+        return 1
+
+    print(f"Body mass {args.mass:.0f} kg, height {args.height:.2f} m\n")
+    for track_id in sorted(peaks):
+        history = recorder.histories.get(track_id)
+        frames = len(history.samples) if history else 0
+        print(f"--- Student #{track_id} ({frames} frames) ---")
+        print(f"  {'joint':<14}{'peak moment':>13}")
+        for joint, moment in sorted(peaks[track_id].items(), key=lambda kv: -kv[1]):
+            print(f"  {joint:<14}{moment:>10.1f} Nm")
+        if track_id in groups:
+            print("\n  carried by:")
+            for name, values in sorted(groups[track_id].items(),
+                                       key=lambda kv: -max(kv[1])):
+                print(f"    {name:<20} peak {max(values):5.1f} Nm, "
+                      f"typical {statistics.median(values):5.1f} Nm")
+        for joint, reason in sorted(skipped.get(track_id, {}).items())[:3]:
+            print(f"\n  not estimated for {joint}: {reason}")
+        print()
+
+    print("Joint moments are modelled, not measured: segment masses are "
+          "population\naverages and only gravity is included. See "
+          "docs/what-cannot-be-measured.md.")
+    return 0
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     """Check this machine can actually run an analysis."""
     from .diagnostics import check_environment, environment_ready
@@ -1015,6 +1084,17 @@ def main(argv: list[str] | None = None) -> int:
     pr.add_argument("--store", required=True, help="history file")
     pr.add_argument("--exercise", default=None, help="default: every exercise recorded")
     pr.set_defaults(func=cmd_progress)
+
+    ld = sub.add_parser("load", help="joint load and the muscle group carrying it")
+    ld.add_argument("video")
+    ld.add_argument("--mass", type=float, required=True, help="body mass in kg")
+    ld.add_argument("--height", type=float, required=True, help="body height in metres")
+    ld.add_argument("--config", default=None)
+    ld.add_argument("--student", type=int, default=None)
+    ld.add_argument("--start", type=int, default=0)
+    ld.add_argument("--end", type=int, default=None)
+    ld.add_argument("--stride", type=int, default=None)
+    ld.set_defaults(func=cmd_load)
 
     dr = sub.add_parser("doctor", help="check this machine can run an analysis")
     dr.set_defaults(func=cmd_doctor)
