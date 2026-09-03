@@ -7,7 +7,7 @@ This is the foundation layer: **video in, tracked people with joint angles
 out.** Scoring, coaching feedback and dashboards sit on top of it later.
 
 ```
-video ─→ RTMO pose ─→ exclusion zones ─→ de-duplication ─→ tracking ─→ geometry ─→ movement ─→ coaching
+video ─→ RTMO pose ─→ exclusion zones ─→ de-duplication ─→ tracking ─→ geometry ─→ movement ─→ coaching ─→ report
               │             │                  │              │           │
         every person   drop mirror        one skeleton    stable       angles,
         in one pass    reflections        per body        student IDs  symmetry
@@ -503,6 +503,38 @@ edge of frame are viewed obliquely. Measured, the flagged students sat at x=615,
 162 and 518 in a 1280-wide frame, while the student at the most extreme edge
 (x=1138) was **not** flagged. No correlation with frame position, so the
 asymmetry is real rather than an artefact of where someone stood.
+
+## Student reports
+
+```bash
+python -m pilates report class.mov --exercise mountain \
+    --name "Anna" --student 4 --history studio_history.json \
+    --studio "Riverside Studio" --out anna.html
+```
+
+A single self-contained HTML page a studio can email, print or hand over on a
+tablet. No external assets, no scripts, nothing that phones home -- a test
+asserts that, because a report about a named person should not be fetching
+anything when it is opened.
+
+The page leads with one thing to work on, then what went well, what the student
+actually did, and how it compares with their earlier sessions. Every observation
+carries the number behind it and the range it was compared against.
+
+The honesty rules matter more here than anywhere else in the system, because a
+printed page reads as more authoritative than a terminal and the student cannot
+check it:
+
+- anything unmeasurable gets its own **Could not be judged** section rather than
+  being quietly dropped;
+- progress is only claimed where a change cleared that student's own
+  session-to-session variation -- there is a test that noise reaches the printed
+  page as "steady", never as "improved";
+- the footer states that these are geometric observations, not health advice,
+  and says how many frames and what pose confidence they came from.
+
+Names and free text are escaped, with tests for that: a student called
+`<script>` must not become one.
 
 ## Session history
 

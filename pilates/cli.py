@@ -12,6 +12,7 @@
     python -m pilates calibrate points.json --out floor.json  # link two cameras
     python -m pilates coach VIDEO --exercise plank    # coaching notes for a student
     python -m pilates progress "Anna" --exercise plank  # how a student has changed
+    python -m pilates report VIDEO --exercise plank --name "Anna"  # take-away page
 """
 from __future__ import annotations
 
@@ -529,6 +530,57 @@ def cmd_progress(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_report(args: argparse.Namespace) -> int:
+    """Write a take-away HTML report for one student."""
+    from .coaching import DEFAULT_STANDARDS, UNSUITABLE, assess, load_standards
+    from .history import HistoryStore
+    from .movement import SessionRecorder, summarise
+    from .report import build, write
+
+    standards = load_standards(args.standards) if args.standards else DEFAULT_STANDARDS
+    standard = standards.get(args.exercise)
+    if standard is None:
+        if args.exercise in UNSUITABLE:
+            print(f"{args.exercise} is not assessed from a single camera: "
+                  f"{UNSUITABLE[args.exercise]}.", file=sys.stderr)
+            return 1
+        print(f"No standard for {args.exercise!r}. Known: "
+              f"{', '.join(sorted(standards))}", file=sys.stderr)
+        return 1
+
+    config = _load_config(args.config)
+    if args.stride is not None:
+        config.frame_stride = args.stride
+    pipeline = Pipeline(config)
+    recorder = SessionRecorder(keypoint_threshold=config.keypoint_threshold)
+
+    with VideoSource(args.video, stride=config.frame_stride,
+                     start_frame=args.start, end_frame=args.end) as source:
+        for result in pipeline.run(source):
+            recorder.observe(result)
+
+    history = recorder.histories.get(args.student)
+    if history is None or len(history.samples) < args.min_samples:
+        print(f"Student #{args.student} was not tracked long enough to report on.",
+              file=sys.stderr)
+        return 1
+
+    store = HistoryStore.load(args.history) if args.history else None
+    report = build(
+        student=args.name, exercise=standard.exercise,
+        assessment=assess(history, standard, config.keypoint_threshold),
+        summary=summarise(history), store=store, date=args.date, studio=args.studio,
+    )
+    out = write(report, args.out or f"{args.name.replace(' ', '_')}_{report.date}.html")
+    print(f"report -> {out}")
+    print(f"  {len(report.assessment.good)} thing(s) going well, "
+          f"{len(report.assessment.improve)} to work on, "
+          f"{len(report.assessment.unmeasured)} not measurable")
+    if report.sessions_recorded:
+        print(f"  includes progress across {report.sessions_recorded} recorded session(s)")
+    return 0
+
+
 def cmd_calibrate(args: argparse.Namespace) -> int:
     """Fit the floor homography linking two camera views.
 
@@ -755,6 +807,23 @@ def main(argv: list[str] | None = None) -> int:
     pr.add_argument("--store", required=True, help="history file")
     pr.add_argument("--exercise", default=None, help="default: every exercise recorded")
     pr.set_defaults(func=cmd_progress)
+
+    rp = sub.add_parser("report", help="write a take-away HTML report for a student")
+    rp.add_argument("video")
+    rp.add_argument("--exercise", required=True)
+    rp.add_argument("--name", required=True, help="the student's name, for the page")
+    rp.add_argument("--student", type=int, required=True, help="their track id")
+    rp.add_argument("--config", default=None)
+    rp.add_argument("--standards", default=None)
+    rp.add_argument("--history", default=None, help="history file, to include progress")
+    rp.add_argument("--out", default=None)
+    rp.add_argument("--studio", default="", help="studio name for the header")
+    rp.add_argument("--date", default=None)
+    rp.add_argument("--start", type=int, default=0)
+    rp.add_argument("--end", type=int, default=None)
+    rp.add_argument("--stride", type=int, default=None)
+    rp.add_argument("--min-samples", type=int, default=10)
+    rp.set_defaults(func=cmd_report)
 
     k = sub.add_parser("calibrate", help="fit the floor homography linking two views")
     k.add_argument("points", help="JSON with matching floor points from both views")

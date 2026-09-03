@@ -19,6 +19,7 @@ from .dataset import (Example, LoadedDataset, build_from_video, feature_vector,
 from .history import (HistoryStore, Measurement, SessionRecord, Trend,
                       measure_session, progress_report)
 from .labels import VOCABULARY, LabelError, LabelSet, Segment, scaffold
+from .report import StudentReport, build as build_report, render, write as write_report
 from .shots import Shot, detect_shots
 from .filters import ExclusionZone
 from .appearance import describe, similarity
@@ -40,7 +41,8 @@ __all__ = [
     "narrate", "DEFAULT_STANDARDS", "UNSUITABLE", "ExerciseClassifier", "Evaluation", "evaluate",
     "featurise", "window_features", "majority_baseline", "LabelSet", "Segment", "LabelError", "VOCABULARY",
     "scaffold", "Shot", "detect_shots", "HistoryStore", "SessionRecord",
-    "Measurement", "Trend", "measure_session", "progress_report", "Example", "build_from_video",
+    "Measurement", "Trend", "measure_session", "progress_report",
+    "StudentReport", "build_report", "render", "write_report", "Example", "build_from_video",
     "feature_vector", "normalise_keypoints", "LoadedDataset", "load_datasets", "Pipeline", "PipelineStats", "VideoSource",
     "RTMOBackend", "StubBackend", "TiledBackend", "IoUTracker", "TrackerConfig",
     "Detection", "FrameResult", "TrackedPerson",
