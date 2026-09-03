@@ -250,3 +250,94 @@ def build(
         assessment=assessment, summary=summary,
         trends=trends, sessions_recorded=sessions, studio=studio,
     )
+
+
+CLASS_STYLE = STYLE + """
+.pattern { border-left:3px solid var(--work); background:#fff; padding:12px 14px;
+           margin:10px 0; border:1px solid var(--rule); }
+.pattern .who { color:var(--muted); font-size:13px; margin-top:4px; }
+.count { font-variant-numeric:tabular-nums; font-weight:700; color:var(--work); }
+.roll td:first-child { font-weight:600; }
+.pill { display:inline-block; font-size:12px; padding:1px 7px; border-radius:9px;
+        background:#eef2f7; color:var(--accent); margin-left:6px;
+        font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+.pill.work { background:#fdf2e3; color:var(--work); }
+"""
+
+
+def render_class_summary(result, patterns, studio: str = "") -> str:
+    """The teacher's page: what the class as a whole did.
+
+    Individual reports do not show that six of eight students had the same
+    problem, which is the observation that changes what gets taught next week.
+    """
+    parts: list[str] = [
+        "<!doctype html><html lang='en'><head><meta charset='utf-8'>",
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>",
+        f"<title>Class summary &mdash; {_e(result.video)}</title>",
+        f"<style>{CLASS_STYLE}</style></head><body><div class='sheet'>",
+        "<header><h1>Class summary</h1>",
+        f"<div class='sub'>{_e(result.video)}"
+        + (f" &middot; {_e(result.date)}" if result.date else "")
+        + (f" &middot; {_e(studio)}" if studio else "")
+        + "</div></header>",
+    ]
+
+    names = result.names
+    parts.append(
+        f"<p class='muted'>{len(names)} student"
+        f"{'s' if len(names) != 1 else ''} assessed across "
+        f"{len(result.exercises)} exercise"
+        f"{'s' if len(result.exercises) != 1 else ''}: "
+        f"{_e(', '.join(e.replace('_', ' ') for e in result.exercises))}.</p>"
+    )
+    if result.skipped_unnamed:
+        parts.append(
+            "<p class='muted'>Not reported on, because the roster has no name for "
+            f"them: {_e(', '.join(f'student {t}' for t in result.skipped_unnamed))}."
+            "</p>"
+        )
+
+    if patterns:
+        parts.append("<h2 class='work'>What the class found hard</h2>")
+        for pattern in patterns:
+            parts.append(
+                "<div class='pattern'>"
+                f"<span class='count'>{pattern.affected} of {pattern.measured}</span> "
+                f"students &mdash; {_e(pattern.message)}"
+                f"<span class='pill'>{_e(pattern.exercise.replace('_', ' '))}</span>"
+                f"<div class='who'>{_e(', '.join(pattern.students))}</div></div>"
+            )
+    else:
+        parts.append(
+            "<h2>What the class found hard</h2>"
+            "<p class='muted'>No correction applied to more than one student. "
+            "Anything flagged was individual, and is in that student's own "
+            "report.</p>"
+        )
+
+    rows: list[str] = []
+    for name in names:
+        entries = [s for s in result.students if s.name == name]
+        improve = sum(len(s.assessment.improve) for s in entries)
+        good = sum(len(s.assessment.good) for s in entries)
+        pill = (f"<span class='pill work'>{improve} to work on</span>" if improve
+                else "<span class='pill'>nothing flagged</span>")
+        rows.append(
+            f"<tr><td>{_e(name)}{pill}</td>"
+            f"<td class='num'>{good}</td><td class='num'>{improve}</td></tr>"
+        )
+    parts.append(
+        "<h2>Every student</h2><table class='roll'><thead><tr><th>Student</th>"
+        "<th class='num'>Going well</th><th class='num'>To work on</th></tr></thead>"
+        "<tbody>" + "".join(rows) + "</tbody></table>"
+    )
+
+    parts.append(
+        "<footer>Counts are out of the students actually measured in each "
+        "exercise, not the whole register &mdash; somebody who was occluded or "
+        "arrived late is not counted as having done it well. These are geometric "
+        "observations, not health advice."
+        "</footer></div></body></html>"
+    )
+    return "".join(parts)

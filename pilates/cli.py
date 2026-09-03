@@ -13,6 +13,8 @@
     python -m pilates coach VIDEO --exercise plank    # coaching notes for a student
     python -m pilates progress "Anna" --exercise plank  # how a student has changed
     python -m pilates report VIDEO --exercise plank --name "Anna"  # take-away page
+    python -m pilates roster VIDEO --out roster.json  # who is which track id
+    python -m pilates class VIDEO --labels l.json --roster r.json  # the whole class
 """
 from __future__ import annotations
 
@@ -581,6 +583,180 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_roster(args: argparse.Namespace) -> int:
+    """Find the students in a class and write a roster stub with reference crops.
+
+    Nobody knows who student 7 is, so each tracked person gets a picture from
+    the frame where they were most confidently detected, for the teacher to look
+    at while filling in the name.
+    """
+    import cv2
+
+    from .classroom import Roster
+    from .movement import SessionRecorder
+
+    config = _load_config(args.config)
+    if args.stride is not None:
+        config.frame_stride = args.stride
+    pipeline = Pipeline(config)
+    recorder = SessionRecorder(keypoint_threshold=config.keypoint_threshold)
+
+    # Remember where each student looked clearest, and their box there.
+    clearest: dict[int, tuple[float, int, tuple]] = {}
+    with VideoSource(args.video, stride=config.frame_stride,
+                     start_frame=args.start, end_frame=args.end) as source:
+        for result in pipeline.run(source):
+            recorder.observe(result)
+            for person in result.people:
+                box = person.detection.bbox(config.keypoint_threshold)
+                if box is None:
+                    continue
+                score = person.detection.confidence
+                if score > clearest.get(person.track_id, (0.0, 0, ()))[0]:
+                    clearest[person.track_id] = (score, result.frame_index, box)
+
+    tracks = [t for t, h in recorder.histories.items()
+              if len(h.samples) >= args.min_samples]
+    if not tracks:
+        print("No student was tracked long enough to put on a roster.", file=sys.stderr)
+        return 1
+
+    out_dir = Path(args.crops or "roster_crops")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    cap = cv2.VideoCapture(args.video)
+    written = 0
+    for track_id in sorted(tracks):
+        if track_id not in clearest:
+            continue
+        _, frame_index, box = clearest[track_id]
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
+        ok, frame = cap.read()
+        if not ok:
+            continue
+        height, width = frame.shape[:2]
+        pad = args.pad
+        x0 = max(0, int(box[0] - pad))
+        y0 = max(0, int(box[1] - pad))
+        x1 = min(width, int(box[2] + pad))
+        y1 = min(height, int(box[3] + pad))
+        if x1 - x0 < 8 or y1 - y0 < 8:
+            continue
+        crop = frame[y0:y1, x0:x1]
+        scale = 360 / max(1, crop.shape[0])
+        crop = cv2.resize(crop, (max(1, int(crop.shape[1] * scale)), 360))
+        cv2.putText(crop, f"student {track_id}", (8, 28),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 4)
+        cv2.putText(crop, f"student {track_id}", (8, 28),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+        cv2.imwrite(str(out_dir / f"student_{track_id:02d}.jpg"), crop,
+                    [cv2.IMWRITE_JPEG_QUALITY, 88])
+        written += 1
+    cap.release()
+
+    roster = Roster.stub(tracks, video=Path(args.video).name,
+                         start_frame=args.start, end_frame=args.end)
+    out = Path(args.out or "roster.json")
+    roster.save(out)
+    print(f"{len(tracks)} student(s) tracked: {sorted(tracks)}")
+    print(f"roster stub  -> {out}")
+    print(f"reference crops -> {out_dir} ({written} written)")
+    print("Fill in each name by looking at the crops. Rows still starting with "
+          "'?' are skipped when the class is run.")
+    if args.end is None:
+        print("\nNote: this roster covers the whole video. Track ids restart at "
+              "every cut,\nso if the video is edited, build one roster per "
+              "continuous shot with --start/--end.")
+    return 0
+
+
+def cmd_class(args: argparse.Namespace) -> int:
+    """Run a whole class: a report per named student, plus a teacher page."""
+    from .classroom import Roster, class_patterns, run_class
+    from .coaching import DEFAULT_STANDARDS, load_standards
+    from .history import HistoryStore, SessionRecord, measure_session
+    from .labels import LabelSet
+    from .report import build, render_class_summary, write
+
+    labels = LabelSet.load(args.labels)
+    problems = labels.validate()
+    if problems:
+        print(f"{args.labels} has {len(problems)} problem(s); fix them first "
+              f"with `pilates check`.", file=sys.stderr)
+        return 1
+
+    roster = Roster.load(args.roster)
+    if roster.named == 0:
+        print(f"{args.roster} has no real names yet -- every entry still starts "
+              f"with '?'. Fill it in first.", file=sys.stderr)
+        return 1
+
+    standards = load_standards(args.standards) if args.standards else DEFAULT_STANDARDS
+    config = _load_config(args.config)
+    if args.stride is not None:
+        config.frame_stride = args.stride
+
+    result = run_class(args.video, labels, roster, config, standards,
+                       date=args.date, min_samples=args.min_samples,
+                       start_frame=args.start, end_frame=args.end)
+
+    coverage = result.coverage
+    if coverage is not None and not coverage.ok and not args.force:
+        print(f"Refusing to run: {coverage.message}", file=sys.stderr)
+        print(f"\nThis roster was built over {roster.range_note}.", file=sys.stderr)
+        print("Producing reports for a handful of students and silently "
+              "dropping the rest\nis worse than stopping. Pass --force to "
+              "override.", file=sys.stderr)
+        return 2
+
+    if not result.students:
+        print("Nothing to report: no named student was tracked through a "
+              "labelled exercise.", file=sys.stderr)
+        return 1
+
+    out_dir = Path(args.out_dir or "class_reports")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    store = HistoryStore.load(args.history) if args.history else None
+
+    for student in result.students:
+        report = build(
+            student=student.name, exercise=student.exercise,
+            assessment=student.assessment, summary=student.summary,
+            store=store, date=args.date, studio=args.studio,
+        )
+        safe = "".join(c if c.isalnum() else "_" for c in student.name)
+        write(report, out_dir / f"{safe}_{student.exercise}.html")
+        if store is not None and student.history is not None:
+            store.add(SessionRecord(
+                student=student.name, date=report.date, exercise=student.exercise,
+                measurements=measure_session(student.history, student.assessment),
+                video=result.video, track_id=student.track_id,
+            ))
+
+    patterns = class_patterns(result, min_affected=args.min_affected)
+    summary_path = out_dir / "class_summary.html"
+    summary_path.write_text(
+        render_class_summary(result, patterns, studio=args.studio), encoding="utf-8"
+    )
+    if store is not None:
+        store.save(args.history)
+
+    print(f"{len(result.students)} report(s) for {len(result.names)} student(s) "
+          f"-> {out_dir}")
+    print(f"class summary -> {summary_path}")
+    if result.skipped_unnamed:
+        print(f"skipped (no name in roster): students {result.skipped_unnamed}")
+    if patterns:
+        print(f"\n{len(patterns)} thing(s) more than one student found hard:")
+        for pattern in patterns[:5]:
+            print(f"  {pattern.affected}/{pattern.measured} in "
+                  f"{pattern.exercise}: {pattern.message}")
+    else:
+        print("\nNothing was flagged for more than one student.")
+    if store is not None:
+        print(f"history updated -> {args.history}")
+    return 0
+
+
 def cmd_calibrate(args: argparse.Namespace) -> int:
     """Fit the floor homography linking two camera views.
 
@@ -807,6 +983,39 @@ def main(argv: list[str] | None = None) -> int:
     pr.add_argument("--store", required=True, help="history file")
     pr.add_argument("--exercise", default=None, help="default: every exercise recorded")
     pr.set_defaults(func=cmd_progress)
+
+    ro = sub.add_parser("roster", help="find students and write a roster stub")
+    ro.add_argument("video")
+    ro.add_argument("--config", default=None)
+    ro.add_argument("--out", default=None)
+    ro.add_argument("--crops", default=None, help="where to write reference crops")
+    ro.add_argument("--pad", type=int, default=20, help="pixels around each crop")
+    ro.add_argument("--start", type=int, default=0)
+    ro.add_argument("--end", type=int, default=None)
+    ro.add_argument("--stride", type=int, default=None)
+    ro.add_argument("--min-samples", type=int, default=10)
+    ro.set_defaults(func=cmd_roster)
+
+    cl = sub.add_parser("class", help="run a whole class: reports plus a teacher page")
+    cl.add_argument("video")
+    cl.add_argument("--labels", required=True)
+    cl.add_argument("--roster", required=True)
+    cl.add_argument("--config", default=None)
+    cl.add_argument("--standards", default=None)
+    cl.add_argument("--history", default=None, help="history file to read and update")
+    cl.add_argument("--out-dir", default=None)
+    cl.add_argument("--studio", default="")
+    cl.add_argument("--date", default=None)
+    cl.add_argument("--stride", type=int, default=None)
+    cl.add_argument("--min-samples", type=int, default=10)
+    cl.add_argument("--min-affected", type=int, default=2,
+                    help="students who must share a problem before it is a class pattern")
+    cl.add_argument("--start", type=int, default=0,
+                    help="first frame; a roster is only valid over one continuous shot")
+    cl.add_argument("--end", type=int, default=None, help="last frame")
+    cl.add_argument("--force", action="store_true",
+                    help="run even when the roster names few of the tracked students")
+    cl.set_defaults(func=cmd_class)
 
     rp = sub.add_parser("report", help="write a take-away HTML report for a student")
     rp.add_argument("video")

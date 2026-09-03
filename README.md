@@ -504,6 +504,68 @@ edge of frame are viewed obliquely. Measured, the flagged students sat at x=615,
 (x=1138) was **not** flagged. No correlation with frame position, so the
 asymmetry is real rather than an artefact of where someone stood.
 
+## Running a whole class
+
+Everything else in this project works on one student at a time, which is right
+for the analysis and wrong for the studio. A teacher has twenty minutes between
+classes, not the patience to run four commands per person.
+
+```bash
+python -m pilates roster class.mov --start 4348 --end 5824 --out roster.json
+# fill in the names by looking at roster_crops/
+python -m pilates class class.mov --labels class.labels.json --roster roster.json \
+    --start 4348 --end 5824 --history studio_history.json --out-dir reports/
+```
+
+One pass over the video produces a report per named student, a teacher's
+summary page, and an updated history file.
+
+### The roster
+
+Nobody knows who student 7 is, so `roster` writes a stub **plus a reference
+crop of each tracked person**, taken from the frame where they were most
+confidently detected. The teacher fills in names by looking. Placeholders start
+with `?`, so an unfilled roster produces no reports rather than a stack of pages
+addressed to "student 7".
+
+### A roster is only valid for one continuous shot
+
+This was found by running the real thing rather than by reasoning about it. A
+roster built from one shot was used against a whole edited video, and the run
+cheerfully produced **five reports and silently skipped forty students** —
+because track ids restart at every cut, so student 4 in the first shot and
+student 4 in the third are different people.
+
+That now fails loudly:
+
+```
+Refusing to run: the roster names 3 of the 43 students tracked here. Track ids
+restart at every cut in a video, so a roster built from one shot does not
+describe another. Build the roster over the same range you are analysing, and
+run one continuous shot at a time.
+
+This roster was built over frames 3648-4348.
+Producing reports for a handful of students and silently dropping the rest
+is worse than stopping. Pass --force to override.
+```
+
+Rosters record the frame range they were built over, and both commands take
+`--start`/`--end` so a run can be scoped to one shot.
+
+### The teacher's page
+
+Individual reports do not show that six of eight students had the same problem,
+which is the observation that changes what gets taught next week. The summary
+groups corrections across the class:
+
+> **3 of 7** students — the hips were not level · *mountain*
+> Bea, Dan, Gia
+
+Counts, never a bare percentage: "75%" hides that it meant three students out of
+four. And counts are out of the students **actually measured in that exercise**,
+not the whole register, so somebody who was occluded or arrived late is not
+silently counted as having done it well.
+
 ## Student reports
 
 ```bash

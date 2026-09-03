@@ -13,6 +13,8 @@ from .classifier import (Evaluation, ExerciseClassifier, evaluate,
                          featurise, majority_baseline, window_features)
 from .coaching import (DEFAULT_STANDARDS, AngleTarget, Assessment, ExerciseStandard,
                        Finding, SymmetryTarget, assess, assess_tempo, narrate, UNSUITABLE)
+from .classroom import (ClassPattern, ClassResult, CoverageCheck, Roster,
+                        StudentResult, check_coverage, class_patterns, run_class)
 from .config import StudioConfig
 from .dataset import (Example, LoadedDataset, build_from_video, feature_vector,
                       load_datasets, normalise_keypoints)
@@ -42,6 +44,8 @@ __all__ = [
     "featurise", "window_features", "majority_baseline", "LabelSet", "Segment", "LabelError", "VOCABULARY",
     "scaffold", "Shot", "detect_shots", "HistoryStore", "SessionRecord",
     "Measurement", "Trend", "measure_session", "progress_report",
+    "Roster", "ClassResult", "ClassPattern", "StudentResult", "CoverageCheck",
+    "check_coverage", "class_patterns", "run_class",
     "StudentReport", "build_report", "render", "write_report", "Example", "build_from_video",
     "feature_vector", "normalise_keypoints", "LoadedDataset", "load_datasets", "Pipeline", "PipelineStats", "VideoSource",
     "RTMOBackend", "StubBackend", "TiledBackend", "IoUTracker", "TrackerConfig",
