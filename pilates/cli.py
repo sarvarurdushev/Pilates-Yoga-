@@ -22,6 +22,7 @@
     python -m pilates describe VIDEO --anatomy        # ...with muscles and nerves
     python -m pilates crosscheck nw.json              # our targets against theirs
     python -m pilates merge nw.json --policy          # combine the two libraries
+    python -m pilates capture v.mp4 --session tue-01 --user anna  # store it all
     python -m pilates enrol anna --name "Anna Smith"  # add a person
     python -m pilates identify class.mp4 --session tue-01  # who is each track?
     python -m pilates confirm tue-01 --track 4 --user anna --by me
@@ -1226,6 +1227,268 @@ def cmd_export(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_capture(args: argparse.Namespace) -> int:
+    """Analyse a recording once and write down everything it contained.
+
+    The video is not kept, so this pass is the only chance. It writes the pose
+    stream, every whole-body angle, the movement summary, joint loads where
+    they are valid, every discrete event, the feedback given, and a manifest
+    saying how it was all produced.
+    """
+    import statistics
+
+    from .archive import PoseStream, cost
+    from .biomechanics import analyse_frame
+    from .geometry import ANGLE_PAIRS, SEGMENT_ANGLES, STANDARD_ANGLES, symmetry
+    from .identity import Link, Signature
+    from .interaction import ContactLog, find_contacts, session_validity
+    from .movement import SessionRecorder, find_repetitions
+    from .store import SessionMeta, Store
+    from .universal import assess_quality, assess_unnamed, build_baseline
+    from . import __version__
+
+    config = _load_config(args.config)
+    if args.stride is not None:
+        config.frame_stride = args.stride
+    equipment = _equipment(args.equipment)
+
+    pipeline = Pipeline(config)
+    recorder = SessionRecorder(keypoint_threshold=config.keypoint_threshold)
+    contacts = ContactLog()
+    frames: dict[int, list] = {}
+    source_fps, width, height = 0.0, 0, 0
+
+    with VideoSource(args.video, stride=config.frame_stride,
+                     start_frame=args.start, end_frame=args.end) as source:
+        source_fps = getattr(source, "fps", 0.0) or 0.0
+        width = getattr(source, "width", 0) or 0
+        height = getattr(source, "height", 0) or 0
+        for result in pipeline.run(source):
+            recorder.observe(result)
+            contacts.observe(result.timestamp,
+                             find_contacts(result.people, config.keypoint_threshold))
+            for person in result.people:
+                frames.setdefault(person.track_id, []).append(
+                    (result.timestamp, person.detection))
+
+    histories = {t: h for t, h in recorder.histories.items()
+                 if len(h.samples) >= args.min_samples}
+    if not histories:
+        print("Nobody was tracked long enough to record.", file=sys.stderr)
+        return 1
+
+    step = config.frame_stride / source_fps if source_fps else 0.0
+    baseline = build_baseline(list(histories.values()),
+                              keypoint_threshold=config.keypoint_threshold)
+
+    with Store.open(args.db) as store:
+        if args.user:
+            known = {p["username"] for p in store.people()}
+            if args.user not in known:
+                print(f"{args.user!r} is not enrolled. Enrol them first:\n"
+                      f"  pilates enrol {args.user} --db {args.db}\n"
+                      f"Enrolled: {', '.join(sorted(known)) or 'nobody'}",
+                      file=sys.stderr)
+                print("A typo would otherwise become a second person, and "
+                      "splitting one\nstudent's history across two names is "
+                      "hard to notice and harder to undo.", file=sys.stderr)
+                return 1
+        store.record_session(SessionMeta(
+            key=args.session, video=Path(args.video).name, date=args.date or "",
+            studio=args.studio or "", students=len(histories),
+            duration_s=max((h.samples[-1].timestamp for h in histories.values()),
+                           default=0.0)))
+        store.save_manifest(args.session, __version__, config.to_dict(),
+                            source_fps=source_fps, stride=config.frame_stride,
+                            width=width, height=height,
+                            notes=args.notes or "")
+
+        archived = 0
+        for track_id, history in sorted(histories.items()):
+            stream = PoseStream.from_samples(track_id, frames.get(track_id, []))
+            archived += store.save_poses(args.session, stream)
+            signature = Signature.from_history(
+                history, [d for _, d in frames.get(track_id, [])],
+                config.keypoint_threshold)
+
+            if args.user:
+                # Declared, not inferred, and a declaration by an operator is
+                # a confirmation: somebody with eyes on the room asserted it,
+                # which is exactly what confirming means everywhere else here.
+                store.settle(Link(session=args.session, track_id=track_id,
+                                  username=args.user,
+                                  method="declared").confirm(args.by))
+            else:
+                store.put_link(Link(session=args.session, track_id=track_id,
+                                    username="", method="unproposed"), signature)
+
+            _record_track(store, args, config, history, stream, contacts,
+                          equipment, baseline, step)
+
+        coverage = store.coverage()
+
+    figures = cost(sum(len(f) for f in frames.values()))
+    print(f"{len(histories)} student(s) recorded into {args.db}")
+    print(f"  pose streams : {archived / 1e6:.2f} MB "
+          f"({figures['video_bytes_at_1mbit'] / max(archived, 1):.0f}x smaller "
+          f"than the video at a conservative bitrate)")
+    print(f"  measurements : {coverage['measurements']}")
+    print(f"  attributed   : {coverage['attributed']} "
+          f"({coverage['share']:.0%})")
+    if args.user:
+        print(f"  named        : every track declared as {args.user} by "
+              f"{args.by}")
+        if len(histories) > 1:
+            print(f"\n{len(histories)} people were tracked but all of them were "
+                  f"declared as one person.\nFor a single-subject recording "
+                  f"that is a second body in shot — an instructor,\nor somebody "
+                  f"walking past. Check with `pilates confirm "
+                  f"{args.session} --track N --reject --by {args.by}`.")
+    if not args.user:
+        print(f"\nNobody is named yet. Either re-run with --user for a "
+              f"single-subject\nrecording, or settle each track with "
+              f"`pilates confirm {args.session} --track N ...`.\n"
+              f"Everything above is stored either way and attaches when it is "
+              f"settled.")
+    return 0
+
+
+def _record_track(store, args, config, history, stream, contacts, equipment,
+                  baseline, step) -> None:
+    """Everything derivable about one person, written down."""
+    import statistics
+
+    from .biomechanics import analyse_frame
+    from .geometry import ANGLE_PAIRS, symmetry
+    from .interaction import session_validity
+    from .movement import find_repetitions, summarise
+    from .universal import assess_unnamed
+
+    track_id = history.track_id
+    session = args.session
+
+    # -- every angle, as a median with the spread it varied by --------------
+    for subject in sorted(history.samples[0].angles):
+        values = [s.angles[subject] for s in history.samples
+                  if s.angles.get(subject) is not None]
+        if len(values) < 3:
+            continue
+        store.add_measurement(
+            session, track_id, subject, statistics.median(values),
+            spread=_iqr(values), samples=len(values), source="standard",
+            exercise=args.exercise or "")
+
+    for pair in ANGLE_PAIRS:
+        gaps = [
+            abs(s.angles[f"left_{pair}"] - s.angles[f"right_{pair}"])
+            for s in history.samples
+            if s.angles.get(f"left_{pair}") is not None
+            and s.angles.get(f"right_{pair}") is not None
+        ]
+        if len(gaps) >= 3:
+            store.add_measurement(
+                session, track_id, f"{pair} symmetry", statistics.median(gaps),
+                spread=_iqr(gaps), samples=len(gaps), source="standard",
+                exercise=args.exercise or "")
+
+    # -- what the movement was ---------------------------------------------
+    summary = summarise(history)
+    if summary is not None:
+        for subject, value, unit in (
+            ("repetitions", summary.repetitions, "count"),
+            ("range of motion", summary.mean_range, "deg"),
+            ("range consistency", summary.range_consistency, "deg"),
+            ("seconds per repetition", summary.mean_rep_duration, "s"),
+            ("tempo ratio", summary.mean_tempo_ratio, "ratio"),
+            ("control", summary.control_ratio, "ratio"),
+            ("longest hold", summary.longest_hold, "s"),
+        ):
+            if value is not None:
+                store.add_measurement(session, track_id, subject, float(value),
+                                      samples=summary.samples, unit=unit,
+                                      source="quality",
+                                      exercise=args.exercise or "")
+
+        if summary.signal:
+            times, values = history.series(summary.signal)
+            for rep in find_repetitions(times, values):
+                store.add_event(session, track_id, "repetition", rep.start,
+                                rep.end, label=summary.signal,
+                                value=rep.range_of_motion)
+
+    # -- who had hands on them, and when ------------------------------------
+    for adjustment in contacts.for_student(track_id):
+        store.add_event(session, track_id, "adjustment", adjustment.start,
+                        adjustment.end, label=adjustment.region,
+                        detail=f"by track {adjustment.toucher_id}")
+
+    # -- stretches where they were not detected -----------------------------
+    if step:
+        for start, end in stream.gaps(expected_step=step):
+            store.add_event(session, track_id, "absent", start, end,
+                            detail="not detected; measurements do not cover this")
+
+    for name in equipment.invalidating:
+        store.add_event(session, track_id, "equipment", 0.0, label=name,
+                        detail="declared in use; load estimates are not valid")
+
+    # -- load, where it is this student's own -------------------------------
+    if args.mass and args.height:
+        peaks: dict[str, float] = {}
+        for sample_time, report in _load_series(history, stream, args, config):
+            note = session_validity(track_id, sample_time, contacts, equipment)
+            for load in report.loads:
+                if load.group is None:
+                    continue
+                key = load.group.name
+                if bool(note):
+                    peaks[key] = max(peaks.get(key, 0.0), load.moment_nm)
+                else:
+                    store.add_measurement(
+                        session, track_id, f"{key} peak moment", load.moment_nm,
+                        unit="Nm", source="load", valid=False,
+                        invalid_reason=note.reason, at_time=sample_time,
+                        exercise=args.exercise or "")
+        for group, moment in sorted(peaks.items()):
+            store.add_measurement(session, track_id, f"{group} peak moment",
+                                  moment, unit="Nm", source="load",
+                                  exercise=args.exercise or "")
+
+    # -- the feedback that was given ----------------------------------------
+    if summary is not None:
+        assessment = assess_unnamed(
+            history, summary, "", baseline if baseline.usable else None,
+            keypoint_threshold=config.keypoint_threshold)
+        for finding in assessment.quality:
+            store.add_finding(session, track_id, finding.kind, finding.message,
+                              subject=finding.subject, measured=finding.measured,
+                              target=finding.target, deviation=finding.deviation,
+                              source="quality", exercise=args.exercise or "")
+        for finding in assessment.versus_class:
+            store.add_finding(session, track_id, finding.kind, finding.message,
+                              subject=finding.subject, measured=finding.measured,
+                              target=finding.target, deviation=finding.deviation,
+                              source="class", exercise=args.exercise or "")
+
+
+def _load_series(history, stream, args, config):
+    """Joint loads frame by frame, paired with the time they were measured."""
+    from .biomechanics import analyse_frame
+
+    for index in range(len(stream)):
+        yield (float(stream.times[index]),
+               analyse_frame(stream.detection(index), args.mass, args.height,
+                             config.keypoint_threshold))
+
+
+def _iqr(values: list[float]) -> float:
+    """Inter-quartile range: the spread a between-session change must clear."""
+    ordered = sorted(values)
+    if len(ordered) < 4:
+        return 0.0
+    return ordered[(3 * len(ordered)) // 4] - ordered[len(ordered) // 4]
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     """Check this machine can actually run an analysis."""
     from .diagnostics import check_environment, environment_ready
@@ -1726,6 +1989,30 @@ def main(argv: list[str] | None = None) -> int:
                     help="print which source each field comes from, and why")
     mg.add_argument("--out", default=None, help="write the merged standards")
     mg.set_defaults(func=cmd_merge)
+
+    cap = sub.add_parser("capture",
+                         help="analyse a recording once and store everything in it")
+    cap.add_argument("video")
+    cap.add_argument("--session", required=True, help="a key for this recording")
+    cap.add_argument("--user", default=None,
+                     help="the person being recorded, when there is only one "
+                          "and the coach knows who")
+    cap.add_argument("--by", default="operator",
+                     help="who is declaring the identity; recorded with it")
+    cap.add_argument("--db", default="studio.db")
+    cap.add_argument("--date", default=None)
+    cap.add_argument("--studio", default=None)
+    cap.add_argument("--exercise", default=None)
+    cap.add_argument("--mass", type=float, default=None, help="body mass in kg")
+    cap.add_argument("--height", type=float, default=None, help="height in metres")
+    cap.add_argument("--equipment", action="append", default=None)
+    cap.add_argument("--notes", default=None)
+    cap.add_argument("--config", default=None)
+    cap.add_argument("--min-samples", type=int, default=20)
+    cap.add_argument("--start", type=int, default=0)
+    cap.add_argument("--end", type=int, default=None)
+    cap.add_argument("--stride", type=int, default=None)
+    cap.set_defaults(func=cmd_capture)
 
     en = sub.add_parser("enrol", help="add a person to the studio directory")
     en.add_argument("username")

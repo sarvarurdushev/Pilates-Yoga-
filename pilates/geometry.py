@@ -96,6 +96,21 @@ def joint_angle(det: Detection, a: int, b: int, c: int, threshold: float = 0.4) 
 
 
 #: Joint angles worth measuring for mat work, as (name, a, b, c).
+#: Every three-point joint angle COCO-17 supports, head to foot.
+#:
+#: The shoulders and the neck were added after a session recorded eight weeks
+#: and produced three lines on a chart: an exercise works a whole body, and a
+#: record of knees, hips and elbows is not a record of what happened.
+#:
+#: What is deliberately absent, and why:
+#:
+#: * **Ankle angle.** It needs a foot or toe keypoint to form the third point
+#:   of the angle, and COCO-17 has none. Nothing here can say whether an ankle
+#:   was dorsiflexed.
+#: * **Torso rotation.** It happens in the camera's depth axis and barely
+#:   changes the image. See ``docs/depth-ambiguity.md``.
+#: * **Wrist and finger angles.** The keypoints exist but are the least stable
+#:   in the skeleton, and no target in this system depends on them.
 STANDARD_ANGLES: tuple[tuple[str, int, int, int], ...] = (
     ("left_knee", kp.L_HIP, kp.L_KNEE, kp.L_ANKLE),
     ("right_knee", kp.R_HIP, kp.R_KNEE, kp.R_ANKLE),
@@ -103,7 +118,81 @@ STANDARD_ANGLES: tuple[tuple[str, int, int, int], ...] = (
     ("right_hip", kp.R_SHOULDER, kp.R_HIP, kp.R_KNEE),
     ("left_elbow", kp.L_SHOULDER, kp.L_ELBOW, kp.L_WRIST),
     ("right_elbow", kp.R_SHOULDER, kp.R_ELBOW, kp.R_WRIST),
+    # How far the arm is carried from the torso: 0 by the side, 180 overhead.
+    ("left_shoulder", kp.L_HIP, kp.L_SHOULDER, kp.L_ELBOW),
+    ("right_shoulder", kp.R_HIP, kp.R_SHOULDER, kp.R_ELBOW),
 )
+
+#: Left/right pairs that should match unless the exercise says otherwise.
+ANGLE_PAIRS = ("knee", "hip", "elbow", "shoulder")
+
+#: Orientations of a whole segment against the world, rather than the angle at
+#: a joint. These answer questions a joint angle cannot: are the shoulders
+#: level, is the pelvis level, is the head carried on the torso or in front of
+#: it.
+SEGMENT_ANGLES = ("trunk", "shoulder_tilt", "pelvis_tilt", "neck")
+
+
+def _line_tilt(det: Detection, left: int, right: int,
+               threshold: float) -> float | None:
+    """How far a left-right line is from level, in degrees. 0 is level.
+
+    Signed so the side that is higher is recoverable: positive means the left
+    marker sits higher in the image than the right.
+    """
+    if det.scores[left] < threshold or det.scores[right] < threshold:
+        return None
+    dx = det.keypoints[right][0] - det.keypoints[left][0]
+    dy = det.keypoints[right][1] - det.keypoints[left][1]
+    if dx == 0.0 and dy == 0.0:
+        return None
+    return float(math.degrees(math.atan2(dy, abs(dx))))
+
+
+def shoulder_tilt(det: Detection, threshold: float = 0.4) -> float | None:
+    """Degrees the shoulder line is off level. Positive: left shoulder higher."""
+    return _line_tilt(det, kp.L_SHOULDER, kp.R_SHOULDER, threshold)
+
+
+def pelvis_tilt(det: Detection, threshold: float = 0.4) -> float | None:
+    """Degrees the hip line is off level. Positive: left hip higher."""
+    return _line_tilt(det, kp.L_HIP, kp.R_HIP, threshold)
+
+
+def neck_angle(det: Detection, threshold: float = 0.4) -> float | None:
+    """Angle of the head on the torso, in degrees. 180 is head stacked in line.
+
+    Measured from the midpoint of the ears through the midpoint of the
+    shoulders to the midpoint of the hips, so it is the head carried on the
+    spine rather than the head against the world -- which is the thing a
+    teacher actually corrects, and it stays meaningful lying down.
+    """
+    needed = (kp.L_EAR, kp.R_EAR, kp.L_SHOULDER, kp.R_SHOULDER, kp.L_HIP, kp.R_HIP)
+    if any(det.scores[j] < threshold for j in needed):
+        return None
+    ears = _midpoint(det, kp.L_EAR, kp.R_EAR)
+    shoulders = _midpoint(det, kp.L_SHOULDER, kp.R_SHOULDER)
+    hips = _midpoint(det, kp.L_HIP, kp.R_HIP)
+    up, down = ears - shoulders, hips - shoulders
+    nu, nd = np.linalg.norm(up), np.linalg.norm(down)
+    if nu == 0.0 or nd == 0.0:
+        return None
+    cosine = float(np.dot(up, down) / (nu * nd))
+    return float(math.degrees(math.acos(max(-1.0, min(1.0, cosine)))))
+
+
+def whole_body(det: Detection, threshold: float = 0.4) -> dict[str, float | None]:
+    """Every angle this system can measure, in one call.
+
+    The complete set matters more than any one of its members: video is not
+    kept, so an angle not extracted here is gone with it.
+    """
+    out = dict(standard_angles(det, threshold))
+    out["trunk"] = trunk_angle(det, threshold)
+    out["shoulder_tilt"] = shoulder_tilt(det, threshold)
+    out["pelvis_tilt"] = pelvis_tilt(det, threshold)
+    out["neck"] = neck_angle(det, threshold)
+    return out
 
 
 def standard_angles(det: Detection, threshold: float = 0.4) -> dict[str, float | None]:
@@ -114,7 +203,7 @@ def standard_angles(det: Detection, threshold: float = 0.4) -> dict[str, float |
 def symmetry(angles: dict[str, float | None]) -> dict[str, float | None]:
     """Left/right differences in degrees, for pairs where both sides were measured."""
     out: dict[str, float | None] = {}
-    for name in ("knee", "hip", "elbow"):
+    for name in ANGLE_PAIRS:
         left, right = angles.get(f"left_{name}"), angles.get(f"right_{name}")
         out[name] = None if left is None or right is None else abs(left - right)
     return out

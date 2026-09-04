@@ -239,7 +239,8 @@ class TestWhatIsHeld:
         store.add_finding(key, 4, "improve", "x")
         confirmed(store, key)
         removed = store.forget("anna")
-        assert removed == {"measurements": 1, "findings": 1, "links": 1}
+        assert removed["measurements"] == 1
+        assert removed["findings"] == 1 and removed["links"] == 1
         assert store.coverage()["measurements"] == 0
         assert store.people() == [] or all(p["username"] != "anna"
                                            for p in store.people())
@@ -392,3 +393,144 @@ class TestMigration:
             store.add_measurement(key, 4, "left_hip", 60.0, at_time=12.5)
             confirmed(store, key)
             assert len(store.history("anna")) == 1
+
+
+class TestArchiving:
+    """Video is discarded, so the pose stream is the record. Everything else in
+    a session can be recomputed from it; it can be recomputed from nothing."""
+
+    def _stream(self, track_id=4, n=40):
+        import numpy as np
+
+        from pilates.archive import PoseStream
+        from conftest import make_detection
+
+        detections = [make_detection(x=100 + i) for i in range(n)]
+        return PoseStream(
+            track_id=track_id,
+            times=(np.arange(n) / 5.0).astype(np.float32),
+            points=np.stack([d.keypoints for d in detections]),
+            scores=np.stack([d.scores for d in detections]))
+
+    def test_a_stream_is_stored_and_comes_back(self, store):
+        key = a_session(store)
+        store.save_poses(key, self._stream())
+        assert len(store.poses(key, 4)) == 40
+
+    def test_the_size_is_recorded_so_disk_use_is_visible(self, store):
+        key = a_session(store)
+        written = store.save_poses(key, self._stream())
+        assert store.archived_tracks(key)[0]["bytes"] == written
+
+    def test_re_analysing_replaces_rather_than_duplicates(self, store):
+        key = a_session(store)
+        store.save_poses(key, self._stream())
+        store.save_poses(key, self._stream(n=60))
+        assert len(store.archived_tracks(key)) == 1
+        assert store.archived_tracks(key)[0]["frames"] == 60
+
+    def test_an_unarchived_track_returns_nothing(self, store):
+        key = a_session(store)
+        assert store.poses(key, 99) is None
+
+    def test_coverage_reports_what_is_archived(self, store):
+        key = a_session(store)
+        store.save_poses(key, self._stream())
+        report = store.coverage()
+        assert report["archived_tracks"] == 1
+        assert report["archived_frames"] == 40 and report["archive_bytes"] > 0
+
+    def test_forgetting_erases_the_pose_stream_too(self, store):
+        """It is the most personal thing held: the shape of their body, frame
+        by frame. Erasing without it would not be erasing."""
+        key = a_session(store)
+        store.save_poses(key, self._stream())
+        confirmed(store, key)
+        removed = store.forget("anna")
+        assert removed["pose_streams"] == 1
+        assert store.poses(key, 4) is None
+
+
+class TestEvents:
+    """A measurement says what a quantity was; an event says something happened
+    at a time. Without these the record is averages with no account of shape."""
+
+    def test_an_event_is_stored_with_its_time(self, store):
+        key = a_session(store)
+        store.add_event(key, 4, "repetition", 12.0, 15.5, label="bridge")
+        assert store.events(key)[0]["start_s"] == 12.0
+
+    def test_an_unknown_kind_is_refused(self, store):
+        key = a_session(store)
+        with pytest.raises(ValueError, match="unknown event kind"):
+            store.add_event(key, 4, "vibes", 1.0)
+
+    def test_events_come_back_in_time_order(self, store):
+        key = a_session(store)
+        for t in (9.0, 1.0, 5.0):
+            store.add_event(key, 4, "repetition", t)
+        assert [e["start_s"] for e in store.events(key)] == [1.0, 5.0, 9.0]
+
+    def test_they_can_be_filtered_by_track_and_kind(self, store):
+        key = a_session(store)
+        store.add_event(key, 4, "repetition", 1.0)
+        store.add_event(key, 5, "adjustment", 2.0)
+        assert len(store.events(key, track_id=4)) == 1
+        assert len(store.events(key, kind="adjustment")) == 1
+
+    def test_a_span_records_both_ends(self, store):
+        key = a_session(store)
+        store.add_event(key, 4, "adjustment", 10.0, 14.0, label="leg")
+        event = store.events(key)[0]
+        assert event["end_s"] == 14.0 and event["label"] == "leg"
+
+    def test_forgetting_erases_events(self, store):
+        key = a_session(store)
+        store.add_event(key, 4, "repetition", 1.0)
+        confirmed(store, key)
+        assert store.forget("anna")["events"] == 1
+
+
+class TestManifest:
+    """A number from 2026 cannot be compared with one from 2028 unless
+    something says what produced each."""
+
+    def test_the_analysis_records_how_it_was_produced(self, store):
+        key = a_session(store)
+        store.save_manifest(key, "0.1.0", {"keypoint_threshold": 0.4},
+                            source_fps=30.0, stride=6, width=1920, height=1080)
+        manifest = store.manifest(key)
+        assert manifest["version"] == "0.1.0"
+        assert manifest["config"]["keypoint_threshold"] == 0.4
+        assert manifest["stride"] == 6
+
+    def test_re_analysing_updates_it(self, store):
+        key = a_session(store)
+        store.save_manifest(key, "0.1.0", {})
+        store.save_manifest(key, "0.2.0", {})
+        assert store.manifest(key)["version"] == "0.2.0"
+
+    def test_a_session_without_one_is_counted_as_a_gap(self, store):
+        a_session(store)
+        assert store.coverage()["sessions_without_manifest"] == 1
+
+    def test_a_session_with_one_is_not(self, store):
+        key = a_session(store)
+        store.save_manifest(key, "0.1.0", {})
+        assert store.coverage()["sessions_without_manifest"] == 0
+
+    def test_an_unanalysed_session_has_no_manifest(self, store):
+        assert store.manifest(a_session(store)) is None
+
+
+class TestExportIsComplete:
+    def test_everything_held_includes_events_and_streams(self, store):
+        key = a_session(store)
+        store.add_measurement(key, 4, "left_hip", 62.0)
+        store.add_finding(key, 4, "improve", "x")
+        store.add_event(key, 4, "repetition", 1.0)
+        store.save_poses(key, TestArchiving()._stream())
+        confirmed(store, key)
+        export = store.export_person("anna")
+        for section in ("measurements", "findings", "events", "pose_streams"):
+            assert export[section], section

@@ -113,3 +113,107 @@ class TestSymmetry:
         for name in ("left_knee", "right_knee", "left_hip", "right_hip",
                      "left_elbow", "right_elbow"):
             assert name in angles
+
+
+class TestWholeBody:
+    """An exercise works a whole body. Eight weeks of recording produced three
+    lines on a chart because only six joints were being measured."""
+
+    def test_every_angle_comes_back_in_one_call(self):
+        from pilates.geometry import SEGMENT_ANGLES, STANDARD_ANGLES, whole_body
+
+        angles = whole_body(make_detection())
+        for name, *_ in STANDARD_ANGLES:
+            assert name in angles
+        for name in SEGMENT_ANGLES:
+            assert name in angles
+
+    def test_shoulders_are_measured_now(self):
+        from pilates.geometry import whole_body
+
+        angles = whole_body(make_detection())
+        assert angles["left_shoulder"] is not None
+        assert angles["right_shoulder"] is not None
+
+    def test_an_arm_by_the_side_is_a_small_shoulder_angle(self):
+        from pilates.geometry import whole_body
+
+        detection = make_detection()
+        points = detection.keypoints.copy()
+        # Elbow directly below the shoulder, along the torso.
+        points[kp.L_ELBOW] = points[kp.L_SHOULDER] + np.array([0.0, 40.0])
+        angles = whole_body(Detection(points, detection.scores.copy()))
+        assert angles["left_shoulder"] < 30.0
+
+    def test_an_arm_overhead_is_a_large_one(self):
+        from pilates.geometry import whole_body
+
+        detection = make_detection()
+        points = detection.keypoints.copy()
+        points[kp.L_ELBOW] = points[kp.L_SHOULDER] - np.array([0.0, 40.0])
+        angles = whole_body(Detection(points, detection.scores.copy()))
+        assert angles["left_shoulder"] > 150.0
+
+    def test_level_shoulders_read_as_level(self):
+        from pilates.geometry import shoulder_tilt
+
+        assert abs(shoulder_tilt(make_detection())) < 1.0
+
+    def test_a_dropped_shoulder_is_measured_and_signed(self):
+        from pilates.geometry import shoulder_tilt
+
+        detection = make_detection()
+        points = detection.keypoints.copy()
+        points[kp.R_SHOULDER] = points[kp.R_SHOULDER] + np.array([0.0, 20.0])
+        tilt = shoulder_tilt(Detection(points, detection.scores.copy()))
+        assert tilt > 5.0            # positive: the left shoulder sits higher
+
+    def test_the_pelvis_is_measured_separately_from_the_shoulders(self):
+        from pilates.geometry import pelvis_tilt, shoulder_tilt
+
+        detection = make_detection()
+        points = detection.keypoints.copy()
+        points[kp.R_HIP] = points[kp.R_HIP] + np.array([0.0, 15.0])
+        moved = Detection(points, detection.scores.copy())
+        assert pelvis_tilt(moved) > 5.0
+        assert abs(shoulder_tilt(moved)) < 1.0
+
+    def test_a_head_stacked_on_the_spine_is_about_straight(self):
+        from pilates.geometry import neck_angle
+
+        assert neck_angle(make_detection()) > 160.0
+
+    def test_a_head_pushed_forward_is_not(self):
+        from pilates.geometry import neck_angle
+
+        detection = make_detection(lying=True)
+        points = detection.keypoints.copy()
+        shoulders = (points[kp.L_SHOULDER] + points[kp.R_SHOULDER]) / 2
+        points[kp.L_EAR] = points[kp.R_EAR] = shoulders + np.array([0.0, -50.0])
+        assert neck_angle(Detection(points, detection.scores.copy())) < 130.0
+
+    def test_the_neck_is_measured_against_the_torso_not_the_world(self):
+        """So it stays meaningful lying down, which is most of a mat class."""
+        from pilates.geometry import neck_angle
+
+        assert neck_angle(make_detection(lying=True)) is not None
+
+    def test_an_unseen_joint_yields_none_rather_than_a_guess(self):
+        from pilates.geometry import whole_body
+
+        detection = make_detection(visible=5)
+        angles = whole_body(detection)
+        assert angles["left_knee"] is None and angles["neck"] is None
+
+    def test_symmetry_now_covers_the_shoulders(self):
+        from pilates.geometry import symmetry, whole_body
+
+        pairs = symmetry(whole_body(make_detection()))
+        assert "shoulder" in pairs
+
+    def test_no_ankle_angle_is_claimed(self):
+        """It needs a foot keypoint to form the third point, and COCO-17 has
+        none. Nothing here can say whether an ankle was dorsiflexed."""
+        from pilates.geometry import whole_body
+
+        assert not any("ankle" in name for name in whole_body(make_detection()))

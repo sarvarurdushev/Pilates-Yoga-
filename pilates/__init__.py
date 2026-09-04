@@ -29,6 +29,7 @@ from .biomechanics import (MUSCLE_GROUPS, SEGMENTS, JointLoad, LoadReport,
                            classify_contraction, gravitational_moment)
 from .classroom import (ClassPattern, ClassResult, CoverageCheck, Roster,
                         StudentResult, check_coverage, class_patterns, run_class)
+from .archive import NOT_RECOVERABLE, PoseStream, cost as archive_cost, decode, encode
 from .config import StudioConfig
 from .dashboard import Point, Series, collect, render as render_dashboard
 from .identity import (CONFIRMED, PROPOSED, REJECTED, Candidate, Directory,
@@ -50,7 +51,9 @@ from .report import StudentReport, build as build_report, render, write as write
 from .shots import Shot, detect_shots
 from .filters import ExclusionZone
 from .appearance import describe, similarity
-from .geometry import posture, standard_angles, symmetry, trunk_angle
+from .geometry import (ANGLE_PAIRS, SEGMENT_ANGLES, neck_angle, pelvis_tilt,
+                       posture, shoulder_tilt, standard_angles, symmetry,
+                       trunk_angle, whole_body)
 from .multiview import (Association, CalibrationError, FloorHomography,
                         associate, floor_point, fuse_frame, fuse_window)
 from .movement import (MovementSummary, Repetition, SessionQuality, SessionRecorder,
@@ -64,6 +67,7 @@ __version__ = "0.1.0"
 
 __all__ = [
     "StudioConfig", "ExclusionZone", "ExerciseStandard", "AngleTarget",
+    "PoseStream", "encode", "decode", "archive_cost", "NOT_RECOVERABLE",
     "Candidate", "Directory", "Link", "Person", "Proposal", "Signature",
     "propose", "CONFIRMED", "PROPOSED", "REJECTED",
     "Store", "SessionMeta", "Row", "Point", "Series", "collect",
@@ -98,6 +102,7 @@ __all__ = [
     "MovementSummary", "Repetition", "SessionQuality", "SessionRecorder", "TrackHistory",
     "find_repetitions", "summarise", "FloorHomography", "Association",
     "CalibrationError", "associate", "floor_point", "fuse_frame", "fuse_window",
-    "trunk_angle", "posture", "standard_angles", "symmetry",
+    "trunk_angle", "posture", "standard_angles", "symmetry", "whole_body",
+    "neck_angle", "shoulder_tilt", "pelvis_tilt", "ANGLE_PAIRS", "SEGMENT_ANGLES",
     "describe", "similarity",
 ]

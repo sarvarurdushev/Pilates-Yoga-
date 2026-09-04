@@ -689,3 +689,158 @@ class TestPersonPipeline:
         main(["enrol", "anna", "--db", db])
         assert main(["export", "anna", "--db", db, "--forget"]) == 0
         assert "erased" in capsys.readouterr().out
+
+
+class TestCapture:
+    """The video is not kept, so this pass is the only chance. What it misses
+    is gone permanently."""
+
+    def _clip(self, n=120, track_ids=(1,)):
+        frames = []
+        for i in range(n):
+            people = []
+            for track_id in track_ids:
+                base = make_detection(x=100 + track_id * 220, y=100, lying=True)
+                points = base.keypoints.copy()
+                swing = 35 * np.sin(2 * np.pi * 4 * i / n)
+                points[kp.L_KNEE] = points[kp.L_KNEE] + np.array([0.0, -swing])
+                points[kp.L_ANKLE] = points[kp.L_ANKLE] + np.array([0.0, -swing * 1.8])
+                people.append(TrackedPerson(
+                    track_id=track_id,
+                    detection=Detection(points, base.scores.copy())))
+            frames.append(FrameResult(frame_index=i, timestamp=i / 10.0,
+                                      people=people))
+        return frames
+
+    def _capture(self, monkeypatch, tmp_path, extra=(), track_ids=(1,)):
+        db = str(tmp_path / "studio.db")
+        main(["enrol", "anna", "--db", db])
+        install(monkeypatch, self._clip(track_ids=track_ids))
+        code = main(["capture", "clip.mov", "--session", "s1", "--user", "anna",
+                     "--db", db, "--by", "coach", "--date", "2026-03-03",
+                     *extra])
+        return db, code
+
+    def test_it_records_the_whole_body_not_a_handful_of_joints(
+            self, monkeypatch, tmp_path):
+        """Eight weeks produced three lines on a chart because only six joints
+        were being measured."""
+        from pilates.store import Store
+
+        db, _ = self._capture(monkeypatch, tmp_path)
+        with Store.open(db) as store:
+            subjects = store.subjects("anna")
+        for expected in ("left_shoulder", "right_shoulder", "neck",
+                         "shoulder_tilt", "pelvis_tilt", "trunk"):
+            assert expected in subjects, expected
+
+    def test_it_records_far_more_than_before(self, monkeypatch, tmp_path):
+        from pilates.store import Store
+
+        db, _ = self._capture(monkeypatch, tmp_path)
+        with Store.open(db) as store:
+            assert len(store.subjects("anna")) >= 18
+
+    def test_it_records_the_movement_summary_as_measurements(
+            self, monkeypatch, tmp_path):
+        from pilates.store import Store
+
+        db, _ = self._capture(monkeypatch, tmp_path)
+        with Store.open(db) as store:
+            subjects = store.subjects("anna")
+        for expected in ("repetitions", "range of motion", "control"):
+            assert expected in subjects, expected
+
+    def test_it_archives_the_pose_stream(self, monkeypatch, tmp_path):
+        from pilates.store import Store
+
+        db, _ = self._capture(monkeypatch, tmp_path)
+        with Store.open(db) as store:
+            stream = store.poses("s1", 1)
+        assert stream is not None and len(stream) == 120
+
+    def test_the_archived_stream_reproduces_the_angles(self, monkeypatch, tmp_path):
+        """The justification for discarding the video: an analysis re-run on
+        the archive reaches the same answer."""
+        from pilates.geometry import whole_body
+        from pilates.store import Store
+
+        db, _ = self._capture(monkeypatch, tmp_path)
+        with Store.open(db) as store:
+            stream = store.poses("s1", 1)
+        angles = whole_body(stream.detection(0))
+        assert angles["left_knee"] is not None
+
+    def test_it_records_repetitions_as_events(self, monkeypatch, tmp_path):
+        from pilates.store import Store
+
+        db, _ = self._capture(monkeypatch, tmp_path)
+        with Store.open(db) as store:
+            assert store.events("s1", kind="repetition")
+
+    def test_it_records_a_manifest(self, monkeypatch, tmp_path):
+        """A number from 2026 cannot be compared with one from 2028 unless
+        something says what produced each."""
+        from pilates.store import Store
+
+        db, _ = self._capture(monkeypatch, tmp_path)
+        with Store.open(db) as store:
+            manifest = store.manifest("s1")
+        assert manifest["version"] and "keypoint_threshold" in manifest["config"]
+
+    def test_load_is_recorded_when_mass_and_height_are_given(
+            self, monkeypatch, tmp_path):
+        from pilates.store import Store
+
+        db, _ = self._capture(monkeypatch, tmp_path,
+                              extra=["--mass", "65", "--height", "1.68"])
+        with Store.open(db) as store:
+            assert any("peak moment" in s for s in store.subjects("anna"))
+
+    def test_a_declaration_counts_as_a_confirmation(self, monkeypatch, tmp_path):
+        """Somebody with eyes on the room asserted it, which is what confirming
+        means everywhere else here."""
+        from pilates.store import Store
+
+        db, _ = self._capture(monkeypatch, tmp_path)
+        with Store.open(db) as store:
+            assert store.coverage()["share"] == 1.0
+            assert store.links("s1")[0].confirmed_by == "coach"
+
+    def test_an_unenrolled_name_is_refused_rather_than_created(
+            self, monkeypatch, tmp_path, capsys):
+        """A typo would otherwise become a second person, and splitting one
+        student's history across two names is hard to notice and harder to
+        undo."""
+        db = str(tmp_path / "studio.db")
+        install(monkeypatch, self._clip())
+        assert main(["capture", "clip.mov", "--session", "s1", "--user", "ana",
+                     "--db", db]) == 1
+        assert "is not enrolled" in capsys.readouterr().err
+
+    def test_a_second_body_in_a_single_subject_clip_is_flagged(
+            self, monkeypatch, tmp_path, capsys):
+        """An instructor, or somebody walking past — not the student."""
+        self._capture(monkeypatch, tmp_path, track_ids=(1, 2))
+        out = capsys.readouterr().out
+        assert "declared as one person" in out
+        assert "--reject" in out
+
+    def test_without_a_user_nothing_is_attributed_but_all_is_stored(
+            self, monkeypatch, tmp_path, capsys):
+        from pilates.store import Store
+
+        db = str(tmp_path / "studio.db")
+        install(monkeypatch, self._clip())
+        main(["capture", "clip.mov", "--session", "s1", "--db", db])
+        with Store.open(db) as store:
+            coverage = store.coverage()
+        assert coverage["measurements"] > 15 and coverage["attributed"] == 0
+        assert "attaches when it is settled" in capsys.readouterr().out
+
+    def test_nobody_tracked_is_an_error_with_a_reason(
+            self, monkeypatch, tmp_path, capsys):
+        db = str(tmp_path / "studio.db")
+        install(monkeypatch, self._clip(n=3))
+        assert main(["capture", "clip.mov", "--session", "s1", "--db", db]) == 1
+        assert "tracked long enough" in capsys.readouterr().err

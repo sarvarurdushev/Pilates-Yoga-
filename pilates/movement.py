@@ -20,12 +20,17 @@ import statistics
 from dataclasses import dataclass, field
 
 from . import keypoints as kp
-from .geometry import STANDARD_ANGLES, standard_angles, trunk_angle
+from .geometry import STANDARD_ANGLES, standard_angles, trunk_angle, whole_body
 from .types import Detection
 
 
 #: Which keypoints each candidate signal is computed from.
-SIGNAL_JOINTS: dict[str, tuple[int, ...]] = {"trunk": kp.TRUNK}
+SIGNAL_JOINTS: dict[str, tuple[int, ...]] = {
+    "trunk": kp.TRUNK,
+    "shoulder_tilt": (kp.L_SHOULDER, kp.R_SHOULDER),
+    "pelvis_tilt": (kp.L_HIP, kp.R_HIP),
+    "neck": (kp.L_EAR, kp.R_EAR, kp.L_SHOULDER, kp.R_SHOULDER),
+}
 SIGNAL_JOINTS.update({name: (a, b, c) for name, a, b, c in STANDARD_ANGLES})
 
 
@@ -53,7 +58,9 @@ class TrackHistory:
         self.samples.append(
             Sample(
                 timestamp=timestamp,
-                angles=standard_angles(detection, threshold),
+                # The whole body, not the six joints this began with. Video is
+                # not kept, so an angle not taken here is gone with it.
+                angles=whole_body(detection, threshold),
                 trunk=trunk_angle(detection, threshold),
                 confidence=detection.confidence,
                 angle_confidence={

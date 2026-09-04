@@ -42,6 +42,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .archive import PoseStream, decode, encode
 from .identity import CONFIRMED, Link, Signature
 
 SCHEMA = """
@@ -115,6 +116,51 @@ CREATE TABLE IF NOT EXISTS findings (
     source     TEXT NOT NULL DEFAULT 'standard'
 );
 
+-- The pose stream: what the video contained, once the video is gone.
+-- One blob per person per session, a few megabytes an hour, from which every
+-- geometric analysis in this system can be re-derived.
+CREATE TABLE IF NOT EXISTS poses (
+    session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    track_id   INTEGER NOT NULL,
+    frames     INTEGER NOT NULL DEFAULT 0,
+    duration_s REAL NOT NULL DEFAULT 0,
+    confidence REAL NOT NULL DEFAULT 0,
+    bytes      INTEGER NOT NULL DEFAULT 0,
+    stream     BLOB NOT NULL,
+    PRIMARY KEY (session_id, track_id)
+);
+
+-- Discrete moments. A measurement says what a quantity was; an event says
+-- something happened at a time -- a repetition, an adjustment, a student
+-- leaving frame. Without these the record is a set of averages with no
+-- account of the session's shape.
+CREATE TABLE IF NOT EXISTS events (
+    id         INTEGER PRIMARY KEY,
+    session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    track_id   INTEGER NOT NULL,
+    kind       TEXT NOT NULL,
+    start_s    REAL NOT NULL,
+    end_s      REAL,
+    label      TEXT NOT NULL DEFAULT '',
+    value      REAL,
+    detail     TEXT NOT NULL DEFAULT ''
+);
+
+-- How the analysis was produced. Without it, a number from 2026 cannot be
+-- compared with one from 2028: a threshold moved, a model changed, and
+-- nothing in the row would say so.
+CREATE TABLE IF NOT EXISTS manifests (
+    session_id INTEGER PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+    version    TEXT NOT NULL DEFAULT '',
+    config     TEXT NOT NULL DEFAULT '{}',
+    source_fps REAL NOT NULL DEFAULT 0,
+    stride     INTEGER NOT NULL DEFAULT 1,
+    width      INTEGER NOT NULL DEFAULT 0,
+    height     INTEGER NOT NULL DEFAULT 0,
+    notes      TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS events_session ON events(session_id, track_id);
 CREATE INDEX IF NOT EXISTS measurements_session ON measurements(session_id, track_id);
 CREATE INDEX IF NOT EXISTS measurements_subject ON measurements(subject);
 CREATE INDEX IF NOT EXISTS findings_session ON findings(session_id, track_id);
@@ -136,6 +182,18 @@ JOIN links l ON l.session_id = f.session_id AND l.track_id = f.track_id
 JOIN sessions s ON s.id = f.session_id
 WHERE l.status = 'confirmed';
 """
+
+#: Kinds of event worth recording. Named rather than free text so a later
+#: query can rely on them, and so adding one is a deliberate act.
+EVENTS = (
+    "repetition",      # one countable cycle, start to end
+    "hold",            # a sustained position
+    "adjustment",      # an instructor's hands on this student
+    "absent",          # tracked, then not detected, then back
+    "equipment",       # a declared prop came in or out of use
+    "exercise",        # a labelled or recognised exercise segment
+    "invalid",         # a stretch where measurements are not this student's
+)
 
 #: Which mechanism produced a row. A later model needs this to know what it is
 #: learning from: a library target and a cohort comparison are different kinds
@@ -394,6 +452,92 @@ class Store:
              measured, target, deviation, source))
         self.db.commit()
 
+    # -- the pose stream -------------------------------------------------
+    def save_poses(self, session: str, stream: PoseStream) -> int:
+        """Archive one person's frames. Returns the bytes stored.
+
+        This is the irreversible one. Everything else in a session can be
+        recomputed from it; it can be recomputed from nothing.
+        """
+        blob = encode(stream)
+        self.db.execute(
+            "INSERT INTO poses (session_id, track_id, frames, duration_s, "
+            "confidence, bytes, stream) VALUES (?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(session_id, track_id) DO UPDATE SET frames=excluded.frames, "
+            "duration_s=excluded.duration_s, confidence=excluded.confidence, "
+            "bytes=excluded.bytes, stream=excluded.stream",
+            (self.session_id(session), stream.track_id, len(stream),
+             stream.duration, stream.mean_confidence, len(blob), blob))
+        self.db.commit()
+        return len(blob)
+
+    def poses(self, session: str, track_id: int) -> PoseStream | None:
+        row = self.db.execute(
+            "SELECT stream FROM poses WHERE session_id = ? AND track_id = ?",
+            (self.session_id(session), track_id)).fetchone()
+        return decode(row["stream"]) if row else None
+
+    def archived_tracks(self, session: str) -> list[dict]:
+        return [dict(r) for r in self.db.execute(
+            "SELECT track_id, frames, duration_s, confidence, bytes FROM poses "
+            "WHERE session_id = ? ORDER BY track_id", (self.session_id(session),))]
+
+    # -- events ----------------------------------------------------------
+    def add_event(self, session: str, track_id: int, kind: str, start_s: float,
+                  end_s: float | None = None, label: str = "",
+                  value: float | None = None, detail: str = "") -> None:
+        if kind not in EVENTS:
+            raise ValueError(f"unknown event kind {kind!r}; expected one of {EVENTS}")
+        self.db.execute(
+            "INSERT INTO events (session_id, track_id, kind, start_s, end_s, "
+            "label, value, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (self.session_id(session), track_id, kind, start_s, end_s, label,
+             value, detail))
+        self.db.commit()
+
+    def events(self, session: str, track_id: int | None = None,
+               kind: str | None = None) -> list[dict]:
+        query = "SELECT * FROM events WHERE session_id = ?"
+        params: list = [self.session_id(session)]
+        if track_id is not None:
+            query += " AND track_id = ?"
+            params.append(track_id)
+        if kind is not None:
+            query += " AND kind = ?"
+            params.append(kind)
+        return [dict(r) for r in
+                self.db.execute(query + " ORDER BY start_s", params)]
+
+    # -- provenance of the analysis itself --------------------------------
+    def save_manifest(self, session: str, version: str, config: dict,
+                      source_fps: float = 0.0, stride: int = 1,
+                      width: int = 0, height: int = 0, notes: str = "") -> None:
+        """Record how this session was analysed.
+
+        A number from 2026 cannot be compared with one from 2028 unless
+        something says what produced each. Thresholds move and models change,
+        and nothing in a measurement row would show it.
+        """
+        self.db.execute(
+            "INSERT INTO manifests (session_id, version, config, source_fps, "
+            "stride, width, height, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(session_id) DO UPDATE SET version=excluded.version, "
+            "config=excluded.config, source_fps=excluded.source_fps, "
+            "stride=excluded.stride, width=excluded.width, "
+            "height=excluded.height, notes=excluded.notes",
+            (self.session_id(session), version, json.dumps(config, sort_keys=True),
+             source_fps, stride, width, height, notes))
+        self.db.commit()
+
+    def manifest(self, session: str) -> dict | None:
+        row = self.db.execute("SELECT * FROM manifests WHERE session_id = ?",
+                              (self.session_id(session),)).fetchone()
+        if row is None:
+            return None
+        out = dict(row)
+        out["config"] = json.loads(out["config"])
+        return out
+
     # -- reading back ---------------------------------------------------
     def history(
         self, username: str, subject: str | None = None,
@@ -463,6 +607,12 @@ class Store:
         Measurements piling up against unconfirmed tracks are not data yet.
         """
         total = self.db.execute("SELECT COUNT(*) AS n FROM measurements").fetchone()["n"]
+        archived = self.db.execute(
+            "SELECT COUNT(*) AS n, COALESCE(SUM(bytes), 0) AS b, "
+            "COALESCE(SUM(frames), 0) AS f FROM poses").fetchone()
+        sessions = self.db.execute("SELECT COUNT(*) AS n FROM sessions").fetchone()["n"]
+        with_manifest = self.db.execute(
+            "SELECT COUNT(*) AS n FROM manifests").fetchone()["n"]
         attributed = self.db.execute(
             "SELECT COUNT(*) AS n FROM attributed_measurements").fetchone()["n"]
         invalid = self.db.execute(
@@ -474,6 +624,13 @@ class Store:
             "invalid": invalid,
             "share": attributed / total if total else 0.0,
             "pending_links": len(self.pending()),
+            "archived_tracks": archived["n"],
+            "archived_frames": archived["f"],
+            "archive_bytes": archived["b"],
+            "sessions": sessions,
+            # Sessions analysed without recording how. Their numbers cannot be
+            # safely compared with later ones.
+            "sessions_without_manifest": sessions - with_manifest,
         }
 
     # -- what is held about a person ------------------------------------
@@ -493,6 +650,18 @@ class Store:
                     "SELECT * FROM attributed_measurements WHERE username = ? "
                     "ORDER BY date", (username,))],
             "findings": self.findings_for(username),
+            "events": [
+                dict(r) for r in self.db.execute(
+                    "SELECT e.* FROM events e JOIN links l "
+                    "ON l.session_id = e.session_id AND l.track_id = e.track_id "
+                    "WHERE l.username = ? AND l.status = 'confirmed' "
+                    "ORDER BY e.session_id, e.start_s", (username,))],
+            "pose_streams": [
+                dict(r) for r in self.db.execute(
+                    "SELECT p.session_id, p.track_id, p.frames, p.duration_s, "
+                    "p.bytes FROM poses p JOIN links l "
+                    "ON l.session_id = p.session_id AND l.track_id = p.track_id "
+                    "WHERE l.username = ? AND l.status = 'confirmed'", (username,))],
         }
 
     def forget(self, username: str) -> dict:
@@ -505,13 +674,23 @@ class Store:
         """
         ids = [(r["session_id"], r["track_id"]) for r in self.db.execute(
             "SELECT session_id, track_id FROM links WHERE username = ?", (username,))]
-        removed = {"measurements": 0, "findings": 0, "links": len(ids)}
+        removed = {"measurements": 0, "findings": 0, "links": len(ids),
+                   "events": 0, "pose_streams": 0}
         for session_id, track_id in ids:
             removed["measurements"] += self.db.execute(
                 "DELETE FROM measurements WHERE session_id = ? AND track_id = ?",
                 (session_id, track_id)).rowcount
             removed["findings"] += self.db.execute(
                 "DELETE FROM findings WHERE session_id = ? AND track_id = ?",
+                (session_id, track_id)).rowcount
+            removed["events"] += self.db.execute(
+                "DELETE FROM events WHERE session_id = ? AND track_id = ?",
+                (session_id, track_id)).rowcount
+            # The pose stream is the most personal thing held: it is the shape
+            # of their body, frame by frame. Erasing without it would not be
+            # erasing.
+            removed["pose_streams"] += self.db.execute(
+                "DELETE FROM poses WHERE session_id = ? AND track_id = ?",
                 (session_id, track_id)).rowcount
         self.db.execute("DELETE FROM links WHERE username = ?", (username,))
         self.db.execute("DELETE FROM people WHERE username = ?", (username,))
