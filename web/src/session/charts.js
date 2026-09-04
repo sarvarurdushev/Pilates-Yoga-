@@ -18,11 +18,15 @@
  * furniture. The one place more than one colour appears is the evidence tiers,
  * and those carry their letter -- identity is never colour alone.
  *
- * **The noise floor is drawn, not just applied.** A change smaller than the
- * quantity's own within-session spread is not a change, and the band across the
- * plot is where that rule becomes something a reader can see rather than
- * something they have to take on trust. It is the most important mark on any of
- * these charts: without it every wobble reads as progress.
+ * **The noise floor is drawn, not just applied**, and only when there is one.
+ * A score has no within-session spread -- it is one number per class, not a
+ * median over frames -- so its chart has no band, and saying "the band is ±0.0,
+ * anything inside it is not a change" under a flat rectangle was worse than
+ * saying nothing. Where there is one, a change smaller than the quantity's own
+ * within-session spread is not a change, and the band is where that rule becomes
+ * something a reader can see rather than something they have to take on trust.
+ * It is the most important mark on any of these charts: without it every wobble
+ * reads as progress.
  */
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g,
   (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -127,17 +131,18 @@ export function spark(series, opts = {}) {
   const hits = points.map((p, i) =>
     `<rect class="ss-hit" x="${(x(i) - step / 2).toFixed(1)}" y="0"
       width="${step.toFixed(1)}" height="${H}"
-      data-read="${esc(p.date)} · ${showValue(p.value, unit)} · varied by ±${
-      showValue(p.spread, unit)} over ${p.samples} frames"></rect>
+      data-read="${esc(p.date)} · ${showValue(p.value, unit)}${p.spread
+        ? ` · varied by ±${showValue(p.spread, unit)} over ${p.samples} frames`
+        : ` · from ${p.samples} ${esc(series.counted ?? 'frames')}`}"></rect>
      <line class="ss-cursor" x1="${x(i).toFixed(1)}" y1="${PAD_T}"
       x2="${x(i).toFixed(1)}" y2="${H - PAD_B}"></line>`).join('');
 
   return `<div class="ss-chart ss-spark" data-spark="${id}">
     <svg viewBox="0 0 ${W} ${H}" role="img"
          aria-label="over ${points.length} sessions">
-      <rect class="ss-band" x="${PAD_L}" y="${y(base + floor).toFixed(1)}"
+      ${floor > 0 ? `<rect class="ss-band" x="${PAD_L}" y="${y(base + floor).toFixed(1)}"
         width="${(W - PAD_L - PAD_R).toFixed(1)}"
-        height="${Math.max(1, y(base - floor) - y(base + floor)).toFixed(1)}"></rect>
+        height="${Math.max(1, y(base - floor) - y(base + floor)).toFixed(1)}"></rect>` : ''}
       <path class="ss-line" d="${path}"/>
       ${dots}${hits}
       <text class="ss-value" x="${W - PAD_R + 5}"
@@ -146,9 +151,9 @@ export function spark(series, opts = {}) {
       <text class="ss-when" x="${(W - PAD_R).toFixed(1)}" y="${H - 3}"
         text-anchor="end">${esc(last.date.slice(2))}</text>
     </svg>
-    <p class="ss-readout">${points.length} sessions. The band is this
-      measurement's own wobble, ±${showValue(floor, unit)} — anything inside it
-      is not a change.</p>
+    <p class="ss-readout">${points.length} sessions.${floor > 0
+      ? ` The band is this measurement's own wobble, ±${showValue(floor, unit)}
+         — anything inside it is not a change.` : ''}</p>
   </div>`;
 }
 

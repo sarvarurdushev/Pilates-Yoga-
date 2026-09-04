@@ -124,7 +124,9 @@ function score(session) {
   const gone = runs.filter((r) => r.value == null);
   if (!kept.length) return '';
   const series = {
-    unit: '', noise_floor: 0, sessions: kept.length,
+    // No within-session spread: a score is one number per class, not a median
+    // over frames, so there is no band and its points are counted in checks.
+    unit: '', noise_floor: 0, counted: 'checks', sessions: kept.length,
     verdict: kept.length > 2 ? 'changed' : 'too few sessions',
     change: kept[kept.length - 1].value - kept[0].value,
     lower_is_better: false,
