@@ -34,6 +34,8 @@ from .config import StudioConfig
 from .dashboard import Point, Series, collect, render as render_dashboard
 from .identity import (CONFIRMED, PROPOSED, REJECTED, Candidate, Directory,
                        Link, Person, Proposal, Signature, propose)
+from .scoring import (MEASURABLE, Component, Score, score_assessment,
+                      score_from_store, score_quality, score_session)
 from .store import Row, SessionMeta, Store
 from .diagnostics import (Check, VideoFacts, check_environment, environment_ready,
                           inspect_video, quickstart)
@@ -71,6 +73,8 @@ __all__ = [
     "Candidate", "Directory", "Link", "Person", "Proposal", "Signature",
     "propose", "CONFIRMED", "PROPOSED", "REJECTED",
     "Store", "SessionMeta", "Row", "Point", "Series", "collect",
+    "Score", "Component", "MEASURABLE", "score_session", "score_assessment",
+    "score_quality", "score_from_store",
     "render_dashboard",
     "SymmetryTarget", "Assessment", "Finding", "assess", "assess_tempo",
     "narrate", "DEFAULT_STANDARDS", "UNSUITABLE", "ExerciseClassifier", "Evaluation", "evaluate",

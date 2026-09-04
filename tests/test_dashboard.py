@@ -224,3 +224,135 @@ class TestPage:
     def test_names_are_escaped(self, store):
         fill(store)
         assert "<script>x</script>" not in render(store, "anna", "<script>x</script>")
+
+
+class TestScoreOnThePage:
+    """A student asks for a number out of a hundred. It has to be traceable."""
+
+    def _scored(self, store, sessions=4, deviation=0.0):
+        from pilates.scoring import MEASURABLE
+
+        for i in range(sessions):
+            key = f"sc{i}"
+            store.record_session(SessionMeta(key=key, date=f"2026-02-{i + 1:02d}"))
+            store.put_link(Link(session=key, track_id=4,
+                                username="anna").confirm("t"))
+            for subject in MEASURABLE:
+                store.add_measurement(key, 4, subject, 100.0, spread=2.0,
+                                      samples=200)
+                store.add_finding(key, 4,
+                                  "improve" if deviation else "good", "x",
+                                  subject=subject, deviation=deviation,
+                                  source="standard")
+
+    def test_the_headline_number_is_shown(self, store):
+        from pilates.dashboard import render
+
+        self._scored(store)
+        assert "out of 100" in render(store, "anna")
+
+    def test_it_is_traceable_to_its_components(self, store):
+        from pilates.dashboard import render
+
+        self._scored(store)
+        html = render(store, "anna")
+        assert "What made up the score" in html or "made up the score" in html
+        assert "form," in html
+
+    def test_the_coverage_travels_with_it(self, store):
+        from pilates.dashboard import render
+
+        self._scored(store)
+        assert "measurable quantities" in render(store, "anna")
+
+    def test_a_body_map_marks_every_measurable_quantity(self, store):
+        from pilates.dashboard import BODY_POINTS, render
+        from pilates.scoring import MEASURABLE
+
+        self._scored(store)
+        html = render(store, "anna")
+        assert set(BODY_POINTS) <= set(MEASURABLE)
+        for name in BODY_POINTS:
+            assert name.replace("_", " ") in html
+
+    def test_unmeasured_is_visibly_not_a_low_score(self, store):
+        from pilates.dashboard import render
+
+        self._scored(store)
+        html = render(store, "anna")
+        assert "not measured" in html
+        assert "Grey is not a low score" in html
+
+    def test_the_axis_shows_dates_not_internal_session_keys(self, store):
+        from pilates.dashboard import render
+
+        self._scored(store)
+        html = render(store, "anna")
+        assert "2026-02-01" in html and "sc0" not in html
+
+    def test_a_score_history_needs_more_than_one_session(self, store):
+        from pilates.dashboard import render
+
+        self._scored(store, sessions=1)
+        assert "Score, session by session" not in render(store, "anna")
+
+    def test_it_appears_once_there_are_several(self, store):
+        from pilates.dashboard import render
+
+        self._scored(store)
+        assert "Score, session by session" in render(store, "anna")
+
+    def test_the_footer_explains_how_a_score_is_built(self, store):
+        from pilates.dashboard import render
+
+        self._scored(store)
+        html = render(store, "anna")
+        assert "average of the checks that could actually be made" in html
+        assert "Nothing unmeasured is counted" in html
+
+
+class TestBodyMap:
+    def test_markers_sit_on_the_figure_they_belong_to(self):
+        """The first version listed marker positions separately from the
+        skeleton's and they drifted off the limbs."""
+        from pilates.dashboard import BODY_POINTS, _ANCHORS
+
+        assert BODY_POINTS["left_elbow"] == _ANCHORS["l_elbow"]
+        assert BODY_POINTS["right_knee"] == _ANCHORS["r_knee"]
+        assert BODY_POINTS["neck"] == _ANCHORS["neck"]
+
+    def test_a_tilt_sits_between_the_two_points_it_measures(self):
+        from pilates.dashboard import BODY_POINTS, _ANCHORS
+
+        left, right = _ANCHORS["l_shoulder"], _ANCHORS["r_shoulder"]
+        assert BODY_POINTS["shoulder_tilt"] == ((left[0] + right[0]) / 2,
+                                               (left[1] + right[1]) / 2)
+
+    def test_the_trunk_marker_is_on_the_mid_line(self):
+        from pilates.dashboard import BODY_POINTS
+
+        assert BODY_POINTS["trunk"][0] == 100.0
+
+    def test_bands_are_named_as_well_as_coloured(self):
+        from pilates.dashboard import BANDS
+
+        assert all(label for _, _, label in BANDS)
+
+    def test_only_the_weakest_few_are_labelled(self):
+        from pilates.dashboard import body_map
+
+        svg = body_map({"left_knee": 20.0, "right_knee": 30.0, "neck": 40.0,
+                        "trunk": 95.0, "left_hip": 96.0}, label_worst=3)
+        assert svg.count("mark-label") == 3
+
+    def test_every_marker_names_itself_on_hover(self):
+        from pilates.dashboard import BODY_POINTS, body_map
+
+        svg = body_map({"left_knee": 80.0})
+        assert svg.count("<title>") == len(BODY_POINTS)
+
+    def test_an_unmeasured_marker_says_so_rather_than_showing_a_number(self):
+        from pilates.dashboard import body_map
+
+        svg = body_map({"left_knee": None})
+        assert "not measured often enough" in svg

@@ -26,6 +26,7 @@ from datetime import date as Date
 
 from .history import (LOWER_IS_BETTER, MIN_PRACTICAL_CHANGE,
                       MIN_SESSIONS_FOR_TREND, NOISE_MULTIPLE)
+from .scoring import MEASURABLE, Score, score_from_store
 from .store import Row, Store
 
 #: Validated in both modes with the palette validator: worst adjacent pair
@@ -237,6 +238,144 @@ def bar_chart(rows: list[tuple[str, int]], width: int = 880,
     return "".join(parts)
 
 
+
+
+# ---------------------------------------------------------------------------
+# The body map: which parts of a body were measured, and how each one scored.
+# ---------------------------------------------------------------------------
+
+#: The figure, as named anchors. Everything else on the map is derived from
+#: these rather than written out again: the first version listed marker
+#: positions separately and they drifted a few pixels off the limbs they were
+#: supposed to sit on, which looked like a rendering fault and was really two
+#: copies of the same numbers disagreeing.
+_ANCHORS: dict[str, tuple[float, float]] = {
+    "head": (100, 28), "neck": (100, 60),
+    "l_shoulder": (70, 82), "r_shoulder": (130, 82),
+    "l_elbow": (56, 132), "r_elbow": (144, 132),
+    "l_wrist": (50, 180), "r_wrist": (150, 180),
+    "l_hip": (82, 172), "r_hip": (118, 172),
+    "l_knee": (79, 244), "r_knee": (121, 244),
+    "l_ankle": (78, 312), "r_ankle": (122, 312),
+}
+
+
+def _between(a: str, b: str) -> tuple[float, float]:
+    (x1, y1), (x2, y2) = _ANCHORS[a], _ANCHORS[b]
+    return ((x1 + x2) / 2, (y1 + y2) / 2)
+
+
+#: Where each measured quantity sits on the figure. Drawn rather than posed:
+#: the map answers "which part of you", and a real pose would answer "what were
+#: you doing", which the charts already do.
+BODY_POINTS: dict[str, tuple[float, float]] = {
+    "neck": _ANCHORS["neck"],
+    "shoulder_tilt": _between("l_shoulder", "r_shoulder"),
+    "left_shoulder": _ANCHORS["l_shoulder"],
+    "right_shoulder": _ANCHORS["r_shoulder"],
+    "left_elbow": _ANCHORS["l_elbow"], "right_elbow": _ANCHORS["r_elbow"],
+    "trunk": (100.0, (_ANCHORS["neck"][1] + _ANCHORS["l_hip"][1]) / 2),
+    "pelvis_tilt": _between("l_hip", "r_hip"),
+    "left_hip": _ANCHORS["l_hip"], "right_hip": _ANCHORS["r_hip"],
+    "left_knee": _ANCHORS["l_knee"], "right_knee": _ANCHORS["r_knee"],
+}
+_BONES = (
+    ("head", "neck"), ("neck", "l_shoulder"), ("neck", "r_shoulder"),
+    ("l_shoulder", "r_shoulder"), ("l_shoulder", "l_elbow"),
+    ("r_shoulder", "r_elbow"), ("l_elbow", "l_wrist"), ("r_elbow", "r_wrist"),
+    ("l_shoulder", "l_hip"), ("r_shoulder", "r_hip"), ("l_hip", "r_hip"),
+    ("l_hip", "l_knee"), ("r_hip", "r_knee"), ("l_knee", "l_ankle"),
+    ("r_knee", "r_ankle"),
+)
+
+#: Score bands. Three states rather than a continuous ramp, because the
+#: question a body map answers is "which parts need attention", and a ramp
+#: makes the parts that are fine the most prominent thing on the picture.
+#: Each band is named in the legend, so colour never carries it alone.
+BANDS = ((80.0, "good", "on target"), (60.0, "watch", "worth watching"),
+         (0.0, "work", "needs work"))
+
+
+def band(value: float | None) -> tuple[str, str]:
+    """Which band a score falls in, and the words for it."""
+    if value is None:
+        return "unmeasured", "not measured"
+    for floor, key, label in BANDS:
+        if value >= floor:
+            return key, label
+    return "work", "needs work"
+
+
+def body_map(scores: dict[str, float | None], width: int = 260,
+             height: int = 360, label_worst: int = 3) -> str:
+    """A figure with every measurable quantity marked and scored.
+
+    Grey is a real state here and a common one: a joint out of frame is not a
+    joint that scored badly, and the two must never look alike.
+    """
+    parts = [f"<svg viewBox='0 0 200 {height}' class='bodymap' role='img' "
+             f"aria-label='body map of measured quantities'>"]
+    for a, b in _BONES:
+        (x1, y1), (x2, y2) = _ANCHORS[a], _ANCHORS[b]
+        parts.append(f"<line class='bone' x1='{x1}' y1='{y1}' x2='{x2}' "
+                     f"y2='{y2}'/>")
+    # Drawn over the bones, so the neck segment does not show through it.
+    parts.append(f"<circle class='bone-fill' cx='{_ANCHORS['head'][0]}' "
+                 f"cy='{_ANCHORS['head'][1]}' r='16'/>")
+
+    ranked = sorted(((n, v) for n, v in scores.items() if v is not None),
+                    key=lambda kv: kv[1])
+    call_out = {name for name, _ in ranked[:label_worst]}
+
+    for name, (x, y) in BODY_POINTS.items():
+        value = scores.get(name)
+        key, label = band(value)
+        shown = f"{value:.0f}" if value is not None else "—"
+        parts.append(
+            f"<g class='mark {key}'><title>{_e(_human(name))}: "
+            f"{shown if value is not None else 'not measured often enough'}"
+            f"{' out of 100' if value is not None else ''} — {_e(label)}</title>"
+            f"<circle cx='{x}' cy='{y}' r='9'/>")
+        if name in call_out:
+            parts.append(f"<text class='mark-label' x='{x}' y='{y - 13}' "
+                         f"text-anchor='middle'>{shown}</text>")
+        parts.append("</g>")
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def score_ring(score: Score, size: int = 132) -> str:
+    """The headline number, as a number rather than a gauge.
+
+    A ring around it reads at a glance; the ring is a plain proportion of a
+    circle, not a dial with an implied scale nobody defined.
+    """
+    value = score.value
+    radius = size / 2 - 10
+    circumference = 2 * 3.14159 * radius
+    filled = circumference * ((value or 0.0) / 100.0)
+    key, _ = band(value)
+    return (
+        f"<svg viewBox='0 0 {size} {size}' class='ring {key}' role='img' "
+        f"aria-label='session score'>"
+        f"<circle class='ring-track' cx='{size/2}' cy='{size/2}' r='{radius}'/>"
+        f"<circle class='ring-fill' cx='{size/2}' cy='{size/2}' r='{radius}' "
+        f"stroke-dasharray='{filled:.1f} {circumference:.1f}' "
+        f"transform='rotate(-90 {size/2} {size/2})'/>"
+        f"<text class='ring-value' x='{size/2}' y='{size/2 + 3}' "
+        f"text-anchor='middle'>{value:.0f}</text>"
+        f"<text class='ring-unit' x='{size/2}' y='{size/2 + 22}' "
+        f"text-anchor='middle'>out of 100</text></svg>"
+        if value is not None else
+        f"<svg viewBox='0 0 {size} {size}' class='ring unmeasured' role='img' "
+        f"aria-label='no score'>"
+        f"<circle class='ring-track' cx='{size/2}' cy='{size/2}' r='{radius}'/>"
+        f"<text class='ring-value' x='{size/2}' y='{size/2 + 3}' "
+        f"text-anchor='middle'>—</text>"
+        f"<text class='ring-unit' x='{size/2}' y='{size/2 + 22}' "
+        f"text-anchor='middle'>no score</text></svg>")
+
+
 # ---------------------------------------------------------------------------
 # The page
 # ---------------------------------------------------------------------------
@@ -244,14 +383,17 @@ def bar_chart(rows: list[tuple[str, int]], width: int = 880,
 STYLE = """
 .viz-root { color-scheme: light;
   --surface:#fcfcfb; --panel:#ffffff; --ink:#0b0b0b; --muted:#52514e;
-  --rule:#e3e0da; --series1:#2a78d6; --band:#dbe8f8; }
+  --rule:#e3e0da; --series1:#2a78d6; --band:#dbe8f8;
+  --good:#0ca30c; --watch:#fab219; --work:#d03b3b; }
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) .viz-root { color-scheme: dark;
     --surface:#1a1a19; --panel:#232322; --ink:#ffffff; --muted:#c3c2b7;
-    --rule:#3a3a37; --series1:#3987e5; --band:#20344c; } }
+    --rule:#3a3a37; --series1:#3987e5; --band:#20344c;
+    --good:#0ca30c; --watch:#fab219; --work:#d03b3b; } }
 :root[data-theme="dark"] .viz-root { color-scheme: dark;
   --surface:#1a1a19; --panel:#232322; --ink:#ffffff; --muted:#c3c2b7;
-  --rule:#3a3a37; --series1:#3987e5; --band:#20344c; }
+  --rule:#3a3a37; --series1:#3987e5; --band:#20344c;
+  --good:#0ca30c; --watch:#fab219; --work:#d03b3b; }
 * { box-sizing:border-box; }
 body { margin:0; padding:28px 20px; background:var(--surface); color:var(--ink);
   font:15px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; }
@@ -269,10 +411,14 @@ h2 + .note { margin:0 0 12px; color:var(--muted); font-size:12.5px; }
 .tile .n { font-size:28px; font-weight:650; letter-spacing:-0.02em;
   font-variant-numeric:tabular-nums; }
 .tile .k { color:var(--muted); font-size:12px; margin-top:2px; }
+.lede { margin:0 0 6px; font-size:15px; }
+.card h3 { margin:0 0 10px; font-size:13px; text-transform:uppercase;
+  letter-spacing:0.08em; color:var(--muted); }
 .grid-2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
   gap:14px; }
 .card { background:var(--panel); border:1px solid var(--rule); border-radius:8px;
   padding:14px 16px; }
+.grid-2 > .card { align-self:start; }
 .card h3 { margin:0 0 2px; font-size:15px; font-weight:620; }
 .card .note { color:var(--muted); font-size:12.5px; margin:0 0 8px; }
 svg { width:100%; height:auto; display:block; overflow:visible; }
@@ -289,6 +435,40 @@ svg { width:100%; height:auto; display:block; overflow:visible; }
 .bar-value { fill:var(--ink); font-size:12px; font-weight:650;
   font-variant-numeric:tabular-nums; }
 .bar-label { fill:var(--ink); font-size:12.5px; }
+.hero { display:grid; grid-template-columns:auto 1fr; gap:22px; align-items:center;
+  background:var(--panel); border:1px solid var(--rule); border-radius:8px;
+  padding:18px 20px; }
+.hero .ring { width:132px; height:132px; }
+.ring-track { fill:none; stroke:var(--rule); stroke-width:9; }
+.ring-fill { fill:none; stroke-width:9; stroke-linecap:round; }
+.ring.good .ring-fill { stroke:var(--good); }
+.ring.watch .ring-fill { stroke:var(--watch); }
+.ring.work .ring-fill { stroke:var(--work); }
+.ring-value { fill:var(--ink); font-size:34px; font-weight:680;
+  font-variant-numeric:tabular-nums; }
+.ring-unit { fill:var(--muted); font-size:11px; }
+.bodymap { width:100%; max-width:236px; height:auto; margin:0 auto; display:block; }
+.bone { stroke:var(--rule); stroke-width:5; stroke-linecap:round; }
+.bone-fill { fill:var(--rule); stroke:none; }
+.mark circle { stroke:var(--panel); stroke-width:2.5; }
+.mark.good circle { fill:var(--good); }
+.mark.watch circle { fill:var(--watch); }
+.mark.work circle { fill:var(--work); }
+.mark.unmeasured circle { fill:var(--rule); }
+.mark:hover circle { r:11; }
+.mark-label { fill:var(--ink); font-size:11px; font-weight:650;
+  font-variant-numeric:tabular-nums; }
+.key { display:flex; flex-wrap:wrap; gap:12px; margin-top:10px; }
+.key span { display:inline-flex; align-items:center; gap:6px; font-size:12px;
+  color:var(--muted); }
+.key i { width:10px; height:10px; border-radius:50%; display:inline-block; }
+.comp { display:flex; align-items:center; gap:10px; margin:7px 0; font-size:13.5px; }
+.comp .n { font-variant-numeric:tabular-nums; font-weight:650; width:34px;
+  text-align:right; }
+.comp .track { display:block; flex:1; height:8px; background:var(--rule);
+  border-radius:4px; overflow:hidden; }
+.comp .fill { display:block; height:8px; border-radius:4px; }
+.comp .cnt { color:var(--muted); font-size:12px; white-space:nowrap; }
 .bar:hover { opacity:0.85; }
 .chip { display:inline-flex; align-items:center; gap:5px; font-size:11.5px;
   font-weight:650; padding:2px 9px; border-radius:10px; border:1px solid var(--rule); }
@@ -302,6 +482,96 @@ td { padding:7px 8px 7px 0; border-top:1px solid var(--rule);
 footer { margin-top:34px; padding-top:14px; border-top:1px solid var(--rule);
   color:var(--muted); font-size:12.5px; }
 """
+
+
+
+
+def _session_keys(store: Store, username: str) -> list[tuple[str, str]]:
+    """This person's confirmed sessions as (key, date), oldest first."""
+    return [(r["session_key"], r["date"]) for r in store.db.execute(
+        "SELECT DISTINCT session_key, date FROM attributed_measurements "
+        "WHERE username = ? ORDER BY date, session_key", (username,))]
+
+
+def _subject_scores(score: Score) -> dict[str, float | None]:
+    """Per-quantity scores for the body map, with unmeasured left as None."""
+    out: dict[str, float | None] = {name: None for name in MEASURABLE}
+    for component in score.components.values():
+        for subject, value in component.checks:
+            base = subject.replace(" symmetry", "")
+            for name in (subject, f"left_{base}", f"right_{base}"):
+                if name in out:
+                    out[name] = value if out[name] is None else min(out[name], value)
+    return out
+
+
+def _band_key() -> str:
+    keys = "".join(
+        f"<span><i style='background:var(--{k})'></i>{_e(label)}</span>"
+        for _, k, label in BANDS)
+    return (f"<div class='key'>{keys}"
+            f"<span><i style='background:var(--rule)'></i>not measured</span>"
+            f"</div>")
+
+
+def _score_history(scores: list) -> str:
+    """Every session's score, if there is more than one to draw.
+
+    A session where less of the body was visible has fewer checks behind it, so
+    each point carries its own count on hover rather than pretending the line
+    is made of like-for-like numbers.
+    """
+    points = [Point(date=date, value=item.value, spread=0.0, samples=item.checks)
+              for date, item in scores if item.value is not None]
+    if len(points) < 2:
+        return ""
+    return ("<div class='card'><h3>Score, session by session</h3>"
+            + line_chart(Series(subject="score", unit="", points=points))
+            + "<p class='note'>Hover a point for the number of checks it came "
+              "from. A score is only as comparable as its coverage.</p></div>")
+
+
+def _components(score: Score) -> str:
+    """The parts the headline number is made of, weakest first."""
+    rows = ["<h3>What made up the score</h3>"]
+    for component in sorted(score.components.values(),
+                            key=lambda c: (c.score is None, c.score or 0)):
+        if component.score is None:
+            continue
+        key, _ = band(component.score)
+        rows.append(
+            f"<div class='comp'><span class='n'>{component.score:.0f}</span>"
+            f"<span class='track'><span class='fill' style='width:"
+            f"{component.score:.0f}%;background:var(--{key})'></span></span>"
+            f"<span class='cnt'>{_e(component.name)}, {component.n} check"
+            f"{'s' if component.n != 1 else ''}</span></div>")
+    weakest = min((c for c in score.components.values() if c.weakest),
+                  key=lambda c: c.weakest[1], default=None)
+    if weakest is not None and weakest.weakest[1] < 70:
+        rows.append(f"<p class='note'>The single weakest check was "
+                    f"{_e(_human(weakest.weakest[0]))} at "
+                    f"{weakest.weakest[1]:.0f} out of 100.</p>")
+    return "".join(rows)
+
+
+def _score_summary(score: Score, history: list) -> str:
+    """The sentence beside the headline number."""
+    lines = [f"<p class='lede'>{score.checks} checks were made, covering "
+             f"{score.measured} of {score.measurable} measurable quantities "
+             f"({score.coverage:.0%} of the body).</p>"]
+    scored = [s for _, s in history if s.value is not None]
+    if len(scored) > 1:
+        change = scored[-1].value - scored[-2].value
+        word = "up" if change > 0 else ("down" if change < 0 else "level")
+        lines.append(f"<p class='note'>{word.title()} {abs(change):.0f} on the "
+                     f"session before. A score is only as comparable as the "
+                     f"coverage behind it: that one had {scored[-2].checks} "
+                     f"checks.</p>")
+    if score.missing:
+        lines.append(f"<p class='note'>Not visible often enough to judge: "
+                     f"{_e(', '.join(_human(m) for m in sorted(score.missing)))}."
+                     f"</p>")
+    return "".join(lines)
 
 
 def _chip(verdict: str) -> str:
@@ -327,6 +597,10 @@ def render(
     dates = store.session_dates(username)
     recurring = store.recurring_findings(username)
     name = display_name or username
+    # Carried as (date, score): a chart axis shows a person a date, never the
+    # internal key a session happens to be filed under.
+    scores = [(date, score_from_store(store, username, key))
+              for key, date in _session_keys(store, username)]
 
     parts = [
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>",
@@ -350,6 +624,23 @@ def render(
             "as a guess.</p></div></body></html>")
         return "".join(parts)
 
+    latest = scores[-1][1] if scores else None
+    if latest is not None:
+        parts.append("<h2>Latest session</h2>")
+        parts.append("<div class='hero'>" + score_ring(latest)
+                     + "<div>" + _score_summary(latest, scores) + "</div></div>")
+
+        by_subject = _subject_scores(latest)
+        parts.append(
+            "<h2>Where it came from</h2><p class='note'>Every quantity this "
+            "system can measure, and how each one scored. Grey is not a low "
+            "score — it is a part of the body that was not visible often "
+            "enough to judge.</p>"
+            "<div class='grid-2'><div class='card'>" + body_map(by_subject)
+            + _band_key() + "</div><div>"
+            + "<div class='card'>" + _components(latest) + "</div>"
+            + _score_history(scores) + "</div></div>")
+
     moving = [s for s in series if s.verdict in ("improved", "worsened", "changed")]
     parts.append("<h2>At a glance</h2><div class='tiles'>")
     parts.append(_tile(str(len(dates)), "sessions recorded"))
@@ -357,6 +648,8 @@ def render(
     parts.append(_tile(str(len(moving)), "with a change clear of the noise"))
     parts.append(_tile(str(len(recurring)), "corrections seen more than once"))
     parts.append("</div>")
+
+
 
     if series:
         parts.append(
@@ -390,12 +683,21 @@ def render(
                 f"<td>{point.samples}</td><td>measured</td></tr>")
     parts.append("</tbody></table></div>")
 
+    if latest is not None and latest.value is None:
+        parts.append(f"<h2>Latest session</h2><div class='card'>"
+                     f"<p class='note'>No score: {_e(latest.withheld_reason)}."
+                     f"</p></div>")
+
     parts.append(
         "<footer>Every number here was measured from video and is geometric: "
         "angles, ranges and timings. It is not health advice. A change is only "
         "called a change once it clears both the spread within a single session "
         f"and {MIN_PRACTICAL_CHANGE:.0f} degrees outright, and a direction is "
         f"only called after {MIN_SESSIONS_FOR_TREND} sessions."
+        "<br>A score is the average of the checks that could actually be made, "
+        "weighted by how many each part contributed. Nothing unmeasured is "
+        "counted as either good or bad, and no score is shown when too little "
+        "of the body was visible for one to mean anything."
         "<br>Only sessions where somebody confirmed which tracked body was this "
         "person appear here.</footer></div></body></html>")
     return "".join(parts)
