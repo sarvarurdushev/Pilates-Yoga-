@@ -20,6 +20,7 @@
     python -m pilates load VIDEO --mass 68 --height 1.68  # joint load, not just shape
     python -m pilates describe VIDEO --model m.joblib # what each student did
     python -m pilates describe VIDEO --anatomy        # ...with muscles and nerves
+    python -m pilates crosscheck nw.json              # our targets against theirs
 """
 from __future__ import annotations
 
@@ -947,6 +948,31 @@ def _anatomy_library(path: str | None, wanted: list[str] | None = None):
     return AnatomyLibrary.load(path)
 
 
+def cmd_crosscheck(args: argparse.Namespace) -> int:
+    """Compare this system's angle targets against a curated library's poses.
+
+    Two sets of targets written independently from the same tradition.
+    Agreement is weak evidence both are right; disagreement is strong evidence
+    one of them is wrong about an exercise, and which one is a question for a
+    teacher. This reports, it does not adjudicate.
+    """
+    from .coaching import DEFAULT_STANDARDS, load_standards
+    from .neurowellness import crosscheck_poses
+
+    standards = load_standards(args.standards) if args.standards else DEFAULT_STANDARDS
+    result = crosscheck_poses(args.library, standards, tolerance=args.tolerance)
+    print(result.describe())
+    if not result.compared:
+        print("\nNothing was comparable. Check the library file is an export "
+              "from tools/export_neuro_wellness.mjs.", file=sys.stderr)
+        return 1
+    print(f"\nOnly joints an interior angle between three keypoints can express "
+          f"are compared.\nA 24-joint spine, shoulder rotation and wrist angles "
+          f"are outside what one camera\nmeasures, so nothing is claimed about "
+          f"them either way.")
+    return 2 if result.disagreed else 0
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     """Check this machine can actually run an analysis."""
     from .diagnostics import check_environment, environment_ready
@@ -1428,6 +1454,15 @@ def main(argv: list[str] | None = None) -> int:
     de.add_argument("--end", type=int, default=None)
     de.add_argument("--stride", type=int, default=None)
     de.set_defaults(func=cmd_describe)
+
+    xc = sub.add_parser("crosscheck",
+                        help="compare angle targets against a curated library")
+    xc.add_argument("library", help="a JSON export of the reference library")
+    xc.add_argument("--standards", default=None)
+    xc.add_argument("--tolerance", type=float, default=20.0,
+                    help="degrees either side of a target pose that still count "
+                         "as doing it (default 20)")
+    xc.set_defaults(func=cmd_crosscheck)
 
     dr = sub.add_parser("doctor", help="check this machine can run an analysis")
     dr.set_defaults(func=cmd_doctor)

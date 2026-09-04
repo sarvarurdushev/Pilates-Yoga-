@@ -629,6 +629,85 @@ a reference expectation, not a measurement, and it lands in a field called
 because the name is the only thing standing between a reference figure and a
 false claim.
 
+### Cross-checking the angle targets
+
+Their records carry a target pose in rig coordinates for all 190 exercises;
+this repo has 36 hand-written angle targets. The two were written
+independently from the same tradition, which is what makes comparing them
+worth doing: where they agree, both are probably right, and where they do not,
+one of them is wrong about an exercise.
+
+The conversion is exact — an interior angle between three keypoints is 180
+degrees when the limb is straight and closes as the joint flexes, so the two
+are complements:
+
+```bash
+python -m pilates crosscheck nw.json
+```
+
+```
+54 joint targets compared across 17 exercises: 52 agree, 2 do not.
+  chaturanga left_elbow:  ours 90 deg (70-110), theirs 46 deg (26-66) — 44 apart
+  chaturanga right_elbow: ours 90 deg (70-110), theirs 46 deg (26-66) — 44 apart
+```
+
+**52 of 54 agree.** That is the result worth reporting: two independent
+readings of the same repertoire land in the same place, which is the strongest
+evidence either set of targets has.
+
+The command exits non-zero on a disagreement, so a build can be made to fail on
+one rather than print it and pass.
+
+Only joints an interior angle can express are compared. Their 24-joint spine,
+shoulder rotation and wrist angles are outside what one camera measures, so
+nothing is claimed about them either way. Hyperextension clamps at straight —
+a hip extended past neutral and a hip at neutral produce the same interior
+angle in an image, and that is a limitation of the measurement rather than a
+rounding choice.
+
+### What the cross-check found
+
+**A wrong alias, here.** `the_hundred` had been mapped to their "Hundred
+Preparation". The classical Hundred holds the legs long; the preparation holds
+them in tabletop. The knee targets came out 50 degrees apart, which is not a
+disagreement about an exercise — it is two different exercises with similar
+names, the exact mismatch an alias table is most likely to create. The alias is
+gone and `the_hundred` is now reported as unmatched.
+
+**A metric bug, here.** Ranking disagreements by the midpoint of the two ranges
+moved the answer when the tolerance changed, because a range is clipped at
+straight and its midpoint then is not the angle it was built from. The target
+angle is now kept separately from the band built around it.
+
+**One substantive disagreement, theirs.** Their chaturanga sets the elbow at
+134 degrees of flexion — a 46-degree interior angle. Standard alignment for
+chaturanga dandasana is roughly 90 degrees, upper arms parallel to the floor
+and forearms vertical; 134 is the shape of the common fault, dropping below
+the line. Their record also sets shoulder flexion at 38.6 degrees, where the
+upper arm alongside the ribs would be much closer to zero, and since their
+poses are solver-placed against floor contacts, an over-open shoulder would
+force the elbow to close further to keep the hand on the mat. That is a
+hypothesis about where the number comes from, not a diagnosis — their rig, and
+their call.
+
+### What is missing from their library
+
+Their library covers 29 of the 34 exercises in Joseph Pilates' *Return to
+Life* mat order. The gaps:
+
+| Missing | Note |
+|---|---|
+| **The Roll Up** | Second in the classical order. Roll Over, Rolling Like a Ball and Standing Roll Down are all present |
+| **The Hundred** (mat) | Only "Hundred Preparation" — tabletop legs. A Reformer Hundred exists |
+| **Swan Dive** | "Swan" is present as a prone extension; the dive is the rocking version |
+| **Leg Pull Back** | Leg Pull Front is present |
+| **The Crab** | Absent entirely |
+
+Jackknife was reported missing on the first pass and is not — their key is one
+word, `jackknife`, where this side writes `jack_knife`. Names are now also
+compared with every separator removed, which is an exact letter-for-letter
+match and so adds no fuzziness.
+
 ### What their table corrected here
 
 Cross-checking their innervation data against the table written here from

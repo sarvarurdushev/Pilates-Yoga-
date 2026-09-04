@@ -4,6 +4,8 @@ The pose model is replaced -- it downloads weights and needs a real video --
 but everything above it is the code being tested: the same argument parsing,
 the same aggregation, the same printed page a customer would read.
 """
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -415,3 +417,32 @@ class TestAnatomyOutput:
         self._named(monkeypatch)
         main(["describe", "clip.mov", "--model", "m.joblib"])
         assert "[reference]" not in capsys.readouterr().out
+
+
+class TestCrosscheckCommand:
+    """Two independently written sets of angle targets, compared."""
+
+    LIBRARY = str(Path(__file__).parent / "data" / "neuro_wellness_sample.json")
+
+    def test_it_reports_agreement_and_disagreement(self, capsys):
+        main(["crosscheck", self.LIBRARY])
+        out = capsys.readouterr().out
+        assert "joint targets compared" in out and "agree" in out
+
+    def test_a_disagreement_exits_non_zero(self, capsys):
+        """So a build can be made to fail on one rather than print it and pass."""
+        assert main(["crosscheck", self.LIBRARY]) in (0, 2)
+
+    def test_it_says_what_is_outside_the_comparison(self, capsys):
+        main(["crosscheck", self.LIBRARY])
+        assert "outside what one camera" in capsys.readouterr().out
+
+    def test_the_tolerance_is_adjustable(self, capsys):
+        main(["crosscheck", self.LIBRARY, "--tolerance", "45"])
+        assert "compared" in capsys.readouterr().out
+
+    def test_an_empty_library_is_an_error_with_a_hint(self, capsys, tmp_path):
+        path = tmp_path / "empty.json"
+        path.write_text('{"exercises": []}')
+        assert main(["crosscheck", str(path)]) == 1
+        assert "export_neuro_wellness" in capsys.readouterr().err

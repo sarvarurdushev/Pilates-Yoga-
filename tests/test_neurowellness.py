@@ -55,9 +55,9 @@ class TestMatching:
         assert library.get("plank") is not None
 
     def test_an_alias_bridges_what_normalisation_cannot(self):
-        library, _ = load_export(SAMPLE, wanted=["the_hundred"])
-        assert ALIASES["the_hundred"] == "hundredPrep"
-        assert library.get("the_hundred") is not None
+        library, _ = load_export(SAMPLE, wanted=["childs_pose"])
+        assert ALIASES["childs_pose"] == "balasana"
+        assert library.get("childs_pose") is not None
 
     def test_an_unmatched_name_is_reported_not_approximated(self):
         """Mapping "standing side bend" onto a side-lying "Side Bend" would
@@ -80,17 +80,16 @@ class TestMuscleProvenance:
     distinction is the reason to import it rather than rewrite it."""
 
     def test_a_measured_role_is_kept_as_measured(self):
-        library, _ = load_export(SAMPLE, wanted=["the_hundred"])
-        entry = library.get("the_hundred")
-        assert entry.support("rectus abdominis") == EMG
+        library, _ = load_export(SAMPLE)
+        assert library.get("hundredPrep").support("rectus abdominis") == EMG
 
     def test_an_inferred_role_is_kept_as_inferred(self):
-        library, _ = load_export(SAMPLE, wanted=["the_hundred"])
-        assert library.get("the_hundred").support("transversus abdominis") == INFERRED
+        library, _ = load_export(SAMPLE)
+        assert library.get("hundredPrep").support("transversus abdominis") == INFERRED
 
     def test_an_unlisted_muscle_defaults_to_inferred_not_measured(self):
-        library, _ = load_export(SAMPLE, wanted=["the_hundred"])
-        assert library.get("the_hundred").support("popliteus") == INFERRED
+        library, _ = load_export(SAMPLE)
+        assert library.get("hundredPrep").support("popliteus") == INFERRED
 
     def test_a_muscle_in_two_roles_keeps_the_stronger_claim(self):
         """Measured once is measured; downgrading it because it also appears as
@@ -104,8 +103,8 @@ class TestMuscleProvenance:
         assert evidence["rectus abdominis"] == EMG
 
     def test_measured_roles_can_be_listed(self):
-        library, _ = load_export(SAMPLE, wanted=["the_hundred"])
-        assert "rectus abdominis" in library.get("the_hundred").measured_roles
+        library, _ = load_export(SAMPLE)
+        assert "rectus abdominis" in library.get("hundredPrep").measured_roles
 
 
 class TestApparatus:
@@ -261,3 +260,169 @@ class TestRoundTrip:
         path = tmp_path / "a.json"
         library.save(path)
         assert AnatomyLibrary.load(path).get("hundredPrep").contraindications
+
+
+class TestPoseConversion:
+    """Their rig gives joint flexion; these targets are interior angles between
+    three keypoints. The two are complements."""
+
+    def test_a_straight_limb_is_180_degrees(self):
+        from pilates.neurowellness import interior_angle
+
+        assert interior_angle(0.0) == 180.0
+
+    def test_ninety_degrees_of_flexion_is_ninety_degrees_interior(self):
+        from pilates.neurowellness import interior_angle
+
+        assert interior_angle(90.0) == 90.0
+
+    def test_hyperextension_clamps_at_straight(self):
+        """A hip extended past neutral and a hip at neutral produce the same
+        interior angle in an image. The rig can express the difference; a
+        camera cannot see it."""
+        from pilates.neurowellness import MAX_INTERIOR, interior_angle
+
+        assert interior_angle(-18.0) == MAX_INTERIOR
+
+    def test_full_flexion_does_not_go_negative(self):
+        from pilates.neurowellness import interior_angle
+
+        assert interior_angle(200.0) == 0.0
+
+    def test_a_pose_becomes_ranges_not_exact_values(self):
+        """A student holding a knee at 88 degrees instead of 90 is not doing it
+        wrong, so a single target angle has to become a band."""
+        from pilates.neurowellness import pose_targets
+
+        targets = pose_targets({"pose": {"knee_angle_l": 90}}, tolerance=20.0)
+        assert targets["left_knee"] == (70.0, 110.0)
+
+    def test_only_joints_a_camera_angle_can_express_are_converted(self):
+        """Their rig carries a 24-joint spine. A single trunk angle cannot say
+        anything about it, so nothing is claimed."""
+        from pilates.neurowellness import pose_targets
+
+        targets = pose_targets({"pose": {"lumbar_flex": 18, "thoracic_flex": 12}})
+        assert targets == {}
+
+    def test_both_sides_convert_independently(self):
+        from pilates.neurowellness import pose_targets
+
+        targets = pose_targets({"pose": {"hip_flexion_r": 90, "hip_flexion_l": 0}})
+        assert targets["right_hip"][0] < targets["left_hip"][0]
+
+
+class TestCrosscheck:
+    """Two sets of angle targets written independently from the same tradition.
+    Agreement is weak evidence both are right; disagreement is strong evidence
+    one is wrong."""
+
+    def _standards(self, **angles):
+        from pilates.coaching import AngleTarget, ExerciseStandard
+
+        return {"plank": ExerciseStandard(
+            exercise="plank",
+            angles=[AngleTarget(joint=j, low=lo, high=hi, cue="x")
+                    for j, (lo, hi) in angles.items()])}
+
+    def test_overlapping_ranges_agree(self):
+        from pilates.neurowellness import crosscheck_poses
+
+        result = crosscheck_poses(SAMPLE, self._standards(left_elbow=(160, 185)))
+        assert ("plank", "left_elbow") in result.agreed
+
+    def test_disjoint_ranges_disagree(self):
+        from pilates.neurowellness import crosscheck_poses
+
+        result = crosscheck_poses(SAMPLE, self._standards(left_elbow=(20, 40)))
+        assert [d.joint for d in result.disagreed] == ["left_elbow"]
+
+    def test_centre_distance_does_not_depend_on_the_tolerance(self):
+        """Range overlap does. Found the hard way: taking the midpoint of the
+        range moved the answer when the tolerance changed, because the range is
+        clipped at straight and the midpoint then is not the target angle."""
+        from pilates.neurowellness import crosscheck_poses
+
+        wide = crosscheck_poses(SAMPLE, self._standards(left_elbow=(20, 40)),
+                                tolerance=40.0)
+        narrow = crosscheck_poses(SAMPLE, self._standards(left_elbow=(20, 40)),
+                                  tolerance=5.0)
+        assert wide.disagreed and narrow.disagreed
+        assert wide.disagreed[0].centres == narrow.disagreed[0].centres
+
+    def test_the_target_angle_is_kept_separately_from_its_band(self):
+        from pilates.neurowellness import pose_angles, pose_targets
+
+        record = {"pose": {"knee_angle_l": -10}}       # hyperextended
+        assert pose_angles(record)["left_knee"] == 185.0
+        low, high = pose_targets(record, tolerance=20.0)["left_knee"]
+        assert high == 185.0 and (low + high) / 2 != 185.0
+
+    def test_a_joint_only_one_side_targets_is_neither(self):
+        from pilates.neurowellness import crosscheck_poses
+
+        result = crosscheck_poses(SAMPLE, self._standards(trunk=(80, 100)))
+        assert ("plank", "trunk") in result.only_ours
+
+    def test_an_exercise_with_no_counterpart_is_reported(self):
+        from pilates.coaching import ExerciseStandard
+        from pilates.neurowellness import crosscheck_poses
+
+        result = crosscheck_poses(
+            SAMPLE, {"moon_salutation": ExerciseStandard(exercise="moon_salutation")})
+        assert result.unmatched == ["moon_salutation"]
+
+    def test_the_summary_ranks_by_centre_distance(self):
+        from pilates.neurowellness import Crosscheck, Disagreement
+
+        result = Crosscheck(disagreed=[
+            Disagreement("a", "left_hip", (0, 10), (20, 30)),
+            Disagreement("b", "left_knee", (0, 10), (100, 110)),
+        ])
+        assert result.describe().index("left_knee") < result.describe().index("left_hip")
+
+    def test_the_real_libraries_mostly_agree(self):
+        """The point of running it. Broad agreement is what makes the handful
+        of disagreements worth investigating rather than noise."""
+        from pilates.coaching import DEFAULT_STANDARDS
+        from pilates.neurowellness import crosscheck_poses
+
+        result = crosscheck_poses(SAMPLE, DEFAULT_STANDARDS)
+        assert result.compared >= 4
+        assert len(result.agreed) > len(result.disagreed)
+
+    def test_the_hundred_is_no_longer_aliased(self):
+        """It was mapped to their "Hundred Preparation" until this cross-check
+        caught it: the classical Hundred holds the legs long and the
+        preparation holds them in tabletop, 50 degrees apart at the knee."""
+        from pilates.neurowellness import ALIASES
+
+        assert "the_hundred" not in ALIASES
+
+
+class TestSquashedMatching:
+    """"Jackknife" and "jack_knife" are the same word written two ways, and
+    normalisation cannot join them because there is no boundary to split on."""
+
+    def test_a_compound_word_matches_its_separated_form(self):
+        from pilates.neurowellness import squash
+
+        assert squash("Jackknife") == squash("jack_knife")
+
+    def test_it_adds_no_fuzziness(self):
+        """It can only merge names that are already identical letter for
+        letter. Fuzziness here attaches a muscle list to the wrong exercise."""
+        from pilates.neurowellness import squash
+
+        assert squash("side_bend") != squash("standing_side_bend")
+        assert squash("rectus abdominis") != squash("rectus femoris")
+
+    def test_it_is_a_last_resort_not_the_first_try(self):
+        """An alias has to win over a letter match, or a deliberate mapping
+        gets quietly overridden by a coincidence."""
+        from pilates.neurowellness import _find, _index
+
+        records = [{"key": "balasana", "name": "Child’s Pose"},
+                   {"key": "childspose", "name": "Something Else"}]
+        by_name, by_squash = _index(records)
+        assert _find("childs_pose", by_name, by_squash)["key"] == "balasana"
