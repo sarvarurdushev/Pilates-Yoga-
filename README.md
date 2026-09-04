@@ -711,6 +711,37 @@ The palette was validated with the colour checker in both light and dark: worst
 adjacent-pair CVD ΔE 24.7 light / 26.8 dark, both slots above 3:1 against their
 surface.
 
+### The dashboard is linked, not just drawn
+
+Click any marker on the body and the page filters to the quantities that
+marker is about — the joint's own angle, its left/right gap, and the moments
+its muscles carried. The corrections that keep coming back fade rather than
+vanish, so a hip correction still shows it was third of thirteen rather than
+first of two. Clicking a chart's heading does the same thing in reverse.
+
+```
+Showing 2 of 20 quantities, for the left hip.        [ Show all quantities ]
+```
+
+Every session is selectable, not only the latest — the panels are all rendered
+into the page, so switching needs no network and no re-render. Hovering a chart
+names the session under the cursor with the spread and the frame count it came
+from.
+
+The script is inline and the page works without it: with scripting off every
+number, chart and table is still there and still readable. A page about
+somebody's body measurements should not go blank because a script failed.
+
+Two bugs worth recording, both found by driving the page rather than by
+testing it:
+
+- The live readout was inside the chart's heading. Showing it reflowed the
+  heading, which moved the chart out from under the pointer, which cleared the
+  readout, which moved it back — a loop the cursor could not escape. It now has
+  its own line with the height reserved whether or not there is text in it.
+- The hover targets extended above the plot, into the card's heading, and
+  swallowed clicks meant for it.
+
 ## Coaching an exercise that is not in any library
 
 A library of named exercises will never be finished. There are hundreds of

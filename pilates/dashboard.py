@@ -61,6 +61,16 @@ def _human(subject: str) -> str:
     return subject.replace("_", " ")
 
 
+#: Units that read as part of the number ("62deg") rather than as a word after
+#: it. Anything else is a description of the quantity, not a unit to print: a
+#: control figure of 1.5 is not "1.5 ratio".
+ATTACHED_UNITS = ("deg", "Nm", "s", "%")
+
+
+def unit_suffix(unit: str) -> str:
+    return unit if unit in ATTACHED_UNITS else ""
+
+
 @dataclass
 class Point:
     """One session's value for one quantity, with the spread behind it."""
@@ -185,10 +195,21 @@ def line_chart(series: Series, width: int = 460, height: int = 170) -> str:
 
     for i, point in enumerate(series.points):
         x, y = x_of(i), y_of(point.value)
-        parts.append(f"<circle class='dot' cx='{x:.1f}' cy='{y:.1f}' r='4.5'>"
-                     f"<title>{_e(point.date)}: {point.value:.1f}"
-                     f"{_e(series.unit)} (varied {point.spread:.1f} within the "
-                     f"session, {point.samples} frames)</title></circle>")
+        parts.append(
+            f"<circle class='dot' cx='{x:.1f}' cy='{y:.1f}' r='4.5' "
+            f"data-date='{_e(point.date)}' data-value='{point.value:.1f}' "
+            f"data-spread='{point.spread:.1f}' data-samples='{point.samples}' "
+            f"data-unit='{_e(unit_suffix(series.unit))}'>"
+            f"<title>{_e(point.date)}: {point.value:.1f}"
+            f"{_e(unit_suffix(series.unit))} (varied {point.spread:.1f} within "
+            f"the session, {point.samples} frames)</title></circle>")
+        # A hit target the size of a fingertip, invisible, so hovering a line
+        # does not require landing on a 9-pixel dot. Kept strictly inside the
+        # plot: the SVG overflows visibly so the axis labels are not clipped,
+        # and a hit area that stuck out above the plot caught pointer events
+        # meant for the card's heading.
+        parts.append(f"<rect class='hit' x='{x - 14:.1f}' y='0' width='28' "
+                     f"height='{plot_h:.1f}' data-index='{i}'/>")
         if i in (0, n - 1):
             anchor = "start" if i == 0 else "end"
             parts.append(f"<text class='point-label' x='{x:.1f}' "
@@ -205,8 +226,8 @@ def line_chart(series: Series, width: int = 460, height: int = 170) -> str:
     return "".join(parts)
 
 
-def bar_chart(rows: list[tuple[str, int]], width: int = 880,
-              bar_h: int = 14, label_h: int = 19, gap: int = 16) -> str:
+def bar_chart(rows, width: int = 880, bar_h: int = 14, label_h: int = 19,
+              gap: int = 16) -> str:
     """How many sessions each recurring correction has appeared in.
 
     Each label sits directly above its own bar in the same group. Listing the
@@ -219,14 +240,20 @@ def bar_chart(rows: list[tuple[str, int]], width: int = 880,
     row_h = label_h + bar_h + gap
     height = len(rows) * row_h
     plot_w = width - left - right - value_w
-    biggest = max(count for _, count in rows)
+    biggest = max(row[1] for row in rows)
 
     parts = [f"<svg viewBox='0 0 {width} {height}' role='img' "
              f"aria-label='corrections by number of sessions'>"]
-    for i, (label, count) in enumerate(rows):
+    for i, row in enumerate(rows):
+        label, count = row[0], row[1]
+        # A third element, when present, is the body-map markers this
+        # correction belongs to. Selecting a joint should bring its own
+        # corrections forward -- somebody who clicked a hip wants the hip's.
+        markers = row[2] if len(row) > 2 else ""
         top = i * row_h
         w = max(3.0, count / biggest * plot_w)
-        parts.append(f"<g><title>{_e(label)}: {count} session(s)</title>")
+        parts.append(f"<g class='barrow' data-subjects='{_e(markers)}'>"
+                     f"<title>{_e(label)}: {count} session(s)</title>")
         parts.append(f"<text class='bar-label' x='{left}' y='{top + 13}'>"
                      f"{_e(label)}</text>")
         parts.append(f"<rect class='bar' x='{left}' y='{top + label_h}' "
@@ -296,6 +323,29 @@ BANDS = ((80.0, "good", "on target"), (60.0, "watch", "worth watching"),
          (0.0, "work", "needs work"))
 
 
+#: Joints a body-map marker stands for. A quantity is linked to a marker when
+#: it is about that joint, so clicking a knee brings up the knee angle, the
+#: knee symmetry gap and the moments the knee muscles carried -- which is what
+#: a person means when they point at a knee.
+JOINT_WORDS = ("knee", "hip", "elbow", "shoulder", "neck", "trunk", "pelvis")
+
+
+def body_subjects_for(subject: str) -> set[str]:
+    """Which body-map markers a measured quantity belongs to.
+
+    Whole-body qualities -- repetitions, control, tempo -- belong to no marker
+    and return an empty set. They are not about a joint, and pretending they
+    are would put a tempo chart under a knee.
+    """
+    if subject in BODY_POINTS:
+        return {subject}
+    for word in JOINT_WORDS:
+        if word in subject:
+            sides = {f"left_{word}", f"right_{word}"} & set(BODY_POINTS)
+            return sides or ({word} if word in BODY_POINTS else set())
+    return set()
+
+
 def band(value: float | None) -> tuple[str, str]:
     """Which band a score falls in, and the words for it."""
     if value is None:
@@ -332,9 +382,13 @@ def body_map(scores: dict[str, float | None], width: int = 260,
         key, label = band(value)
         shown = f"{value:.0f}" if value is not None else "—"
         parts.append(
-            f"<g class='mark {key}'><title>{_e(_human(name))}: "
+            f"<g class='mark {key}' data-subject='{_e(name)}' role='button' "
+            f"tabindex='0' aria-label='{_e(_human(name))}, {_e(label)}"
+            f"{f', {value:.0f} out of 100' if value is not None else ''}'>"
+            f"<title>{_e(_human(name))}: "
             f"{shown if value is not None else 'not measured often enough'}"
             f"{' out of 100' if value is not None else ''} — {_e(label)}</title>"
+            f"<circle class='halo' cx='{x}' cy='{y}' r='15'/>"
             f"<circle cx='{x}' cy='{y}' r='9'/>")
         if name in call_out:
             parts.append(f"<text class='mark-label' x='{x}' y='{y - 13}' "
@@ -469,6 +523,51 @@ svg { width:100%; height:auto; display:block; overflow:visible; }
   border-radius:4px; overflow:hidden; }
 .comp .fill { display:block; height:8px; border-radius:4px; }
 .comp .cnt { color:var(--muted); font-size:12px; white-space:nowrap; }
+
+/* --- interaction ------------------------------------------------------- */
+.picker { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:20px; }
+.pick { font:inherit; font-size:12.5px; cursor:pointer; padding:5px 10px;
+  border:1px solid var(--rule); background:var(--panel); color:var(--muted);
+  border-radius:6px; display:inline-flex; align-items:baseline; gap:7px; }
+.pick em { font-style:normal; font-weight:650; font-variant-numeric:tabular-nums;
+  color:var(--ink); }
+.pick:hover { border-color:var(--series1); }
+.pick.on { border-color:var(--series1); color:var(--ink);
+  box-shadow:inset 0 0 0 1px var(--series1); }
+.mark { cursor:pointer; }
+.mark .halo { fill:transparent; }
+.mark:hover circle:last-of-type, .mark:focus-visible circle:last-of-type { r:11; }
+.mark:focus-visible .halo { fill:none; stroke:var(--series1); stroke-width:2; }
+.mark.picked circle:last-of-type { stroke:var(--ink); stroke-width:2.5; r:11; }
+.hit { fill:transparent; cursor:crosshair; }
+/* Its own line with the height always reserved. Inside the heading, showing
+   this text reflowed the heading, which moved the chart out from under the
+   pointer, which cleared the text, which moved it back -- a loop. */
+.readout { font-size:12px; color:var(--series1); margin:0 0 6px;
+  font-variant-numeric:tabular-nums; min-height:1.35em; line-height:1.35;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.card h3 { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.filterbar { display:flex; align-items:center; gap:14px; margin:0 0 14px;
+  padding:9px 14px; background:var(--panel); border:1px solid var(--series1);
+  border-radius:6px; font-size:13.5px; }
+.filterbar .what { color:var(--ink); }
+.clear { font:inherit; font-size:13px; cursor:pointer; padding:4px 11px;
+  border:1px solid var(--rule); background:var(--surface); color:var(--ink);
+  border-radius:5px; margin-left:auto; }
+.clear:hover { border-color:var(--series1); }
+.card.chart.dim { display:none; }
+/* Corrections fade rather than vanish: a person who clicked a hip still wants
+   to see that this correction is third of thirteen, not first of two. */
+.barrow.dim { opacity:0.22; }
+@media (prefers-reduced-motion: no-preference) { .barrow { transition:opacity .15s ease; } }
+button:focus-visible, .mark:focus-visible { outline:2px solid var(--series1);
+  outline-offset:2px; }
+@media (prefers-reduced-motion: no-preference) {
+  /* Named properties, not "all": transitioning everything animates fill
+     changes and confuses anything measuring whether the page has settled. */
+  .pick, .clear { transition:border-color .12s ease, box-shadow .12s ease; }
+  .dot, .mark circle { transition:r .12s ease; }
+}
 .bar:hover { opacity:0.85; }
 .chip { display:inline-flex; align-items:center; gap:5px; font-size:11.5px;
   font-weight:650; padding:2px 9px; border-radius:10px; border:1px solid var(--rule); }
@@ -531,6 +630,25 @@ def _score_history(scores: list) -> str:
               "from. A score is only as comparable as its coverage.</p></div>")
 
 
+def _session_picker(scores: list) -> str:
+    """Every session, selectable. The page opens on the most recent one.
+
+    Rendered as buttons rather than a dropdown: a dozen dates is a thing to
+    scan, and a person comparing two sessions wants to see both labels at
+    once.
+    """
+    if len(scores) < 2:
+        return "<h2>Latest session</h2>"
+    buttons = "".join(
+        f"<button type='button' class='pick{' on' if i == len(scores) - 1 else ''}' "
+        f"data-session='{i}'>{_e(date)}"
+        + (f"<em>{score.value:.0f}</em>" if score.value is not None else "<em>—</em>")
+        + "</button>"
+        for i, (date, score) in enumerate(scores))
+    return ("<h2>Session</h2><div class='picker' role='group' "
+            "aria-label='choose a session'>" + buttons + "</div>")
+
+
 def _components(score: Score) -> str:
     """The parts the headline number is made of, weakest first."""
     rows = ["<h3>What made up the score</h3>"]
@@ -572,6 +690,117 @@ def _score_summary(score: Score, history: list) -> str:
                      f"{_e(', '.join(_human(m) for m in sorted(score.missing)))}."
                      f"</p>")
     return "".join(lines)
+
+
+
+
+#: The page works without this. Everything is rendered and readable with
+#: scripting off -- the script adds linking between the two views, a live
+#: readout on the charts, and the session picker. A page about somebody's body
+#: measurements should not go blank because a script failed to run.
+SCRIPT = """
+(function () {
+  var sheet = document.querySelector('.sheet');
+  if (!sheet) return;
+
+  /* ---- session picker: panels are pre-rendered, this only toggles them --- */
+  var picks = sheet.querySelectorAll('.pick');
+  var panels = sheet.querySelectorAll('.session');
+  function showSession(index) {
+    panels.forEach(function (p) { p.hidden = p.dataset.session !== index; });
+    picks.forEach(function (b) { b.classList.toggle('on', b.dataset.session === index); });
+  }
+  picks.forEach(function (b) {
+    b.addEventListener('click', function () { showSession(b.dataset.session); });
+  });
+
+  /* ---- linked selection: one subject, both views ------------------------ */
+  var charts = sheet.querySelectorAll('.card.chart');
+  var bar = sheet.querySelector('.filterbar');
+  var what = bar ? bar.querySelector('.what') : null;
+  var selected = null;
+
+  function human(name) { return name.replace(/_/g, ' '); }
+
+  function apply() {
+    var shown = 0;
+    charts.forEach(function (card) {
+      var owns = (card.dataset.subjects || '').split(' ').filter(Boolean);
+      var match = !selected || card.dataset.subject === selected
+                  || owns.indexOf(selected) !== -1;
+      card.classList.toggle('dim', !match);
+      if (match) shown++;
+    });
+    sheet.querySelectorAll('.mark').forEach(function (m) {
+      m.classList.toggle('picked', !!selected && m.dataset.subject === selected);
+    });
+    sheet.querySelectorAll('.barrow').forEach(function (row) {
+      var owns = (row.dataset.subjects || '').split(' ').filter(Boolean);
+      row.classList.toggle('dim', !!selected && owns.indexOf(selected) === -1);
+    });
+    if (bar) {
+      bar.hidden = !selected;
+      if (selected && what) {
+        what.textContent = 'Showing ' + shown + ' of ' + charts.length
+          + ' quantities, for the ' + human(selected) + '.';
+      }
+    }
+  }
+
+  function select(subject) {
+    selected = (selected === subject) ? null : subject;
+    apply();
+    if (selected) {
+      var heading = document.getElementById('over-time');
+      var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (heading) {
+        heading.scrollIntoView({ behavior: still ? 'auto' : 'smooth',
+                                 block: 'start' });
+      }
+    }
+  }
+
+  sheet.addEventListener('click', function (event) {
+    var mark = event.target.closest('.mark');
+    if (mark && mark.dataset.subject) { select(mark.dataset.subject); return; }
+    var head = event.target.closest('.card.chart h3');
+    if (head) { select(head.parentElement.dataset.subject); }
+  });
+
+  sheet.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && selected) { selected = null; apply(); return; }
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    var mark = event.target.closest('.mark');
+    if (mark && mark.dataset.subject) { event.preventDefault(); select(mark.dataset.subject); }
+  });
+
+  var clear = sheet.querySelector('.clear');
+  if (clear) clear.addEventListener('click', function () { selected = null; apply(); });
+
+  /* ---- live readout: hovering a chart names the session under the cursor - */
+  charts.forEach(function (card) {
+    var readout = card.querySelector('.readout');
+    var dots = card.querySelectorAll('.dot');
+    if (!readout || !dots.length) return;
+    card.querySelectorAll('.hit').forEach(function (hit) {
+      hit.addEventListener('mouseenter', function () {
+        var dot = dots[+hit.dataset.index];
+        if (!dot) return;
+        var unit = dot.dataset.unit || '';
+        readout.textContent = dot.dataset.date + ' · ' + dot.dataset.value + unit
+          + ' (varied ' + dot.dataset.spread + unit + ' over '
+          + dot.dataset.samples + ' frames)';
+        dot.setAttribute('r', '6.5');
+      });
+      hit.addEventListener('mouseleave', function () {
+        var dot = dots[+hit.dataset.index];
+        if (dot) dot.setAttribute('r', '4.5');
+        readout.textContent = '';
+      });
+    });
+  });
+})();
+"""
 
 
 def _chip(verdict: str) -> str:
@@ -626,20 +855,23 @@ def render(
 
     latest = scores[-1][1] if scores else None
     if latest is not None:
-        parts.append("<h2>Latest session</h2>")
-        parts.append("<div class='hero'>" + score_ring(latest)
-                     + "<div>" + _score_summary(latest, scores) + "</div></div>")
-
-        by_subject = _subject_scores(latest)
-        parts.append(
-            "<h2>Where it came from</h2><p class='note'>Every quantity this "
-            "system can measure, and how each one scored. Grey is not a low "
-            "score — it is a part of the body that was not visible often "
-            "enough to judge.</p>"
-            "<div class='grid-2'><div class='card'>" + body_map(by_subject)
-            + _band_key() + "</div><div>"
-            + "<div class='card'>" + _components(latest) + "</div>"
-            + _score_history(scores) + "</div></div>")
+        parts.append(_session_picker(scores))
+        for index, (date, score) in enumerate(scores):
+            last = index == len(scores) - 1
+            parts.append(
+                f"<div class='session' data-session='{index}'"
+                + ("" if last else " hidden") + ">"
+                + "<div class='hero'>" + score_ring(score)
+                + "<div>" + _score_summary(score, scores[:index + 1]) + "</div></div>"
+                + "<p class='note map-note'>Every quantity this system can "
+                  "measure, and how each one scored. Grey is not a low score — "
+                  "it is a part of the body that was not visible often enough "
+                  "to judge. Click any marker to see its charts.</p>"
+                + "<div class='grid-2'><div class='card'>"
+                + body_map(_subject_scores(score)) + _band_key()
+                + "</div><div>"
+                + "<div class='card'>" + _components(score) + "</div>"
+                + _score_history(scores) + "</div></div></div>")
 
     moving = [s for s in series if s.verdict in ("improved", "worsened", "changed")]
     parts.append("<h2>At a glance</h2><div class='tiles'>")
@@ -653,14 +885,23 @@ def render(
 
     if series:
         parts.append(
-            "<h2>Over time</h2><p class='note'>The shaded band behind each line "
-            "is how much that quantity varied inside a single session. A move "
-            "that stays inside the band is not a move.</p><div class='grid-2'>")
+            "<h2 id='over-time'>Over time</h2>"
+            "<p class='note'>The shaded band behind each line is how much that "
+            "quantity varied inside a single session. A move that stays inside "
+            "the band is not a move.</p>"
+            "<div class='filterbar' hidden>"
+            "<span class='what'></span>"
+            "<button type='button' class='clear'>Show all quantities</button>"
+            "</div>"
+            "<div class='grid-2' id='charts'>")
         for item in sorted(series, key=lambda s: s.subject):
+            markers = " ".join(sorted(body_subjects_for(item.subject)))
             parts.append(
-                f"<div class='card'><h3>{_e(_human(item.subject))} "
-                f"{_chip(item.verdict)}</h3>"
+                f"<div class='card chart' data-subjects='{_e(markers)}' "
+                f"data-subject='{_e(item.subject)}'>"
+                f"<h3>{_e(_human(item.subject))} {_chip(item.verdict)}</h3>"
                 f"<p class='note'>{_e(item.explain())}</p>"
+                f"<p class='readout' aria-live='polite'></p>"
                 + line_chart(item) + "</div>")
         parts.append("</div>")
 
@@ -668,7 +909,10 @@ def render(
         parts.append("<h2>What keeps coming back</h2><div class='card'>")
         parts.append("<p class='note'>Corrections given in more than one "
                      "session, by how many sessions they appeared in.</p>")
-        parts.append(bar_chart([(e["message"], e["sessions"]) for e in recurring]))
+        parts.append(bar_chart([
+            (e["message"], e["sessions"],
+             " ".join(sorted(body_subjects_for(e["subject"] or e["message"]))))
+            for e in recurring]))
         parts.append("</div>")
 
     parts.append("<h2>The numbers behind the charts</h2><div class='card'><table>"
@@ -699,5 +943,6 @@ def render(
         "counted as either good or bad, and no score is shown when too little "
         "of the body was visible for one to mean anything."
         "<br>Only sessions where somebody confirmed which tracked body was this "
-        "person appear here.</footer></div></body></html>")
+        "person appear here.</footer></div>"
+        f"<script>{SCRIPT}</script></body></html>")
     return "".join(parts)

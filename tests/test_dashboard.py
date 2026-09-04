@@ -127,7 +127,7 @@ class TestBarChart:
         """Listing labels separately and bars below leaves a reader matching
         two ordered lists by eye."""
         svg = bar_chart([("the hips were not level", 6), ("the knee drifted", 4)])
-        groups = re.findall(r"<g>.*?</g>", svg, re.S)
+        groups = re.findall(r"<g class='barrow'.*?</g>", svg, re.S)
         assert len(groups) == 2
         for group in groups:
             assert "bar-label" in group and "<rect" in group
@@ -176,11 +176,16 @@ class TestCollect:
 class TestPage:
     def test_it_is_self_contained(self, store):
         """A studio emails it or opens it with no network, and nothing about a
-        person's body measurements is fetched from somebody else's server."""
+        person's body measurements is fetched from somebody else's server.
+
+        The page carries an inline script for the linking, which is not a
+        network dependency. What must never appear is a URL or a src.
+        """
         fill(store)
         html = render(store, "anna", "Anna Smith")
         assert "http://" not in html and "https://" not in html
-        assert "<script" not in html
+        assert "src=" not in html
+        assert "<link" not in html and "@import" not in html
 
     def test_it_names_the_person_and_the_span(self, store):
         fill(store)
@@ -356,3 +361,239 @@ class TestBodyMap:
 
         svg = body_map({"left_knee": None})
         assert "not measured often enough" in svg
+
+
+class TestLinking:
+    """One selection, both views. Clicking a knee should bring up the knee
+    angle, the knee symmetry gap and the moments the knee muscles carried."""
+
+    def test_a_joint_angle_belongs_to_its_own_marker(self):
+        from pilates.dashboard import body_subjects_for
+
+        assert body_subjects_for("left_knee") == {"left_knee"}
+
+    def test_a_symmetry_gap_belongs_to_both_sides(self):
+        from pilates.dashboard import body_subjects_for
+
+        assert body_subjects_for("knee symmetry") == {"left_knee", "right_knee"}
+
+    def test_a_muscle_group_moment_belongs_to_its_joint(self):
+        from pilates.dashboard import body_subjects_for
+
+        assert body_subjects_for("knee extensors peak moment") == \
+            {"left_knee", "right_knee"}
+
+    def test_a_whole_body_quality_belongs_to_no_marker(self):
+        """Pretending otherwise would put a tempo chart under a knee."""
+        from pilates.dashboard import body_subjects_for
+
+        for subject in ("repetitions", "control", "tempo ratio", "longest hold"):
+            assert body_subjects_for(subject) == set(), subject
+
+    def test_a_single_sided_marker_maps_to_itself(self):
+        from pilates.dashboard import body_subjects_for
+
+        assert body_subjects_for("neck") == {"neck"}
+        assert body_subjects_for("trunk") == {"trunk"}
+
+    def test_chart_cards_declare_what_they_belong_to(self, store):
+        from pilates.dashboard import render
+
+        fill(store, subject="left_knee")
+        fill(store, subject="knee symmetry", values=(9, 6, 3))
+        html = render(store, "anna")
+        assert "data-subjects='left_knee'" in html
+        assert "data-subjects='left_knee right_knee'" in html
+
+    def test_body_markers_are_real_controls(self, store):
+        from pilates.dashboard import render
+
+        fill(store)
+        html = render(store, "anna")
+        assert "role='button'" in html and "tabindex='0'" in html
+
+    def test_each_marker_carries_the_subject_it_selects(self, store):
+        from pilates.dashboard import render
+
+        fill(store)
+        assert "data-subject='left_knee'" in render(store, "anna")
+
+    def test_the_filter_bar_starts_hidden(self, store):
+        from pilates.dashboard import render
+
+        fill(store)
+        assert "<div class='filterbar' hidden>" in render(store, "anna")
+
+    def test_chart_points_carry_their_own_numbers_for_a_readout(self, store):
+        from pilates.dashboard import render
+
+        fill(store)
+        html = render(store, "anna")
+        for attribute in ("data-date=", "data-value=", "data-spread=",
+                          "data-samples="):
+            assert attribute in html, attribute
+
+    def test_hover_targets_are_bigger_than_the_dots(self, store):
+        """Hovering a line should not require landing on a 9-pixel dot."""
+        from pilates.dashboard import line_chart
+
+        svg = line_chart(series([60, 65, 70]))
+        assert svg.count("class='hit'") == 3
+
+    def test_the_page_is_readable_without_the_script(self, store):
+        """A page about somebody's body measurements should not go blank
+        because a script failed to run."""
+        from pilates.dashboard import render
+
+        fill(store)
+        html = render(store, "anna")
+        body = html.split("<script>")[0]
+        assert "60.0deg" in body and "left hip" in body
+
+
+class TestSessionPicker:
+    def _sessions(self, store, n=3):
+        from pilates.scoring import MEASURABLE
+
+        for i in range(n):
+            key = f"p{i}"
+            store.record_session(SessionMeta(key=key, date=f"2026-04-{i + 1:02d}"))
+            store.put_link(Link(session=key, track_id=4,
+                                username="anna").confirm("t"))
+            for subject in MEASURABLE:
+                store.add_measurement(key, 4, subject, 100.0, spread=2.0, samples=200)
+                store.add_finding(key, 4, "good", "x", subject=subject,
+                                  source="standard")
+
+    def test_every_session_is_offered(self, store):
+        from pilates.dashboard import render
+
+        self._sessions(store)
+        html = render(store, "anna")
+        for date in ("2026-04-01", "2026-04-02", "2026-04-03"):
+            assert f"data-session=" in html and date in html
+
+    def test_each_button_shows_that_session_score(self, store):
+        from pilates.dashboard import render
+
+        self._sessions(store)
+        assert "<em>100</em>" in render(store, "anna")
+
+    def test_the_page_opens_on_the_most_recent(self, store):
+        from pilates.dashboard import render
+
+        self._sessions(store)
+        html = render(store, "anna")
+        assert "<div class='session' data-session='2'>" in html
+        assert "<div class='session' data-session='0' hidden>" in html
+
+    def test_every_session_panel_is_rendered_not_fetched(self, store):
+        """Switching sessions must work with no network and no re-render."""
+        from pilates.dashboard import render
+
+        self._sessions(store)
+        assert render(store, "anna").count("class='session'") == 3
+
+    def test_one_session_needs_no_picker(self, store):
+        from pilates.dashboard import render
+
+        self._sessions(store, n=1)
+        html = render(store, "anna")
+        assert "class='picker'" not in html
+        assert "Latest session" in html
+
+
+class TestUnits:
+    """A control figure of 1.5 is not "1.5 ratio"."""
+
+    def test_real_units_are_printed(self):
+        from pilates.dashboard import unit_suffix
+
+        assert unit_suffix("deg") == "deg" and unit_suffix("Nm") == "Nm"
+
+    def test_a_description_of_the_quantity_is_not(self):
+        from pilates.dashboard import unit_suffix
+
+        assert unit_suffix("ratio") == "" and unit_suffix("count") == ""
+
+    def test_the_readout_data_carries_the_printable_unit(self, store):
+        from pilates.dashboard import render
+
+        fill(store)
+        store.record_session(SessionMeta(key="r1", date="2026-05-01"))
+        store.put_link(Link(session="r1", track_id=4,
+                            username="anna").confirm("t"))
+        store.add_measurement("r1", 4, "control", 1.5, unit="ratio",
+                              samples=100, source="quality")
+        html = render(store, "anna")
+        assert "data-unit='ratio'" not in html
+
+
+class TestNoLayoutLoop:
+    """Showing the readout inside the heading reflowed it, which moved the chart
+    out from under the pointer, which cleared the readout, which moved it back."""
+
+    def test_the_readout_is_not_inside_the_heading(self, store):
+        from pilates.dashboard import render
+
+        fill(store)
+        html = render(store, "anna")
+        assert "<span class='readout'" not in html
+        assert "<p class='readout'" in html
+
+    def test_its_height_is_reserved_whether_or_not_it_has_text(self, store):
+        from pilates.dashboard import render
+
+        fill(store)
+        assert "min-height:1.35em" in render(store, "anna")
+
+    def test_hit_targets_stay_inside_the_plot(self):
+        """One that stuck out above caught pointer events meant for the card's
+        heading."""
+        from pilates.dashboard import line_chart
+        import re
+
+        svg = line_chart(series([60, 65, 70]))
+        for y in re.findall(r"class='hit'[^>]*y='(-?[\d.]+)'", svg):
+            assert float(y) >= 0.0
+
+
+class TestCorrectionsFollowTheSelection:
+    """Somebody who clicked a hip wants the hip's corrections brought
+    forward."""
+
+    def test_a_correction_carries_the_markers_it_belongs_to(self):
+        from pilates.dashboard import bar_chart
+
+        svg = bar_chart([("the hips were not level", 6, "left_hip right_hip")])
+        assert "data-subjects='left_hip right_hip'" in svg
+
+    def test_a_correction_with_no_joint_carries_none(self):
+        from pilates.dashboard import bar_chart
+
+        svg = bar_chart([("the movement wobbled", 4, "")])
+        assert "data-subjects=''" in svg
+
+    def test_the_chart_still_works_without_the_third_element(self):
+        """The signature has to stay usable for a plain label-and-count."""
+        from pilates.dashboard import bar_chart
+
+        assert "<rect" in bar_chart([("a", 3), ("b", 1)])
+
+    def test_the_page_wires_findings_to_their_joint(self, store):
+        from pilates.dashboard import render
+
+        fill(store)
+        for i in range(3):
+            store.add_finding(f"s{i}-left_hip", 4, "improve",
+                              "the hips were not level", subject="hip symmetry")
+        html = render(store, "anna")
+        assert "data-subjects='left_hip right_hip'" in html
+
+    def test_they_fade_rather_than_vanish(self, store):
+        """A correction that disappeared would lose its rank among the
+        others."""
+        from pilates.dashboard import render
+
+        fill(store)
+        assert ".barrow.dim { opacity:0.22; }" in render(store, "anna")
