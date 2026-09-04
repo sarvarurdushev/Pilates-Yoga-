@@ -217,7 +217,7 @@ class TestAnatomyInTheReport:
         from pilates.report import render
 
         html = render(self._report())
-        assert "intercostal nerves" in html and "Spinal levels" in html
+        assert "thoracoabdominal nerves" in html and "Spinal levels" in html
 
     def test_measured_and_reference_lines_are_visually_tagged(self):
         from pilates.report import render

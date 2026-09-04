@@ -575,10 +575,8 @@ def cmd_report(args: argparse.Namespace) -> int:
     store = HistoryStore.load(args.history) if args.history else None
     anatomy = None
     if args.anatomy:
-        from .anatomy import AnatomyLibrary
-
-        library = (AnatomyLibrary.load(args.anatomy_file) if args.anatomy_file
-                   else AnatomyLibrary.default())
+        library = _anatomy_library(args.anatomy_file,
+                                   wanted=sorted(standards))
         anatomy = library.get(standard.exercise)
         if anatomy is None:
             print(f"  no reference anatomy on file for {standard.exercise}; "
@@ -587,7 +585,7 @@ def cmd_report(args: argparse.Namespace) -> int:
         student=args.name, exercise=standard.exercise,
         assessment=assess(history, standard, config.keypoint_threshold),
         summary=summarise(history), store=store, date=args.date, studio=args.studio,
-        anatomy=anatomy,
+        anatomy=anatomy, nerves=library.nerves if anatomy is not None else None,
     )
     out = write(report, args.out or f"{args.name.replace(' ', '_')}_{report.date}.html")
     print(f"report -> {out}")
@@ -739,10 +737,15 @@ def cmd_describe(args: argparse.Namespace) -> int:
     recogniser = OpenSetRecogniser.load(args.model) if args.model else None
     library = None
     if args.anatomy:
-        from .anatomy import AnatomyLibrary
+        # Keyed to the names this system can actually produce -- the model's
+        # own classes when there is one. A library keyed to its source's
+        # vocabulary would never be found by a lookup on ours.
+        from .coaching import DEFAULT_STANDARDS
 
-        library = (AnatomyLibrary.load(args.anatomy_file) if args.anatomy_file
-                   else AnatomyLibrary.default())
+        wanted = sorted(recogniser.classifier.names) if (
+            recogniser is not None and getattr(recogniser.classifier, "names", None)
+        ) else sorted(DEFAULT_STANDARDS)
+        library = _anatomy_library(args.anatomy_file, wanted=wanted)
         unknown = library.unknown_muscles()
         if unknown:
             print(f"Note: no nerve supply recorded for {', '.join(unknown)}. "
@@ -868,13 +871,22 @@ def _print_anatomy(library, recognition, load_report) -> None:
               f"{recognition.name.replace('_', ' ')}")
         return
 
+    table = library.nerves
     for provenance, line in reconcile(entry, load_report).describe():
         print(f"  [{provenance}] {line}")
-    supplies = {supply.describe() for _, supply in entry.nerves()}
-    if supplies:
-        print(f"  [{REFERENCE}] supplied by {', '.join(sorted(supplies))}")
-    if entry.roots():
-        print(f"  [{REFERENCE}] spinal levels {', '.join(entry.roots())}")
+    measured_roles = entry.measured_roles
+    if measured_roles:
+        print(f"  [{REFERENCE}] roles an EMG study recorded for this movement: "
+              f"{', '.join(measured_roles)}")
+    seen: set[str] = set()
+    for muscle, supply in entry.nerves(table):
+        text = supply.describe()
+        if text in seen:
+            continue
+        seen.add(text)
+        print(f"  [{REFERENCE}] {muscle}: {text}")
+    if entry.spinal_levels(table):
+        print(f"  [{REFERENCE}] spinal levels {entry.spinal_summary(table)}")
     if entry.bones:
         print(f"  [{REFERENCE}] at the {', '.join(entry.joints)}; bones involved: "
               f"{', '.join(entry.bones)}")
@@ -910,6 +922,29 @@ def _best_load(track_id, samples, contacts, equipment):
     elif not refusal and samples:
         refusal = "no limb was both fully visible and free of the floor"
     return best, usable, excluded, refusal
+
+
+def _anatomy_library(path: str | None, wanted: list[str] | None = None):
+    """Load an anatomy library, accepting either schema.
+
+    A curated project exports its own shape; asking a studio to convert it by
+    hand before this will read it is how imported data gets mangled. A
+    Neuro Wellness export is recognised by its own marker and mapped here.
+    """
+    import json
+
+    from .anatomy import AnatomyLibrary
+
+    if path is None:
+        return AnatomyLibrary.default()
+    payload = json.loads(Path(path).read_text())
+    if "exercises" in payload and isinstance(payload.get("muscles"), dict):
+        from .neurowellness import load_export
+
+        library, report = load_export(path, wanted=wanted)
+        print(report.describe(), file=sys.stderr)
+        return library
+    return AnatomyLibrary.load(path)
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:

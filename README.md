@@ -566,6 +566,88 @@ python -m pilates describe class.mp4 --anatomy --anatomy-file our_library.json
 Bones are derived from the joints when a file does not list them, so the two
 cannot drift apart.
 
+## Importing Neuro Wellness
+
+[Neuro Wellness](https://github.com/sarvarurdushev/Neuro_Wellness) holds 190
+Pilates and yoga exercises with per-muscle roles, an innervation table sourced
+to Gray's Anatomy 42nd edition, and brain-effect claims each carrying an
+evidence tier, citation, effect size, population and caveat. It is better
+curated than anything written here from scratch, and in one respect stricter:
+it marks every muscle role **per muscle, per exercise** as measured by EMG or
+inferred from biomechanics.
+
+```bash
+node tools/export_neuro_wellness.mjs ../Neuro_Wellness nw.json
+python -m pilates describe class.mp4 --anatomy --anatomy-file nw.json     --model model.joblib --mass 65 --height 1.68
+```
+
+The export script dumps their ES modules verbatim; all schema translation is in
+`pilates/neurowellness.py`, where the tests are. A transform split across two
+languages, half of it untested, is how imported data quietly acquires errors.
+
+```
+33 exercises, 91 muscles with innervation, 18 research claims.
+No entry found for roll_up, standing_back_bend, standing_side_bend. Those keep
+whatever anatomy they already had rather than being matched to something close.
+
+Student #1 — the hundred
+  [measured]  the hip flexors carried 24 Nm, in a role this exercise lists as
+              stabilising — and more than anything the exercise names as a prime
+              mover, which is what compensation looks like
+  [reference] roles an EMG study recorded for this movement: rectus abdominis,
+              external oblique, internal oblique, diaphragm
+  [reference] diaphragm: Phrenic nerve (C3, C4, C5)
+  [reference] multifidus: Medial branches of the posterior rami, segmentally (C3-S1)
+```
+
+That first line is the whole point of the join. Anatomy says the Hundred is an
+abdominal exercise with psoas stabilising; the camera says psoas carried more
+than anything else. Neither source says that alone.
+
+### Four things the mapping has to get right
+
+**Names.** "Warrior II" and `warrior_two` have to meet somewhere, and camelCase
+keys have to split into words first. 33 of 36 match on a normalised name plus
+five explicit aliases. The other three are **reported, not forced** — their
+side-lying "Side Bend" is not a standing side bend, and mapping it would attach
+a real muscle list to the wrong movement.
+
+**Apparatus.** 32 of their 190 exercises are on a reformer, cadillac, chair or
+barrel. Importing that field wires straight into the equipment rules: an
+exercise recognised as reformer work invalidates its own load estimate without
+anyone remembering to declare it.
+
+**Muscle vocabulary.** They separate psoas major from iliacus, where the moment
+model has only "iliopsoas". Fuzzy matching was tried and rejected — "rectus
+abdominis" and "rectus femoris" share a word and nothing else, and a near-match
+put an abdominal muscle in the knee extensors. Synonyms are an explicit table,
+and a test checks every entry resolves.
+
+**Activation.** Their records carry an expected activation per muscle. That is
+a reference expectation, not a measurement, and it lands in a field called
+`expected_activation` — a test asserts there is no field called `activation`,
+because the name is the only thing standing between a reference figure and a
+false claim.
+
+### What their table corrected here
+
+Cross-checking their innervation data against the table written here from
+memory found real errors, all of them in the same direction — mine were
+truncated:
+
+| Muscle | Was | Is |
+|---|---|---|
+| adductor magnus | obturator, L2–L4 | obturator **and tibial**, L2–S1 |
+| brachialis | musculocutaneous, C5–C6 | musculocutaneous **with a radial contribution**, C5–C7 |
+| teres major | C5–C6 | C5–C7 |
+| fibularis longus | L5–S1 | L5–S2 |
+
+And one structural bug: root ranges were stored as two endpoints, so a report
+printed "spinal levels T7, T12" — which reads as two segments with nothing
+between them. Ranges are now expanded, and a **segmental** supply (erector
+spinae, multifidus) fills in its whole span rather than listing the levels a
+source happened to sample.
+
 ## Hands, props and machines
 
 Three things break the assumption every load figure rests on — that gravity is

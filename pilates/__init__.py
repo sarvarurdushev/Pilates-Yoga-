@@ -13,10 +13,12 @@ from .classifier import (Evaluation, ExerciseClassifier, evaluate,
                          featurise, majority_baseline, window_features)
 from .coaching import (DEFAULT_STANDARDS, AngleTarget, Assessment, ExerciseStandard,
                        Finding, SymmetryTarget, assess, assess_tempo, narrate, UNSUITABLE)
-from .anatomy import (DEFAULT_ANATOMY, MEASURED, NERVE_SUPPLY, REFERENCE,
-                      RESEARCH, AnatomyEntry, AnatomyLibrary, Innervation,
-                      Reconciliation, ResearchNote, bones_for, innervation,
-                      reconcile)
+from .anatomy import (DEFAULT_ANATOMY, EMG, INFERRED, MEASURED, MUSCLE_SYNONYMS,
+                      NERVE_SUPPLY, REFERENCE, RESEARCH, AnatomyEntry,
+                      AnatomyLibrary, Innervation, Reconciliation, ResearchNote,
+                      bones_for, canonical, extract_roots, groups_for,
+                      innervation, reconcile)
+from .neurowellness import ImportReport, load_export, normalise
 from .biomechanics import (MUSCLE_GROUPS, SEGMENTS, JointLoad, LoadReport,
                            MuscleGroup, NotComputable, analyse_frame,
                            classify_contraction, gravitational_moment)
@@ -60,7 +62,9 @@ __all__ = [
     "Measurement", "Trend", "measure_session", "progress_report",
     "DEFAULT_ANATOMY", "NERVE_SUPPLY", "AnatomyEntry", "AnatomyLibrary",
     "Innervation", "Reconciliation", "ResearchNote", "bones_for", "innervation",
-    "reconcile", "MEASURED", "REFERENCE", "RESEARCH",
+    "reconcile", "MEASURED", "REFERENCE", "RESEARCH", "EMG", "INFERRED",
+    "MUSCLE_SYNONYMS", "canonical", "extract_roots", "groups_for",
+    "ImportReport", "load_export", "normalise",
     "JointLoad", "LoadReport", "MuscleGroup", "MUSCLE_GROUPS", "SEGMENTS",
     "analyse_frame", "gravitational_moment", "classify_contraction", "NotComputable",
     "Check", "VideoFacts", "check_environment", "environment_ready",

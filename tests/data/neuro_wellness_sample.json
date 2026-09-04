@@ -1,0 +1,1882 @@
+{
+  "source": "Neuro Wellness",
+  "exercises": [
+    {
+      "key": "balasana",
+      "name": "Child’s Pose",
+      "family": "restorative",
+      "apparatus": "mat",
+      "position": "kneelingFold",
+      "actions": [
+        "forward-fold",
+        "breath-focus",
+        "shoulder-flexion"
+      ],
+      "breath": "natural",
+      "reps": null,
+      "hold": 120,
+      "difficulty": 1,
+      "contacts": [
+        "knee_r",
+        "knee_l",
+        "foot_r",
+        "foot_l",
+        "hand_r",
+        "hand_l",
+        "head"
+      ],
+      "muscles": {
+        "prime": [
+          [
+            "diaphragm",
+            "emg"
+          ]
+        ],
+        "synergists": [
+          [
+            "longissimus thoracis",
+            "inferred"
+          ],
+          [
+            "gluteus maximus",
+            "inferred"
+          ],
+          [
+            "latissimus dorsi",
+            "inferred"
+          ]
+        ],
+        "stabilisers": [
+          [
+            "transversus abdominis",
+            "inferred"
+          ],
+          [
+            "multifidus",
+            "inferred"
+          ],
+          [
+            "diaphragm",
+            "inferred"
+          ]
+        ]
+      },
+      "activation": {
+        "diaphragm": 0.55,
+        "longissimus thoracis": 0.2,
+        "gluteus maximus": 0.15,
+        "latissimus dorsi": 0.2,
+        "transversus abdominis": 0.2,
+        "multifidus": 0.2
+      },
+      "contra": [
+        "knee",
+        "lumbar-flexion",
+        "pregnancy"
+      ],
+      "brain": [
+        "slow_breathing_hrv",
+        "interoception_breath"
+      ],
+      "pose": {
+        "pro_sup_l": -8.9,
+        "pro_sup_r": -8.1,
+        "wrist_dev_l": -25,
+        "wrist_flex_l": -34.1,
+        "wrist_dev_r": -25,
+        "wrist_flex_r": -34.2,
+        "pelvis_tilt": -80,
+        "hip_flexion_r": 133.8,
+        "hip_flexion_l": 133.8,
+        "knee_angle_r": 145.3,
+        "knee_angle_l": 145.3,
+        "hip_adduction_r": -20,
+        "hip_adduction_l": -20,
+        "ankle_angle_r": -50,
+        "ankle_angle_l": -50,
+        "lumbar_flex": 22,
+        "thoracic_flex": 20,
+        "cervical_flex": 37.7,
+        "arm_flex_r": 180,
+        "arm_flex_l": 180,
+        "elbow_flex_r": 30,
+        "elbow_flex_l": 30
+      },
+      "entry": {}
+    },
+    {
+      "key": "hundredPrep",
+      "name": "Hundred Preparation",
+      "family": "mat-abdominal",
+      "apparatus": "mat",
+      "position": "supine",
+      "actions": [
+        "trunk-flexion",
+        "breath-focus"
+      ],
+      "breath": "lateral-costal",
+      "reps": 10,
+      "hold": null,
+      "difficulty": 1,
+      "contacts": null,
+      "muscles": {
+        "prime": [
+          [
+            "rectus abdominis",
+            "emg"
+          ]
+        ],
+        "synergists": [
+          [
+            "external oblique",
+            "emg"
+          ],
+          [
+            "internal oblique",
+            "emg"
+          ],
+          [
+            "diaphragm",
+            "emg"
+          ]
+        ],
+        "stabilisers": [
+          [
+            "transversus abdominis",
+            "inferred"
+          ],
+          [
+            "multifidus",
+            "inferred"
+          ],
+          [
+            "diaphragm",
+            "inferred"
+          ],
+          [
+            "psoas major",
+            "inferred"
+          ]
+        ]
+      },
+      "activation": {
+        "rectus abdominis": 0.7,
+        "external oblique": 0.55,
+        "internal oblique": 0.5,
+        "diaphragm": 0.75,
+        "psoas major": 0.4,
+        "transversus abdominis": 0.6
+      },
+      "contra": [
+        "neck",
+        "pregnancy"
+      ],
+      "brain": [
+        "apa_timing",
+        "interoception_breath"
+      ],
+      "pose": {
+        "pelvis_tilt": 90,
+        "hip_flexion_r": 88,
+        "hip_flexion_l": 88,
+        "knee_angle_r": 90,
+        "knee_angle_l": 90,
+        "thoracic_flex": 18,
+        "cervical_flex": 24,
+        "lumbar_flex": 8,
+        "arm_flex_r": 1.8,
+        "arm_flex_l": 1.8,
+        "elbow_flex_r": 13.3,
+        "elbow_flex_l": 1.5,
+        "arm_add_r": -1.2
+      },
+      "entry": {
+        "pelvis_tilt": 90,
+        "hip_flexion_r": 88,
+        "hip_flexion_l": 88,
+        "knee_angle_r": 90,
+        "knee_angle_l": 90
+      }
+    },
+    {
+      "key": "oneLegCircle",
+      "name": "One Leg Circle",
+      "family": "mat-classical",
+      "apparatus": "mat",
+      "position": "supine",
+      "actions": [
+        "hip-flexion",
+        "hip-rotation",
+        "hip-abduction"
+      ],
+      "breath": "exhale-effort",
+      "reps": 10,
+      "hold": null,
+      "difficulty": 2,
+      "contacts": null,
+      "muscles": {
+        "prime": [
+          [
+            "psoas major",
+            "inferred"
+          ],
+          [
+            "gluteus medius",
+            "emg"
+          ]
+        ],
+        "synergists": [
+          [
+            "rectus femoris",
+            "inferred"
+          ],
+          [
+            "tensor fasciae latae",
+            "emg"
+          ]
+        ],
+        "stabilisers": [
+          [
+            "transversus abdominis",
+            "inferred"
+          ],
+          [
+            "multifidus",
+            "inferred"
+          ],
+          [
+            "diaphragm",
+            "inferred"
+          ],
+          [
+            "external oblique",
+            "inferred"
+          ],
+          [
+            "quadratus lumborum",
+            "inferred"
+          ]
+        ]
+      },
+      "activation": {
+        "psoas major": 0.6,
+        "gluteus medius": 0.6,
+        "rectus femoris": 0.45,
+        "tensor fasciae latae": 0.5,
+        "transversus abdominis": 0.6,
+        "external oblique": 0.55
+      },
+      "contra": [
+        "hip",
+        "sacroiliac"
+      ],
+      "brain": [
+        "apa_timing",
+        "motor_learning"
+      ],
+      "pose": {
+        "pelvis_tilt": 90,
+        "hip_flexion_r": 88,
+        "hip_adduction_r": -22,
+        "hip_rotation_r": 18,
+        "hip_flexion_l": 4
+      },
+      "entry": {
+        "pelvis_tilt": 90,
+        "hip_flexion_r": 88,
+        "hip_flexion_l": 4
+      }
+    },
+    {
+      "key": "phalakasana",
+      "name": "Plank Pose",
+      "family": "arm-balance",
+      "apparatus": "mat",
+      "position": "plank",
+      "actions": [
+        "weight-bearing-arms",
+        "isometric-hold",
+        "scapular-stability"
+      ],
+      "breath": "ujjayi",
+      "reps": null,
+      "hold": 45,
+      "difficulty": 2,
+      "contacts": null,
+      "muscles": {
+        "prime": [
+          [
+            "rectus abdominis",
+            "emg"
+          ],
+          [
+            "serratus anterior",
+            "emg"
+          ]
+        ],
+        "synergists": [
+          [
+            "external oblique",
+            "emg"
+          ],
+          [
+            "deltoid",
+            "emg"
+          ],
+          [
+            "triceps brachii",
+            "emg"
+          ],
+          [
+            "gluteus maximus",
+            "emg"
+          ]
+        ],
+        "stabilisers": [
+          [
+            "transversus abdominis",
+            "inferred"
+          ],
+          [
+            "multifidus",
+            "inferred"
+          ],
+          [
+            "diaphragm",
+            "inferred"
+          ],
+          [
+            "extensor carpi radialis longus",
+            "inferred"
+          ],
+          [
+            "trapezius",
+            "inferred"
+          ]
+        ]
+      },
+      "activation": {
+        "rectus abdominis": 0.8,
+        "serratus anterior": 0.85,
+        "external oblique": 0.7,
+        "deltoid": 0.6,
+        "triceps brachii": 0.6,
+        "gluteus maximus": 0.55,
+        "extensor carpi radialis longus": 0.65,
+        "trapezius": 0.5,
+        "transversus abdominis": 0.75
+      },
+      "contra": [
+        "wrist",
+        "shoulder"
+      ],
+      "brain": [
+        "apa_timing",
+        "neural_strength"
+      ],
+      "pose": {
+        "wrist_dev_l": -5,
+        "wrist_dev_r": -25,
+        "pelvis_tilt": -73.5,
+        "hip_flexion_r": -4,
+        "hip_flexion_l": -4,
+        "knee_angle_r": 2,
+        "knee_angle_l": 2,
+        "arm_flex_r": 102.9,
+        "arm_flex_l": 102.9,
+        "elbow_flex_r": 17.6,
+        "elbow_flex_l": 17.6,
+        "wrist_flex_r": 13.6,
+        "wrist_flex_l": -11.1,
+        "lumbar_flex": -2,
+        "arm_add_r": 6.7,
+        "arm_add_l": -0.6
+      },
+      "entry": {}
+    },
+    {
+      "key": "reformerFootworkParallel",
+      "name": "Footwork — Parallel",
+      "family": "reformer",
+      "apparatus": "reformer",
+      "position": "reformer",
+      "actions": [
+        "knee-extension",
+        "hip-extension",
+        "ankle-plantarflexion"
+      ],
+      "breath": "exhale-effort",
+      "reps": 10,
+      "hold": null,
+      "difficulty": 1,
+      "contacts": null,
+      "muscles": {
+        "prime": [
+          [
+            "rectus femoris",
+            "emg"
+          ],
+          [
+            "vastus lateralis",
+            "emg"
+          ],
+          [
+            "gluteus maximus",
+            "emg"
+          ]
+        ],
+        "synergists": [
+          [
+            "gastrocnemius",
+            "emg"
+          ],
+          [
+            "soleus",
+            "emg"
+          ],
+          [
+            "biceps femoris",
+            "inferred"
+          ]
+        ],
+        "stabilisers": [
+          [
+            "transversus abdominis",
+            "inferred"
+          ],
+          [
+            "multifidus",
+            "inferred"
+          ],
+          [
+            "diaphragm",
+            "inferred"
+          ],
+          [
+            "gluteus medius",
+            "inferred"
+          ]
+        ]
+      },
+      "activation": {
+        "rectus femoris": 0.85,
+        "vastus lateralis": 0.8,
+        "gluteus maximus": 0.78,
+        "gastrocnemius": 0.55,
+        "soleus": 0.6,
+        "transversus abdominis": 0.45
+      },
+      "contra": [
+        "knee"
+      ],
+      "brain": [
+        "neural_strength",
+        "motor_learning"
+      ],
+      "pose": {
+        "pelvis_tilt": 90,
+        "hip_flexion_r": 22,
+        "hip_flexion_l": 22,
+        "knee_angle_r": 10,
+        "knee_angle_l": 10,
+        "ankle_angle_r": -30,
+        "ankle_angle_l": -30
+      },
+      "entry": {
+        "pelvis_tilt": 90,
+        "hip_flexion_r": 96,
+        "hip_flexion_l": 96,
+        "knee_angle_r": 112,
+        "knee_angle_l": 112
+      }
+    },
+    {
+      "key": "reformerFootworkTurnout",
+      "name": "Footwork — Pilates V",
+      "family": "reformer",
+      "apparatus": "reformer",
+      "position": "reformer",
+      "actions": [
+        "knee-extension",
+        "hip-rotation",
+        "hip-extension"
+      ],
+      "breath": "exhale-effort",
+      "reps": 10,
+      "hold": null,
+      "difficulty": 2,
+      "contacts": null,
+      "muscles": {
+        "prime": [
+          [
+            "rectus femoris",
+            "emg"
+          ],
+          [
+            "gluteus maximus",
+            "emg"
+          ]
+        ],
+        "synergists": [
+          [
+            "piriformis",
+            "inferred"
+          ],
+          [
+            "obturator internus",
+            "inferred"
+          ],
+          [
+            "soleus",
+            "emg"
+          ]
+        ],
+        "stabilisers": [
+          [
+            "transversus abdominis",
+            "inferred"
+          ],
+          [
+            "multifidus",
+            "inferred"
+          ],
+          [
+            "diaphragm",
+            "inferred"
+          ],
+          [
+            "gluteus medius",
+            "inferred"
+          ]
+        ]
+      },
+      "activation": {
+        "rectus femoris": 0.8,
+        "gluteus maximus": 0.85,
+        "piriformis": 0.6,
+        "obturator internus": 0.55,
+        "soleus": 0.55,
+        "transversus abdominis": 0.45
+      },
+      "contra": [
+        "knee",
+        "hip"
+      ],
+      "brain": [
+        "neural_strength",
+        "motor_learning"
+      ],
+      "pose": {
+        "pelvis_tilt": 90,
+        "hip_flexion_r": 22,
+        "hip_flexion_l": 22,
+        "knee_angle_r": 10,
+        "knee_angle_l": 10,
+        "hip_rotation_r": -26,
+        "hip_rotation_l": -26
+      },
+      "entry": {
+        "pelvis_tilt": 90,
+        "hip_flexion_r": 96,
+        "hip_flexion_l": 96,
+        "knee_angle_r": 112,
+        "knee_angle_l": 112,
+        "hip_rotation_r": -26,
+        "hip_rotation_l": -26
+      }
+    },
+    {
+      "key": "reformerHundred",
+      "name": "Reformer Hundred",
+      "family": "reformer",
+      "apparatus": "reformer",
+      "position": "reformer",
+      "actions": [
+        "trunk-flexion",
+        "shoulder-extension",
+        "hip-flexion"
+      ],
+      "breath": "lateral-costal",
+      "reps": 10,
+      "hold": null,
+      "difficulty": 3,
+      "contacts": null,
+      "muscles": {
+        "prime": [
+          [
+            "rectus abdominis",
+            "emg"
+          ],
+          [
+            "external oblique",
+            "emg"
+          ]
+        ],
+        "synergists": [
+          [
+            "latissimus dorsi",
+            "emg"
+          ],
+          [
+            "triceps brachii",
+            "inferred"
+          ],
+          [
+            "psoas major",
+            "inferred"
+          ]
+        ],
+        "stabilisers": [
+          [
+            "transversus abdominis",
+            "inferred"
+          ],
+          [
+            "multifidus",
+            "inferred"
+          ],
+          [
+            "diaphragm",
+            "inferred"
+          ],
+          [
+            "serratus anterior",
+            "inferred"
+          ]
+        ]
+      },
+      "activation": {
+        "rectus abdominis": 0.85,
+        "external oblique": 0.75,
+        "latissimus dorsi": 0.6,
+        "transversus abdominis": 0.7,
+        "diaphragm": 0.7
+      },
+      "contra": [
+        "neck",
+        "pregnancy"
+      ],
+      "brain": [
+        "apa_timing",
+        "interoception_breath"
+      ],
+      "pose": {
+        "pelvis_tilt": 90,
+        "thoracic_flex": 20,
+        "cervical_flex": 22,
+        "hip_flexion_r": 58,
+        "hip_flexion_l": 58,
+        "arm_flex_r": -2.7,
+        "arm_flex_l": -2.7,
+        "elbow_flex_r": 15.6,
+        "elbow_flex_l": 3.3,
+        "arm_add_r": -7,
+        "arm_add_l": -1.1
+      },
+      "entry": {
+        "pelvis_tilt": 90,
+        "thoracic_flex": 18,
+        "cervical_flex": 20,
+        "hip_flexion_r": 60,
+        "hip_flexion_l": 60,
+        "arm_flex_r": -24,
+        "arm_flex_l": -24
+      }
+    },
+    {
+      "key": "reformerLongStretch",
+      "name": "Long Stretch",
+      "family": "reformer",
+      "apparatus": "reformer",
+      "position": "plank",
+      "actions": [
+        "isometric-hold",
+        "weight-bearing-arms",
+        "scapular-stability",
+        "shoulder-extension"
+      ],
+      "breath": "exhale-effort",
+      "reps": 6,
+      "hold": null,
+      "difficulty": 4,
+      "contacts": null,
+      "muscles": {
+        "prime": [
+          [
+            "serratus anterior",
+            "emg"
+          ],
+          [
+            "rectus abdominis",
+            "emg"
+          ]
+        ],
+        "synergists": [
+          [
+            "latissimus dorsi",
+            "emg"
+          ],
+          [
+            "triceps brachii",
+            "emg"
+          ],
+          [
+            "gluteus maximus",
+            "inferred"
+          ]
+        ],
+        "stabilisers": [
+          [
+            "transversus abdominis",
+            "inferred"
+          ],
+          [
+            "multifidus",
+            "inferred"
+          ],
+          [
+            "diaphragm",
+            "inferred"
+          ]
+        ]
+      },
+      "activation": {
+        "serratus anterior": 0.9,
+        "rectus abdominis": 0.85,
+        "latissimus dorsi": 0.7,
+        "triceps brachii": 0.7,
+        "transversus abdominis": 0.75
+      },
+      "contra": [
+        "wrist",
+        "shoulder"
+      ],
+      "brain": [
+        "neural_strength",
+        "apa_timing"
+      ],
+      "pose": {
+        "wrist_dev_l": -7.2,
+        "wrist_flex_l": 53.2,
+        "wrist_dev_r": -25,
+        "wrist_flex_r": 70,
+        "pelvis_tilt": -74,
+        "arm_flex_r": 58,
+        "arm_flex_l": 58,
+        "hip_flexion_r": 2,
+        "hip_flexion_l": 2
+      },
+      "entry": {
+        "wrist_dev_l": -7.2,
+        "wrist_flex_l": 53.2,
+        "wrist_dev_r": -25,
+        "wrist_flex_r": 70,
+        "pelvis_tilt": -74,
+        "arm_flex_r": 84,
+        "arm_flex_l": 84,
+        "hip_flexion_r": 2,
+        "hip_flexion_l": 2
+      }
+    },
+    {
+      "key": "reformerShortSpine",
+      "name": "Short Spine Massage",
+      "family": "reformer",
+      "apparatus": "reformer",
+      "position": "reformer",
+      "actions": [
+        "segmental-articulation",
+        "hip-flexion",
+        "inversion"
+      ],
+      "breath": "exhale-effort",
+      "reps": 5,
+      "hold": null,
+      "difficulty": 4,
+      "contacts": null,
+      "muscles": {
+        "prime": [
+          [
+            "rectus abdominis",
+            "inferred"
+          ],
+          [
+            "external oblique",
+            "inferred"
+          ]
+        ],
+        "synergists": [
+          [
+            "psoas major",
+            "inferred"
+          ],
+          [
+            "biceps femoris",
+            "inferred"
+          ]
+        ],
+        "stabilisers": [
+          [
+            "transversus abdominis",
+            "inferred"
+          ],
+          [
+            "multifidus",
+            "inferred"
+          ],
+          [
+            "diaphragm",
+            "inferred"
+          ]
+        ]
+      },
+      "activation": {
+        "rectus abdominis": 0.75,
+        "external oblique": 0.6,
+        "transversus abdominis": 0.7,
+        "multifidus": 0.5
+      },
+      "contra": [
+        "neck",
+        "lumbar-flexion",
+        "pregnancy"
+      ],
+      "brain": [
+        "motor_learning"
+      ],
+      "pose": {
+        "pelvis_tilt": 90,
+        "hip_flexion_r": 118,
+        "hip_flexion_l": 118,
+        "lumbar_flex": 32,
+        "thoracic_flex": 20,
+        "lumbar_wave": 0.8,
+        "arm_flex_r": 9.9,
+        "arm_flex_l": 10,
+        "elbow_flex_r": 0.2,
+        "elbow_flex_l": 0.7,
+        "arm_add_r": -0.2,
+        "arm_add_l": -0.4
+      },
+      "entry": {
+        "pelvis_tilt": 90,
+        "hip_flexion_r": 88,
+        "hip_flexion_l": 88
+      }
+    },
+    {
+      "key": "setuBandha",
+      "name": "Bridge Pose",
+      "family": "backbend",
+      "apparatus": "mat",
+      "position": "supine",
+      "actions": [
+        "hip-extension",
+        "segmental-articulation"
+      ],
+      "breath": "ujjayi",
+      "reps": 8,
+      "hold": null,
+      "difficulty": 1,
+      "contacts": null,
+      "muscles": {
+        "prime": [
+          [
+            "gluteus maximus",
+            "emg"
+          ],
+          [
+            "biceps femoris",
+            "emg"
+          ]
+        ],
+        "synergists": [
+          [
+            "semitendinosus",
+            "emg"
+          ],
+          [
+            "longissimus thoracis",
+            "emg"
+          ],
+          [
+            "adductor magnus",
+            "inferred"
+          ]
+        ],
+        "stabilisers": [
+          [
+            "transversus abdominis",
+            "inferred"
+          ],
+          [
+            "multifidus",
+            "inferred"
+          ],
+          [
+            "diaphragm",
+            "inferred"
+          ],
+          [
+            "gluteus medius",
+            "inferred"
+          ],
+          [
+            "pubococcygeus",
+            "inferred"
+          ],
+          [
+            "iliococcygeus",
+            "inferred"
+          ]
+        ]
+      },
+      "activation": {
+        "gluteus maximus": 0.85,
+        "biceps femoris": 0.65,
+        "semitendinosus": 0.62,
+        "longissimus thoracis": 0.6,
+        "adductor magnus": 0.5,
+        "gluteus medius": 0.5,
+        "transversus abdominis": 0.5,
+        "multifidus": 0.6,
+        "pubococcygeus": 0.35,
+        "iliococcygeus": 0.3
+      },
+      "contra": [
+        "neck",
+        "lumbar-extension"
+      ],
+      "brain": [
+        "apa_timing",
+        "motor_learning"
+      ],
+      "pose": {
+        "pelvis_tilt": 90,
+        "pelvis_ty": 0.15,
+        "hip_flexion_r": 8,
+        "hip_flexion_l": 8,
+        "knee_angle_r": 74,
+        "knee_angle_l": 74,
+        "lumbar_flex": -20,
+        "thoracic_flex": -10,
+        "lumbar_wave": -1.3
+      },
+      "entry": {
+        "pelvis_tilt": 90,
+        "hip_flexion_r": 46,
+        "hip_flexion_l": 46,
+        "knee_angle_r": 84,
+        "knee_angle_l": 84
+      }
+    },
+    {
+      "key": "sideBend",
+      "name": "Side Bend",
+      "family": "mat-sidelying",
+      "apparatus": "mat",
+      "position": "sidelying",
+      "actions": [
+        "trunk-lateral",
+        "weight-bearing-arms",
+        "scapular-stability"
+      ],
+      "breath": "exhale-effort",
+      "reps": 5,
+      "hold": null,
+      "difficulty": 4,
+      "contacts": null,
+      "muscles": {
+        "prime": [
+          [
+            "quadratus lumborum",
+            "emg"
+          ],
+          [
+            "external oblique",
+            "emg"
+          ]
+        ],
+        "synergists": [
+          [
+            "deltoid",
+            "inferred"
+          ],
+          [
+            "serratus anterior",
+            "emg"
+          ],
+          [
+            "gluteus medius",
+            "inferred"
+          ]
+        ],
+        "stabilisers": [
+          [
+            "transversus abdominis",
+            "inferred"
+          ],
+          [
+            "multifidus",
+            "inferred"
+          ],
+          [
+            "diaphragm",
+            "inferred"
+          ]
+        ]
+      },
+      "activation": {
+        "quadratus lumborum": 0.9,
+        "external oblique": 0.85,
+        "serratus anterior": 0.8,
+        "deltoid": 0.6,
+        "gluteus medius": 0.6,
+        "transversus abdominis": 0.7
+      },
+      "contra": [
+        "shoulder",
+        "wrist"
+      ],
+      "brain": [
+        "apa_timing",
+        "balance_cerebellum"
+      ],
+      "pose": {
+        "pro_sup_r": 90,
+        "arm_rot_r": 11.3,
+        "pelvis_tilt": 1.5,
+        "pelvis_list": -86,
+        "thoracic_bend": -18,
+        "arm_add_r": -110,
+        "arm_flex_r": 20
+      },
+      "entry": {
+        "pelvis_list": -86,
+        "pro_sup_r": 90,
+        "arm_rot_r": 11.3,
+        "pelvis_tilt": 1.5,
+        "arm_add_r": -40
+      }
+    },
+    {
+      "key": "uttanasana",
+      "name": "Standing Forward Fold",
+      "family": "standing",
+      "apparatus": "mat",
+      "position": "standingFold",
+      "actions": [
+        "forward-fold",
+        "shoulder-flexion"
+      ],
+      "breath": "ujjayi",
+      "reps": null,
+      "hold": 45,
+      "difficulty": 1,
+      "contacts": null,
+      "muscles": {
+        "prime": [
+          [
+            "semitendinosus",
+            "emg"
+          ],
+          [
+            "semimembranosus",
+            "emg"
+          ],
+          [
+            "biceps femoris",
+            "emg"
+          ]
+        ],
+        "synergists": [
+          [
+            "gastrocnemius",
+            "inferred"
+          ],
+          [
+            "gluteus maximus",
+            "inferred"
+          ]
+        ],
+        "stabilisers": [
+          [
+            "transversus abdominis",
+            "inferred"
+          ],
+          [
+            "multifidus",
+            "inferred"
+          ],
+          [
+            "diaphragm",
+            "inferred"
+          ],
+          [
+            "longissimus thoracis",
+            "inferred"
+          ]
+        ]
+      },
+      "activation": {
+        "semitendinosus": 0.55,
+        "semimembranosus": 0.55,
+        "biceps femoris": 0.55,
+        "gastrocnemius": 0.3,
+        "gluteus maximus": 0.25,
+        "transversus abdominis": 0.35,
+        "longissimus thoracis": 0.35
+      },
+      "contra": [
+        "hamstring",
+        "lumbar-flexion",
+        "blood-pressure"
+      ],
+      "brain": [
+        "stretch_tolerance"
+      ],
+      "pose": {
+        "pro_sup_l": 63.2,
+        "arm_rot_l": 31.3,
+        "pro_sup_r": 57.8,
+        "arm_rot_r": 35.1,
+        "pelvis_tilt": -110,
+        "hip_flexion_r": 110,
+        "hip_flexion_l": 110,
+        "knee_angle_r": 12,
+        "knee_angle_l": 12,
+        "lumbar_flex": 18,
+        "thoracic_flex": 18,
+        "cervical_flex": 24,
+        "arm_flex_r": 107.3,
+        "arm_flex_l": 107.3,
+        "arm_add_r": 9.8,
+        "arm_add_l": 9.8,
+        "elbow_flex_r": 8.5,
+        "elbow_flex_l": 8.5
+      },
+      "entry": {}
+    },
+    {
+      "key": "virabhadrasana2",
+      "name": "Warrior II",
+      "family": "standing",
+      "apparatus": "mat",
+      "position": "lunge",
+      "actions": [
+        "knee-flexion",
+        "hip-abduction",
+        "hip-external-rotation",
+        "shoulder-abduction"
+      ],
+      "breath": "ujjayi",
+      "reps": null,
+      "hold": 30,
+      "difficulty": 2,
+      "contacts": null,
+      "muscles": {
+        "prime": [
+          [
+            "vastus lateralis",
+            "emg"
+          ],
+          [
+            "gluteus medius",
+            "emg"
+          ],
+          [
+            "gluteus maximus",
+            "emg"
+          ]
+        ],
+        "synergists": [
+          [
+            "vastus medialis",
+            "emg"
+          ],
+          [
+            "piriformis",
+            "inferred"
+          ],
+          [
+            "obturator internus",
+            "inferred"
+          ],
+          [
+            "deltoid",
+            "emg"
+          ]
+        ],
+        "stabilisers": [
+          [
+            "transversus abdominis",
+            "inferred"
+          ],
+          [
+            "multifidus",
+            "inferred"
+          ],
+          [
+            "diaphragm",
+            "inferred"
+          ],
+          [
+            "quadratus lumborum",
+            "inferred"
+          ],
+          [
+            "trapezius",
+            "inferred"
+          ]
+        ]
+      },
+      "activation": {
+        "vastus lateralis": 0.82,
+        "gluteus medius": 0.75,
+        "gluteus maximus": 0.7,
+        "vastus medialis": 0.75,
+        "piriformis": 0.5,
+        "obturator internus": 0.45,
+        "deltoid": 0.65,
+        "quadratus lumborum": 0.5,
+        "transversus abdominis": 0.5,
+        "trapezius": 0.45
+      },
+      "contra": [
+        "knee",
+        "hip",
+        "shoulder"
+      ],
+      "brain": [
+        "neural_strength",
+        "external_focus"
+      ],
+      "pose": {
+        "pro_sup_l": 57.3,
+        "arm_rot_l": 20.3,
+        "pro_sup_r": 54,
+        "arm_rot_r": 22.2,
+        "hip_flexion_r": 47.5,
+        "hip_rotation_r": -45,
+        "hip_adduction_r": -50,
+        "knee_angle_r": 92,
+        "ankle_angle_r": -4,
+        "hip_flexion_l": 10,
+        "hip_adduction_l": -43,
+        "knee_angle_l": 3,
+        "hip_rotation_l": -14,
+        "ankle_angle_l": 0,
+        "arm_add_r": -88,
+        "arm_add_l": -88,
+        "cervical_rot": 34
+      },
+      "entry": {}
+    },
+    {
+      "key": "vrksasana",
+      "name": "Tree Pose",
+      "family": "balance-poses",
+      "apparatus": "mat",
+      "position": "balance",
+      "actions": [
+        "balance",
+        "hip-external-rotation",
+        "ankle-stability"
+      ],
+      "breath": "ujjayi",
+      "reps": null,
+      "hold": 30,
+      "difficulty": 2,
+      "contacts": null,
+      "muscles": {
+        "prime": [
+          [
+            "gluteus medius",
+            "emg"
+          ],
+          [
+            "soleus",
+            "emg"
+          ]
+        ],
+        "synergists": [
+          [
+            "gluteus minimus",
+            "inferred"
+          ],
+          [
+            "piriformis",
+            "inferred"
+          ],
+          [
+            "obturator internus",
+            "inferred"
+          ],
+          [
+            "tibialis posterior",
+            "inferred"
+          ]
+        ],
+        "stabilisers": [
+          [
+            "transversus abdominis",
+            "inferred"
+          ],
+          [
+            "multifidus",
+            "inferred"
+          ],
+          [
+            "diaphragm",
+            "inferred"
+          ],
+          [
+            "quadratus lumborum",
+            "inferred"
+          ],
+          [
+            "abductor hallucis",
+            "inferred"
+          ],
+          [
+            "fibularis longus",
+            "inferred"
+          ]
+        ]
+      },
+      "activation": {
+        "gluteus medius": 0.8,
+        "soleus": 0.65,
+        "gluteus minimus": 0.6,
+        "piriformis": 0.5,
+        "obturator internus": 0.45,
+        "tibialis posterior": 0.55,
+        "quadratus lumborum": 0.5,
+        "transversus abdominis": 0.55,
+        "abductor hallucis": 0.55,
+        "fibularis longus": 0.45
+      },
+      "contra": [
+        "balance",
+        "hip"
+      ],
+      "brain": [
+        "balance_cerebellum",
+        "external_focus"
+      ],
+      "pose": {
+        "hip_flexion_r": 31.4,
+        "hip_adduction_r": -37.4,
+        "hip_rotation_r": -38,
+        "knee_angle_r": 126,
+        "hip_flexion_l": 0.6,
+        "knee_angle_l": 5.9,
+        "arm_flex_r": 10,
+        "arm_flex_l": 10,
+        "hip_adduction_l": -0.1,
+        "ankle_angle_r": -0.7,
+        "ankle_angle_l": -3.6
+      },
+      "entry": {}
+    }
+  ],
+  "muscles": {
+    "diaphragm": {
+      "latin": "Diaphragma",
+      "display": "Diaphragm",
+      "nerves": "Phrenic nerve (C3, C4, C5) — \"C3, 4, 5 keeps the diaphragm alive\"",
+      "roots": [
+        "C3",
+        "C4",
+        "C5"
+      ],
+      "actions": "Inspiration; modulates intra-abdominal pressure for trunk stiffness"
+    },
+    "longissimus thoracis": {
+      "latin": "Musculus longissimus thoracis",
+      "display": "Longissimus thoracis",
+      "nerves": "Lateral branches of the posterior rami of spinal nerves, segmentally",
+      "roots": [
+        "C1",
+        "T1",
+        "T6",
+        "L1",
+        "L5"
+      ],
+      "actions": "Trunk and neck extension, ipsilateral lateral flexion, eccentric control of flexion"
+    },
+    "gluteus maximus": {
+      "latin": "Musculus gluteus maximus",
+      "display": "Gluteus maximus",
+      "nerves": "Inferior gluteal nerve (L5, S1, S2)",
+      "roots": [
+        "L5",
+        "S1",
+        "S2"
+      ],
+      "actions": "Hip extension, external rotation, upper fibres abduct; stabilises the extended knee via the IT tract"
+    },
+    "latissimus dorsi": {
+      "latin": "Musculus latissimus dorsi",
+      "display": "Latissimus dorsi",
+      "nerves": "Thoracodorsal nerve (C6, C7, C8)",
+      "roots": [
+        "C6",
+        "C7",
+        "C8"
+      ],
+      "actions": "Humeral extension, adduction and medial rotation; assists trunk extension"
+    },
+    "transversus abdominis": {
+      "latin": "Musculus transversus abdominis",
+      "display": "Transversus abdominis",
+      "nerves": "Thoracoabdominal (T7–T11), subcostal (T12), iliohypogastric and ilioinguinal (L1)",
+      "roots": [
+        "T7",
+        "T8",
+        "T9",
+        "T10",
+        "T11",
+        "T12",
+        "L1"
+      ],
+      "actions": "Compresses the abdomen, raises intra-abdominal pressure, tensions thoracolumbar fascia"
+    },
+    "multifidus": {
+      "latin": "Musculus multifidus",
+      "display": "Multifidus",
+      "nerves": "Medial branches of the posterior rami of spinal nerves, segmentally",
+      "roots": [
+        "C3",
+        "T1",
+        "T6",
+        "L1",
+        "L3",
+        "L5",
+        "S1"
+      ],
+      "actions": "Segmental stabilisation; small contributions to extension and contralateral rotation"
+    },
+    "rectus abdominis": {
+      "latin": "Musculus rectus abdominis",
+      "display": "Rectus abdominis",
+      "nerves": "Thoracoabdominal nerves (T7–T11), subcostal (T12)",
+      "roots": [
+        "T7",
+        "T8",
+        "T9",
+        "T10",
+        "T11",
+        "T12"
+      ],
+      "actions": "Trunk flexion, posterior pelvic tilt, raises intra-abdominal pressure"
+    },
+    "external oblique": {
+      "latin": "Musculus obliquus externus abdominis",
+      "display": "External oblique",
+      "nerves": "Thoracoabdominal nerves (T7–T11), subcostal (T12)",
+      "roots": [
+        "T7",
+        "T8",
+        "T9",
+        "T10",
+        "T11",
+        "T12"
+      ],
+      "actions": "Contralateral rotation, ipsilateral lateral flexion, trunk flexion, posterior pelvic tilt"
+    },
+    "internal oblique": {
+      "latin": "Musculus obliquus internus abdominis",
+      "display": "Internal oblique",
+      "nerves": "Thoracoabdominal (T7–T11), subcostal (T12), iliohypogastric and ilioinguinal (L1)",
+      "roots": [
+        "T7",
+        "T8",
+        "T9",
+        "T10",
+        "T11",
+        "T12",
+        "L1"
+      ],
+      "actions": "Ipsilateral rotation and lateral flexion, trunk flexion, abdominal compression"
+    },
+    "psoas major": {
+      "latin": "Musculus psoas major",
+      "display": "Psoas major",
+      "nerves": "Anterior rami of L1–L3 directly (not via the femoral nerve)",
+      "roots": [
+        "L1",
+        "L2",
+        "L3"
+      ],
+      "actions": "Hip flexion, external rotation of hip; with the femur fixed, lumbar flexion and lateral flexion"
+    },
+    "gluteus medius": {
+      "latin": "Musculus gluteus medius",
+      "display": "Gluteus medius",
+      "nerves": "Superior gluteal nerve (L4, L5, S1)",
+      "roots": [
+        "L4",
+        "L5",
+        "S1"
+      ],
+      "actions": "Hip abduction; anterior fibres medially rotate, posterior fibres laterally rotate; pelvic stabilisation in single-leg stance"
+    },
+    "rectus femoris": {
+      "latin": "Musculus rectus femoris",
+      "display": "Rectus femoris",
+      "nerves": "Femoral nerve (L2, L3, L4)",
+      "roots": [
+        "L2",
+        "L3",
+        "L4"
+      ],
+      "actions": "Knee extension, hip flexion"
+    },
+    "tensor fasciae latae": {
+      "latin": "Musculus tensor fasciae latae",
+      "display": "Tensor fasciae latae",
+      "nerves": "Superior gluteal nerve",
+      "roots": [
+        "L4",
+        "L5",
+        "S1"
+      ],
+      "actions": "Hip flexion, abduction and medial rotation; tensions the iliotibial tract"
+    },
+    "quadratus lumborum": {
+      "latin": "Musculus quadratus lumborum",
+      "display": "Quadratus lumborum",
+      "nerves": "Subcostal nerve (T12) and anterior rami of L1–L4",
+      "roots": [
+        "T12",
+        "L1",
+        "L2",
+        "L3",
+        "L4"
+      ],
+      "actions": "Lateral flexion of trunk, elevation of ipsilateral ilium, fixes rib 12"
+    },
+    "serratus anterior": {
+      "latin": "Musculus serratus anterior",
+      "display": "Serratus anterior",
+      "nerves": "Long thoracic nerve (C5, C6, C7)",
+      "roots": [
+        "C5",
+        "C6",
+        "C7"
+      ],
+      "actions": "Scapular protraction and upward rotation; holds the scapula against the thorax"
+    },
+    "deltoid": {
+      "latin": "Musculus deltoideus",
+      "display": "Deltoid",
+      "nerves": "Axillary nerve (C5, C6)",
+      "roots": [
+        "C5",
+        "C6"
+      ],
+      "actions": "Abduction; anterior part flexes and medially rotates, posterior part extends and laterally rotates"
+    },
+    "triceps brachii": {
+      "latin": "Musculus triceps brachii",
+      "display": "Triceps brachii",
+      "nerves": "Radial nerve",
+      "roots": [
+        "C6",
+        "C7",
+        "C8"
+      ],
+      "actions": "Elbow extension; shoulder extension and adduction from the long head"
+    },
+    "extensor carpi radialis longus": {
+      "latin": "Musculus extensor carpi radialis longus",
+      "display": "Extensor carpi radialis longus",
+      "nerves": "Radial nerve",
+      "roots": [
+        "C6",
+        "C7"
+      ],
+      "actions": "Wrist extension and radial deviation"
+    },
+    "trapezius": {
+      "latin": "Musculus trapezius",
+      "display": "Trapezius",
+      "nerves": "Accessory nerve (CN XI) for motor; C3–C4 for proprioception",
+      "roots": [
+        "CN XI",
+        "C3",
+        "C4"
+      ],
+      "actions": "Upper: scapular elevation. Middle: retraction. Lower: depression and upward rotation."
+    },
+    "vastus lateralis": {
+      "latin": "Musculus vastus lateralis",
+      "display": "Vastus lateralis",
+      "nerves": "Femoral nerve",
+      "roots": [
+        "L2",
+        "L3",
+        "L4"
+      ],
+      "actions": "Knee extension"
+    },
+    "gastrocnemius": {
+      "latin": "Musculus gastrocnemius",
+      "display": "Gastrocnemius",
+      "nerves": "Tibial nerve (S1, S2)",
+      "roots": [
+        "S1",
+        "S2"
+      ],
+      "actions": "Plantarflexion of the ankle, assists knee flexion"
+    },
+    "soleus": {
+      "latin": "Musculus soleus",
+      "display": "Soleus",
+      "nerves": "Tibial nerve (S1, S2)",
+      "roots": [
+        "S1",
+        "S2"
+      ],
+      "actions": "Plantarflexion; postural control of forward sway in standing"
+    },
+    "biceps femoris": {
+      "latin": "Musculus biceps femoris",
+      "display": "Biceps femoris",
+      "nerves": "Long head: tibial division of sciatic (L5, S1, S2). Short head: common fibular division (L5, S1, S2).",
+      "roots": [
+        "L5",
+        "S1",
+        "S2"
+      ],
+      "actions": "Knee flexion, hip extension, lateral rotation of the flexed knee"
+    },
+    "piriformis": {
+      "latin": "Musculus piriformis",
+      "display": "Piriformis",
+      "nerves": "Nerve to piriformis, from the sacral plexus",
+      "roots": [
+        "S1",
+        "S2"
+      ],
+      "actions": "Hip lateral rotation in extension, abduction in flexion, sacroiliac stabilisation"
+    },
+    "obturator internus": {
+      "latin": "Musculus obturator internus",
+      "display": "Obturator internus",
+      "nerves": "Nerve to obturator internus",
+      "roots": [
+        "L5",
+        "S1",
+        "S2"
+      ],
+      "actions": "Hip lateral rotation, abduction of the flexed hip, femoral head centring"
+    },
+    "semitendinosus": {
+      "latin": "Musculus semitendinosus",
+      "display": "Semitendinosus",
+      "nerves": "Tibial division of the sciatic nerve (L5, S1, S2)",
+      "roots": [
+        "L5",
+        "S1",
+        "S2"
+      ],
+      "actions": "Knee flexion, hip extension, medial rotation of the flexed knee"
+    },
+    "adductor magnus": {
+      "latin": "Musculus adductor magnus",
+      "display": "Adductor magnus",
+      "nerves": "Obturator nerve (adductor part) and tibial division of the sciatic nerve (hamstring part)",
+      "roots": [
+        "L2",
+        "L3",
+        "L4",
+        "L5",
+        "S1"
+      ],
+      "actions": "Hip adduction throughout; hip extension from the ischiocondylar part"
+    },
+    "pubococcygeus": {
+      "latin": "Musculus pubococcygeus",
+      "display": "Pubococcygeus",
+      "nerves": "Nerve to levator ani, with a pudendal contribution",
+      "roots": [
+        "S3",
+        "S4"
+      ],
+      "actions": "Pelvic floor elevation, visceral support, intra-abdominal pressure regulation"
+    },
+    "iliococcygeus": {
+      "latin": "Musculus iliococcygeus",
+      "display": "Iliococcygeus",
+      "nerves": "Nerve to levator ani",
+      "roots": [
+        "S3",
+        "S4"
+      ],
+      "actions": "Pelvic floor support and elevation"
+    },
+    "semimembranosus": {
+      "latin": "Musculus semimembranosus",
+      "display": "Semimembranosus",
+      "nerves": "Tibial division of the sciatic nerve",
+      "roots": [
+        "L5",
+        "S1",
+        "S2"
+      ],
+      "actions": "Hip extension, knee flexion, medial rotation of the flexed knee"
+    },
+    "vastus medialis": {
+      "latin": "Musculus vastus medialis",
+      "display": "Vastus medialis",
+      "nerves": "Femoral nerve",
+      "roots": [
+        "L2",
+        "L3",
+        "L4"
+      ],
+      "actions": "Knee extension; medial patellar stabilisation"
+    },
+    "gluteus minimus": {
+      "latin": "Musculus gluteus minimus",
+      "display": "Gluteus minimus",
+      "nerves": "Superior gluteal nerve",
+      "roots": [
+        "L4",
+        "L5",
+        "S1"
+      ],
+      "actions": "Hip abduction, medial rotation, pelvic stabilisation in stance"
+    },
+    "tibialis posterior": {
+      "latin": "Musculus tibialis posterior",
+      "display": "Tibialis posterior",
+      "nerves": "Tibial nerve",
+      "roots": [
+        "L4",
+        "L5"
+      ],
+      "actions": "Ankle plantarflexion, inversion, arch support"
+    },
+    "abductor hallucis": {
+      "latin": "Musculus abductor hallucis",
+      "display": "Abductor hallucis",
+      "nerves": "Medial plantar nerve",
+      "roots": [
+        "S1",
+        "S2"
+      ],
+      "actions": "Hallux abduction and flexion, arch elevation"
+    },
+    "fibularis longus": {
+      "latin": "Musculus fibularis longus",
+      "display": "Fibularis longus",
+      "nerves": "Superficial fibular nerve",
+      "roots": [
+        "L5",
+        "S1",
+        "S2"
+      ],
+      "actions": "Ankle eversion and plantarflexion; first ray plantarflexion"
+    }
+  },
+  "brain": {
+    "neural_strength": {
+      "claim": "The first few weeks of strength training make you stronger by changing the nervous system, before the muscle grows at all.",
+      "mechanism": "Motor unit discharge rates rise, recruitment thresholds fall, and antagonist co-contraction drops. Measurable hypertrophy lags weeks behind the strength gain.",
+      "tier": "A",
+      "citation": "Moritani T, deVries HA, Am J Phys Med 1979;58(3):115–30; Del Vecchio A et al., J Physiol 2019;597(7):1873–87",
+      "effect": "Most of the strength gain in weeks 1–4 is neural; hypertrophy contributes measurably from around week 4–6",
+      "population": "Healthy untrained adults",
+      "species": "human",
+      "timescale": "chronic",
+      "caveat": "The classic time course comes from small samples and indirect EMG measures; modern high-density EMG supports the direction while revising the details. The crossover point depends on the person and the programme."
+    },
+    "apa_timing": {
+      "claim": "In healthy people the deep trunk muscles fire before the limb that is about to move — and that timing is delayed in recurrent low back pain.",
+      "mechanism": "The nervous system predicts the postural disturbance a movement is about to cause and pre-stiffens the trunk. It is feedforward control, issued before any sensory feedback could arrive.",
+      "tier": "B",
+      "citation": "Hodges PW, Richardson CA, Spine 1996;21(22):2640–50; Exp Brain Res 1997;114:362–70",
+      "effect": "Transversus abdominis leads the prime mover by roughly 30 ms; in low back pain the lead is lost or reversed",
+      "population": "Small laboratory samples of adults with and without low back pain",
+      "species": "human",
+      "timescale": "acute",
+      "caveat": "This is the single best entry point for the Pilates story and also the most over-sold. The original bilateral-brace reading has been contested: Allison and colleagues (2008) showed the response is side-specific and direction-specific, not a uniform corset. And a delayed onset is an association with pain, not a demonstrated cause of it — training the timing has not reliably outperformed general exercise in trials."
+    },
+    "motor_learning": {
+      "claim": "Learning a movement moves through distinct stages and distinct structures: fast within-session gains, then slow consolidation across days and sleep.",
+      "mechanism": "Prefrontal and premotor areas dominate early while the movement is still being figured out; with practice the representation shifts toward primary motor cortex, cerebellum for error correction, and basal ganglia for chunking a sequence into one unit.",
+      "tier": "A",
+      "citation": "Dayan E, Cohen LG, Neuron 2011;72(3):443–54 (review); Doyon J, Benali H, Curr Opin Neurobiol 2005;15(2):161–7",
+      "effect": "",
+      "population": "Healthy adults, motor sequence and adaptation paradigms",
+      "species": "human",
+      "timescale": "chronic",
+      "caveat": "The staged account comes largely from finger-sequence and reaching tasks in a scanner. Whole-body movement under load is not the same problem, and the mapping to a Pilates repertoire is an extrapolation."
+    },
+    "external_focus": {
+      "claim": "Directing attention outside the body — to the effect of the movement — produces better performance and better retention than directing it at the body part.",
+      "mechanism": "The constrained action hypothesis: attending to your own limb interferes with automatic control processes that run better without conscious supervision.",
+      "tier": "A",
+      "citation": "Chua L-K et al., Psychol Bull 2021;147(6):618–45 (meta-analysis, 218 studies); Wulf G, Int Rev Sport Exerc Psychol 2013;6(1):77–104",
+      "effect": "Small-to-moderate advantage for external focus across accuracy, force production and retention",
+      "population": "Mostly healthy adults, laboratory and sport tasks",
+      "species": "human",
+      "timescale": "acute",
+      "caveat": "This sits in real tension with how Pilates is traditionally taught — \"draw your navel to your spine\" is an internal cue, and the tradition is built on them. The honest position is that the evidence favours external cues for performance while internal cues may still be useful for teaching a person to find a muscle they cannot yet feel. This app surfaces the tension rather than resolving it."
+    },
+    "interoception_breath": {
+      "claim": "Attending to the breath engages the insula and anterior cingulate, and nasal breathing entrains oscillations in limbic structures.",
+      "mechanism": "The insula is the cortical destination for signals from inside the body. Airflow through the nose rhythmically drives piriform cortex, amygdala and hippocampus in phase with the breath.",
+      "tier": "C",
+      "citation": "Zelano C et al., J Neurosci 2016;36(49):12448–67 (7 patients with intracranial electrodes); Critchley HD et al., Nat Neurosci 2004;7(2):189–95",
+      "effect": "Breath-locked oscillatory entrainment; behavioural effects on fear discrimination and recall were small and nasal-specific",
+      "population": "Seven epilepsy patients with implanted electrodes, plus healthy behavioural samples",
+      "species": "human",
+      "timescale": "acute",
+      "caveat": "Seven patients. This is the finding most likely to be inflated into \"breathwork rewires your brain\", and it does not support that. Pilates lateral costal breathing has no direct imaging evidence at all — the link from this work to that practice is inference."
+    },
+    "balance_cerebellum": {
+      "claim": "Balance and coordination training changes cerebellar and cortical grey matter, and improves postural control in older adults.",
+      "mechanism": "The cerebellum computes the error between the movement predicted and the movement that happened. Training that repeatedly generates and corrects that error is training the structure that does the correcting.",
+      "tier": "B",
+      "citation": "Taubert M et al., J Neurosci 2010;30(35):11670–7; Lesinski M et al., Sports Med 2015;45(12):1721–38 (meta-analysis, balance training in older adults)",
+      "effect": "Moderate-to-large improvement in static and dynamic balance measures in older adults",
+      "population": "Healthy adults; the balance meta-analysis is specifically older adults",
+      "species": "human",
+      "timescale": "chronic",
+      "caveat": "Structural MRI changes over weeks are small and their functional meaning is debated. The balance improvement is solid; the grey-matter story attached to it is much softer."
+    },
+    "slow_breathing_hrv": {
+      "claim": "Breathing slowly, at around six breaths a minute, raises heart rate variability and shifts autonomic balance toward the parasympathetic side while it is happening.",
+      "mechanism": "At roughly 0.1 Hz the breathing rhythm resonates with the baroreflex, so blood pressure oscillations and respiratory sinus arrhythmia line up and amplify each other. Vagal outflow to the heart rises with it.",
+      "tier": "B",
+      "citation": "Lehrer PM, Gevirtz R, Front Psychol 2014;5:756; Laborde S et al., Neurosci Biobehav Rev 2022;138:104711 (meta-analysis of slow-paced breathing)",
+      "effect": "Moderate increase in vagally-mediated HRV during and shortly after paced breathing (g ≈ 0.5)",
+      "population": "Healthy adults across many small trials",
+      "species": "human",
+      "timescale": "acute",
+      "caveat": "This is a state, not a trait: the effect is largest while you are breathing that way and shrinks afterwards. Higher HRV during a practice is not evidence that the practice made you a calmer person, and HRV itself is a noisy proxy for \"vagal tone\" rather than a measurement of it."
+    },
+    "stretch_tolerance": {
+      "claim": "Most of the range of motion gained from stretching is increased tolerance to the sensation, not a longer muscle.",
+      "mechanism": "Passive torque at a given joint angle changes little over weeks of stretching, while the angle at which the stretch becomes intolerable moves. The change is in how the nervous system interprets and permits the position.",
+      "tier": "B",
+      "citation": "Weppler CH, Magnusson SP, Phys Ther 2010;90(3):438–49; Freitas SR et al., Scand J Med Sci Sports 2018;28(3):794–806 (systematic review)",
+      "effect": "Range increases substantially; passive stiffness at matched angles changes little over programmes under about eight weeks",
+      "population": "Healthy adults, mostly hamstring and calf protocols",
+      "species": "human",
+      "timescale": "chronic",
+      "caveat": "It does not mean tissue never adapts — longer, heavier or loaded protocols do change muscle architecture. It means the fast gains a class produces are a nervous-system change, and describing them as \"lengthening the muscle\" is describing the wrong organ."
+    }
+  },
+  "tiers": {
+    "A": "Meta-analysis or multiple RCTs",
+    "B": "One human RCT, or consistent observational evidence",
+    "C": "Human mechanistic or imaging work, small samples",
+    "D": "Animal models only",
+    "E": "Mechanistic inference — reasoning, not a finding"
+  }
+}

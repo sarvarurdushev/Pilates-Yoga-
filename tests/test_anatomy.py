@@ -49,7 +49,7 @@ class TestNerveSupply:
 
     def test_roots_are_ordered_head_to_tail(self):
         entry = DEFAULT_ANATOMY["the_hundred"]
-        roots = entry.roots()
+        roots = entry.spinal_levels()
         assert roots.index("C5") < roots.index("T7") < roots.index("L2")
 
 
@@ -278,3 +278,132 @@ class TestImportedBones:
 
     def test_no_joints_means_no_bones_rather_than_a_guess(self):
         assert AnatomyEntry.from_dict({"exercise": "x"}).bones == ()
+
+
+class TestSynonyms:
+    """Two curated libraries name the same muscle differently. Fuzzy matching
+    was tried and is not safe: "rectus abdominis" and "rectus femoris" share a
+    word and nothing else."""
+
+    def test_a_split_muscle_maps_to_the_group_that_contains_it(self):
+        """A source that separates psoas major from iliacus is being more
+        precise than the moment model can be."""
+        from pilates.anatomy import groups_for
+
+        assert groups_for("psoas major") == ["hip flexors"]
+        assert groups_for("iliacus") == ["hip flexors"]
+
+    def test_an_undivided_deltoid_belongs_to_both_groups(self):
+        """Its anterior fibres flex and its posterior extend. Picking one would
+        be a guess."""
+        from pilates.anatomy import groups_for
+
+        assert groups_for("deltoid") == ["shoulder extensors", "shoulder flexors"]
+
+    def test_a_shared_word_is_not_a_match(self):
+        from pilates.anatomy import groups_for
+
+        assert groups_for("rectus abdominis") == []
+
+    def test_every_synonym_points_at_a_real_group_member(self):
+        """Catches a typo in the table, which would otherwise fail silently as
+        a muscle that simply never matches anything."""
+        from pilates.anatomy import MUSCLE_SYNONYMS, groups_for
+
+        for source, targets in MUSCLE_SYNONYMS.items():
+            assert groups_for(source), source
+            for target in targets:
+                assert groups_for(target), target
+
+    def test_an_unmapped_name_is_returned_unchanged(self):
+        from pilates.anatomy import canonical
+
+        assert canonical("gluteus maximus") == ("gluteus maximus",)
+
+
+class TestStabiliserLoad:
+    """A muscle listed as a stabiliser carrying load is the exercise working.
+    The same muscle carrying more than any prime mover is compensation."""
+
+    def _entry(self):
+        from pilates.anatomy import AnatomyEntry
+
+        return AnatomyEntry("the_hundred",
+                            prime_movers=("rectus abdominis",),
+                            synergists=(),
+                            stabilisers=("psoas major",),
+                            joints=("spine", "hip"))
+
+    def test_a_stabiliser_carrying_load_is_not_called_unexpected(self):
+        result = reconcile(self._entry(), load_report(hip_flexion=24.0))
+        assert "hip flexors" in result.supporting
+        assert result.unexpected == {}
+
+    def test_it_is_described_as_a_stabilising_role(self):
+        result = reconcile(self._entry(), load_report(hip_flexion=24.0))
+        assert "lists as stabilising" in " ".join(l for _, l in result.describe())
+
+    def test_leading_on_a_stabiliser_is_flagged(self):
+        result = reconcile(self._entry(), load_report(hip_flexion=24.0))
+        assert result.leading_on_a_stabiliser
+        assert "compensation" in " ".join(l for _, l in result.describe())
+
+    def test_a_prime_mover_leading_is_not(self):
+        from pilates.anatomy import AnatomyEntry
+
+        entry = AnatomyEntry("x", prime_movers=("iliopsoas",),
+                             stabilisers=("rectus femoris",), joints=("hip",))
+        result = reconcile(entry, load_report(hip_flexion=40.0))
+        assert not result.leading_on_a_stabiliser
+
+    def test_a_group_in_no_role_at_all_is_still_unexpected(self):
+        result = reconcile(self._entry(),
+                           load_report(hip_flexion=10.0, elbow_flexion=40.0))
+        assert "elbow flexors" in result.unexpected
+
+    def test_a_muscle_in_both_roles_counts_as_the_stronger(self):
+        from pilates.anatomy import AnatomyEntry
+
+        entry = AnatomyEntry("x", prime_movers=("iliopsoas",),
+                             stabilisers=("psoas major",), joints=("hip",))
+        result = reconcile(entry, load_report(hip_flexion=40.0))
+        assert "hip flexors" in result.confirmed
+        assert result.supporting == {}
+
+
+class TestSegmentalInnervation:
+    """Curated data records representative levels for a segmental supply.
+    Reading that list literally asserts the gaps are uninvolved."""
+
+    def test_a_segmental_supply_is_recognised_from_its_description(self):
+        assert Innervation("posterior rami, segmentally",
+                           ("C3", "T6", "L1")).segmental
+
+    def test_it_fills_in_the_whole_span(self):
+        levels = Innervation("posterior rami, segmentally",
+                             ("C3", "T6", "L1")).levels()
+        assert "C8" in levels and "T3" in levels
+
+    def test_an_ordinary_nerve_is_left_alone(self):
+        supply = Innervation("femoral nerve", ("L2", "L3", "L4"))
+        assert not supply.segmental
+        assert supply.levels() == ("L2", "L3", "L4")
+
+    def test_the_description_shows_the_span_not_the_samples(self):
+        text = Innervation("posterior rami, segmentally", ("C3", "T6", "L1")).describe()
+        assert "C3-L1" in text
+
+    def test_levels_are_pulled_out_of_prose_when_no_list_is_given(self):
+        from pilates.anatomy import extract_roots
+
+        assert extract_roots("femoral nerve (L2-L4)") == ("L2", "L3", "L4")
+
+    def test_a_range_crossing_regions_is_expanded(self):
+        from pilates.anatomy import extract_roots
+
+        assert extract_roots("thoracoabdominal (T11-L1)") == ("T11", "T12", "L1")
+
+    def test_prose_with_no_levels_yields_none(self):
+        from pilates.anatomy import extract_roots
+
+        assert extract_roots("accessory nerve") == ()

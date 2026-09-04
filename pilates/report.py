@@ -46,6 +46,9 @@ class StudentReport:
     anatomy: object | None = None
     #: Joint loads for this student, when mass and height were supplied.
     load_report: object | None = None
+    #: The innervation table the anatomy entry's muscle names are keyed to. An
+    #: imported library brings its own vocabulary and its own sourcing.
+    nerves: dict | None = None
 
 
 def _e(text: object) -> str:
@@ -103,7 +106,7 @@ def _movement_block(summary: MovementSummary) -> str:
     return ("<h2>What you did</h2><table><tbody>" + "".join(rows) + "</tbody></table>")
 
 
-def _anatomy_block(entry, load_report) -> str:
+def _anatomy_block(entry, load_report, nerves=None) -> str:
     """Muscles, nerves and bones, with every line marked measured or reference.
 
     The visual distinction is the point. On a printed page handed to a
@@ -118,13 +121,18 @@ def _anatomy_block(entry, load_report) -> str:
         rows.append(f"<tr><td><span class='tag {css}'>{_e(provenance)}</span></td>"
                     f"<td>{_e(line)}</td></tr>")
 
-    supplies = sorted({supply.describe() for _, supply in entry.nerves()})
+    if entry.measured_roles:
+        rows.append("<tr><td><span class='tag reference'>reference</span></td>"
+                    f"<td>Roles an EMG study recorded for this movement: "
+                    f"{_e(', '.join(entry.measured_roles))}. The rest are worked "
+                    f"out from the mechanics.</td></tr>")
+    supplies = sorted({supply.describe() for _, supply in entry.nerves(nerves)})
     if supplies:
         rows.append("<tr><td><span class='tag reference'>reference</span></td>"
                     f"<td>Supplied by {_e(', '.join(supplies))}.</td></tr>")
-    if entry.roots():
+    if entry.spinal_levels(nerves):
         rows.append("<tr><td><span class='tag reference'>reference</span></td>"
-                    f"<td>Spinal levels {_e(', '.join(entry.roots()))}.</td></tr>")
+                    f"<td>Spinal levels {_e(entry.spinal_summary(nerves))}.</td></tr>")
     if entry.bones:
         rows.append("<tr><td><span class='tag reference'>reference</span></td>"
                     f"<td>At the {_e(', '.join(entry.joints))}; bones involved: "
@@ -248,7 +256,8 @@ def render(report: StudentReport) -> str:
         parts.append(_movement_block(report.summary))
 
     if report.anatomy is not None:
-        parts.append(_anatomy_block(report.anatomy, report.load_report))
+        parts.append(_anatomy_block(report.anatomy, report.load_report,
+                                    report.nerves))
 
     if report.trends:
         parts.append(_progress_block(report.trends, report.sessions_recorded))
@@ -302,6 +311,7 @@ def build(
     studio: str = "",
     anatomy=None,
     load_report=None,
+    nerves=None,
 ) -> StudentReport:
     """Assemble a report, pulling progress from a history store if there is one."""
     trends = None
@@ -315,7 +325,7 @@ def build(
         date=date or Date.today().isoformat(),
         assessment=assessment, summary=summary,
         trends=trends, sessions_recorded=sessions, studio=studio,
-        anatomy=anatomy, load_report=load_report,
+        anatomy=anatomy, load_report=load_report, nerves=nerves,
     )
 
 

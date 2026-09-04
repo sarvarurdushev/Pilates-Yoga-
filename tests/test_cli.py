@@ -336,7 +336,7 @@ class TestAnatomyOutput:
               "--anatomy", "--model", "m.joblib"])
         out = capsys.readouterr().out
         assert "rectus abdominis" in out
-        assert "intercostal nerves" in out
+        assert "thoracoabdominal nerves" in out
         assert "spinal levels" in out
 
     def test_measured_and_reference_lines_are_labelled(self, monkeypatch, capsys):
