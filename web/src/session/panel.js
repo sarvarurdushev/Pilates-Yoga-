@@ -22,6 +22,7 @@
 import { CHART_CSS, bar, chip, group, showValue, spark, stat, verdictChip,
          wireCharts } from './charts.js';
 import { MEASURED, RESEARCH } from './session.js';
+import { saidAbout, wireWriter, writer } from './coach.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g,
   (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -196,10 +197,17 @@ export function attachPanel(session, nw, hooks = {}) {
                 ?? detail.querySelector('.dname');
     const button = carried
       ? '<button type="button" class="ss-tolab">Read about this in the lab</button>' : '';
-    (anchor ?? detail).insertAdjacentHTML('afterend', html + button);
+    /* What the coach said about this structure sits with the measurements, in
+     * its own treatment: it is a fourth kind of claim, and it carries who said
+     * it and when because that is the whole of its authority. */
+    const name = record?.name?.en ?? '';
+    (anchor ?? detail).insertAdjacentHTML(
+      'afterend',
+      html + saidAbout(name) + writer(name, (record?.fma ?? [])[0] ?? '') + button);
     writing = false;
 
     hooks.onProse?.(carried, id, record);
+    wireWriter(detail);
     wireCharts(detail);
     drawViews(detail, nw);
     detail.querySelector('.ss-tolab')

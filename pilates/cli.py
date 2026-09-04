@@ -1631,8 +1631,13 @@ def cmd_web(args: argparse.Namespace) -> int:
                 print(f"  {problem}", file=sys.stderr)
             return 1
 
+    # The coach can only write where there is a record to write into. Serving a
+    # single exported bundle is a viewer, and says so.
+    from pathlib import Path as _P
+
+    record = args.db if _P(args.db).exists() else ""
     url = run(bundle, port=args.port, analyse=not args.no_analyse,
-              host=args.host)
+              host=args.host, db=record)
     print(f"the body -> {url}")
     if not args.no_analyse:
         print("  the Record button is live: point a camera at yourself, or drop "
@@ -1649,6 +1654,11 @@ def cmd_web(args: argparse.Namespace) -> int:
         if not bundle["exercises"]:
             print("  no exercise labels in this session, so nothing can be "
                   "looked up against the evidence table")
+    if record:
+        print(f"  coach mode is on, writing into {record}")
+    else:
+        print("  no studio record open, so this is a viewer: pass --db to let a "
+              "coach write notes")
     print("  ctrl-c to stop")
     try:
         while True:
@@ -1673,6 +1683,81 @@ def cmd_demo(args: argparse.Namespace) -> int:
     print("  every number in it is made up, and the bundle is marked so the "
           "viewer says it too")
     print(f"  python -m pilates web --bundle {bundle_path}")
+    return 0
+
+
+def cmd_note(args: argparse.Namespace) -> int:
+    """Write down what the camera cannot see.
+
+    A coach observation: a cue that works for this person, something to avoid,
+    what was modified and why, a goal with a date to review it. Carries who
+    said it and when, and is never mixed with a measurement.
+    """
+    from .observations import KINDS, Observation
+    from .store import Store
+
+    try:
+        observation = Observation(
+            username=args.username, kind=args.kind, text=args.text,
+            by=args.by, session=args.session or "", made_on=args.date or "",
+            structure=args.structure or "", subject=args.subject or "",
+            exercise=args.exercise or "", rating=args.rating,
+            rates=args.rates or "", review_on=args.review or "")
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        if "not one of" in str(exc):
+            for name, what in KINDS.items():
+                print(f"  {name:18} {what}", file=sys.stderr)
+        return 2
+
+    with Store.open(args.db) as store:
+        if args.username not in {p["username"] for p in store.people()}:
+            print(f"{args.username!r} is not enrolled", file=sys.stderr)
+            return 1
+        note_id = store.observe(observation)
+    print(f"noted #{note_id}: {observation.kind} about "
+          f"{observation.about} — {observation.text}")
+    if observation.standing:
+        print("  stands until it is retired, and is read before every class")
+    return 0
+
+
+def cmd_sheet(args: argparse.Namespace) -> int:
+    """Everything to read before this person's next class, in reading order."""
+    from .store import Store
+
+    with Store.open(args.db) as store:
+        if args.username not in {p["username"] for p in store.people()}:
+            print(f"{args.username!r} is not enrolled", file=sys.stderr)
+            return 1
+        sheet = store.coach_sheet(args.username)
+
+    name = sheet.display_name or sheet.username
+    print(f"{name}")
+    if sheet.flags:
+        print("\n  BEFORE YOU START")
+        for note in sheet.flags:
+            print(f"    ! {note.text}  ({note.about}, {note.by}, {note.made_on})")
+    for title, notes in (("Cues that work", sheet.cues),
+                         ("Settings", sheet.settings),
+                         ("Working towards", sheet.goals)):
+        if not notes:
+            continue
+        print(f"\n  {title.upper()}")
+        for note in notes:
+            due = f" — review {note.review_on}" if note.review_on else ""
+            print(f"    - {note.text}  ({note.about}){due}")
+    if sheet.recent:
+        print("\n  LAST FEW CLASSES")
+        for note in sheet.recent:
+            rating = (f" [{note.rating}/5 {note.rates}]"
+                      if note.rating is not None else "")
+            print(f"    {note.made_on}  {note.kind}: {note.text}{rating}")
+    due = sheet.due()
+    if due:
+        print(f"\n  {len(due)} goal(s) due for review")
+    if not (sheet.flags or sheet.cues or sheet.goals or sheet.recent):
+        print("  nothing written down yet")
     return 0
 
 
@@ -2306,6 +2391,30 @@ def main(argv: list[str] | None = None) -> int:
     dm.add_argument("--out", default="web/demo",
                     help="where to write it; the viewer looks in web/demo")
     dm.set_defaults(func=cmd_demo)
+
+    nt = sub.add_parser("note",
+                        help="write down what the camera cannot see")
+    nt.add_argument("username")
+    nt.add_argument("kind", help="cue, modification, contraindication, goal, "
+                                 "setting, subjective, assessment or note")
+    nt.add_argument("text")
+    nt.add_argument("--by", required=True, help="who is writing this")
+    nt.add_argument("--session", help="the class it is about, if it is about one")
+    nt.add_argument("--date")
+    nt.add_argument("--structure", help="a muscle, bone, nerve or brain region")
+    nt.add_argument("--subject", help="a measured quantity")
+    nt.add_argument("--exercise")
+    nt.add_argument("--rating", type=int, help="1 to 5")
+    nt.add_argument("--rates", help="what the rating is of")
+    nt.add_argument("--review", help="a date to look at this again")
+    nt.add_argument("--db", default="studio.db")
+    nt.set_defaults(func=cmd_note)
+
+    sh = sub.add_parser("sheet",
+                        help="what to read before this person's next class")
+    sh.add_argument("username")
+    sh.add_argument("--db", default="studio.db")
+    sh.set_defaults(func=cmd_sheet)
 
     br = sub.add_parser("bridge",
                         help="check every measurement-to-structure link")

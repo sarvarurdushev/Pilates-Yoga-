@@ -29,6 +29,7 @@ from .activation import MEASURED_FLOOR, REFERENCE_LEVEL
 from .activation import plan as activation_plan
 from .bridge import (MEASURED, REFERENCE, bones_for_joint, meshes_for_group,
                      nerves_for_group)
+from .observations import ratings_over_time
 from .scoring import score_from_store
 from .store import Store
 from .wording import MUSCLE_PLAIN, quantity
@@ -312,6 +313,18 @@ def _history(store: Store, username: str, session: str) -> dict:
     return out
 
 
+def _observations(store: Store, username: str) -> dict:
+    """What the coach wrote about this person, in the order a coach reads it.
+
+    **Everything is carried, and that is deliberate.** A bundle is the file
+    somebody is handed when they ask what is held about them, so a note in it
+    that they were not allowed to see would make the export a lie. The rule that
+    follows is one for the coach rather than the code: a record written in
+    somebody's file is written where they can read it.
+    """
+    return store.coach_sheet(username).to_dict()
+
+
 def _score_history(store: Store, username: str) -> list[dict]:
     """The score for every session this person has, oldest first.
 
@@ -409,6 +422,9 @@ def build(
         "quantities": quantities,
         "history": _history(store, username, session),
         "score_history": _score_history(store, username),
+        "observations": _observations(store, username),
+        "ratings": ratings_over_time(store.observations(username),
+                                     username),
         "structures": structures,
         "lighting": activation_plan(structures).scheme(),
         "events": [],

@@ -116,6 +116,30 @@ CREATE TABLE IF NOT EXISTS findings (
     source     TEXT NOT NULL DEFAULT 'standard'
 );
 
+-- What the coach saw, which the camera cannot. A fourth tier: `observed`.
+--
+-- Not attached to a track, because a coach writes about a person and not about
+-- whichever numbered box the tracker put them in that day -- and often about no
+-- session at all: a contraindication is true of them, not of Tuesday.
+CREATE TABLE IF NOT EXISTS observations (
+    id         INTEGER PRIMARY KEY,
+    username   TEXT NOT NULL REFERENCES people(username) ON DELETE CASCADE,
+    session_id INTEGER REFERENCES sessions(id) ON DELETE SET NULL,
+    kind       TEXT NOT NULL,
+    text       TEXT NOT NULL,
+    by         TEXT NOT NULL,
+    made_on    TEXT NOT NULL,
+    structure  TEXT NOT NULL DEFAULT '',
+    fma        TEXT NOT NULL DEFAULT '',
+    subject    TEXT NOT NULL DEFAULT '',
+    exercise   TEXT NOT NULL DEFAULT '',
+    rating     INTEGER,
+    rates      TEXT NOT NULL DEFAULT '',
+    review_on  TEXT NOT NULL DEFAULT '',
+    retired    INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS observations_person ON observations(username, made_on);
+
 -- The pose stream: what the video contained, once the video is gone.
 -- One blob per person per session, a few megabytes an hour, from which every
 -- geometric analysis in this system can be re-derived.
@@ -451,6 +475,87 @@ class Store:
             (self.session_id(session), track_id, exercise, kind, subject, message,
              measured, target, deviation, source))
         self.db.commit()
+
+    # -- what the coach saw ----------------------------------------------
+    def observe(self, observation) -> int:
+        """Record one coach observation. Returns its id.
+
+        The session is looked up by key and may be absent: a note about a
+        person -- an old injury, a cue that works for them -- belongs to them
+        rather than to a class.
+        """
+        session_id = (self.session_id(observation.session)
+                      if observation.session else None)
+        cursor = self.db.execute(
+            "INSERT INTO observations (username, session_id, kind, text, by, "
+            "made_on, structure, fma, subject, exercise, rating, rates, "
+            "review_on, retired) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (observation.username, session_id, observation.kind,
+             observation.text, observation.by, observation.made_on,
+             observation.structure, observation.fma, observation.subject,
+             observation.exercise, observation.rating, observation.rates,
+             observation.review_on, int(observation.retired)))
+        self.db.commit()
+        return int(cursor.lastrowid)
+
+    def observations(self, username: str | None = None, kind: str | None = None,
+                     structure: str | None = None,
+                     include_retired: bool = False) -> list:
+        """Read observations back, newest first.
+
+        Retired ones are excluded by default and kept rather than deleted: a
+        contraindication that was lifted is a different thing from one that was
+        never there, and a coach reviewing a decision needs to see that it was
+        made.
+        """
+        from .observations import Observation
+
+        query = ("SELECT o.*, s.key AS session_key FROM observations o "
+                 "LEFT JOIN sessions s ON s.id = o.session_id WHERE 1=1")
+        params: list = []
+        if username is not None:
+            query += " AND o.username = ?"
+            params.append(username)
+        if kind is not None:
+            query += " AND o.kind = ?"
+            params.append(kind)
+        if structure is not None:
+            query += " AND o.structure = ?"
+            params.append(structure)
+        if not include_retired:
+            query += " AND o.retired = 0"
+        query += " ORDER BY o.made_on DESC, o.id DESC"
+        return [
+            Observation(
+                id=r["id"], username=r["username"], kind=r["kind"],
+                text=r["text"], by=r["by"], made_on=r["made_on"],
+                session=r["session_key"] or "", structure=r["structure"],
+                fma=r["fma"], subject=r["subject"], exercise=r["exercise"],
+                rating=r["rating"], rates=r["rates"],
+                review_on=r["review_on"], retired=bool(r["retired"]))
+            for r in self.db.execute(query, params)
+        ]
+
+    def retire(self, observation_id: int, by: str) -> None:
+        """Stop a standing observation applying, without erasing it.
+
+        An injury that has healed and an injury that was never recorded are not
+        the same, and a coach who lifted a restriction should be able to show
+        that they did.
+        """
+        self.db.execute(
+            "UPDATE observations SET retired = 1, "
+            "text = text || ' [retired by ' || ? || ']' WHERE id = ?",
+            (by, observation_id))
+        self.db.commit()
+
+    def coach_sheet(self, username: str):
+        """Everything to read before this person's next class."""
+        from .observations import sheet
+
+        people = {p["username"]: p for p in self.people()}
+        return sheet(self.observations(username), username,
+                     people.get(username, {}).get("display_name", ""))
 
     # -- the pose stream -------------------------------------------------
     def save_poses(self, session: str, stream: PoseStream) -> int:

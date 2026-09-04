@@ -132,3 +132,86 @@ class TestJobs:
         jobs = Jobs(root=tmp_path)
         jobs.submit(b"x" * 64, "a.mp4", {})
         assert jobs.busy.locked() or jobs.running() is not None or True
+
+
+class TestTheCoachWritesFromTheBody:
+    """The interesting field is `structure`: the coach clicked a muscle on the
+    3D model and the note is about that muscle, which is the whole reason this
+    endpoint exists rather than a text box in a spreadsheet."""
+
+    @pytest.fixture
+    def studio(self, tmp_path):
+        from pilates.demo import fill
+        from pilates.store import Store
+
+        db = tmp_path / "studio.db"
+        with Store.open(db) as store:
+            fill(store, session="s1", date="2026-03-03")
+        server, url = serve(None, root=WEB, port=0, analyse=False, db=str(db))
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        yield url.split("/index.html")[0], db
+        server.shutdown()
+
+    def test_coach_mode_is_offered_where_there_is_a_record(self, studio):
+        base, _ = studio
+        _, payload = get(f"{base}/capabilities")
+        assert payload["coach"] is True
+        assert "contraindication" in payload["kinds"]
+
+    def test_it_is_not_offered_to_a_viewer(self, running):
+        """A viewer showing an exported bundle has nothing to write into, and a
+        note with nowhere to go is worse than no note."""
+        base, _ = running
+        _, payload = get(f"{base}/capabilities")
+        assert payload["coach"] is False
+
+    def test_a_note_is_written_and_comes_straight_back_in_the_sheet(self, studio):
+        base, _ = studio
+        status, payload = post(
+            f"{base}/note",
+            json.dumps({"username": "anna", "kind": "cue", "by": "Sam",
+                        "text": "reach the heel away",
+                        "structure": "rectus femoris"}).encode(),
+            {"Content-Type": "application/json"})
+        assert status == 201
+        assert payload["note"]["tier"] == "observed"
+        assert payload["sheet"]["cues"][0]["text"] == "reach the heel away"
+
+    def test_a_rating_with_nothing_attached_is_refused_at_the_door(self, studio):
+        base, _ = studio
+        status, payload = post(
+            f"{base}/note",
+            json.dumps({"username": "anna", "kind": "assessment", "by": "Sam",
+                        "text": "steadier", "rating": 4}).encode(),
+            {"Content-Type": "application/json"})
+        assert status == 400 and "what it rates" in payload["error"]
+
+    def test_a_note_about_somebody_who_is_not_enrolled_is_refused(self, studio):
+        base, _ = studio
+        status, payload = post(
+            f"{base}/note",
+            json.dumps({"username": "ghost", "kind": "note", "by": "Sam",
+                        "text": "hello"}).encode(),
+            {"Content-Type": "application/json"})
+        assert status == 404 and "not enrolled" in payload["error"]
+
+    def test_the_sheet_reads_in_reading_order(self, studio):
+        base, _ = studio
+        for kind, text in (("note", "warm-up fine"),
+                           ("contraindication", "left knee")):
+            post(f"{base}/note",
+                 json.dumps({"username": "anna", "kind": kind, "by": "Sam",
+                             "text": text}).encode(),
+                 {"Content-Type": "application/json"})
+        _, sheet = get(f"{base}/sheet?user=anna")
+        assert sheet["flags"][0]["text"] == "left knee"
+        assert [n["text"] for n in sheet["recent"]] == ["warm-up fine"]
+
+    def test_a_viewer_cannot_be_written_into(self, running):
+        base, _ = running
+        status, payload = post(
+            f"{base}/note",
+            json.dumps({"username": "anna", "kind": "note", "by": "Sam",
+                        "text": "hello"}).encode(),
+            {"Content-Type": "application/json"})
+        assert status == 404 and "viewer" in payload["error"]

@@ -26,7 +26,8 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g,
   (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 const CSS = `
-#ss-rec-open{position:fixed;left:22px;bottom:22px;z-index:60;display:flex;gap:9px;
+/* Beside the coach button, clear of the layers panel on the left. */
+#ss-rec-open{position:fixed;left:308px;bottom:70px;z-index:60;display:flex;gap:9px;
   align-items:center;padding:10px 15px;border-radius:4px;cursor:pointer;
   background:rgba(90,169,230,.13);border:1px solid rgba(90,169,230,.45);
   color:var(--txt);font-size:12.5px;letter-spacing:.02em}

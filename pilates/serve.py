@@ -9,6 +9,8 @@ plain static server plus three routes that are not files.
 ``/capabilities``   what this server can do, so the page can hide what it cannot
 ``/analyse``        a clip, uploaded; returns a job id
 ``/job/<id>``       how that job is going, and the bundle when it is done
+``/note``           one coach observation, written from the body itself
+``/sheet``          what to read before this person's next class
 
 **Nothing is written into the site directory.** A bundle is somebody's health
 data; writing it next to the code so that it can be served is how it ends up
@@ -38,6 +40,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from .analysis_jobs import MAX_UPLOAD_BYTES, Jobs
+from .observations import KINDS
 
 #: The application root, inside this repository.
 WEB = Path(__file__).resolve().parent.parent / "web"
@@ -55,6 +58,20 @@ class Handler(SimpleHTTPRequestHandler):
 
     bundle: dict | None = None
     jobs: Jobs | None = None
+    #: Where the studio's record lives, when there is one. A viewer serving a
+    #: single exported bundle has none, and then a coach cannot write into it --
+    #: which is right: there is nothing to write into.
+    db: str = ""
+
+    def _store(self):
+        """A short-lived store for one request.
+
+        Opened and closed per request rather than held: SQLite connections are
+        not shareable across threads, and this server is threaded.
+        """
+        from .store import Store
+
+        return Store.open(self.db)
 
     # -- helpers ----------------------------------------------------------
     def _json(self, payload: dict, status: int = 200) -> None:
@@ -83,7 +100,23 @@ class Handler(SimpleHTTPRequestHandler):
             # being a viewer rather than pretending it can analyse anything.
             self._json({"analyse": self.jobs is not None,
                         "max_upload_bytes": MAX_UPLOAD_BYTES,
-                        "session": self.bundle is not None})
+                        "session": self.bundle is not None,
+                        # Coach mode is offered only where a note has somewhere
+                        # to go. Reading a session from a file is a viewer.
+                        "coach": bool(self.db),
+                        "kinds": KINDS if self.db else {}})
+            return
+        if route.path == "/sheet" and self.db:
+            who = parse_qs(route.query).get("user", [""])[0]
+            if not who:
+                self._json({"error": "which person?"}, 400)
+                return
+            with self._store() as store:
+                self._json(store.coach_sheet(who).to_dict())
+            return
+        if route.path == "/people" and self.db:
+            with self._store() as store:
+                self._json({"people": [dict(p) for p in store.people()]})
             return
         if route.path.startswith("/job/") and self.jobs is not None:
             job = self.jobs.get(route.path[len("/job/"):])
@@ -96,6 +129,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):  # noqa: N802
         route = urlparse(self.path)
+        if route.path == "/note":
+            self._note()
+            return
         if route.path != "/analyse" or self.jobs is None:
             self._json({"error": "not here"}, 404)
             return
@@ -120,12 +156,59 @@ class Handler(SimpleHTTPRequestHandler):
                                options)
         self._json(job.public(), 202)
 
+    def _note(self) -> None:
+        """One coach observation, written from the body itself.
+
+        The interesting field is `structure`: the coach clicked a muscle on the
+        3D model and the note is about that muscle, which is the whole reason
+        this endpoint exists rather than a text box in a spreadsheet.
+        """
+        from .observations import Observation
+
+        if not self.db:
+            self._json({"error": "this is a viewer; there is no record to "
+                                 "write into"}, 404)
+            return
+        length = int(self.headers.get("Content-Length") or 0)
+        if not 0 < length < 64 * 1024:
+            self._json({"error": "no note in the request"}, 400)
+            return
+        try:
+            payload = json.loads(self.rfile.read(length))
+        except ValueError:
+            self._json({"error": "that was not JSON"}, 400)
+            return
+        try:
+            observation = Observation(
+                username=payload.get("username", ""),
+                kind=payload.get("kind", ""), text=payload.get("text", ""),
+                by=payload.get("by", ""), session=payload.get("session", ""),
+                structure=payload.get("structure", ""),
+                fma=payload.get("fma", ""), subject=payload.get("subject", ""),
+                exercise=payload.get("exercise", ""),
+                rating=payload.get("rating"), rates=payload.get("rates", ""),
+                review_on=payload.get("review_on", ""))
+        except ValueError as exc:
+            # The dataclass refuses a rating with nothing attached, a note with
+            # no text and a note with no author. Those refusals are the point,
+            # so they reach the page as they are.
+            self._json({"error": str(exc)}, 400)
+            return
+        with self._store() as store:
+            if observation.username not in {p["username"] for p in store.people()}:
+                self._json({"error": f"{observation.username} is not enrolled"}, 404)
+                return
+            note_id = store.observe(observation)
+            sheet = store.coach_sheet(observation.username).to_dict()
+        self._json({"id": note_id, "note": observation.to_dict(),
+                    "sheet": sheet}, 201)
+
     def log_message(self, *args):
         """Quiet. The interesting output is the URL, printed once."""
 
 
 def serve(bundle: dict | None, root: Path = WEB, port: int = 8000,
-          host: str = "127.0.0.1", analyse: bool = False):
+          host: str = "127.0.0.1", analyse: bool = False, db: str = ""):
     """Start the server and return it with the URL to open.
 
     A platform that hands out the port in ``$PORT`` -- Render, Fly, Heroku and
@@ -140,6 +223,7 @@ def serve(bundle: dict | None, root: Path = WEB, port: int = 8000,
     handler = partial(Handler, directory=str(root))
     Handler.bundle = bundle
     Handler.jobs = Jobs() if analyse else None
+    Handler.db = db
     server = ThreadingHTTPServer((host, port), handler)
     url = f"http://{host}:{server.server_address[1]}/index.html"
     if bundle is not None:
@@ -148,10 +232,11 @@ def serve(bundle: dict | None, root: Path = WEB, port: int = 8000,
 
 
 def run(bundle: dict | None, root: Path = WEB, port: int = 8000,
-        analyse: bool = False, host: str = "127.0.0.1") -> str:
+        analyse: bool = False, host: str = "127.0.0.1", db: str = "") -> str:
     """Serve in the background. Returns the URL it served."""
     import threading
 
-    server, url = serve(bundle, root=root, port=port, analyse=analyse, host=host)
+    server, url = serve(bundle, root=root, port=port, analyse=analyse,
+                        host=host, db=db)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return url

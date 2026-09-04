@@ -27,6 +27,7 @@ import { attachPanel } from './panel.js';
 import { Session } from './session.js';
 import { attachLab, showReading } from './lab.js';
 import { capabilities, mount as mountRecorder } from './record.js';
+import { mount as mountCoach } from './coach.js';
 
 const BANNER_CSS = `
 #sessbar{position:fixed;left:0;right:0;top:0;z-index:60;display:flex;gap:14px;
@@ -46,7 +47,7 @@ const BANNER_CSS = `
 #sessbar .sample{color:var(--gold);letter-spacing:.11em;text-transform:uppercase;
   font-size:9px;border:1px solid rgba(233,180,92,.4);border-radius:3px;
   padding:1px 6px}
-#demochip{position:fixed;left:22px;bottom:22px;z-index:60;display:flex;gap:10px;
+#demochip{position:fixed;left:308px;bottom:22px;z-index:60;display:flex;gap:10px;
   align-items:center;padding:9px 14px;border-radius:4px;cursor:pointer;
   background:rgba(233,180,92,.10);border:1px solid rgba(233,180,92,.45);
   color:var(--txt);font-size:12px;letter-spacing:.02em}
@@ -235,8 +236,18 @@ export async function install(bundle) {
     openLab: () => document.getElementById('labBtn')?.click(),
   });
 
+  /* The coach's half. Offered only where there is a record to write into: a
+   * viewer showing an exported bundle has none, and a note with nowhere to go
+   * is worse than no note. */
+  const coach = await mountCoach(session, nw, () => {
+    // Re-render the panel so the form appears and disappears with the mode.
+    for (const el of document.querySelectorAll('.ss-panel, .ss-said, .ss-write')) {
+      el.remove();
+    }
+  });
+
   // For the render harness and for anybody poking at it in a console.
-  globalThis.__session = { session, lit };
+  globalThis.__session = { session, lit, coach };
   console.info(`[session] ${session.person.username}: ${lit.lit.length} structures lit, `
              + `${session.ranked().length} groups measured, `
              + `${session.brainRegions().length} brain regions with claims`);
