@@ -29,6 +29,7 @@
     python -m pilates dashboard anna --out anna.html  # charts and history
     python -m pilates bundle anna --session tue-01    # one file for the 3D view
     python -m pilates anatomy anna --session tue-01   # that session, on a body
+    python -m pilates web anna --session tue-01       # ...the 3D one, and the lab
 """
 from __future__ import annotations
 
@@ -1590,6 +1591,69 @@ def cmd_anatomy(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_web(args: argparse.Namespace) -> int:
+    """Open the anatomy application with one person's session in it.
+
+    The 3D body, the exercise library, the evidence table and the lab -- all of
+    it, with the muscles this person measured lit from the measurement, every
+    structure carrying what this session says about it, and the lab carrying the
+    learner panels it was designed for.
+    """
+    import json as _json
+    import time
+    from pathlib import Path as _Path
+
+    from .bundle import build, validate
+    from .serve import WEB, run
+    from .store import Store
+
+    if not (WEB / "index.html").exists():
+        print(f"the application is not in {WEB}. See web/VENDOR.md",
+              file=sys.stderr)
+        return 1
+
+    bundle = None
+    if args.bundle:
+        bundle = _json.loads(_Path(args.bundle).read_text())
+    elif args.username and args.session:
+        with Store.open(args.db) as store:
+            try:
+                bundle = build(store, args.username, args.session,
+                               include_poses=False)
+            except ValueError as exc:
+                print(str(exc), file=sys.stderr)
+                return 1
+    if bundle is not None:
+        problems = validate(bundle)
+        if problems:
+            print("This bundle will not be shown:", file=sys.stderr)
+            for problem in problems:
+                print(f"  {problem}", file=sys.stderr)
+            return 1
+
+    url = run(bundle, port=args.port)
+    print(f"the body -> {url}")
+    if bundle is None:
+        print("  no session: this is the anatomy application on its own, which "
+              "is how it is meant to work without one")
+    else:
+        measured = sum(1 for s in bundle["structures"] if s["tier"] == "measured")
+        print(f"  {bundle['person']['display_name'] or bundle['person']['username']}"
+              f" · {bundle['session']['key']} · {bundle['session']['date']}")
+        print(f"  {measured} structures lit from measurement, "
+              f"{len(bundle['exercises'])} exercise(s) recorded")
+        if not bundle["exercises"]:
+            print("  no exercise labels in this session, so nothing can be "
+                  "looked up against the evidence table")
+    print("  ctrl-c to stop")
+    try:
+        while True:
+            time.sleep(3600)
+    except KeyboardInterrupt:
+        print()
+    return 0
+
+
 def cmd_bridge(args: argparse.Namespace) -> int:
     """Check every measurement-to-structure link against the anatomy model."""
     import json as _json
@@ -2199,6 +2263,15 @@ def main(argv: list[str] | None = None) -> int:
                                                             "technical"),
                     help="plain words, the terms, or both")
     an.set_defaults(func=cmd_anatomy)
+
+    wb = sub.add_parser("web",
+                        help="open the 3D anatomy application with a session in it")
+    wb.add_argument("username", nargs="?")
+    wb.add_argument("--session")
+    wb.add_argument("--bundle", help="a file written by 'pilates bundle'")
+    wb.add_argument("--db", default="studio.db")
+    wb.add_argument("--port", type=int, default=8000)
+    wb.set_defaults(func=cmd_web)
 
     br = sub.add_parser("bridge",
                         help="check every measurement-to-structure link")

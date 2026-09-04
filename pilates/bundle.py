@@ -209,6 +209,71 @@ def _structures(quantities: list[dict]) -> list[dict]:
     return ordered
 
 
+def _exercises(store: Store, username: str, session: str) -> list[dict]:
+    """Which exercises this person actually did, and for how long.
+
+    The link nothing else in either project could make. The anatomy side knows
+    what every exercise is claimed to do -- to muscles, and to the brain, with a
+    tier and a citation on each claim. It has never known which of them anybody
+    did. This side watched somebody do them.
+
+    Time comes from ``exercise`` events where they were recorded, and otherwise
+    from the frames measured under that exercise's name -- a session labelled by
+    hand has no segment boundaries, and refusing to say anything about it would
+    throw away the labelling. Which of the two produced a row is recorded in
+    ``from``, because "measured for 4 minutes" and "labelled, duration unknown"
+    are different statements.
+    """
+    session_id = store.session_id(session)
+    links = [l for l in store.links(session=session, status="confirmed")
+             if l.username == username]
+    if not links:
+        return []
+    tracks = {l.track_id for l in links}
+
+    seconds: dict[str, float] = {}
+    reps: dict[str, int] = {}
+    source: dict[str, str] = {}
+    spans: list[tuple[float, float, str]] = []
+    mine = [e for e in store.events(session) if e["track_id"] in tracks]
+
+    for event in mine:
+        if event["kind"] == "exercise" and event["label"]:
+            end = event["end_s"] if event["end_s"] is not None else event["start_s"]
+            seconds[event["label"]] = seconds.get(event["label"], 0.0) + (
+                end - event["start_s"])
+            source[event["label"]] = "timed segments"
+            spans.append((event["start_s"], end, event["label"]))
+
+    rows = store.db.execute(
+        "SELECT DISTINCT exercise FROM measurements "
+        "WHERE session_id = ? AND exercise != ''", (session_id,))
+    for row in rows:
+        source.setdefault(row["exercise"], "labelled measurements")
+        seconds.setdefault(row["exercise"], 0.0)
+
+    # A repetition belongs to whichever exercise was running when it happened.
+    # The first version matched the repetition's label against the exercise's
+    # name -- a repetition is labelled with the joint that turned, so nothing
+    # ever matched and every exercise reported zero.
+    spans.sort()
+    for event in mine:
+        if event["kind"] != "repetition":
+            continue
+        at = event["start_s"]
+        for start, end, name in spans:
+            if start <= at <= end:
+                reps[name] = reps.get(name, 0) + 1
+                break
+
+    return [{
+        "key": name,
+        "seconds": round(seconds[name], 1),
+        "repetitions": reps.get(name, 0),
+        "from": source.get(name, "labelled measurements"),
+    } for name in sorted(seconds)]
+
+
 def build(
     store: Store,
     username: str,
@@ -265,6 +330,7 @@ def build(
             ],
             "missing": sorted(score.missing),
         },
+        "exercises": _exercises(store, username, session),
         "quantities": quantities,
         "structures": structures,
         "lighting": activation_plan(structures).scheme(),
