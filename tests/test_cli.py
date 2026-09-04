@@ -898,6 +898,64 @@ class TestBundleCommand:
         assert "not enrolled" in capsys.readouterr().err
 
 
+class TestAnatomyCommand:
+    """The same session drawn on a body, for the reader with no 3D engine."""
+
+    def _bundle(self, monkeypatch, tmp_path):
+        db = TestBundleCommand()._captured(monkeypatch, tmp_path)
+        out = tmp_path / "b.json"
+        main(["bundle", "anna", "--session", "s1", "--db", db,
+              "--out", str(out)])
+        return db, out
+
+    def test_it_draws_a_bundle_from_a_file(self, monkeypatch, tmp_path):
+        _, bundle = self._bundle(monkeypatch, tmp_path)
+        page = tmp_path / "body.html"
+        assert main(["anatomy", "--bundle", str(bundle),
+                     "--out", str(page)]) == 0
+        assert "Anna Smith" in page.read_text()
+
+    def test_it_can_build_one_from_the_store_instead(self, monkeypatch, tmp_path):
+        db, _ = self._bundle(monkeypatch, tmp_path)
+        page = tmp_path / "body.html"
+        assert main(["anatomy", "anna", "--session", "s1", "--db", db,
+                     "--out", str(page)]) == 0
+        assert page.exists()
+
+    def test_it_says_which_scale_the_picture_is_drawn_to(
+            self, monkeypatch, tmp_path, capsys):
+        _, bundle = self._bundle(monkeypatch, tmp_path)
+        main(["anatomy", "--bundle", str(bundle),
+              "--out", str(tmp_path / "body.html")])
+        out = capsys.readouterr().out
+        assert "brightest is" in out or "set a scale" in out
+
+    def test_it_refuses_a_bundle_whose_levels_contradict_its_tiers(
+            self, monkeypatch, tmp_path, capsys):
+        import json
+
+        _, bundle = self._bundle(monkeypatch, tmp_path)
+        broken = json.loads(bundle.read_text())
+        broken["lighting"]["reference_level"] = 0.95
+        bundle.write_text(json.dumps(broken))
+        assert main(["anatomy", "--bundle", str(bundle),
+                     "--out", str(tmp_path / "body.html")]) == 1
+        assert "will not be drawn" in capsys.readouterr().err
+
+    def test_a_person_with_no_session_is_told_what_is_missing(
+            self, monkeypatch, tmp_path, capsys):
+        db, _ = self._bundle(monkeypatch, tmp_path)
+        assert main(["anatomy", "anna", "--db", db]) == 2
+        assert "a person and --session" in capsys.readouterr().err
+
+    def test_the_register_reaches_the_page(self, monkeypatch, tmp_path):
+        _, bundle = self._bundle(monkeypatch, tmp_path)
+        page = tmp_path / "body.html"
+        main(["anatomy", "--bundle", str(bundle), "--out", str(page),
+              "--register", "technical"])
+        assert "data-register='technical'" in page.read_text()
+
+
 class TestBridgeCommand:
     LIBRARY = str(Path(__file__).parent / "data" / "neuro_wellness_sample.json")
 

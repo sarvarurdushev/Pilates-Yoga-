@@ -28,6 +28,7 @@
     python -m pilates confirm tue-01 --track 4 --user anna --by me
     python -m pilates dashboard anna --out anna.html  # charts and history
     python -m pilates bundle anna --session tue-01    # one file for the 3D view
+    python -m pilates anatomy anna --session tue-01   # that session, on a body
 """
 from __future__ import annotations
 
@@ -1533,6 +1534,62 @@ def cmd_bundle(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_anatomy(args: argparse.Namespace) -> int:
+    """Draw one session on a body, without needing a 3D engine.
+
+    Reads a bundle rather than the store, so this page and whatever the 3D
+    viewer shows are built from the same file and cannot disagree. Takes a
+    bundle written by ``pilates bundle``, or builds one on the spot from a
+    store when given a person and a session.
+    """
+    import json as _json
+    from pathlib import Path as _Path
+
+    from .anatomyview import render
+    from .bundle import InvalidBundle, build, validate
+    from .store import Store
+
+    if args.bundle:
+        bundle = _json.loads(_Path(args.bundle).read_text())
+    else:
+        if not (args.username and args.session):
+            print("give a bundle file, or a person and --session",
+                  file=sys.stderr)
+            return 2
+        with Store.open(args.db) as store:
+            try:
+                bundle = build(store, args.username, args.session,
+                               include_poses=False)
+            except ValueError as exc:
+                print(str(exc), file=sys.stderr)
+                return 1
+
+    problems = validate(bundle)
+    if problems:
+        print("This bundle will not be drawn:", file=sys.stderr)
+        for problem in problems:
+            print(f"  {problem}", file=sys.stderr)
+        return 1
+
+    page = render(bundle, register=args.register)
+    out = _Path(args.out or f"{bundle['person']['username']}_"
+                            f"{bundle['session']['key']}_body.html")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(page)
+    measured = sum(1 for s in bundle["structures"] if s["tier"] == "measured")
+    print(f"body -> {out} ({out.stat().st_size / 1024:.0f} KB)")
+    print(f"  {measured} structure(s) filled in from measurement, "
+          f"{len(bundle['structures']) - measured} hatched from anatomy")
+    scale = (bundle.get("lighting") or {}).get("scale")
+    if scale:
+        print(f"  brightest is {scale['from']} at "
+              f"{scale['value']:.1f} {scale['unit']}")
+    else:
+        print("  nothing was measured hard enough to set a scale, so every "
+              "band is drawn at the floor of the measured range")
+    return 0
+
+
 def cmd_bridge(args: argparse.Namespace) -> int:
     """Check every measurement-to-structure link against the anatomy model."""
     import json as _json
@@ -2130,6 +2187,18 @@ def main(argv: list[str] | None = None) -> int:
                     help="leave out the frame-by-frame stream, which is most "
                          "of the file")
     bu.set_defaults(func=cmd_bundle)
+
+    an = sub.add_parser("anatomy",
+                        help="draw one session on a body, as a printable page")
+    an.add_argument("username", nargs="?")
+    an.add_argument("--session")
+    an.add_argument("--bundle", help="a file written by 'pilates bundle'")
+    an.add_argument("--db", default="studio.db")
+    an.add_argument("--out", default=None)
+    an.add_argument("--register", default="plain", choices=("plain", "both",
+                                                            "technical"),
+                    help="plain words, the terms, or both")
+    an.set_defaults(func=cmd_anatomy)
 
     br = sub.add_parser("bridge",
                         help="check every measurement-to-structure link")

@@ -29,6 +29,9 @@ from .biomechanics import (MUSCLE_GROUPS, SEGMENTS, JointLoad, LoadReport,
                            classify_contraction, gravitational_moment)
 from .classroom import (ClassPattern, ClassResult, CoverageCheck, Roster,
                         StudentResult, check_coverage, class_patterns, run_class)
+from .activation import (MEASURED_CEILING, MEASURED_FLOOR, REFERENCE_LEVEL,
+                         Light, Plan, level_for, plan as activation_plan)
+from .anatomyview import render as render_body
 from .archive import NOT_RECOVERABLE, PoseStream, cost as archive_cost, decode, encode
 from .bridge import (BONE_MESH, MUSCLE_MESH, NERVE_MESH, BridgeCheck, Mesh,
                      bones_for_joint, check as check_bridge, mesh_for_muscle,
@@ -81,6 +84,8 @@ __all__ = [
     "mesh_for_muscle", "meshes_for_group", "bones_for_joint",
     "nerves_for_group", "check_bridge",
     "build_bundle", "validate_bundle", "write_bundle", "InvalidBundle",
+    "Light", "Plan", "activation_plan", "level_for", "render_body",
+    "MEASURED_FLOOR", "MEASURED_CEILING", "REFERENCE_LEVEL",
     "Candidate", "Directory", "Link", "Person", "Proposal", "Signature",
     "propose", "CONFIRMED", "PROPOSED", "REJECTED",
     "Store", "SessionMeta", "Row", "Point", "Series", "collect",

@@ -876,12 +876,14 @@ default happened to point, how a claim about somebody's body is presented.
 
 | Tier | What lights up | The sentence it carries |
 |---|---|---|
-| `measured` | the 17 muscle meshes a measured joint moment names | "the hip flexors carried 44 Nm in this session, and this is one of them" |
-| `reference` | the bones a measured joint articulates | "articulates the left knee, which was measured. No load on this bone was estimated." |
+| `measured` | the 17 muscle meshes a measured joint moment names | "the hip flexors carried up to 44 Nm in this session — the highest moment either side reached — and this muscle is one of them" |
+| `reference` | the bones a measured joint articulates | "articulates the knee, which was measured. No load on this bone was estimated." |
 | `reference` | the nerves supplying a measured muscle | "supplies a muscle that was measured here. Nothing in this recording observed a nerve." |
 
-Each entry carries the sentence a viewer may print, so the wording cannot get
-stronger on the far side of the boundary. Four rules the validator enforces:
+Each entry carries the sentence a viewer may print, **in both registers**, so
+the wording cannot get stronger on the far side of the boundary and a student
+is never shown the technical half because the plain one was not shipped. Six
+rules the validator enforces:
 
 - a joint angle never lights a muscle — it says where a limb was, not what a
   muscle did;
@@ -890,7 +892,39 @@ stronger on the far side of the boundary. Four rules the validator enforces:
 - a structure marked `measured` must carry a value **and** name the measurement
   it came from;
 - a measured mesh is never downgraded to reference because it also happens to
-  sit beside a measured joint.
+  sit beside a measured joint;
+- every structure carries a `level` and a plain-words sentence, neither of them
+  defaulted;
+- a measured level lands inside the measured band and a reference one on the
+  flat level — a bundle whose levels contradict its tiers is refused.
+
+### How brightly a structure lights
+
+The anatomy model has one channel for "how lit is this", and today it carries an
+authored role. A bundle takes it over completely and says, in the file, what the
+numbers in it mean.
+
+| | Level | What it means |
+|---|---|---|
+| Measured | 0.70 – 1.00 | This group's share of the largest joint moment measured **in this one session** |
+| Reference | 0.30, flat | Where to look next. A gradient here would be an amount nothing measured |
+| Unlit | 0 | Not "zero effort" — no measurement in this session reaches it |
+
+Three things the level is deliberately not:
+
+- **a share of maximum voluntary contraction** — nothing here measured one;
+- **a per-muscle activation** — a joint moment is the net torque at a joint, and
+  every muscle crossing it contributed an unknown fraction, so every member of a
+  group carries the same level and the picture never ranks them;
+- **a gradient over reference structures** — lighting a nerve in proportion to
+  the muscle it supplies would read as "this nerve fired this hard".
+
+The empty gap between the two tiers (0.40) is wider than the whole measured band
+(0.30), so which tier a structure belongs to is legible before how much it
+carried. And the floor is not zero on purpose: a group measured at 2 Nm against
+a 44 Nm top has a share of 0.05, and a measured structure rendered as invisible
+reads as *not measured*, which is the one confusion the bridge exists to
+prevent.
 
 ### The bridge
 
@@ -915,6 +949,85 @@ links are name-only and the check says so out loud rather than hiding it.
 `bridge` exits non-zero when a link breaks, so it can gate a build. It is worth
 more than the tables themselves — it is what fails when either side renames a
 structure, instead of a body quietly lighting up the wrong part.
+
+### The viewer side
+
+`viewer/bundle.js` is a dependency-free ES module that reads a bundle in a
+browser and drives an anatomy model from it. It does as little arithmetic as it
+can: the levels, the tiers and the sentences are decided in Python where the
+test suite can check them, and this side owns only the *join* — turning a named
+structure into an id the palette understands.
+
+```js
+import { load, apply } from './viewer/bundle.js';
+const session = load(await (await fetch('anna-s1.json')).json());
+apply(session, { registry: registry(), palette });   // then palette.upload()
+```
+
+Three things it does that are not obvious:
+
+- **it re-checks the bundle.** By the time a file reaches a browser it has been
+  through a download, a filesystem and possibly a text editor, and the failure
+  mode of an edited one is not an error but a picture that lies quietly;
+- **it clears the palette first.** The activation channel carries one meaning at
+  a time; left as it was, a picture would mix authored roles with measured
+  moments and say nothing about which was which. `restore()` hands it back;
+- **a structure it cannot resolve is reported, never skipped.** A silently
+  missing muscle looks exactly like a muscle that was not measured.
+
+```bash
+node --test viewer/test/*.test.mjs                      # the adapter, alone
+node tools/check_viewer.mjs ../neuro_wellness anna.json  # against the real model
+```
+
+The second one is the interesting one: it builds the registry from the anatomy
+project's own `structures.js` and reports how each link was made.
+
+```
+29 structure(s) lit, 0 unresolved, 5 matched by name alone
+17 measured, 12 reference; 24 joined by FMA id, 5 by name
+matched by name, so a rename breaks them silently: axillary nerve,
+femoral nerve, radial nerve, sciatic nerve, tibial nerve
+```
+
+It is also what caught the first version's real bug. A structure in the model
+carries a **list** of FMA ids, one per side — `anconeus` is
+`['FMA37705', 'FMA37706']` — and the adapter was comparing a string against that
+array. It matched nothing, fell through to name matching for all twenty-nine
+structures, and looked identical on screen: the ontology join was doing nothing
+at all.
+
+## The body, on one page
+
+The 2D half, for the reader with no WebGL and for the printed take-home.
+
+```bash
+python -m pilates anatomy anna --session tue-01 --register both
+```
+
+```
+body -> anna_tue-01_body.html (44 KB)
+  17 structure(s) filled in from measurement, 12 hatched from anatomy
+  brightest is hip flexors peak moment at 23.5 Nm
+```
+
+It reads the bundle rather than the store, so this page and whatever the 3D
+viewer shows are built from the same file and cannot drift apart.
+
+**Measurement and lookup never differ only in colour.** A measured band is
+filled solid and carries a number and a date; a reference structure is hatched
+and carries neither. In the table a reference row's number cell is *empty*
+rather than a dash — there is no figure to put there, and a dash reads as zero.
+
+**The figure is a diagram and says so.** Eight muscle groups are drawn as bands
+along the limb each one moves, spaced out so they can be told apart. That
+spacing is an index, not a location: flexor and extensor compartments are in
+front of and behind a limb, and a coronal view cannot separate them. The real
+shapes are the 3D model's job.
+
+Clicking a band, a group or a table row selects that group everywhere on the
+page. Clicking a reference row clears the selection rather than leaving a muscle
+lit, which would read as "this nerve lit that muscle".
 
 ## Importing Neuro Wellness
 

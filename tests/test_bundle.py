@@ -286,3 +286,136 @@ class TestEventsAreIndependentOfPoses:
         store.add_event("s1", 1, "repetition", 4.0)
         events = build(store, "anna", "s1")["events"]
         assert [e["track_id"] for e in events] == [1]
+
+
+class TestLighting:
+    """The level is what a viewer writes into the palette, so it travels with
+    the bundle rather than being worked out on the far side, where nothing
+    tests it."""
+
+    def test_every_structure_carries_a_level(self, store):
+        measured(store, "hip flexors peak moment", 44.0, unit="Nm",
+                 source="load")
+        for structure in build(store, "anna", "s1")["structures"]:
+            assert isinstance(structure["level"], float)
+
+    def test_the_scheme_says_what_the_bands_mean(self, store):
+        measured(store, "hip flexors peak moment", 44.0, unit="Nm",
+                 source="load")
+        lighting = build(store, "anna", "s1")["lighting"]
+        floor, ceiling = lighting["measured_band"]
+        assert lighting["reference_level"] < floor < ceiling
+        assert lighting["scale"]["value"] == 44.0
+
+    def test_reference_structures_are_all_at_one_level(self, store):
+        measured(store, "hip flexors peak moment", 44.0, unit="Nm",
+                 source="load")
+        measured(store, "elbow extensors peak moment", 2.0, unit="Nm",
+                 source="load")
+        bundle = build(store, "anna", "s1")
+        flat = bundle["lighting"]["reference_level"]
+        levels = {s["level"] for s in bundle["structures"]
+                  if s["tier"] == REFERENCE}
+        assert levels == {flat}
+
+    def test_a_bundle_whose_levels_contradict_its_tiers_is_refused(self, store):
+        measured(store, "hip flexors peak moment", 44.0, unit="Nm",
+                 source="load")
+        bundle = build(store, "anna", "s1")
+        bundle["structures"][0]["level"] = bundle["lighting"]["reference_level"]
+        assert any("outside" in p or "not the flat" in p
+                   for p in validate(bundle))
+
+    def test_overlapping_bands_are_refused(self, store):
+        measured(store, "hip flexors peak moment", 44.0, unit="Nm",
+                 source="load")
+        bundle = build(store, "anna", "s1")
+        bundle["lighting"]["reference_level"] = 0.9
+        assert any("look alike" in p for p in validate(bundle))
+
+    def test_a_structure_with_no_level_is_refused(self, store):
+        measured(store, "hip flexors peak moment", 44.0, unit="Nm",
+                 source="load")
+        bundle = build(store, "anna", "s1")
+        del bundle["structures"][0]["level"]
+        assert any("no level" in p for p in validate(bundle))
+
+
+class TestAMuscleInTwoMeasuredGroups:
+    """Biceps femoris is a hip extensor and a knee flexor; rectus femoris is a
+    hip flexor and a knee extensor. Keeping whichever group sorted first left
+    the hamstrings showing a hip number and never a knee one, for no reason a
+    reader could see."""
+
+    def test_the_larger_effort_sets_the_light(self, store):
+        measured(store, "hip extensors peak moment", 21.0, unit="Nm",
+                 source="load")
+        measured(store, "knee flexors peak moment", 3.0, unit="Nm",
+                 source="load")
+        bundle = build(store, "anna", "s1")
+        biceps = next(s for s in bundle["structures"]
+                      if s["name"] == "biceps femoris")
+        assert biceps["value"] == 21.0
+        assert biceps["from"] == "hip extensors peak moment"
+
+    def test_the_other_group_is_named_rather_than_dropped(self, store):
+        measured(store, "hip extensors peak moment", 21.0, unit="Nm",
+                 source="load")
+        measured(store, "knee flexors peak moment", 3.0, unit="Nm",
+                 source="load")
+        biceps = next(s for s in build(store, "anna", "s1")["structures"]
+                      if s["name"] == "biceps femoris")
+        assert biceps["also"] == ["knee flexors peak moment"]
+        assert "knee flexors" in biceps["because"]
+
+    def test_a_muscle_in_one_group_carries_no_also(self, store):
+        measured(store, "hip extensors peak moment", 21.0, unit="Nm",
+                 source="load")
+        gluteus = next(s for s in build(store, "anna", "s1")["structures"]
+                       if s["name"] == "gluteus maximus")
+        assert "also" not in gluteus
+
+
+class TestBothRegisters:
+    """A viewer holding only the technical half will show it to a student, and
+    the student is the reader the plain half exists for."""
+
+    def test_every_structure_carries_a_plain_sentence(self, store):
+        measured(store, "hip flexors peak moment", 44.0, unit="Nm",
+                 source="load")
+        for structure in build(store, "anna", "s1")["structures"]:
+            assert structure["plain"]
+
+    def test_a_structure_with_no_plain_half_is_refused(self, store):
+        measured(store, "hip flexors peak moment", 44.0, unit="Nm",
+                 source="load")
+        bundle = build(store, "anna", "s1")
+        del bundle["structures"][0]["plain"]
+        assert any("plain-words" in p for p in validate(bundle))
+
+    def test_the_plain_half_keeps_the_caveat_the_technical_one_carries(self, store):
+        """Both have to say the number is a peak across both sides. A plain
+        register that quietly drops the caveats is the worse lie."""
+        measured(store, "hip flexors peak moment", 44.0, unit="Nm",
+                 source="load")
+        psoas = next(s for s in build(store, "anna", "s1")["structures"]
+                     if s["name"] == "psoas major")
+        assert "either side" in psoas["plain"]
+        assert "either side" in psoas["because"]
+
+    def test_a_nerve_says_in_both_registers_that_it_was_not_observed(self, store):
+        measured(store, "hip flexors peak moment", 44.0, unit="Nm",
+                 source="load")
+        nerve = next(s for s in build(store, "anna", "s1")["structures"]
+                     if s["name"] == "femoral nerve")
+        assert "not measured" in nerve["plain"]
+        assert "observed a nerve" in nerve["because"]
+
+    def test_a_bone_is_not_given_a_side_it_does_not_have(self, store):
+        """One mesh serves both femurs. Naming the left one, because that angle
+        came first in the list, printed an accident as a fact."""
+        measured(store, "left_hip", 120.0)
+        measured(store, "right_hip", 118.0)
+        femur = next(s for s in build(store, "anna", "s1")["structures"]
+                     if s["name"] == "femur")
+        assert "left" not in femur["plain"] and "right" not in femur["plain"]
