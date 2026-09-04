@@ -241,13 +241,19 @@ def render(report: StudentReport) -> str:
                f"target {_e(priority.target)}." if priority.measured is not None else ".")
             + "</div>"
         )
-    elif report.assessment.good:
+    elif any(f.message for f in report.assessment.good):
         parts.append(
             "<div class='headline'><strong>Summary</strong>"
             "Nothing stood out as needing correction in what could be measured.</div>"
         )
 
-    good = _section("Going well", [_finding_row(f) for f in report.assessment.good])
+    # Only the findings somebody wrote a sentence for. Every target that was
+    # hit now produces a finding so that it counts towards the score, and most
+    # of the shipped targets carry no praise text -- printing those would fill
+    # the page with rows that say nothing but a number. `narrate` draws the same
+    # line for the same reason.
+    said = [f for f in report.assessment.good if f.message]
+    good = _section("Going well", [_finding_row(f) for f in said])
     parts.append(good.replace("<h2>", "<h2 class='good'>", 1) if good else "")
     work = _section("Worth working on", [_finding_row(f) for f in report.assessment.improve])
     parts.append(work.replace("<h2>", "<h2 class='work'>", 1) if work else "")
@@ -397,7 +403,10 @@ def render_class_summary(result, patterns, studio: str = "") -> str:
     for name in names:
         entries = [s for s in result.students if s.name == name]
         improve = sum(len(s.assessment.improve) for s in entries)
-        good = sum(len(s.assessment.good) for s in entries)
+        # Counted the same way it is displayed: a tally of twelve above a list
+        # of three is a contradiction the reader has no way to resolve.
+        good = sum(len([f for f in s.assessment.good if f.message])
+                   for s in entries)
         pill = (f"<span class='pill work'>{improve} to work on</span>" if improve
                 else "<span class='pill'>nothing flagged</span>")
         rows.append(

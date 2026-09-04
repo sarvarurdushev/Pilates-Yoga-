@@ -279,3 +279,38 @@ class TestAnatomyInTheReport:
             assessment=Assessment(exercise="x", samples=50, confidence=0.8),
             anatomy=AnatomyEntry("x", ("<script>alert(1)</script>",), joints=("knee",)))
         assert "<script>alert(1)</script>" not in render(report)
+
+
+class TestWordlessFindingsStayOffThePage:
+    """Every target that was hit now produces a finding so it counts towards the
+    score, and most of the shipped targets carry no praise text. Those must not
+    reach the page: a row that says nothing but a number is not a sentence, and
+    a tally above a list it does not match is a contradiction."""
+
+    def _report(self):
+        from pilates.coaching import Assessment, Finding
+
+        return Assessment(exercise="mountain", samples=100, confidence=0.9,
+                          findings=[
+            Finding(kind="good", subject="left_knee", message="", measured=170.0,
+                    target="160-185deg"),
+            Finding(kind="good", subject="trunk", message="stood tall",
+                    measured=86.0, target="82-90deg"),
+            Finding(kind="close", subject="right_knee", message="",
+                    measured=157.0, target="160-185deg", deviation=3.0),
+        ])
+
+    def test_only_the_finding_with_a_sentence_is_printed(self):
+        html = render(StudentReport(student="Anna", exercise="mountain",
+                                    date="2026-03-03",
+                                    assessment=self._report()))
+        assert "stood tall" in html
+        # The wordless ones leave no row behind them.
+        assert "170" not in html
+        assert "157" not in html
+
+    def test_a_near_miss_is_never_shown_as_something_to_work_on(self):
+        html = render(StudentReport(student="Anna", exercise="mountain",
+                                    date="2026-03-03",
+                                    assessment=self._report()))
+        assert "Worth working on" not in html
