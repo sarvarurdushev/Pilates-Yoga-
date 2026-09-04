@@ -2,7 +2,7 @@
  * Run the bundle adapter against the real anatomy model, and report the join.
  *
  * `pilates bridge` checks the mapping table from the Python side, against an
- * export. This checks the other half: that `viewer/bundle.js` can actually turn
+ * export. This checks the other half: that the session adapter can actually turn
  * the structures in a real bundle into ids the real registry hands back, and
  * that what lands in the palette says what the bundle meant.
  *
@@ -13,9 +13,10 @@
  * has to run in a terminal -- so what is proved is the join and the levels,
  * not the rendering.
  *
- * Nothing is written to the anatomy project. It is read, the way it always is.
+ * Points at any copy of the anatomy application -- `./web` in this repository,
+ * or a clone of it upstream. Read-only either way.
  *
- *   node tools/check_viewer.mjs /path/to/neuro_wellness bundle.json
+ *   node tools/check_viewer.mjs ./web bundle.json
  */
 import { readFileSync } from 'node:fs';
 import { register } from 'node:module';
@@ -23,7 +24,7 @@ import { pathToFileURL } from 'node:url';
 import { resolve as resolvePath } from 'node:path';
 
 import { load, apply, legend, rows, MEASURED, REFERENCE }
-  from '../viewer/bundle.js';
+  from '../web/src/session/bundle.js';
 
 const [repo, bundlePath] = process.argv.slice(2);
 if (!repo || !bundlePath) {
