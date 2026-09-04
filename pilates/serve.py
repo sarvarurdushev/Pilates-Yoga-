@@ -18,7 +18,15 @@ the analysis takes.
 **Bound to localhost by default, and that is a decision.** This server accepts a
 video and runs a pipeline over it. On a studio machine that is exactly right; on
 an open interface it is an upload endpoint with no authentication in front of it.
-Serving a session to the room needs a proxy that knows who is asking.
+``--host 0.0.0.0`` opens it deliberately, which is what a hosted deployment
+needs, and what a studio serving the room needs a proxy in front of.
+
+**A hosted deployment is a real trade, not a free upgrade.** Running the
+analysis in a data centre means video of people leaves the building, which is
+the one thing this design is otherwise built to avoid: the clip is deleted after
+analysis, but it still travelled. Local is the honest default and the reason
+`pilates web` exists at all. Hosting is for showing the thing to somebody who
+has not installed it.
 """
 from __future__ import annotations
 
@@ -118,7 +126,17 @@ class Handler(SimpleHTTPRequestHandler):
 
 def serve(bundle: dict | None, root: Path = WEB, port: int = 8000,
           host: str = "127.0.0.1", analyse: bool = False):
-    """Start the server and return it with the URL to open."""
+    """Start the server and return it with the URL to open.
+
+    A platform that hands out the port in ``$PORT`` -- Render, Fly, Heroku and
+    most others -- is honoured when no port was asked for explicitly, because a
+    service that ignores it never receives a request and is reported as failing
+    its health check with nothing in the log to say why.
+    """
+    import os
+
+    if port == 8000 and os.environ.get("PORT"):
+        port = int(os.environ["PORT"])
     handler = partial(Handler, directory=str(root))
     Handler.bundle = bundle
     Handler.jobs = Jobs() if analyse else None
@@ -130,10 +148,10 @@ def serve(bundle: dict | None, root: Path = WEB, port: int = 8000,
 
 
 def run(bundle: dict | None, root: Path = WEB, port: int = 8000,
-        analyse: bool = False) -> str:
+        analyse: bool = False, host: str = "127.0.0.1") -> str:
     """Serve in the background. Returns the URL it served."""
     import threading
 
-    server, url = serve(bundle, root=root, port=port, analyse=analyse)
+    server, url = serve(bundle, root=root, port=port, analyse=analyse, host=host)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return url

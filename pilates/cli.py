@@ -1631,7 +1631,8 @@ def cmd_web(args: argparse.Namespace) -> int:
                 print(f"  {problem}", file=sys.stderr)
             return 1
 
-    url = run(bundle, port=args.port, analyse=not args.no_analyse)
+    url = run(bundle, port=args.port, analyse=not args.no_analyse,
+              host=args.host)
     print(f"the body -> {url}")
     if not args.no_analyse:
         print("  the Record button is live: point a camera at yourself, or drop "
@@ -2294,6 +2295,10 @@ def main(argv: list[str] | None = None) -> int:
     wb.add_argument("--port", type=int, default=8000)
     wb.add_argument("--no-analyse", action="store_true",
                     help="serve the viewer only, with no upload endpoint")
+    wb.add_argument("--host", default="127.0.0.1",
+                    help="0.0.0.0 to accept connections from the network. This "
+                         "server takes video uploads and has no authentication "
+                         "of its own; open it only behind something that does")
     wb.set_defaults(func=cmd_web)
 
     dm = sub.add_parser("demo",
