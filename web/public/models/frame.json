@@ -1,0 +1,9 @@
+{
+  "note": "fsaverage RAS -> canonical: X=-x, Y=z, Z=y, then (p-center)*scale",
+  "center": [
+    -0.56221,
+    16.373,
+    -18.48715
+  ],
+  "scale": 0.00595122
+}

@@ -1,0 +1,41 @@
+{
+  "source": "BodyParts3D 3.0 (20110915), 99% reduction",
+  "attribution": "BodyParts3D, (c) The Database Center for Life Science licensed under CC Attribution-Share Alike 2.1 Japan",
+  "note": "archive mm -> canonical: X=x, Y=z, Z=-y, then (p-center)*scale",
+  "center": [
+    1.7804999999999964,
+    902.3695,
+    152.115
+  ],
+  "scale": 0.0006041461949211242,
+  "height_mm": 1655.2285,
+  "brainToBody": {
+    "scale": 0.09843313446448414,
+    "rotation": [
+      -0.2719396866666293,
+      0.0067696592867232275,
+      -0.04889658553147265
+    ],
+    "translation": [
+      -0.001792249906598147,
+      0.40477501053823167,
+      -0.04100475165317049
+    ],
+    "landmarks": [
+      "cerebellum",
+      "brainstem",
+      "motor cortex",
+      "somatosensory",
+      "hippocampus",
+      "amygdala",
+      "thalamus",
+      "corpus callosum",
+      "lateral ventricle",
+      "basal ganglia"
+    ],
+    "residual_mm": {
+      "mean": 6.516943759323814,
+      "max": 15.41204828791946
+    }
+  }
+}
