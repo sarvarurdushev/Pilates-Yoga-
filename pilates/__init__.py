@@ -30,6 +30,11 @@ from .biomechanics import (MUSCLE_GROUPS, SEGMENTS, JointLoad, LoadReport,
 from .classroom import (ClassPattern, ClassResult, CoverageCheck, Roster,
                         StudentResult, check_coverage, class_patterns, run_class)
 from .archive import NOT_RECOVERABLE, PoseStream, cost as archive_cost, decode, encode
+from .bridge import (BONE_MESH, MUSCLE_MESH, NERVE_MESH, BridgeCheck, Mesh,
+                     bones_for_joint, check as check_bridge, mesh_for_muscle,
+                     meshes_for_group, nerves_for_group)
+from .bundle import (FORMAT, VERSION, InvalidBundle, build as build_bundle,
+                     validate as validate_bundle, write as write_bundle)
 from .config import StudioConfig
 from .dashboard import Point, Series, collect, render as render_dashboard
 from .identity import (CONFIRMED, PROPOSED, REJECTED, Candidate, Directory,
@@ -72,6 +77,10 @@ __version__ = "0.1.0"
 __all__ = [
     "StudioConfig", "ExclusionZone", "ExerciseStandard", "AngleTarget",
     "PoseStream", "encode", "decode", "archive_cost", "NOT_RECOVERABLE",
+    "Mesh", "BridgeCheck", "MUSCLE_MESH", "BONE_MESH", "NERVE_MESH",
+    "mesh_for_muscle", "meshes_for_group", "bones_for_joint",
+    "nerves_for_group", "check_bridge",
+    "build_bundle", "validate_bundle", "write_bundle", "InvalidBundle",
     "Candidate", "Directory", "Link", "Person", "Proposal", "Signature",
     "propose", "CONFIRMED", "PROPOSED", "REJECTED",
     "Store", "SessionMeta", "Row", "Point", "Series", "collect",

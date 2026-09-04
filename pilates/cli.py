@@ -27,6 +27,7 @@
     python -m pilates identify class.mp4 --session tue-01  # who is each track?
     python -m pilates confirm tue-01 --track 4 --user anna --by me
     python -m pilates dashboard anna --out anna.html  # charts and history
+    python -m pilates bundle anna --session tue-01    # one file for the 3D view
 """
 from __future__ import annotations
 
@@ -1489,6 +1490,66 @@ def _iqr(values: list[float]) -> float:
     return ordered[(3 * len(ordered)) // 4] - ordered[len(ordered) // 4]
 
 
+def cmd_bundle(args: argparse.Namespace) -> int:
+    """Write one session as one file, for an anatomy viewer to read.
+
+    The same file is what a person is handed when they ask what is held about
+    them. If it is fit to drive a rendering of somebody's body, it is the file
+    that describes them.
+    """
+    from .bundle import build, validate, write
+    from .store import Store
+
+    with Store.open(args.db) as store:
+        try:
+            bundle = build(store, args.username, args.session,
+                           include_poses=not args.no_poses)
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+
+    problems = validate(bundle)
+    if problems:
+        print("This bundle will not be written:", file=sys.stderr)
+        for problem in problems:
+            print(f"  {problem}", file=sys.stderr)
+        return 1
+
+    out = write(bundle, args.out or f"{args.username}_{args.session}.json")
+    measured = sum(1 for s in bundle["structures"] if s["tier"] == "measured")
+    reference = len(bundle["structures"]) - measured
+    print(f"bundle -> {out} ({out.stat().st_size / 1024:.0f} KB)")
+    print(f"  {len(bundle['quantities'])} measured quantities")
+    print(f"  {measured} structures lit from measurement, "
+          f"{reference} from anatomy")
+    if bundle.get("pose"):
+        print(f"  {bundle['pose']['frames']} pose frames, for scrubbing the "
+              f"session after the video is gone")
+    if bundle["score"]["value"] is None:
+        print(f"  no score: {bundle['score']['withheld_reason']}")
+    else:
+        print(f"  score {bundle['score']['value']:.0f} from "
+              f"{bundle['score']['checks']} checks")
+    return 0
+
+
+def cmd_bridge(args: argparse.Namespace) -> int:
+    """Check every measurement-to-structure link against the anatomy model."""
+    import json as _json
+
+    from .bridge import check
+
+    payload = _json.loads(Path(args.export).read_text())
+    structures = payload.get("structures")
+    if not structures:
+        print("That export carries no structure list. Re-run "
+              "tools/export_neuro_wellness.mjs to include one.", file=sys.stderr)
+        return 1
+    result = check(structures)
+    print(result.describe())
+    return 0 if result.ok else 2
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     """Check this machine can actually run an analysis."""
     from .diagnostics import check_environment, environment_ready
@@ -2058,6 +2119,22 @@ def main(argv: list[str] | None = None) -> int:
     ex.add_argument("--forget", action="store_true",
                     help="erase the person and every measurement about them")
     ex.set_defaults(func=cmd_export)
+
+    bu = sub.add_parser("bundle",
+                        help="write one session as a file an anatomy viewer can read")
+    bu.add_argument("username")
+    bu.add_argument("--session", required=True)
+    bu.add_argument("--db", default="studio.db")
+    bu.add_argument("--out", default=None)
+    bu.add_argument("--no-poses", action="store_true",
+                    help="leave out the frame-by-frame stream, which is most "
+                         "of the file")
+    bu.set_defaults(func=cmd_bundle)
+
+    br = sub.add_parser("bridge",
+                        help="check every measurement-to-structure link")
+    br.add_argument("export", help="a JSON export of the anatomy model")
+    br.set_defaults(func=cmd_bridge)
 
     dr = sub.add_parser("doctor", help="check this machine can run an analysis")
     dr.set_defaults(func=cmd_doctor)

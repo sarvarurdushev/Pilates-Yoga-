@@ -850,6 +850,72 @@ setting this system is built for, and it holds for a variation nobody has named.
 
 The last two are both gates, and both have to clear.
 
+## The session bundle
+
+One session, as one file, for an anatomy viewer to read — and the same file a
+person is handed when they ask what is held about them. That is not a
+coincidence: if a file is fit to drive a rendering of somebody's body, it is
+the file that describes them.
+
+```bash
+python -m pilates bundle anna --session tue-01 --out anna.json
+```
+
+```
+bundle -> anna.json (23 KB)
+  28 measured quantities
+  17 structures lit from measurement, 12 from anatomy
+  120 pose frames, for scrubbing the session after the video is gone
+```
+
+### The tier is the load-bearing field
+
+Every value carries one, and the validator **refuses** a bundle where any does
+not — defaulting it would decide, silently and in whichever direction the
+default happened to point, how a claim about somebody's body is presented.
+
+| Tier | What lights up | The sentence it carries |
+|---|---|---|
+| `measured` | the 17 muscle meshes a measured joint moment names | "the hip flexors carried 44 Nm in this session, and this is one of them" |
+| `reference` | the bones a measured joint articulates | "articulates the left knee, which was measured. No load on this bone was estimated." |
+| `reference` | the nerves supplying a measured muscle | "supplies a muscle that was measured here. Nothing in this recording observed a nerve." |
+
+Each entry carries the sentence a viewer may print, so the wording cannot get
+stronger on the far side of the boundary. Four rules the validator enforces:
+
+- a joint angle never lights a muscle — it says where a limb was, not what a
+  muscle did;
+- an invalid measurement lights nothing at all (a load taken while an
+  instructor's hands were on someone is a reading of two people);
+- a structure marked `measured` must carry a value **and** name the measurement
+  it came from;
+- a measured mesh is never downgraded to reference because it also happens to
+  sit beside a measured joint.
+
+### The bridge
+
+The mapping lives in this repository; the anatomy project is read-only to it.
+
+```bash
+python -m pilates bridge nw.json
+```
+
+```
+52 link(s) checked, 0 broken.
+  20 link(s) matched by name alone, with no FMA id to fall back on:
+  a rename on either side breaks these silently.
+```
+
+Muscles and bones carry a **Foundational Model of Anatomy** id — `FMA22342`
+means psoas major to anything that speaks it, which is a real contract where a
+name string either side might reword is not. **Nerves carry none**: the meshes
+are named but the source data has no FMA id for any of them, so those twenty
+links are name-only and the check says so out loud rather than hiding it.
+
+`bridge` exits non-zero when a link breaks, so it can gate a build. It is worth
+more than the tables themselves — it is what fails when either side renames a
+structure, instead of a body quietly lighting up the wrong part.
+
 ## Importing Neuro Wellness
 
 [Neuro Wellness](https://github.com/sarvarurdushev/Neuro_Wellness) holds 190

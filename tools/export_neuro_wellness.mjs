@@ -13,7 +13,7 @@
  *
  *   node tools/export_neuro_wellness.mjs /path/to/neuro_wellness out.json
  */
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 
@@ -61,6 +61,14 @@ const exercises = [...PILATES, ...YOGA].map((r) => ({
   entry: r.entry ?? {},
 }));
 
+/* The structure list, for the bridge table: name, ontology id and layer for
+ * every drawable thing. Read-only, like everything else here. */
+const structuresPath = resolve(repo, 'src/generated/structures.json');
+const generated = JSON.parse(readFileSync(structuresPath, 'utf8'));
+const structures = generated.structures.map((s) => ({
+  name: s.name, fma: s.fma ?? [], layer: s.layer, sides: s.sides ?? [],
+}));
+
 const brain = {};
 for (const [key, e] of Object.entries(EXERCISE_BRAIN)) {
   brain[key] = {
@@ -80,6 +88,8 @@ const tiers = {};
 for (const [key, t] of Object.entries(TIERS)) tiers[key] = t.en ?? '';
 
 writeFileSync(out, JSON.stringify(
-  { source: 'Neuro Wellness', exercises, muscles, brain, tiers }, null, 2) + '\n');
+  { source: 'Neuro Wellness', exercises, muscles, brain, tiers, structures },
+  null, 2) + '\n');
 console.error(`${exercises.length} exercises, ${Object.keys(muscles).length} muscles, `
-  + `${Object.keys(brain).length} brain claims -> ${out}`);
+  + `${Object.keys(brain).length} brain claims, ${structures.length} structures `
+  + `-> ${out}`);

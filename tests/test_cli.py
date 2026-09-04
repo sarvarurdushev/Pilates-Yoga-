@@ -844,3 +844,74 @@ class TestCapture:
         install(monkeypatch, self._clip(n=3))
         assert main(["capture", "clip.mov", "--session", "s1", "--db", db]) == 1
         assert "tracked long enough" in capsys.readouterr().err
+
+
+class TestBundleCommand:
+    """One session as one file, for an anatomy viewer — and the same file a
+    person is handed when they ask what is held about them."""
+
+    def _captured(self, monkeypatch, tmp_path):
+        db = str(tmp_path / "studio.db")
+        main(["enrol", "anna", "--name", "Anna Smith", "--db", db])
+        install(monkeypatch, TestCapture()._clip())
+        main(["capture", "clip.mov", "--session", "s1", "--user", "anna",
+              "--db", db, "--by", "coach", "--date", "2026-03-03",
+              "--mass", "65", "--height", "1.68"])
+        return db
+
+    def test_it_writes_a_valid_bundle(self, monkeypatch, tmp_path, capsys):
+        import json
+
+        from pilates.bundle import validate
+
+        db = self._captured(monkeypatch, tmp_path)
+        out = tmp_path / "b.json"
+        assert main(["bundle", "anna", "--session", "s1", "--db", db,
+                     "--out", str(out)]) == 0
+        assert validate(json.loads(out.read_text())) == []
+
+    def test_it_reports_what_is_lit_from_measurement(
+            self, monkeypatch, tmp_path, capsys):
+        db = self._captured(monkeypatch, tmp_path)
+        main(["bundle", "anna", "--session", "s1", "--db", db,
+              "--out", str(tmp_path / "b.json")])
+        out = capsys.readouterr().out
+        assert "lit from measurement" in out and "from anatomy" in out
+
+    def test_the_pose_stream_can_be_left_out(self, monkeypatch, tmp_path):
+        import json
+
+        db = self._captured(monkeypatch, tmp_path)
+        small = tmp_path / "small.json"
+        big = tmp_path / "big.json"
+        main(["bundle", "anna", "--session", "s1", "--db", db,
+              "--out", str(big)])
+        main(["bundle", "anna", "--session", "s1", "--db", db,
+              "--out", str(small), "--no-poses"])
+        assert "pose" not in json.loads(small.read_text())
+        assert small.stat().st_size < big.stat().st_size
+
+    def test_an_unknown_person_is_refused_with_a_reason(
+            self, monkeypatch, tmp_path, capsys):
+        db = self._captured(monkeypatch, tmp_path)
+        assert main(["bundle", "ghost", "--session", "s1", "--db", db]) == 1
+        assert "not enrolled" in capsys.readouterr().err
+
+
+class TestBridgeCommand:
+    LIBRARY = str(Path(__file__).parent / "data" / "neuro_wellness_sample.json")
+
+    def test_every_link_resolves_against_the_real_model(self, capsys):
+        assert main(["bridge", self.LIBRARY]) == 0
+        assert "0 broken" in capsys.readouterr().out
+
+    def test_it_reports_the_links_that_have_no_ontology_id(self, capsys):
+        main(["bridge", self.LIBRARY])
+        assert "matched by name alone" in capsys.readouterr().out
+
+    def test_an_export_without_structures_says_how_to_fix_it(
+            self, tmp_path, capsys):
+        path = tmp_path / "old.json"
+        path.write_text('{"exercises": []}')
+        assert main(["bridge", str(path)]) == 1
+        assert "export_neuro_wellness" in capsys.readouterr().err

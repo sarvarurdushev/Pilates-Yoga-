@@ -1878,5 +1878,577 @@
     "C": "Human mechanistic or imaging work, small samples",
     "D": "Animal models only",
     "E": "Mechanistic inference — reasoning, not a finding"
-  }
+  },
+  "structures": [
+    {
+      "name": "clavicle",
+      "fma": [
+        "FMA13322",
+        "FMA13323"
+      ],
+      "layer": "skeleton",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "femur",
+      "fma": [
+        "FMA24474",
+        "FMA24475"
+      ],
+      "layer": "skeleton",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "fibula",
+      "fma": [
+        "FMA24480",
+        "FMA24481"
+      ],
+      "layer": "skeleton",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "humerus",
+      "fma": [
+        "FMA23130",
+        "FMA23131"
+      ],
+      "layer": "skeleton",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "patella",
+      "fma": [
+        "FMA24486",
+        "FMA24487"
+      ],
+      "layer": "skeleton",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "radius",
+      "fma": [
+        "FMA23464",
+        "FMA23465"
+      ],
+      "layer": "skeleton",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "scapula",
+      "fma": [
+        "FMA13395",
+        "FMA13396"
+      ],
+      "layer": "skeleton",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "tibia",
+      "fma": [
+        "FMA24477",
+        "FMA24478"
+      ],
+      "layer": "skeleton",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "ulna",
+      "fma": [
+        "FMA23467",
+        "FMA23468"
+      ],
+      "layer": "skeleton",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "biceps brachii",
+      "fma": [
+        "FMA37684",
+        "FMA37685",
+        "FMA37686",
+        "FMA37687"
+      ],
+      "layer": "muscles_superficial",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "biceps femoris",
+      "fma": [
+        "FMA45888",
+        "FMA45889",
+        "FMA45891",
+        "FMA45892"
+      ],
+      "layer": "muscles_superficial",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "brachioradialis",
+      "fma": [
+        "FMA38486",
+        "FMA38487"
+      ],
+      "layer": "muscles_superficial",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "deltoid",
+      "fma": [
+        "FMA34680",
+        "FMA34681",
+        "FMA34682",
+        "FMA34683",
+        "FMA34684",
+        "FMA34685"
+      ],
+      "layer": "muscles_superficial",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "gastrocnemius",
+      "fma": [
+        "FMA45957",
+        "FMA45958",
+        "FMA45960",
+        "FMA45961"
+      ],
+      "layer": "muscles_superficial",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "gluteus maximus",
+      "fma": [
+        "FMA22328",
+        "FMA22329"
+      ],
+      "layer": "muscles_superficial",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "latissimus dorsi",
+      "fma": [
+        "FMA13358",
+        "FMA13359"
+      ],
+      "layer": "muscles_superficial",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "pectoralis major",
+      "fma": [
+        "FMA34690",
+        "FMA34691",
+        "FMA45874",
+        "FMA45875",
+        "FMA79979",
+        "FMA79980"
+      ],
+      "layer": "muscles_superficial",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "rectus femoris",
+      "fma": [
+        "FMA38928",
+        "FMA38929"
+      ],
+      "layer": "muscles_superficial",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "sartorius",
+      "fma": [
+        "FMA22354",
+        "FMA22355"
+      ],
+      "layer": "muscles_superficial",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "semitendinosus",
+      "fma": [
+        "FMA22358",
+        "FMA22359"
+      ],
+      "layer": "muscles_superficial",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "tensor fasciae latae",
+      "fma": [
+        "FMA22425",
+        "FMA22426"
+      ],
+      "layer": "muscles_superficial",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "teres major",
+      "fma": [
+        "FMA32551",
+        "FMA32552"
+      ],
+      "layer": "muscles_superficial",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "triceps brachii",
+      "fma": [
+        "FMA37695",
+        "FMA37696",
+        "FMA37697",
+        "FMA37698",
+        "FMA37699",
+        "FMA37700"
+      ],
+      "layer": "muscles_superficial",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "vastus lateralis",
+      "fma": [
+        "FMA38930",
+        "FMA38931"
+      ],
+      "layer": "muscles_superficial",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "vastus medialis",
+      "fma": [
+        "FMA38932",
+        "FMA38933"
+      ],
+      "layer": "muscles_superficial",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "anconeus",
+      "fma": [
+        "FMA37705",
+        "FMA37706"
+      ],
+      "layer": "muscles_deep",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "brachialis",
+      "fma": [
+        "FMA37668",
+        "FMA37669"
+      ],
+      "layer": "muscles_deep",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "coracobrachialis",
+      "fma": [
+        "FMA37665",
+        "FMA37666"
+      ],
+      "layer": "muscles_deep",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "psoas major",
+      "fma": [
+        "FMA22342",
+        "FMA22343"
+      ],
+      "layer": "muscles_deep",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "semimembranosus",
+      "fma": [
+        "FMA22448",
+        "FMA22449"
+      ],
+      "layer": "muscles_deep",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "vastus intermedius",
+      "fma": [
+        "FMA38934",
+        "FMA38935"
+      ],
+      "layer": "muscles_deep",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "axillary nerve",
+      "fma": [],
+      "layer": "nervous",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "brachial plexus",
+      "fma": [],
+      "layer": "nervous",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "common fibular nerve",
+      "fma": [],
+      "layer": "nervous",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "cranial nerves",
+      "fma": [],
+      "layer": "nervous",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "femoral nerve",
+      "fma": [],
+      "layer": "nervous",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "intercostal nerves",
+      "fma": [],
+      "layer": "nervous",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "long thoracic nerve",
+      "fma": [],
+      "layer": "nervous",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "lumbar plexus",
+      "fma": [],
+      "layer": "nervous",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "median nerve",
+      "fma": [],
+      "layer": "nervous",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "musculocutaneous nerve",
+      "fma": [],
+      "layer": "nervous",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "obturator nerve",
+      "fma": [],
+      "layer": "nervous",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "radial nerve",
+      "fma": [],
+      "layer": "nervous",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "sacral plexus",
+      "fma": [],
+      "layer": "nervous",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "sciatic nerve",
+      "fma": [],
+      "layer": "nervous",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "spinal cord",
+      "fma": [],
+      "layer": "nervous",
+      "sides": [
+        "M"
+      ]
+    },
+    {
+      "name": "spinal nerve roots",
+      "fma": [],
+      "layer": "nervous",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "sympathetic trunk",
+      "fma": [],
+      "layer": "nervous",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "tibial nerve",
+      "fma": [],
+      "layer": "nervous",
+      "sides": [
+        "L",
+        "M",
+        "R"
+      ]
+    },
+    {
+      "name": "ulnar nerve",
+      "fma": [],
+      "layer": "nervous",
+      "sides": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "name": "vagus nerve",
+      "fma": [],
+      "layer": "nervous",
+      "sides": [
+        "L",
+        "R"
+      ]
+    }
+  ]
 }
