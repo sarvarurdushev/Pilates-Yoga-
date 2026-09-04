@@ -28,6 +28,8 @@ from .history import (LOWER_IS_BETTER, MIN_PRACTICAL_CHANGE,
                       MIN_SESSIONS_FOR_TREND, NOISE_MULTIPLE)
 from .scoring import MEASURABLE, Score, score_from_store
 from .store import Row, Store
+from .wording import (BOTH, COMPONENTS, COPY, PLAIN, REGISTERS, TECHNICAL,
+                      VERDICTS, change_note, coverage_note, dual, quantity)
 
 #: Validated in both modes with the palette validator: worst adjacent pair
 #: CVD delta-E 24.7 light / 26.8 dark, normal-vision 33.6 / 31.8, both slots
@@ -61,14 +63,9 @@ def _human(subject: str) -> str:
     return subject.replace("_", " ")
 
 
-#: Units that read as part of the number ("62deg") rather than as a word after
-#: it. Anything else is a description of the quantity, not a unit to print: a
-#: control figure of 1.5 is not "1.5 ratio".
-ATTACHED_UNITS = ("deg", "Nm", "s", "%")
-
-
-def unit_suffix(unit: str) -> str:
-    return unit if unit in ATTACHED_UNITS else ""
+#: One rule for whether a unit prints after a number, shared with the wording
+#: layer so the plain and technical halves can never disagree about it.
+from .wording import ATTACHED_UNITS, technical_unit as unit_suffix  # noqa: E402
 
 
 @dataclass
@@ -116,14 +113,15 @@ class Series:
         return "changed"
 
     def explain(self) -> str:
-        if self.verdict == "too few sessions":
-            return (f"{len(self.points)} session(s); {MIN_SESSIONS_FOR_TREND} "
-                    f"are needed before a direction is called")
-        if self.verdict == "steady":
-            return (f"moved {self.change:+.1f}{self.unit}, inside the "
-                    f"{self.floor:.1f}{self.unit} it varies anyway")
-        return (f"moved {self.change:+.1f}{self.unit}, clear of the "
-                f"{self.floor:.1f}{self.unit} noise floor")
+        """The same refusal in both registers.
+
+        A plain half that quietly dropped "less than it wobbles anyway" would
+        be a worse lie than the jargon it replaced.
+        """
+        return change_note(
+            self.change, self.floor, self.unit,
+            steady=self.verdict == "steady", sessions=len(self.points),
+            needed=MIN_SESSIONS_FOR_TREND).html()
 
 
 def collect(store: Store, username: str, exercise: str | None = None) -> list[Series]:
@@ -449,6 +447,10 @@ STYLE = """
   --rule:#3a3a37; --series1:#3987e5; --band:#20344c;
   --good:#0ca30c; --watch:#fab219; --work:#d03b3b; }
 * { box-sizing:border-box; }
+/* An author rule with display:flex beats the browser's own [hidden] rule, so
+   the filter bar rendered on load as an empty box with a "show all" button --
+   which reads as "something is filtered" before anything has been clicked. */
+[hidden] { display:none !important; }
 body { margin:0; padding:28px 20px; background:var(--surface); color:var(--ink);
   font:15px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; }
 .sheet { max-width:1000px; margin:0 auto; }
@@ -523,6 +525,23 @@ svg { width:100%; height:auto; display:block; overflow:visible; }
   border-radius:4px; overflow:hidden; }
 .comp .fill { display:block; height:8px; border-radius:4px; }
 .comp .cnt { color:var(--muted); font-size:12px; white-space:nowrap; }
+
+/* --- wording register --------------------------------------------------- */
+/* Both halves are rendered; CSS picks. The toggle is instant and the page
+   still shows one register with scripting off. */
+[data-register="plain"] .tc { display:none; }
+[data-register="technical"] .pl { display:none; }
+[data-register="both"] .tc::before { content:" — "; }
+[data-register="both"] .tc { color:var(--muted); }
+.regswitch { display:flex; align-items:center; gap:6px; margin-top:12px; }
+.reglab { font-size:11px; text-transform:uppercase; letter-spacing:0.08em;
+  color:var(--muted); margin-right:2px; }
+.reg { font:inherit; font-size:12px; cursor:pointer; padding:3px 10px;
+  border:1px solid var(--rule); background:var(--panel); color:var(--muted);
+  border-radius:5px; }
+.reg:hover { border-color:var(--series1); }
+.reg.on { border-color:var(--series1); color:var(--ink);
+  box-shadow:inset 0 0 0 1px var(--series1); }
 
 /* --- interaction ------------------------------------------------------- */
 .picker { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:20px; }
@@ -624,10 +643,23 @@ def _score_history(scores: list) -> str:
               for date, item in scores if item.value is not None]
     if len(points) < 2:
         return ""
-    return ("<div class='card'><h3>Score, session by session</h3>"
+    return (f"<div class='card'><h3>{COPY['score_hist'].html()}</h3>"
             + line_chart(Series(subject="score", unit="", points=points))
-            + "<p class='note'>Hover a point for the number of checks it came "
-              "from. A score is only as comparable as its coverage.</p></div>")
+            + f"<p class='note'>{COPY['score_hist_note'].html()}</p></div>")
+
+
+def _register_switch(current: str) -> str:
+    """Plain, both, or the terms. Borrowed from the Neuro Wellness reader.
+
+    "Both" is the one worth keeping: it is how somebody grows into the
+    vocabulary rather than being handed it or shielded from it.
+    """
+    labels = {PLAIN: "Plain", BOTH: "Both", TECHNICAL: "Technical"}
+    buttons = "".join(
+        f"<button type='button' class='reg{' on' if r == current else ''}' "
+        f"data-register='{r}'>{labels[r]}</button>" for r in REGISTERS)
+    return ("<div class='regswitch' role='group' aria-label='how much detail'>"
+            "<span class='reglab'>Wording</span>" + buttons + "</div>")
 
 
 def _session_picker(scores: list) -> str:
@@ -638,20 +670,20 @@ def _session_picker(scores: list) -> str:
     once.
     """
     if len(scores) < 2:
-        return "<h2>Latest session</h2>"
+        return f"<h2>{COPY['latest'].html()}</h2>"
     buttons = "".join(
         f"<button type='button' class='pick{' on' if i == len(scores) - 1 else ''}' "
         f"data-session='{i}'>{_e(date)}"
         + (f"<em>{score.value:.0f}</em>" if score.value is not None else "<em>—</em>")
         + "</button>"
         for i, (date, score) in enumerate(scores))
-    return ("<h2>Session</h2><div class='picker' role='group' "
-            "aria-label='choose a session'>" + buttons + "</div>")
+    return (f"<h2>{COPY['session'].html()}</h2><div class='picker' role='group' "
+            f"aria-label='choose a session'>" + buttons + "</div>")
 
 
 def _components(score: Score) -> str:
     """The parts the headline number is made of, weakest first."""
-    rows = ["<h3>What made up the score</h3>"]
+    rows = [f"<h3>{COPY['made_up'].html()}</h3>"]
     for component in sorted(score.components.values(),
                             key=lambda c: (c.score is None, c.score or 0)):
         if component.score is None:
@@ -661,34 +693,42 @@ def _components(score: Score) -> str:
             f"<div class='comp'><span class='n'>{component.score:.0f}</span>"
             f"<span class='track'><span class='fill' style='width:"
             f"{component.score:.0f}%;background:var(--{key})'></span></span>"
-            f"<span class='cnt'>{_e(component.name)}, {component.n} check"
-            f"{'s' if component.n != 1 else ''}</span></div>")
+            f"<span class='cnt'>"
+            f"{COMPONENTS[component.name].html() if component.name in COMPONENTS else _e(component.name)}"
+            f", {component.n} check{'s' if component.n != 1 else ''}</span></div>")
     weakest = min((c for c in score.components.values() if c.weakest),
                   key=lambda c: c.weakest[1], default=None)
     if weakest is not None and weakest.weakest[1] < 70:
-        rows.append(f"<p class='note'>The single weakest check was "
-                    f"{_e(_human(weakest.weakest[0]))} at "
-                    f"{weakest.weakest[1]:.0f} out of 100.</p>")
+        rows.append(f"<p class='note'>"
+                    + dual("The one that scored lowest was ",
+                           "The single weakest check was ")
+                    + quantity(weakest.weakest[0]).html()
+                    + f", at {weakest.weakest[1]:.0f} out of 100.</p>")
     return "".join(rows)
 
 
 def _score_summary(score: Score, history: list) -> str:
     """The sentence beside the headline number."""
-    lines = [f"<p class='lede'>{score.checks} checks were made, covering "
-             f"{score.measured} of {score.measurable} measurable quantities "
-             f"({score.coverage:.0%} of the body).</p>"]
+    lines = ["<p class='lede'>" + coverage_note(
+        score.checks, score.measured, score.measurable, score.coverage).html()
+        + "</p>"]
     scored = [s for _, s in history if s.value is not None]
     if len(scored) > 1:
         change = scored[-1].value - scored[-2].value
         word = "up" if change > 0 else ("down" if change < 0 else "level")
-        lines.append(f"<p class='note'>{word.title()} {abs(change):.0f} on the "
-                     f"session before. A score is only as comparable as the "
-                     f"coverage behind it: that one had {scored[-2].checks} "
-                     f"checks.</p>")
+        lines.append("<p class='note'>" + dual(
+            f"{word.title()} {abs(change):.0f} on your last class. That one had "
+            f"{scored[-2].checks} things checked, so the two are only as "
+            f"comparable as what could be seen each time.",
+            f"{word.title()} {abs(change):.0f} on the session before. A score "
+            f"is only as comparable as the coverage behind it: that one had "
+            f"{scored[-2].checks} checks.") + "</p>")
     if score.missing:
-        lines.append(f"<p class='note'>Not visible often enough to judge: "
-                     f"{_e(', '.join(_human(m) for m in sorted(score.missing)))}."
-                     f"</p>")
+        named = ", ".join(quantity(m).plain for m in sorted(score.missing))
+        terms = ", ".join(quantity(m).technical for m in sorted(score.missing))
+        lines.append("<p class='note'>" + dual(
+            f"Could not be seen well enough to judge: {named}.",
+            f"Not visible often enough to judge: {terms}.") + "</p>")
     return "".join(lines)
 
 
@@ -702,6 +742,24 @@ SCRIPT = """
 (function () {
   var sheet = document.querySelector('.sheet');
   if (!sheet) return;
+
+  /* ---- wording register: CSS does the switching, this only sets it ------ */
+  var regs = sheet.querySelectorAll('.reg');
+  regs.forEach(function (b) {
+    b.addEventListener('click', function () {
+      sheet.dataset.register = b.dataset.register;
+      regs.forEach(function (o) { o.classList.toggle('on', o === b); });
+      try { localStorage.setItem('pilates-register', b.dataset.register); }
+      catch (e) { /* private mode, or storage disabled. Not worth failing. */ }
+    });
+  });
+  try {
+    var saved = localStorage.getItem('pilates-register');
+    if (saved) {
+      var button = sheet.querySelector(".reg[data-register='" + saved + "']");
+      if (button) button.click();
+    }
+  } catch (e) { /* as above */ }
 
   /* ---- session picker: panels are pre-rendered, this only toggles them --- */
   var picks = sheet.querySelectorAll('.pick');
@@ -805,8 +863,10 @@ SCRIPT = """
 
 def _chip(verdict: str) -> str:
     colour = STATUS.get(verdict, STATUS["steady"])
+    said = VERDICTS.get(verdict)
     return (f"<span class='chip'><span class='dot-mark' "
-            f"style='background:{colour}'></span>{_e(verdict)}</span>")
+            f"style='background:{colour}'></span>"
+            f"{said.html() if said else _e(verdict)}</span>")
 
 
 def _tile(number: str, label: str) -> str:
@@ -820,8 +880,16 @@ def render(
     display_name: str = "",
     studio: str = "",
     exercise: str | None = None,
+    register: str = PLAIN,
 ) -> str:
-    """One person's whole record as a self-contained page."""
+    """One person's whole record as a self-contained page.
+
+    ``register`` sets which wording the page opens in. Plain by default: the
+    student is the reader, and an instructor can switch in one click.
+    """
+    if register not in REGISTERS:
+        raise ValueError(f"unknown register {register!r}; expected one of "
+                         f"{REGISTERS}")
     series = collect(store, username, exercise)
     dates = store.session_dates(username)
     recurring = store.recurring_findings(username)
@@ -835,22 +903,20 @@ def render(
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>",
         "<meta name='viewport' content='width=device-width,initial-scale=1'>",
         f"<title>{_e(name)} — progress</title>",
-        f"<style>{STYLE}</style></head><body class='viz-root'><div class='sheet'>",
+        f"<style>{STYLE}</style></head><body class='viz-root'>"
+        f"<div class='sheet' data-register='{_e(register)}'>",
         f"<header><h1>{_e(name)}</h1><div class='sub'>",
         f"{len(dates)} session(s)"
         + (f" · {_e(dates[0])} to {_e(dates[-1])}" if dates else "")
         + (f" · {_e(studio)}" if studio else "")
         + (f" · {_e(exercise.replace('_', ' '))}" if exercise else "")
-        + "</div></header>",
+        + "</div>" + _register_switch(register) + "</header>",
     ]
 
     if not dates:
         parts.append(
-            "<p class='sub'>Nothing is recorded against this person yet. "
-            "Measurements are stored as soon as a class is analysed, but they "
-            "are only attributed once somebody confirms which tracked body was "
-            "whom — so an unconfirmed session shows here as nothing rather than "
-            "as a guess.</p></div></body></html>")
+            f"<p class='sub'>{COPY['nothing_recorded'].html()}</p></div>"
+            f"<script>{SCRIPT}</script></body></html>")
         return "".join(parts)
 
     latest = scores[-1][1] if scores else None
@@ -863,10 +929,7 @@ def render(
                 + ("" if last else " hidden") + ">"
                 + "<div class='hero'>" + score_ring(score)
                 + "<div>" + _score_summary(score, scores[:index + 1]) + "</div></div>"
-                + "<p class='note map-note'>Every quantity this system can "
-                  "measure, and how each one scored. Grey is not a low score — "
-                  "it is a part of the body that was not visible often enough "
-                  "to judge. Click any marker to see its charts.</p>"
+                + f"<p class='note map-note'>{COPY['map_note'].html()}</p>"
                 + "<div class='grid-2'><div class='card'>"
                 + body_map(_subject_scores(score)) + _band_key()
                 + "</div><div>"
@@ -885,10 +948,8 @@ def render(
 
     if series:
         parts.append(
-            "<h2 id='over-time'>Over time</h2>"
-            "<p class='note'>The shaded band behind each line is how much that "
-            "quantity varied inside a single session. A move that stays inside "
-            "the band is not a move.</p>"
+            f"<h2 id='over-time'>{COPY['over_time'].html()}</h2>"
+            f"<p class='note'>{COPY['band_note'].html()}</p>"
             "<div class='filterbar' hidden>"
             "<span class='what'></span>"
             "<button type='button' class='clear'>Show all quantities</button>"
@@ -899,50 +960,78 @@ def render(
             parts.append(
                 f"<div class='card chart' data-subjects='{_e(markers)}' "
                 f"data-subject='{_e(item.subject)}'>"
-                f"<h3>{_e(_human(item.subject))} {_chip(item.verdict)}</h3>"
-                f"<p class='note'>{_e(item.explain())}</p>"
+                f"<h3>{quantity(item.subject).html()} {_chip(item.verdict)}</h3>"
+                f"<p class='note'>{item.explain()}</p>"
                 f"<p class='readout' aria-live='polite'></p>"
                 + line_chart(item) + "</div>")
         parts.append("</div>")
 
     if recurring:
-        parts.append("<h2>What keeps coming back</h2><div class='card'>")
-        parts.append("<p class='note'>Corrections given in more than one "
-                     "session, by how many sessions they appeared in.</p>")
+        parts.append(f"<h2>{COPY['recurring'].html()}</h2><div class='card'>")
+        parts.append(f"<p class='note'>{COPY['recurring_note'].html()}</p>")
         parts.append(bar_chart([
             (e["message"], e["sessions"],
              " ".join(sorted(body_subjects_for(e["subject"] or e["message"]))))
             for e in recurring]))
         parts.append("</div>")
 
-    parts.append("<h2>The numbers behind the charts</h2><div class='card'><table>"
-                 "<thead><tr><th>Date</th><th>Quantity</th><th>Value</th>"
-                 "<th>Varied by</th><th>Frames</th><th>From</th></tr></thead><tbody>")
+    parts.append(f"<h2>{COPY['numbers'].html()}</h2><div class='card'><table>"
+                 "<thead><tr><th>" + dual("Class", "Date") + "</th><th>"
+                 + dual("What", "Quantity") + "</th><th>"
+                 + dual("Number", "Value") + "</th><th>"
+                 + dual("Wobbled by", "Varied by") + "</th><th>"
+                 + dual("Frames seen", "Frames") + "</th><th>"
+                 + dual("Where from", "From") + "</th></tr></thead><tbody>")
     for item in sorted(series, key=lambda s: s.subject):
         for point in item.points:
             parts.append(
-                f"<tr><td>{_e(point.date)}</td><td>{_e(_human(item.subject))}</td>"
+                f"<tr><td>{_e(point.date)}</td><td>{quantity(item.subject).html()}</td>"
                 f"<td>{point.value:.1f}{_e(item.unit)}</td>"
                 f"<td>{point.spread:.1f}{_e(item.unit)}</td>"
                 f"<td>{point.samples}</td><td>measured</td></tr>")
     parts.append("</tbody></table></div>")
 
     if latest is not None and latest.value is None:
-        parts.append(f"<h2>Latest session</h2><div class='card'>"
-                     f"<p class='note'>No score: {_e(latest.withheld_reason)}."
-                     f"</p></div>")
+        parts.append(f"<h2>{COPY['latest'].html()}</h2><div class='card'>"
+                     f"<p class='note'>" + dual(
+                         f"No score this time — {latest.withheld_reason}.",
+                         f"No score: {latest.withheld_reason}.")
+                     + "</p></div>")
 
     parts.append(
-        "<footer>Every number here was measured from video and is geometric: "
-        "angles, ranges and timings. It is not health advice. A change is only "
-        "called a change once it clears both the spread within a single session "
-        f"and {MIN_PRACTICAL_CHANGE:.0f} degrees outright, and a direction is "
-        f"only called after {MIN_SESSIONS_FOR_TREND} sessions."
-        "<br>A score is the average of the checks that could actually be made, "
-        "weighted by how many each part contributed. Nothing unmeasured is "
-        "counted as either good or bad, and no score is shown when too little "
-        "of the body was visible for one to mean anything."
-        "<br>Only sessions where somebody confirmed which tracked body was this "
-        "person appear here.</footer></div>"
+        "<footer>"
+        + dual(
+            "Everything here comes from watching how you moved on video — "
+            "angles, distances and timings. It is not health advice, and "
+            "whether any of it matters for your body is a question for your "
+            "teacher.",
+            "Every number here was measured from video and is geometric: "
+            "angles, ranges and timings. It is not health advice, and whether "
+            "any of them matters for your body is a question for your "
+            "instructor.")
+        + "<br>" + dual(
+            f"Something only counts as having changed if it moved more than it "
+            f"wobbles inside a single class, and more than "
+            f"{MIN_PRACTICAL_CHANGE:.0f} degrees. Which way something is going "
+            f"is only said after {MIN_SESSIONS_FOR_TREND} classes.",
+            f"A change is only called a change once it clears both the spread "
+            f"within a single session and {MIN_PRACTICAL_CHANGE:.0f} degrees "
+            f"outright, and a direction is only called after "
+            f"{MIN_SESSIONS_FOR_TREND} sessions.")
+        + "<br>" + dual(
+            "Your score is the average of the things that could actually be "
+            "checked. Anything that could not be seen counts as neither good "
+            "nor bad, and no score is shown at all when too little of you was "
+            "visible for one to mean anything.",
+            "A score is the average of the checks that could actually be made, "
+            "weighted by how many each part contributed. Nothing unmeasured is "
+            "counted as either good or bad, and no score is shown when too "
+            "little of the body was visible for one to mean anything.")
+        + "<br>" + dual(
+            "Only classes where somebody confirmed which person on the video "
+            "was you appear here.",
+            "Only sessions where somebody confirmed which tracked body was "
+            "this person appear here.")
+        + "</footer></div>"
         f"<script>{SCRIPT}</script></body></html>")
     return "".join(parts)

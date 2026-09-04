@@ -261,8 +261,9 @@ class TestScoreOnThePage:
 
         self._scored(store)
         html = render(store, "anna")
-        assert "What made up the score" in html or "made up the score" in html
-        assert "form," in html
+        assert "made of" in html or "made up the score" in html
+        # Named in whichever register the reader asked for.
+        assert "positions" in html and "form" in html
 
     def test_the_coverage_travels_with_it(self, store):
         from pilates.dashboard import render
@@ -597,3 +598,127 @@ class TestCorrectionsFollowTheSelection:
 
         fill(store)
         assert ".barrow.dim { opacity:0.22; }" in render(store, "anna")
+
+
+class TestHiddenReallyHides:
+    """An author rule with display:flex beats the browser's own [hidden] rule.
+    The filter bar rendered on load as an empty box with a "show all" button,
+    which reads as "something is filtered" before anything has been clicked."""
+
+    def test_hidden_is_enforced_over_layout_rules(self, store):
+        from pilates.dashboard import render
+
+        fill(store)
+        assert "[hidden] { display:none !important; }" in render(store, "anna")
+
+
+class TestRegisters:
+    """The same fact in two registers. A number nobody understands is worse
+    than no number: it looks authoritative and cannot be argued with."""
+
+    def test_the_page_opens_plain(self, store):
+        from pilates.dashboard import render
+        from pilates.wording import PLAIN
+
+        fill(store)
+        assert f"data-register='{PLAIN}'" in render(store, "anna")
+
+    def test_the_register_can_be_chosen(self, store):
+        from pilates.dashboard import render
+        from pilates.wording import TECHNICAL
+
+        fill(store)
+        html = render(store, "anna", register=TECHNICAL)
+        assert f"data-register='{TECHNICAL}'" in html
+
+    def test_an_unknown_register_is_refused(self, store):
+        from pilates.dashboard import render
+
+        with pytest.raises(ValueError, match="unknown register"):
+            render(store, "anna", register="jargon")
+
+    def test_both_halves_are_in_the_page_whichever_is_shown(self, store):
+        """The switch is CSS, so it is instant and needs no re-render."""
+        from pilates.dashboard import render
+
+        fill(store)
+        html = render(store, "anna")
+        assert "how open the left hip was" in html
+        assert "left hip angle" in html
+
+    def test_css_switches_them(self, store):
+        from pilates.dashboard import render
+
+        fill(store)
+        html = render(store, "anna")
+        assert '[data-register="plain"] .tc { display:none; }' in html
+        assert '[data-register="technical"] .pl { display:none; }' in html
+
+    def test_all_three_choices_are_offered(self, store):
+        from pilates.dashboard import render
+        from pilates.wording import REGISTERS
+
+        fill(store)
+        html = render(store, "anna")
+        for register in REGISTERS:
+            assert f"data-register='{register}'" in html
+
+    def test_the_plain_half_keeps_the_refusal(self, store):
+        """A plain register that quietly dropped the caveats would be a worse
+        lie than the jargon it replaced."""
+        from pilates.wording import change_note
+
+        note = change_note(0.9, 5.0, "deg", steady=True, sessions=12, needed=3)
+        assert "wobbles anyway" in note.plain
+        assert "nothing really changed" in note.plain
+
+    def test_a_real_change_says_why_it_counts(self):
+        from pilates.wording import change_note
+
+        note = change_note(-9.8, 3.0, "deg", steady=False, sessions=12, needed=3)
+        assert "more than" in note.plain and "real change" in note.plain
+
+    def test_too_few_sessions_says_so_plainly(self):
+        from pilates.wording import change_note
+
+        note = change_note(9.0, 3.0, "deg", steady=False, sessions=2, needed=3)
+        assert "classes so far" in note.plain
+
+    def test_a_unitless_quantity_drops_the_figure_in_plain(self):
+        """"Less than the 3 it wobbles anyway" reads as a typo."""
+        from pilates.wording import change_note
+
+        note = change_note(-0.6, 3.0, "ratio", steady=True, sessions=12, needed=3)
+        assert "less than it wobbles anyway" in note.plain
+        assert "3" not in note.plain
+
+    def test_muscle_groups_are_named_the_way_a_teacher_points(self):
+        from pilates.wording import quantity
+
+        said = quantity("hip flexors peak moment")
+        assert said.plain == "how hard the front of the hip worked"
+        assert said.technical == "hip flexors peak moment"
+
+    def test_an_unknown_quantity_falls_back_to_its_own_name(self):
+        from pilates.wording import quantity
+
+        said = quantity("some_new_measure")
+        assert said.plain == said.technical == "some new measure"
+
+    def test_identical_halves_are_not_duplicated_in_the_markup(self):
+        from pilates.wording import dual
+
+        assert dual("same", "same") == "same"
+
+    def test_both_registers_are_escaped(self):
+        from pilates.wording import dual
+
+        assert "<script>" not in dual("<script>x</script>", "y")
+
+    def test_one_unit_rule_is_shared_by_both_modules(self):
+        """The plain and technical halves can never disagree about whether a
+        unit prints."""
+        from pilates.dashboard import unit_suffix
+        from pilates.wording import technical_unit
+
+        assert unit_suffix is technical_unit

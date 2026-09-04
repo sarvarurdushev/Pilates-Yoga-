@@ -711,6 +711,40 @@ The palette was validated with the colour checker in both light and dark: worst
 adjacent-pair CVD ΔE 24.7 light / 26.8 dark, both slots above 3:1 against their
 surface.
 
+### Two registers: plain and technical
+
+"shoulder_tilt: 6.2deg, clear of the 3.0deg noise floor" is written for the
+person who built it. The student it is for reads that and learns nothing — and
+a number nobody understands is worse than no number, because it looks
+authoritative and cannot be argued with.
+
+So every user-facing phrase exists twice, and the reader picks. The pattern is
+borrowed from the Neuro Wellness reader, including its third option:
+
+| | |
+|---|---|
+| **Plain** | "how open the left hip was — down about 8 degrees, more than the 3 degrees it wobbles anyway, so this is a real change" |
+| **Technical** | "left hip angle — moved -8.0deg, clear of the 3.0deg noise floor" |
+| **Both** | plain first, the term after an em-dash — how somebody grows into the vocabulary rather than being handed it |
+
+Plain is the default: the student is the reader, and an instructor switches in
+one click. The choice is remembered per browser.
+
+Three rules for the plain half, and the middle one is the load-bearing one:
+
+- **Say what was looked at, not what it is called.** "How far the left arm was
+  lifted", not "left shoulder angle".
+- **Never lose the honesty.** The technical half refuses to call a change a
+  change unless it clears the noise floor. The plain half has to refuse just as
+  hard, in words: *"barely moved — less than it wobbles anyway, so nothing
+  really changed"*. A plain register that quietly drops the caveats is a worse
+  lie than the jargon it replaced.
+- **No new claims.** If the plain half needs a fact the technical half does not
+  have, it is not a translation.
+
+Both halves are rendered into the page and CSS picks between them, so the
+toggle is instant and the page still reads correctly with scripting off.
+
 ### The dashboard is linked, not just drawn
 
 Click any marker on the body and the page filters to the quantities that

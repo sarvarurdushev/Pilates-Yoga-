@@ -37,6 +37,8 @@ from .identity import (CONFIRMED, PROPOSED, REJECTED, Candidate, Directory,
 from .scoring import (MEASURABLE, Component, Score, score_assessment,
                       score_from_store, score_quality, score_session)
 from .store import Row, SessionMeta, Store
+from .wording import (BOTH, PLAIN, REGISTERS, TECHNICAL, Phrase, change_note,
+                      coverage_note, dual, quantity)
 from .diagnostics import (Check, VideoFacts, check_environment, environment_ready,
                           inspect_video, quickstart)
 from .dataset import (Example, LoadedDataset, build_from_video, feature_vector,
@@ -75,7 +77,8 @@ __all__ = [
     "Store", "SessionMeta", "Row", "Point", "Series", "collect",
     "Score", "Component", "MEASURABLE", "score_session", "score_assessment",
     "score_quality", "score_from_store",
-    "render_dashboard",
+    "render_dashboard", "Phrase", "dual", "quantity", "change_note",
+    "coverage_note", "PLAIN", "BOTH", "TECHNICAL", "REGISTERS",
     "SymmetryTarget", "Assessment", "Finding", "assess", "assess_tempo",
     "narrate", "DEFAULT_STANDARDS", "UNSUITABLE", "ExerciseClassifier", "Evaluation", "evaluate",
     "featurise", "window_features", "majority_baseline", "LabelSet", "Segment", "LabelError", "VOCABULARY",
