@@ -1,0 +1,11 @@
+{
+  "sessions": [
+    {
+      "file": "anna-tue-14.json",
+      "label": "Demo Student",
+      "date": "2026-08-25",
+      "synthetic": true
+    }
+  ],
+  "note": "A demonstration session. No camera recorded it and no person performed it: every number here was written by hand to show what the application does with a real one."
+}
