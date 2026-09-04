@@ -419,3 +419,54 @@ class TestBothRegisters:
         femur = next(s for s in build(store, "anna", "s1")["structures"]
                      if s["name"] == "femur")
         assert "left" not in femur["plain"] and "right" not in femur["plain"]
+
+
+class TestSynthetic:
+    """A demonstration that cannot be told from a measurement is the worst thing
+    this project could publish: a student would believe it, and anyone who found
+    out afterwards would be right to distrust everything beside it."""
+
+    def _demo(self):
+        from pilates.demo import build as build_demo
+        from pilates.demo import fill, marker
+
+        with Store.memory() as store:
+            fill(store)
+            return build(store, "anna", "tue-14", include_poses=False,
+                         synthetic=marker())
+
+    def test_a_real_capture_carries_no_marker(self, store):
+        measured(store, "left_hip", 120.0)
+        assert "synthetic" not in build(store, "anna", "s1")
+
+    def test_the_demo_says_it_is_one(self):
+        marker = self._demo()["synthetic"]
+        assert marker["not_a_person"] is True
+        assert "No camera recorded it" in marker["why"]
+
+    def test_the_demo_is_otherwise_a_valid_bundle(self):
+        assert validate(self._demo()) == []
+
+    def test_a_marker_with_no_reason_is_refused(self, store):
+        measured(store, "left_hip", 120.0)
+        bundle = build(store, "anna", "s1")
+        bundle["synthetic"] = {"not_a_person": True}
+        assert any("without saying why" in p for p in validate(bundle))
+
+    def test_a_marker_that_does_not_deny_a_person_is_refused(self, store):
+        """The field a viewer reads to decide how loudly to say so."""
+        measured(store, "left_hip", 120.0)
+        bundle = build(store, "anna", "s1")
+        bundle["synthetic"] = {"why": "made up"}
+        assert any("not_a_person" in p for p in validate(bundle))
+
+    def test_the_demo_carries_the_exercises_the_evidence_needs(self):
+        keys = {e["key"] for e in self._demo()["exercises"]}
+        assert {"pelvicCurl", "oneLegCircle", "plank"} <= keys
+
+    def test_the_demo_is_shaped_like_a_mat_class(self):
+        """Hips hardest, arms barely. A demo whose numbers are shaped wrongly
+        teaches the reader something false about what the instrument makes."""
+        moments = {s["name"]: s["value"] for s in self._demo()["structures"]
+                   if s["tier"] == MEASURED}
+        assert moments["psoas major"] > moments["triceps brachii"] * 5

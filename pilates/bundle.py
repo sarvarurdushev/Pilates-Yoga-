@@ -279,6 +279,7 @@ def build(
     username: str,
     session: str,
     include_poses: bool = True,
+    synthetic: dict | None = None,
 ) -> dict:
     """Assemble one person's session as a bundle.
 
@@ -331,6 +332,12 @@ def build(
             "missing": sorted(score.missing),
         },
         "exercises": _exercises(store, username, session),
+        # Absent on a real capture. Present, loud, and checked by the validator
+        # on anything generated, because a bundle is the file that drives a
+        # picture of somebody's body -- and a demonstration that cannot be told
+        # from a measurement is the single most damaging thing this project
+        # could publish.
+        **({"synthetic": synthetic} if synthetic else {}),
         "quantities": quantities,
         "structures": structures,
         "lighting": activation_plan(structures).scheme(),
@@ -430,6 +437,15 @@ def validate(bundle: dict) -> list[str]:
             problems.append(f"{name}: reference lit at {level}, not the flat "
                             f"{flat} -- a gradient here is an amount nothing "
                             f"measured")
+
+    synthetic = bundle.get("synthetic")
+    if synthetic is not None:
+        if not isinstance(synthetic, dict) or not synthetic.get("why"):
+            problems.append("marked synthetic without saying why, which is the "
+                            "half of the marking that does the work")
+        elif not synthetic.get("not_a_person"):
+            problems.append("marked synthetic without not_a_person: a viewer "
+                            "reads that field to decide how loudly to say so")
 
     pose = bundle.get("pose")
     if pose is not None and pose.get("encoding") != POSE_ENCODING:

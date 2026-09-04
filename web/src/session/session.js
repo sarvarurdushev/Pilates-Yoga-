@@ -95,6 +95,8 @@ export class Session {
   get key() { return this.bundle.session?.key ?? ''; }
   get score() { return this.bundle.score ?? null; }
   get lighting() { return this.bundle.lighting ?? {}; }
+  /** Present only on a bundle nobody was recorded for. Never inferred. */
+  get synthetic() { return this.bundle.synthetic ?? null; }
 
   /**
    * The exercises this person did, as the anatomy library knows them.

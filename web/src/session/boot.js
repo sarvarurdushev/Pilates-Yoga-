@@ -36,6 +36,20 @@ const BANNER_CSS = `
 #sessbar .sep{color:var(--dim2)}
 #sessbar .warn{margin-left:auto;color:var(--gold);letter-spacing:.1em;
   text-transform:uppercase;font-size:9.5px}
+/* A demonstration is amber from end to end, not a blue bar with a footnote.
+   Somebody scrolling past a screenshot reads the colour and the first three
+   words, and those have to carry it on their own. */
+#sessbar.synthetic{background:linear-gradient(90deg,rgba(233,180,92,.22),rgba(233,180,92,.05));
+  border-bottom-color:rgba(233,180,92,.5)}
+#sessbar.synthetic b{color:var(--gold)}
+#sessbar.synthetic .warn{color:var(--gold)}
+#demochip{position:fixed;left:22px;bottom:22px;z-index:60;display:flex;gap:10px;
+  align-items:center;padding:9px 14px;border-radius:4px;cursor:pointer;
+  background:rgba(233,180,92,.10);border:1px solid rgba(233,180,92,.45);
+  color:var(--txt);font-size:12px;letter-spacing:.02em}
+#demochip:hover{background:rgba(233,180,92,.17)}
+#demochip em{font-style:normal;color:var(--gold);font-size:9.5px;
+  letter-spacing:.12em;text-transform:uppercase}
 /* Everything the application positions under its own header is measured from
    --barh, and its top bar is fixed at zero. So the session bar takes the top
    strip and the header, the panel, the HUD and the view buttons all move down
@@ -46,21 +60,68 @@ body.hassess{--barh:110px}
 body.hassess #topbar{padding-top:40px}
 `;
 
-function banner(session) {
+function styles() {
+  if (document.getElementById('sessstyle')) return;
   const style = document.createElement('style');
+  style.id = 'sessstyle';
   style.textContent = BANNER_CSS;
   document.head.appendChild(style);
+}
+
+function banner(session) {
+  styles();
   const bar = document.createElement('div');
   bar.id = 'sessbar';
   const score = session.score?.value;
+  const fake = session.synthetic;
   const person = session.person.display_name || session.person.username;
-  bar.innerHTML = `<b>${person}</b><span class="sep">·</span>
-    <span>${session.key} · ${session.date}</span><span class="sep">·</span>
-    <span>${session.ranked().length} muscle groups measured</span>
-    ${score != null ? `<span class="sep">·</span><span>score ${Math.round(score)}/100</span>` : ''}
-    <span class="warn">Measured muscles are this person. Everything else is anatomy</span>`;
+  if (fake) bar.classList.add('synthetic');
+  bar.innerHTML = fake
+    ? `<b>${esc(fake.label ?? 'Demonstration data')}</b><span class="sep">·</span>
+       <span>${esc(fake.why ?? '')}</span>`
+    : `<b>${esc(person)}</b><span class="sep">·</span>
+       <span>${esc(session.key)} · ${esc(session.date)}</span><span class="sep">·</span>
+       <span>${session.ranked().length} muscle groups measured</span>
+       ${score != null ? `<span class="sep">·</span><span>score ${Math.round(score)}/100</span>` : ''}
+       <span class="warn">Measured muscles are this person. Everything else is anatomy</span>`;
   document.body.appendChild(bar);
   document.body.classList.add('hassess');
+}
+
+const esc = (t) => String(t ?? '').replace(/[&<>"]/g,
+  (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/**
+ * Offer a demonstration without forcing one on anybody.
+ *
+ * With no session in the URL the application is the anatomy explorer, and that
+ * has to stay true -- somebody who came to look at a shoulder did not ask to be
+ * shown a stranger's Pilates class. But a deployment with nothing to click is a
+ * deployment that looks broken to the person evaluating it. So: if the site
+ * ships a `demo/index.json`, one chip in the corner, amber, saying what it is
+ * before it is clicked. An installation that wants no demo ships no folder.
+ */
+async function offerDemo() {
+  let manifest;
+  try {
+    const response = await fetch('demo/index.json');
+    if (!response.ok) return;
+    manifest = await response.json();
+  } catch { return; }
+  const first = manifest.sessions?.[0];
+  if (!first) return;
+  styles();
+  const chip = document.createElement('button');
+  chip.id = 'demochip';
+  chip.type = 'button';
+  chip.innerHTML = `<em>Demo</em><span>See a session on this body — ${
+    esc(first.label)}, ${esc(first.date)}</span>`;
+  chip.addEventListener('click', () => {
+    const next = new URL(location.href);
+    next.searchParams.set('session', `demo/${first.file}`);
+    location.href = next.toString();
+  });
+  document.body.appendChild(chip);
 }
 
 /**
@@ -138,7 +199,7 @@ function light(session, model) {
 
 async function boot() {
   const url = new URLSearchParams(location.search).get('session');
-  if (!url) return;
+  if (!url) { offerDemo(); return; }
   let bundle;
   try {
     const response = await fetch(url);

@@ -1654,6 +1654,24 @@ def cmd_web(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_demo(args: argparse.Namespace) -> int:
+    """Write a made-up class, so the application can be shown to somebody.
+
+    Every number in it is invented, and the bundle says so in a field the
+    viewer reads: a demonstration that cannot be told from a measurement is the
+    worst thing this project could put on a public URL.
+    """
+    from .demo import build as build_demo
+
+    bundle_path, manifest = build_demo(args.out)
+    print(f"demo -> {bundle_path} ({bundle_path.stat().st_size / 1024:.0f} KB)")
+    print(f"     -> {manifest}")
+    print("  every number in it is made up, and the bundle is marked so the "
+          "viewer says it too")
+    print(f"  python -m pilates web --bundle {bundle_path}")
+    return 0
+
+
 def cmd_bridge(args: argparse.Namespace) -> int:
     """Check every measurement-to-structure link against the anatomy model."""
     import json as _json
@@ -2272,6 +2290,12 @@ def main(argv: list[str] | None = None) -> int:
     wb.add_argument("--db", default="studio.db")
     wb.add_argument("--port", type=int, default=8000)
     wb.set_defaults(func=cmd_web)
+
+    dm = sub.add_parser("demo",
+                        help="write a made-up session for showing the app")
+    dm.add_argument("--out", default="web/demo",
+                    help="where to write it; the viewer looks in web/demo")
+    dm.set_defaults(func=cmd_demo)
 
     br = sub.add_parser("bridge",
                         help="check every measurement-to-structure link")
