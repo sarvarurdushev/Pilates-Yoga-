@@ -997,6 +997,71 @@ array. It matched nothing, fell through to name matching for all twenty-nine
 structures, and looked identical on screen: the ontology join was doing nothing
 at all.
 
+## Recording, and the app around it
+
+```bash
+python -m pilates web                 # the whole thing, with a Record button
+python -m pilates web anna --session tue-01   # ...opened on one person's class
+```
+
+The anatomy application, the exercise library, the evidence table and the lab,
+with three things added and nothing forked.
+
+### Where you start recording
+
+The Record button, bottom left. Point a camera at yourself in the browser or
+drop in a clip you already have; it runs the same `pilates capture` a studio
+would type, shows the pipeline's own output while it works, and loads the result
+onto the body **without a page reload** — so the camera angle and the layers you
+turned on survive it.
+
+Height and weight are asked for once, in the words that say why: a joint moment
+is a mass on a lever, so without them every angle is still measured and no load
+is.
+
+**The clip is never kept.** It is deleted when the job finishes, whether it
+succeeded or not. What survives is the measurements and the pose stream — about
+a megabyte an hour, instead of gigabytes of video of somebody's body.
+
+The button only exists when something is behind it: the page asks
+`/capabilities` first, so a static deployment draws no button rather than
+offering to analyse a clip and then failing. `--no-analyse` serves the viewer
+alone.
+
+### Click any structure
+
+The right-hand column is that part's dashboard: the structure rendered from the
+live scene, the figure this class produced for it, its line across every class
+on record, and the measurements around it.
+
+| Clicked | What it shows |
+|---|---|
+| A measured muscle | peak moment in Nm, its rank among the session's groups, its line over every class, the other groups for scale, the joint angles beside it |
+| A bone | the angles measured at the joint it meets, and one of them over time. Never a load |
+| A nerve | the group it supplies and that group's effort, and the muscles in it. Never a number of its own |
+| A brain region | how many claims the exercises actually done carry about it, by evidence tier, and which exercises raised them |
+
+The application's own writing about a structure is lifted out of that column and
+moved to the lab. It is good writing and it is the wrong thing in a
+three-hundred-pixel column somebody opened to find out how their hip is doing.
+
+### Your progress
+
+A third tab in the lab, holding everything about the person: the score class by
+class, every joint angle, every symmetry gap, every muscle group's effort — 32
+charts on the demo session — plus every measured muscle rendered from the model,
+what was done, and the brain regions the evidence touches.
+
+Every chart draws its **noise floor as a band**. A line that stays inside it has
+not changed, however much it looks like it has. That rule is computed once, on
+the measurement side, and carried in the bundle: the sparkline in the anatomy
+viewer, the chart on the printable page and the sentence in the written report
+are the same rule rather than three chances to disagree in front of the person
+they are about.
+
+Where a class produced too few checks to score, the line has a gap and the panel
+says why. A score that swings on one measurement is not a score.
+
 ## The body, on one page
 
 The 2D half, for the reader with no WebGL and for the printed take-home.
