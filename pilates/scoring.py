@@ -167,7 +167,12 @@ def score_assessment(
     for finding in assessment.findings:
         if finding.kind == "not_measured":
             continue
-        value = _from_deviation(finding.deviation if finding.kind == "improve" else 0.0)
+        # By the deviation the comparison actually produced, whatever the
+        # finding is called. A near miss is not a perfect score and it is not
+        # nothing; treating every non-"improve" finding as zero deviation meant
+        # the moment a joint crossed the notable threshold its check dropped
+        # from 100 to about 70 in one step.
+        value = _from_deviation(finding.deviation)
         target = symmetry if "symmetry" in finding.subject else form
         target.checks.append((finding.subject, value))
 

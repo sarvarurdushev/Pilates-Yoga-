@@ -124,6 +124,17 @@ def assess_quality(summary: MovementSummary) -> list[Finding]:
                     deviation=summary.range_consistency
                               - RANGE_SPREAD_LIMIT * summary.mean_range,
                 ))
+            else:
+                # Recorded when it passes, not only when it fails. Emitting
+                # nothing for a student who repeated the movement at the same
+                # size every time gave them no credit for it and cost the
+                # session a check -- the same asymmetry the angle targets had.
+                findings.append(Finding(
+                    kind="good", subject="consistency",
+                    message="every repetition was about the same size",
+                    measured=summary.range_consistency,
+                    target=f"within {RANGE_SPREAD_LIMIT * summary.mean_range:.0f}deg",
+                ))
         if summary.mean_tempo_ratio is not None and \
                 summary.mean_tempo_ratio < TEMPO_RATIO_FLOOR:
             findings.append(Finding(
@@ -133,6 +144,13 @@ def assess_quality(summary: MovementSummary) -> list[Finding]:
                 measured=summary.mean_tempo_ratio,
                 target=f"at least {TEMPO_RATIO_FLOOR:.1f}",
                 deviation=(TEMPO_RATIO_FLOOR - summary.mean_tempo_ratio) * 10.0,
+            ))
+        elif summary.mean_tempo_ratio is not None:
+            findings.append(Finding(
+                kind="good", subject="tempo",
+                message="the movement was lowered as slowly as it was lifted",
+                measured=summary.mean_tempo_ratio,
+                target=f"at least {TEMPO_RATIO_FLOOR:.1f}",
             ))
     elif summary.kind == "held" and summary.longest_hold is not None:
         findings.append(Finding(

@@ -460,9 +460,26 @@ class TestSynthetic:
         bundle["synthetic"] = {"why": "made up"}
         assert any("not_a_person" in p for p in validate(bundle))
 
-    def test_the_demo_carries_the_exercises_the_evidence_needs(self):
+    def test_every_demo_exercise_can_be_judged_and_looked_up(self):
+        """The two properties the demo class is chosen for: a standard on this
+        side, so the class makes enough checks to be scored, and brain claims on
+        the other, so the evidence panel has something to show."""
+        from pilates.demo import PLAN, standard_for
+
         keys = {e["key"] for e in self._demo()["exercises"]}
-        assert {"pelvicCurl", "oneLegCircle", "plank"} <= keys
+        assert keys == {key for key, *_ in PLAN}
+        for key, *_ in PLAN:
+            assert standard_for(key) is not None, key
+
+    def test_the_class_makes_enough_checks_to_be_scored(self):
+        """One standing standard made five, which is the floor below which a
+        score is withheld -- so any session that lost one check to a near miss
+        had no score at all."""
+        from pilates.scoring import MIN_CHECKS
+
+        for run in self._demo()["score_history"]:
+            assert run["value"] is not None, run
+            assert run["checks"] > MIN_CHECKS * 2, run
 
     def test_the_demo_is_shaped_like_a_mat_class(self):
         """Hips hardest, arms barely. A demo whose numbers are shaped wrongly

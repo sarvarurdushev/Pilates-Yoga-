@@ -58,21 +58,40 @@ class TestQualityWithoutAName:
 
     def test_consistency_is_judged_against_the_size_of_the_movement(self):
         """Five degrees of variation in a sixty-degree movement is tight; in a
-        ten-degree movement it is not the same movement twice."""
-        assert not any(f.subject == "consistency"
-                       for f in assess_quality(summary(mean_range=60.0,
-                                                       range_consistency=5.0)))
-        assert any(f.subject == "consistency"
-                   for f in assess_quality(summary(mean_range=10.0,
-                                                   range_consistency=5.0)))
+        ten-degree movement it is not the same movement twice.
+
+        Both are recorded. Which one it was is the finding's kind, not whether
+        a finding exists: a check that only appears when it fails cannot be
+        told apart from a check that was never made.
+        """
+        tight = [f for f in assess_quality(summary(mean_range=60.0,
+                                                   range_consistency=5.0))
+                 if f.subject == "consistency"]
+        loose = [f for f in assess_quality(summary(mean_range=10.0,
+                                                   range_consistency=5.0))
+                 if f.subject == "consistency"]
+        assert [f.kind for f in tight] == ["good"]
+        assert [f.kind for f in loose] == ["improve"]
 
     def test_a_dropped_return_is_flagged(self):
         findings = assess_quality(summary(mean_tempo_ratio=0.5))
         assert any(f.subject == "tempo" for f in findings)
 
     def test_a_controlled_return_is_not(self):
-        assert not any(f.subject == "tempo"
-                       for f in assess_quality(summary(mean_tempo_ratio=1.5)))
+        """It is recorded as having gone well, rather than not recorded."""
+        tempo = [f for f in assess_quality(summary(mean_tempo_ratio=1.5))
+                 if f.subject == "tempo"]
+        assert [f.kind for f in tempo] == ["good"]
+
+    def test_a_passing_check_still_counts_as_a_check(self):
+        """The reason the kinds matter: a score is the mean of the checks that
+        were made, so a check that vanishes when it passes drags the score
+        towards whatever went wrong."""
+        from pilates.scoring import score_quality
+
+        components = score_quality(assess_quality(summary()))
+        assert set(components) == {"control", "consistency", "tempo"}
+        assert all(c.score == 100.0 for c in components.values())
 
     def test_repetition_qualities_are_not_claimed_for_a_held_position(self):
         """Reps per minute means nothing in a plank."""
@@ -252,8 +271,10 @@ class TestUnnamedAssessment:
 
     def test_it_says_so_when_nothing_stood_out(self):
         cohort = [history(track_id=i, left_knee=90.0 + i) for i in range(6)]
-        result = assess_unnamed(cohort[2], summary(control_ratio=None),
-                                "A repeated movement", build_baseline(cohort))
+        nothing = summary(control_ratio=None, range_consistency=None,
+                          mean_tempo_ratio=None)
+        result = assess_unnamed(cohort[2], nothing, "A repeated movement",
+                                build_baseline(cohort))
         assert "nothing measurable stood out" in result.summarise()
 
     def test_it_works_with_no_class_at_all(self):

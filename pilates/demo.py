@@ -38,32 +38,58 @@ WHY = ("A demonstration session. No camera recorded it and no person performed "
 #: table has something to look up. A key it does not know would still be shown
 #: -- the viewer keeps unknown exercises rather than shortening the list -- but
 #: it would demonstrate nothing.
+#: Chosen so that every one of them also has a standard on this side. The two
+#: projects name exercises differently -- ``rollingLikeABall`` against
+#: ``rolling_like_a_ball`` -- and the merge normaliser already reconciles them,
+#: which is what makes a class judgeable exercise by exercise rather than
+#: against one standing pose.
+#: A mat sequence that holds one body shape throughout -- long, legs extended,
+#: face down or supine -- so that a single set of joint angles is a truthful
+#: description of the whole class.
+#:
+#: **That constraint is real, not a convenience.** A knee is at 170 degrees in a
+#: teaser and tucked to 50 in rolling like a ball, and this file stores one
+#: value per joint per class, as the measurement store does. Judging that one
+#: value against both exercises produced a ninety-degree "error" that was an
+#: artefact of the demo rather than anything about a student. Choosing a
+#: coherent class avoids inventing a per-exercise model the rest of the system
+#: does not yet have -- see the note in the README about what a joint angle
+#: belongs to.
 PLAN: tuple[tuple[str, int, int, int], ...] = (
-    ("breathing", 0, 180, 0),
-    ("pelvicCurl", 180, 480, 8),
-    ("chestLift", 480, 760, 10),
-    ("rollingLikeABall", 760, 980, 6),
-    ("oneLegCircle", 980, 1340, 12),
-    ("swan", 1340, 1600, 6),
-    ("plank", 1600, 1780, 3),
+    ("singleLegStretch", 0, 280, 10),
+    ("doubleLegStretch", 280, 560, 8),
+    ("neckPull", 560, 800, 6),
+    ("swan", 800, 1060, 6),
+    ("swimming", 1060, 1300, 12),
+    ("singleLegKick", 1300, 1540, 10),
+    ("legPullFront", 1540, 1800, 4),
 )
 
 #: Joint angles, in degrees, with the spread they varied by inside the session.
 ANGLES: dict[str, tuple[float, float]] = {
-    # Starts outside the standard's band and comes into it, so the score
-    # has something to do over twelve weeks. Its neighbour barely moves, so
-    # the two together show the instrument both finding a change and
-    # refusing to call one.
-    "left_knee": (152.0, 4.1), "right_knee": (171.0, 3.8),
-    "left_hip": (128.0, 6.2), "right_hip": (124.0, 5.9),
+    # The left knee starts outside every band that names it and comes into
+    # them around week six, so the score has something real to do. Its
+    # neighbour barely moves, so the two together show the instrument both
+    # finding a change and refusing to call one.
+    "left_knee": (142.0, 4.1), "right_knee": (171.0, 3.8),
+    # And the right hip sits just under its band for the first half of the
+    # run, so there is something the score is still waiting on after the
+    # knee has resolved. A demo where everything lands at once teaches the
+    # reader that progress arrives all together, which it does not.
+    "left_hip": (170.0, 6.2), "right_hip": (156.0, 5.9),
     "left_elbow": (172.0, 3.0), "right_elbow": (169.0, 3.4),
     "left_shoulder": (58.0, 7.7), "right_shoulder": (61.0, 8.1),
-    "neck": (12.0, 2.9), "trunk": (7.5, 3.3),
+    # Two degrees under the floor of every band that names it, and it stays
+    # there: a class where everything resolves by the end teaches the reader
+    # that everything always does.
+    "neck": (12.0, 2.9), "trunk": (3.0, 3.3),
     "shoulder_tilt": (2.4, 1.4), "pelvis_tilt": (3.1, 1.6),
 }
 
 SYMMETRY: dict[str, float] = {
-    "knee symmetry": 3.0, "hip symmetry": 4.0,
+    # Outside its ten-degree tolerance to begin with, inside it by the
+    # middle of the run.
+    "knee symmetry": 3.0, "hip symmetry": 12.0,
     "elbow symmetry": 3.0, "shoulder symmetry": 3.0,
 }
 
@@ -85,43 +111,103 @@ QUALITY: tuple[tuple[str, float, str], ...] = (
 )
 
 
-#: The standard the demo is judged against. Standing, so the angles this file
-#: makes up are the ones it actually names.
-JUDGED_AGAINST = "mountain"
+def standard_for(key: str):
+    """The standard this side holds for an exercise the library names.
+
+    The two projects spell exercises differently -- ``rollingLikeABall`` here,
+    ``rolling_like_a_ball`` there -- so the match goes through the same
+    normaliser the library merge uses rather than a second table written beside
+    it. Twelve of the library's hundred and ninety exercises have a standard;
+    the rest are coached without one, which is what `pilates.universal` is for.
+    """
+    from .coaching import DEFAULT_STANDARDS
+    from .neurowellness import normalise, squash
+
+    by = {squash(name): name for name in DEFAULT_STANDARDS}
+    found = by.get(squash(normalise(key)))
+    return DEFAULT_STANDARDS[found] if found else None
 
 
 def _judge(shift):
     """Findings from the demo's own numbers, using the real comparison.
 
-    Returns tuples rather than Finding objects so this file does not have to
-    import the coaching module's dataclass; what matters is that the deviation
-    and the threshold are the standard's own, not a second opinion written here.
-    """
-    from .coaching import DEFAULT_STANDARDS, NOTABLE_DEGREES
+    One assessment per exercise, which is what a capture produces: a class is
+    not judged against a single standing pose, it is judged against whatever it
+    was that the student was doing at the time. Seven exercises with standards
+    make about thirty checks, where one standard made five -- and five was the
+    floor below which a score is withheld, which is why the first version of
+    this demo had gaps in its score line.
 
-    standard = DEFAULT_STANDARDS[JUDGED_AGAINST]
+    Returns tuples rather than Finding objects so this file does not import the
+    coaching dataclass; what matters is that the deviation and the thresholds
+    are the standard's own, not a second opinion written here.
+    """
+    from .coaching import CLOSE, NOTABLE_DEGREES
+
     out = []
-    for target in standard.angles:
-        if target.joint not in ANGLES:
+    for key, *_ in PLAN:
+        standard = standard_for(key)
+        if standard is None:
             continue
-        median = shift(target.joint, ANGLES[target.joint][0])
-        deviation = target.deviation(median)
-        band = f"{target.low:.0f}-{target.high:.0f}deg"
-        if deviation >= NOTABLE_DEGREES:
-            out.append(("improve", target.cue, target.joint, median, band, deviation))
-        elif deviation == 0.0 and target.praise:
-            out.append(("good", target.praise, target.joint, median, band, 0.0))
-    for target in standard.symmetry:
-        name = f"{target.pair} symmetry"
-        if name not in SYMMETRY:
-            continue
-        gap = max(0.0, shift(name, SYMMETRY[name]))
-        band = f"within {target.tolerance:.0f}deg"
-        if gap > target.tolerance:
-            out.append(("improve", target.cue, name, gap, band, gap - target.tolerance))
-        else:
-            out.append(("good", f"left and right {target.pair} matched closely",
-                        name, gap, band, 0.0))
+        for target in standard.angles:
+            if target.joint not in ANGLES:
+                continue
+            median = shift(target.joint, ANGLES[target.joint][0])
+            deviation = target.deviation(median)
+            band = f"{target.low:.0f}-{target.high:.0f}deg"
+            if deviation >= NOTABLE_DEGREES:
+                kind, message = "improve", target.cue
+            elif deviation > 0.0:
+                kind, message = CLOSE, ""
+            else:
+                kind, message = "good", target.praise
+            out.append((kind, message, target.joint, median, band, deviation, key))
+        for target in standard.symmetry:
+            name = f"{target.pair} symmetry"
+            if name not in SYMMETRY:
+                continue
+            gap = max(0.0, shift(name, SYMMETRY[name]))
+            band = f"within {target.tolerance:.0f}deg"
+            if gap > target.tolerance:
+                out.append(("improve", target.cue, name, gap, band,
+                            gap - target.tolerance, key))
+            else:
+                out.append(("good", f"left and right {target.pair} matched closely",
+                            name, gap, band, 0.0, key))
+    return out
+
+
+def _quality(shift):
+    """The three checks that need no standard, judged by the real limits."""
+    from .universal import CONTROL_LIMIT, RANGE_SPREAD_LIMIT, TEMPO_RATIO_FLOOR
+
+    values = dict((name, value) for name, value, _ in QUALITY)
+    control = values["control"]
+    tempo = values["tempo ratio"]
+    spread = values["range consistency"] * values["range of motion"]
+    limit = RANGE_SPREAD_LIMIT * values["range of motion"]
+    out = []
+    if control > CONTROL_LIMIT:
+        out.append(("improve", "the movement changed direction inside a repetition",
+                    "control", control, f"below {CONTROL_LIMIT:.1f}",
+                    (control - CONTROL_LIMIT) * 10.0, PLAN[-1][0]))
+    else:
+        out.append(("good", "the movement was smooth through each repetition",
+                    "control", control, "", 0.0, PLAN[-1][0]))
+    if spread > limit:
+        out.append(("improve", "the repetitions were not the same size",
+                    "consistency", spread, f"within {limit:.0f}deg",
+                    spread - limit, PLAN[-1][0]))
+    else:
+        out.append(("good", "every repetition was about the same size",
+                    "consistency", spread, f"within {limit:.0f}deg", 0.0, PLAN[-1][0]))
+    if tempo < TEMPO_RATIO_FLOOR:
+        out.append(("improve", "the return was quicker than the effort", "tempo",
+                    tempo, f"at least {TEMPO_RATIO_FLOOR:.1f}",
+                    (TEMPO_RATIO_FLOOR - tempo) * 10.0, PLAN[-1][0]))
+    else:
+        out.append(("good", "lowered as slowly as it was lifted", "tempo", tempo,
+                    f"at least {TEMPO_RATIO_FLOOR:.1f}", 0.0, PLAN[-1][0]))
     return out
 
 
@@ -175,15 +261,15 @@ def fill(store: Store, username: str = "anna", display: str = "Sample Student",
         store.add_measurement(session, 1, subject, max(0.0, shift(subject, value)),
                               spread=1.2, samples=900,
                               unit="deg", source="standard",
-                              exercise="oneLegCircle")
+                              exercise=PLAN[2][0])
     for group, moment in MOMENTS.items():
         store.add_measurement(session, 1, f"{group} peak moment",
                               shift(f"{group} peak moment", moment),
                               spread=moment * 0.14, samples=880, unit="Nm",
-                              source="load", exercise="oneLegCircle")
+                              source="load", exercise=PLAN[2][0])
     for subject, value, unit in QUALITY:
         store.add_measurement(session, 1, subject, value, spread=0.2, samples=900,
-                              unit=unit, source="quality", exercise="plank")
+                              unit=unit, source="quality", exercise=PLAN[-1][0])
 
     # A score is derived from findings, not from measurements, because the
     # question it answers is "how close to the standard" rather than "what were
@@ -191,11 +277,14 @@ def fill(store: Store, username: str = "anna", display: str = "Sample Student",
     # is assessed by the real rule: the standard's own AngleTarget.deviation and
     # the same NOTABLE_DEGREES threshold `assess` applies to a capture. Made-up
     # inputs, real judgement.
-    for finding in _judge(shift):
-        store.add_finding(session, 1, finding[0], finding[1], subject=finding[2],
-                          exercise="mountain", measured=finding[3],
-                          target=finding[4], deviation=finding[5],
-                          source="standard")
+    for kind, message, subject, measured, target, deviation, key in _judge(shift):
+        store.add_finding(session, 1, kind, message, subject=subject,
+                          exercise=key, measured=measured, target=target,
+                          deviation=deviation, source="standard")
+    for kind, message, subject, measured, target, deviation, key in _quality(shift):
+        store.add_finding(session, 1, kind, message, subject=subject,
+                          exercise=key, measured=measured, target=target,
+                          deviation=deviation, source="quality")
 
 
 #: Twelve weeks of Tuesdays. One session shows what the instrument produces;
@@ -208,9 +297,11 @@ WEEKS = 12
 DRIFT: dict[str, float] = {
     "hip flexors peak moment": 0.9,     # clears the floor over twelve weeks
     "hip extensors peak moment": 0.7,
-    "left_hip": 0.55, "right_hip": 0.5,
+    "left_hip": 0.2,                    # stays inside its band throughout
+    "right_hip": 0.6,                   # comes into it around week eight
     "knee symmetry": -0.14,             # lower is better, and it clears
-    "left_knee": 1.7,                   # crosses into the band around week 6
+    "hip symmetry": -0.45,              # crosses the tolerance mid-run
+    "left_knee": 2.6,                   # crosses into the band around week 7
     "right_knee": 0.05,                 # never clears: stays "steady"
     "trunk": -0.04,
 }

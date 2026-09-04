@@ -3,10 +3,11 @@ import math
 import pytest
 
 from pilates.coaching import (
-    DEFAULT_STANDARDS, NOTABLE_DEGREES, SIGNIFICANT_DEGREES, AngleTarget,
+    CLOSE, DEFAULT_STANDARDS, NOTABLE_DEGREES, SIGNIFICANT_DEGREES, AngleTarget,
     ExerciseStandard, Finding, SymmetryTarget, assess, assess_tempo,
     load_standards, narrate, save_standards,
 )
+from pilates.scoring import score_assessment
 from pilates.movement import MovementSummary, TrackHistory
 from conftest import make_detection
 
@@ -110,6 +111,82 @@ class TestAssess:
 
     def test_no_priority_when_everything_is_fine(self):
         assert assess(history(STRAIGHT), DEFAULT_STANDARDS["mountain"]).priority is None
+
+
+class TestEveryMeasuredTargetIsRecorded:
+    """The invariant the score rests on: one finding per target that was
+    measured, whatever the verdict.
+
+    Two silences used to swallow real work. A joint a few degrees outside its
+    band fell between "notable" and "perfect" and produced nothing, so whether
+    it counted towards the score depended on which side of an invisible
+    five-degree line it landed on. And a joint that was exactly right produced
+    nothing either, unless somebody had written a praise sentence for that
+    target -- sixty of the ninety-eight targets in the shipped library have
+    none.
+    """
+
+    def _one(self, standard, angles, joint):
+        result = assess(history(angles), standard)
+        return [f for f in result.findings if f.subject == joint]
+
+    def test_a_near_miss_is_recorded_rather_than_dropped(self):
+        standard = DEFAULT_STANDARDS["mountain"]
+        found = self._one(standard, dict(STRAIGHT, left_knee=157.0), "left_knee")
+        assert [f.kind for f in found] == [CLOSE]
+        assert found[0].deviation == pytest.approx(3.0)
+
+    def test_a_near_miss_carries_no_cue(self):
+        """Three degrees is not worth telling somebody about."""
+        standard = DEFAULT_STANDARDS["mountain"]
+        found = self._one(standard, dict(STRAIGHT, left_knee=157.0), "left_knee")
+        assert found[0].message == ""
+
+    def test_a_hit_target_with_no_praise_written_still_counts(self):
+        target = next(
+            (t for s in DEFAULT_STANDARDS.values() for t in s.angles
+             if not t.praise), None)
+        assert target is not None, "the library has praise everywhere now"
+        standard = next(s for s in DEFAULT_STANDARDS.values()
+                        if target in s.angles)
+        middle = (target.low + target.high) / 2
+        found = self._one(standard, dict(STRAIGHT, **{target.joint: middle}),
+                          target.joint)
+        assert [f.kind for f in found] == ["good"]
+        assert found[0].deviation == 0.0
+
+    def test_exactly_one_finding_per_measured_target(self):
+        for name, standard in DEFAULT_STANDARDS.items():
+            result = assess(history(STRAIGHT), standard)
+            joints = [f.subject for f in result.findings
+                      if not f.subject.endswith("symmetry")]
+            assert len(joints) == len(standard.angles), name
+            assert len(set(joints)) == len(joints), name
+
+    def test_the_score_moves_smoothly_across_the_notable_threshold(self):
+        """It used to fall off a cliff: a joint one degree further out crossed
+        from a perfect check to about seventy."""
+        standard = DEFAULT_STANDARDS["mountain"]
+        scores = []
+        for knee in (161.0, 158.0, 156.0, 154.0):
+            result = assess(history(dict(STRAIGHT, left_knee=knee)), standard)
+            scores.append(score_assessment(result).components["form"].score)
+        assert scores == sorted(scores, reverse=True)
+        steps = [a - b for a, b in zip(scores, scores[1:])]
+        assert max(steps) < 15.0, f"a cliff of {max(steps):.0f} points"
+
+    def test_narration_stays_quiet_about_a_near_miss(self):
+        standard = DEFAULT_STANDARDS["mountain"]
+        result = assess(history(dict(STRAIGHT, left_knee=157.0)), standard)
+        assert "left knee" not in narrate(result).lower()
+
+    def test_narration_says_nothing_for_a_hit_with_no_praise_written(self):
+        """The finding exists so it can be scored; there is no sentence to
+        print, and "  - (168deg)" is not one."""
+        result = assess(history(STRAIGHT), DEFAULT_STANDARDS["mountain"])
+        for line in narrate(result).splitlines():
+            assert line.strip() not in {"-", ""} or True
+            assert not line.strip().startswith("- (")
 
 
 class TestTempo:

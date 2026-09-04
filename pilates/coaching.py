@@ -31,6 +31,10 @@ from .movement import MovementSummary, TrackHistory
 
 #: How far outside a target range something must be before it is worth saying.
 NOTABLE_DEGREES = 5.0
+#: Measured, slightly outside its band, and not worth saying anything about.
+#: It still counts as a check and still scores by how far out it was -- see
+#: `assess` for why leaving it out was worse than either alternative.
+CLOSE = "close"
 #: And how far before it is the main thing to work on.
 SIGNIFICANT_DEGREES = 15.0
 
@@ -125,6 +129,11 @@ class Assessment:
         return [f for f in self.findings if f.kind == "good"]
 
     @property
+    def close(self) -> list[Finding]:
+        """Measured, just outside, deliberately not mentioned to the student."""
+        return [f for f in self.findings if f.kind == CLOSE]
+
+    @property
     def improve(self) -> list[Finding]:
         return sorted(
             (f for f in self.findings if f.kind == "improve"),
@@ -182,17 +191,32 @@ def assess(
             continue
         median = statistics.median(values)
         deviation = target.deviation(median)
+        # Every target that was measured produces exactly one finding, and that
+        # invariant is the point.
+        #
+        # This used to emit nothing at all in two cases, and both were losing
+        # real work. A joint a few degrees outside its band fell between
+        # "notable" and "perfect" and vanished -- so whether it counted towards
+        # the score depended on which side of an invisible five-degree line it
+        # landed on, and the score moved for a reason no reader could see. And a
+        # joint that was *exactly right* vanished too, unless somebody had
+        # written a praise sentence for that target: sixty of the ninety-eight
+        # targets in the shipped library have none, so a student hitting them
+        # got no credit and the session lost a check.
+        #
+        # The finding is always made; what varies is what is said. A near miss
+        # carries no message, because five degrees is not worth a cue, and
+        # `narrate` prints nothing without one.
         if deviation >= NOTABLE_DEGREES:
-            assessment.findings.append(Finding(
-                kind="improve", subject=target.joint, message=target.cue,
-                measured=median, target=f"{target.low:.0f}-{target.high:.0f}deg",
-                deviation=deviation,
-            ))
-        elif deviation == 0.0 and target.praise:
-            assessment.findings.append(Finding(
-                kind="good", subject=target.joint, message=target.praise,
-                measured=median, target=f"{target.low:.0f}-{target.high:.0f}deg",
-            ))
+            kind, message = "improve", target.cue
+        elif deviation > 0.0:
+            kind, message = CLOSE, ""
+        else:
+            kind, message = "good", target.praise
+        assessment.findings.append(Finding(
+            kind=kind, subject=target.joint, message=message, measured=median,
+            target=f"{target.low:.0f}-{target.high:.0f}deg", deviation=deviation,
+        ))
 
     if standard.asymmetric_by_design:
         # Belt and braces: a symmetry target on a lunge would tell a student
@@ -278,7 +302,10 @@ def narrate(assessment: Assessment, name: str = "") -> str:
     if assessment.samples == 0:
         return f"{who} was not tracked long enough to say anything."
 
-    good = assessment.good
+    # Only findings somebody wrote a sentence for. A target that was hit and has
+    # no authored praise still counts towards the score; it just has nothing to
+    # say, and "  - (168deg)" is not a sentence.
+    good = [f for f in assessment.good if f.message]
     if good:
         lines.append("Going well:")
         for finding in good:
