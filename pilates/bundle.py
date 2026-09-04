@@ -274,6 +274,49 @@ def _exercises(store: Store, username: str, session: str) -> list[dict]:
     } for name in sorted(seconds)]
 
 
+def _history(store: Store, username: str, session: str) -> dict:
+    """Every quantity this person has, across every session they have.
+
+    The bundle stops being one photograph and becomes a record. A viewer that
+    only ever sees the latest session can print a number; one that sees the
+    series can put a sparkline under it and say whether it moved -- which is the
+    question a student actually has, and the reason to keep measuring at all.
+
+    The verdict comes from :class:`pilates.dashboard.Series` rather than being
+    recomputed here, so the sparkline in the anatomy viewer, the chart on the
+    printable page and the sentence in the written report are all the same rule.
+    Three implementations of "did this change" is three chances to disagree in
+    front of the person it is about.
+    """
+    from .dashboard import collect
+
+    out: dict[str, dict] = {}
+    for series in collect(store, username):
+        if len(series.points) < 2:
+            # A single point is not a history. Shipped anyway, because "one
+            # session so far" is a true and useful thing for a viewer to say,
+            # and it is different from having no record at all.
+            pass
+        out[series.subject] = {
+            "unit": series.unit,
+            "lower_is_better": series.lower_is_better,
+            "noise_floor": round(series.floor, 3),
+            "verdict": series.verdict,
+            "change": round(series.change, 3),
+            "sessions": len(series.points),
+            "points": [{"date": p.date, "value": round(p.value, 3),
+                        "spread": round(p.spread, 3), "samples": p.samples,
+                        "current": p.date == _date_of(store, session)}
+                       for p in series.points],
+        }
+    return out
+
+
+def _date_of(store: Store, session: str) -> str:
+    row = next((s for s in store.sessions() if s["key"] == session), None)
+    return row["date"] if row else ""
+
+
 def build(
     store: Store,
     username: str,
@@ -339,6 +382,7 @@ def build(
         # could publish.
         **({"synthetic": synthetic} if synthetic else {}),
         "quantities": quantities,
+        "history": _history(store, username, session),
         "structures": structures,
         "lighting": activation_plan(structures).scheme(),
         "events": [],

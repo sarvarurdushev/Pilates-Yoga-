@@ -1,0 +1,5464 @@
+{
+  "format": "pilates-session-bundle",
+  "version": 1,
+  "person": {
+    "username": "anna",
+    "display_name": "Sample Student"
+  },
+  "session": {
+    "key": "tue-12",
+    "date": "2026-08-25",
+    "studio": "Demo studio",
+    "duration_s": 1800.0,
+    "video": ""
+  },
+  "produced_by": {
+    "version": "demo",
+    "source_fps": 30.0,
+    "stride": 6,
+    "config": {
+      "keypoint_threshold": 0.4
+    }
+  },
+  "score": {
+    "value": null,
+    "withheld_reason": "only 0 check(s) could be made; a score from that few swings on any one of them",
+    "checks": 0,
+    "measured": 12,
+    "measurable": 12,
+    "coverage": 1.0,
+    "components": [],
+    "missing": []
+  },
+  "exercises": [
+    {
+      "key": "breathing",
+      "seconds": 180.0,
+      "repetitions": 0,
+      "from": "timed segments"
+    },
+    {
+      "key": "chestLift",
+      "seconds": 280.0,
+      "repetitions": 10,
+      "from": "timed segments"
+    },
+    {
+      "key": "oneLegCircle",
+      "seconds": 360.0,
+      "repetitions": 12,
+      "from": "timed segments"
+    },
+    {
+      "key": "pelvicCurl",
+      "seconds": 300.0,
+      "repetitions": 8,
+      "from": "timed segments"
+    },
+    {
+      "key": "plank",
+      "seconds": 180.0,
+      "repetitions": 3,
+      "from": "timed segments"
+    },
+    {
+      "key": "rollingLikeABall",
+      "seconds": 220.0,
+      "repetitions": 6,
+      "from": "timed segments"
+    },
+    {
+      "key": "swan",
+      "seconds": 260.0,
+      "repetitions": 6,
+      "from": "timed segments"
+    }
+  ],
+  "synthetic": {
+    "not_a_person": true,
+    "why": "A demonstration session. No camera recorded it and no person performed it: every number here was written by hand to show what the application does with a real one.",
+    "label": "Sample data"
+  },
+  "quantities": [
+    {
+      "name": "control",
+      "plain": "how smooth the movement was",
+      "technical": "control ratio",
+      "tier": "measured",
+      "because": "measured from this session's video over 900 frames",
+      "value": 1.9,
+      "spread": 0.2,
+      "samples": 900,
+      "unit": "",
+      "source": "quality",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "elbow extensors peak moment",
+      "plain": "how hard the back of the upper arm worked",
+      "technical": "elbow extensors peak moment",
+      "tier": "measured",
+      "because": "measured from this session's video over 880 frames",
+      "value": 2.9,
+      "spread": 0.434,
+      "samples": 880,
+      "unit": "Nm",
+      "source": "load",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "elbow flexors peak moment",
+      "plain": "how hard the front of the upper arm worked",
+      "technical": "elbow flexors peak moment",
+      "tier": "measured",
+      "because": "measured from this session's video over 880 frames",
+      "value": 4.0,
+      "spread": 0.588,
+      "samples": 880,
+      "unit": "Nm",
+      "source": "load",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "elbow symmetry",
+      "plain": "the difference between the two elbows",
+      "technical": "elbow symmetry gap",
+      "tier": "measured",
+      "because": "measured from this session's video over 900 frames",
+      "value": 2.8,
+      "spread": 1.2,
+      "samples": 900,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "hip extensors peak moment",
+      "plain": "how hard the glutes and hamstrings worked",
+      "technical": "hip extensors peak moment",
+      "tier": "measured",
+      "because": "measured from this session's video over 880 frames",
+      "value": 40.7,
+      "spread": 4.648,
+      "samples": 880,
+      "unit": "Nm",
+      "source": "load",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "hip flexors peak moment",
+      "plain": "how hard the front of the hip worked",
+      "technical": "hip flexors peak moment",
+      "tier": "measured",
+      "because": "measured from this session's video over 880 frames",
+      "value": 51.5,
+      "spread": 5.852,
+      "samples": 880,
+      "unit": "Nm",
+      "source": "load",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "hip symmetry",
+      "plain": "the difference between the two hips",
+      "technical": "hip symmetry gap",
+      "tier": "measured",
+      "because": "measured from this session's video over 900 frames",
+      "value": 3.8,
+      "spread": 1.2,
+      "samples": 900,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "knee extensors peak moment",
+      "plain": "how hard the front of the thigh worked",
+      "technical": "knee extensors peak moment",
+      "tier": "measured",
+      "because": "measured from this session's video over 880 frames",
+      "value": 22.4,
+      "spread": 3.164,
+      "samples": 880,
+      "unit": "Nm",
+      "source": "load",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "knee flexors peak moment",
+      "plain": "how hard the back of the thigh worked",
+      "technical": "knee flexors peak moment",
+      "tier": "measured",
+      "because": "measured from this session's video over 880 frames",
+      "value": 12.2,
+      "spread": 1.736,
+      "samples": 880,
+      "unit": "Nm",
+      "source": "load",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "knee symmetry",
+      "plain": "the difference between the two knees",
+      "technical": "knee symmetry gap",
+      "tier": "measured",
+      "because": "measured from this session's video over 900 frames",
+      "value": 1.26,
+      "spread": 1.2,
+      "samples": 900,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_elbow",
+      "plain": "how straight the left elbow was",
+      "technical": "left elbow angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 171.8,
+      "spread": 3.0,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_elbow",
+      "plain": "how straight the left elbow was",
+      "technical": "left elbow angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 50 frames",
+      "value": 171.8,
+      "spread": 3.0,
+      "samples": 50,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_elbow",
+      "plain": "how straight the left elbow was",
+      "technical": "left elbow angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 46 frames",
+      "value": 171.8,
+      "spread": 3.0,
+      "samples": 46,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_elbow",
+      "plain": "how straight the left elbow was",
+      "technical": "left elbow angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 36 frames",
+      "value": 171.8,
+      "spread": 3.0,
+      "samples": 36,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_elbow",
+      "plain": "how straight the left elbow was",
+      "technical": "left elbow angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 60 frames",
+      "value": 171.8,
+      "spread": 3.0,
+      "samples": 60,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_elbow",
+      "plain": "how straight the left elbow was",
+      "technical": "left elbow angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 43 frames",
+      "value": 171.8,
+      "spread": 3.0,
+      "samples": 43,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_elbow",
+      "plain": "how straight the left elbow was",
+      "technical": "left elbow angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 171.8,
+      "spread": 3.0,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_hip",
+      "plain": "how open the left hip was",
+      "technical": "left hip angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 133.85,
+      "spread": 6.2,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_hip",
+      "plain": "how open the left hip was",
+      "technical": "left hip angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 50 frames",
+      "value": 133.85,
+      "spread": 6.2,
+      "samples": 50,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_hip",
+      "plain": "how open the left hip was",
+      "technical": "left hip angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 46 frames",
+      "value": 133.85,
+      "spread": 6.2,
+      "samples": 46,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_hip",
+      "plain": "how open the left hip was",
+      "technical": "left hip angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 36 frames",
+      "value": 133.85,
+      "spread": 6.2,
+      "samples": 36,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_hip",
+      "plain": "how open the left hip was",
+      "technical": "left hip angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 60 frames",
+      "value": 133.85,
+      "spread": 6.2,
+      "samples": 60,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_hip",
+      "plain": "how open the left hip was",
+      "technical": "left hip angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 43 frames",
+      "value": 133.85,
+      "spread": 6.2,
+      "samples": 43,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_hip",
+      "plain": "how open the left hip was",
+      "technical": "left hip angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 133.85,
+      "spread": 6.2,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_knee",
+      "plain": "how straight the left knee was",
+      "technical": "left knee angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 168.46,
+      "spread": 4.1,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_knee",
+      "plain": "how straight the left knee was",
+      "technical": "left knee angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 50 frames",
+      "value": 168.46,
+      "spread": 4.1,
+      "samples": 50,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_knee",
+      "plain": "how straight the left knee was",
+      "technical": "left knee angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 46 frames",
+      "value": 168.46,
+      "spread": 4.1,
+      "samples": 46,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_knee",
+      "plain": "how straight the left knee was",
+      "technical": "left knee angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 36 frames",
+      "value": 168.46,
+      "spread": 4.1,
+      "samples": 36,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_knee",
+      "plain": "how straight the left knee was",
+      "technical": "left knee angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 60 frames",
+      "value": 168.46,
+      "spread": 4.1,
+      "samples": 60,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_knee",
+      "plain": "how straight the left knee was",
+      "technical": "left knee angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 43 frames",
+      "value": 168.46,
+      "spread": 4.1,
+      "samples": 43,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_knee",
+      "plain": "how straight the left knee was",
+      "technical": "left knee angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 168.46,
+      "spread": 4.1,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_shoulder",
+      "plain": "how far the left arm was lifted",
+      "technical": "left shoulder angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 57.8,
+      "spread": 7.7,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_shoulder",
+      "plain": "how far the left arm was lifted",
+      "technical": "left shoulder angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 50 frames",
+      "value": 57.8,
+      "spread": 7.7,
+      "samples": 50,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_shoulder",
+      "plain": "how far the left arm was lifted",
+      "technical": "left shoulder angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 46 frames",
+      "value": 57.8,
+      "spread": 7.7,
+      "samples": 46,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_shoulder",
+      "plain": "how far the left arm was lifted",
+      "technical": "left shoulder angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 36 frames",
+      "value": 57.8,
+      "spread": 7.7,
+      "samples": 36,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_shoulder",
+      "plain": "how far the left arm was lifted",
+      "technical": "left shoulder angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 60 frames",
+      "value": 57.8,
+      "spread": 7.7,
+      "samples": 60,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_shoulder",
+      "plain": "how far the left arm was lifted",
+      "technical": "left shoulder angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 43 frames",
+      "value": 57.8,
+      "spread": 7.7,
+      "samples": 43,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "left_shoulder",
+      "plain": "how far the left arm was lifted",
+      "technical": "left shoulder angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 57.8,
+      "spread": 7.7,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "longest hold",
+      "plain": "the longest you held it",
+      "technical": "longest hold",
+      "tier": "measured",
+      "because": "measured from this session's video over 900 frames",
+      "value": 41.0,
+      "spread": 0.2,
+      "samples": 900,
+      "unit": "s",
+      "source": "quality",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "neck",
+      "plain": "how the head sat on the spine",
+      "technical": "neck angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 11.8,
+      "spread": 2.9,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "neck",
+      "plain": "how the head sat on the spine",
+      "technical": "neck angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 50 frames",
+      "value": 11.8,
+      "spread": 2.9,
+      "samples": 50,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "neck",
+      "plain": "how the head sat on the spine",
+      "technical": "neck angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 46 frames",
+      "value": 11.8,
+      "spread": 2.9,
+      "samples": 46,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "neck",
+      "plain": "how the head sat on the spine",
+      "technical": "neck angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 36 frames",
+      "value": 11.8,
+      "spread": 2.9,
+      "samples": 36,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "neck",
+      "plain": "how the head sat on the spine",
+      "technical": "neck angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 60 frames",
+      "value": 11.8,
+      "spread": 2.9,
+      "samples": 60,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "neck",
+      "plain": "how the head sat on the spine",
+      "technical": "neck angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 43 frames",
+      "value": 11.8,
+      "spread": 2.9,
+      "samples": 43,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "neck",
+      "plain": "how the head sat on the spine",
+      "technical": "neck angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 11.8,
+      "spread": 2.9,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "pelvis_tilt",
+      "plain": "whether the hips were level",
+      "technical": "pelvis line tilt",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 2.9,
+      "spread": 1.6,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "pelvis_tilt",
+      "plain": "whether the hips were level",
+      "technical": "pelvis line tilt",
+      "tier": "measured",
+      "because": "measured from this session's video over 50 frames",
+      "value": 2.9,
+      "spread": 1.6,
+      "samples": 50,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "pelvis_tilt",
+      "plain": "whether the hips were level",
+      "technical": "pelvis line tilt",
+      "tier": "measured",
+      "because": "measured from this session's video over 46 frames",
+      "value": 2.9,
+      "spread": 1.6,
+      "samples": 46,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "pelvis_tilt",
+      "plain": "whether the hips were level",
+      "technical": "pelvis line tilt",
+      "tier": "measured",
+      "because": "measured from this session's video over 36 frames",
+      "value": 2.9,
+      "spread": 1.6,
+      "samples": 36,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "pelvis_tilt",
+      "plain": "whether the hips were level",
+      "technical": "pelvis line tilt",
+      "tier": "measured",
+      "because": "measured from this session's video over 60 frames",
+      "value": 2.9,
+      "spread": 1.6,
+      "samples": 60,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "pelvis_tilt",
+      "plain": "whether the hips were level",
+      "technical": "pelvis line tilt",
+      "tier": "measured",
+      "because": "measured from this session's video over 43 frames",
+      "value": 2.9,
+      "spread": 1.6,
+      "samples": 43,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "pelvis_tilt",
+      "plain": "whether the hips were level",
+      "technical": "pelvis line tilt",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 2.9,
+      "spread": 1.6,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "range consistency",
+      "plain": "whether every repetition was the same size",
+      "technical": "range consistency",
+      "tier": "measured",
+      "because": "measured from this session's video over 900 frames",
+      "value": 0.19,
+      "spread": 0.2,
+      "samples": 900,
+      "unit": "",
+      "source": "quality",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "range of motion",
+      "plain": "how far you moved",
+      "technical": "range of motion",
+      "tier": "measured",
+      "because": "measured from this session's video over 900 frames",
+      "value": 62.0,
+      "spread": 0.2,
+      "samples": 900,
+      "unit": "deg",
+      "source": "quality",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "repetitions",
+      "plain": "how many you did",
+      "technical": "repetitions",
+      "tier": "measured",
+      "because": "measured from this session's video over 900 frames",
+      "value": 45.0,
+      "spread": 0.2,
+      "samples": 900,
+      "unit": "",
+      "source": "quality",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_elbow",
+      "plain": "how straight the right elbow was",
+      "technical": "right elbow angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 168.8,
+      "spread": 3.4,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_elbow",
+      "plain": "how straight the right elbow was",
+      "technical": "right elbow angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 50 frames",
+      "value": 168.8,
+      "spread": 3.4,
+      "samples": 50,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_elbow",
+      "plain": "how straight the right elbow was",
+      "technical": "right elbow angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 46 frames",
+      "value": 168.8,
+      "spread": 3.4,
+      "samples": 46,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_elbow",
+      "plain": "how straight the right elbow was",
+      "technical": "right elbow angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 36 frames",
+      "value": 168.8,
+      "spread": 3.4,
+      "samples": 36,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_elbow",
+      "plain": "how straight the right elbow was",
+      "technical": "right elbow angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 60 frames",
+      "value": 168.8,
+      "spread": 3.4,
+      "samples": 60,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_elbow",
+      "plain": "how straight the right elbow was",
+      "technical": "right elbow angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 43 frames",
+      "value": 168.8,
+      "spread": 3.4,
+      "samples": 43,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_elbow",
+      "plain": "how straight the right elbow was",
+      "technical": "right elbow angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 168.8,
+      "spread": 3.4,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_hip",
+      "plain": "how open the right hip was",
+      "technical": "right hip angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 129.3,
+      "spread": 5.9,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_hip",
+      "plain": "how open the right hip was",
+      "technical": "right hip angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 50 frames",
+      "value": 129.3,
+      "spread": 5.9,
+      "samples": 50,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_hip",
+      "plain": "how open the right hip was",
+      "technical": "right hip angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 46 frames",
+      "value": 129.3,
+      "spread": 5.9,
+      "samples": 46,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_hip",
+      "plain": "how open the right hip was",
+      "technical": "right hip angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 36 frames",
+      "value": 129.3,
+      "spread": 5.9,
+      "samples": 36,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_hip",
+      "plain": "how open the right hip was",
+      "technical": "right hip angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 60 frames",
+      "value": 129.3,
+      "spread": 5.9,
+      "samples": 60,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_hip",
+      "plain": "how open the right hip was",
+      "technical": "right hip angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 43 frames",
+      "value": 129.3,
+      "spread": 5.9,
+      "samples": 43,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_hip",
+      "plain": "how open the right hip was",
+      "technical": "right hip angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 129.3,
+      "spread": 5.9,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_knee",
+      "plain": "how straight the right knee was",
+      "technical": "right knee angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 171.35,
+      "spread": 3.8,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_knee",
+      "plain": "how straight the right knee was",
+      "technical": "right knee angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 50 frames",
+      "value": 171.35,
+      "spread": 3.8,
+      "samples": 50,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_knee",
+      "plain": "how straight the right knee was",
+      "technical": "right knee angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 46 frames",
+      "value": 171.35,
+      "spread": 3.8,
+      "samples": 46,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_knee",
+      "plain": "how straight the right knee was",
+      "technical": "right knee angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 36 frames",
+      "value": 171.35,
+      "spread": 3.8,
+      "samples": 36,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_knee",
+      "plain": "how straight the right knee was",
+      "technical": "right knee angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 60 frames",
+      "value": 171.35,
+      "spread": 3.8,
+      "samples": 60,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_knee",
+      "plain": "how straight the right knee was",
+      "technical": "right knee angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 43 frames",
+      "value": 171.35,
+      "spread": 3.8,
+      "samples": 43,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_knee",
+      "plain": "how straight the right knee was",
+      "technical": "right knee angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 171.35,
+      "spread": 3.8,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_shoulder",
+      "plain": "how far the right arm was lifted",
+      "technical": "right shoulder angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 60.8,
+      "spread": 8.1,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_shoulder",
+      "plain": "how far the right arm was lifted",
+      "technical": "right shoulder angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 50 frames",
+      "value": 60.8,
+      "spread": 8.1,
+      "samples": 50,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_shoulder",
+      "plain": "how far the right arm was lifted",
+      "technical": "right shoulder angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 46 frames",
+      "value": 60.8,
+      "spread": 8.1,
+      "samples": 46,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_shoulder",
+      "plain": "how far the right arm was lifted",
+      "technical": "right shoulder angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 36 frames",
+      "value": 60.8,
+      "spread": 8.1,
+      "samples": 36,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_shoulder",
+      "plain": "how far the right arm was lifted",
+      "technical": "right shoulder angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 60 frames",
+      "value": 60.8,
+      "spread": 8.1,
+      "samples": 60,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_shoulder",
+      "plain": "how far the right arm was lifted",
+      "technical": "right shoulder angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 43 frames",
+      "value": 60.8,
+      "spread": 8.1,
+      "samples": 43,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "right_shoulder",
+      "plain": "how far the right arm was lifted",
+      "technical": "right shoulder angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 60.8,
+      "spread": 8.1,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "seconds per repetition",
+      "plain": "how long each one took",
+      "technical": "seconds per repetition",
+      "tier": "measured",
+      "because": "measured from this session's video over 900 frames",
+      "value": 3.4,
+      "spread": 0.2,
+      "samples": 900,
+      "unit": "s",
+      "source": "quality",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "shoulder extensors peak moment",
+      "plain": "how hard the back of the shoulder worked",
+      "technical": "shoulder extensors peak moment",
+      "tier": "measured",
+      "because": "measured from this session's video over 880 frames",
+      "value": 8.9,
+      "spread": 1.274,
+      "samples": 880,
+      "unit": "Nm",
+      "source": "load",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "shoulder flexors peak moment",
+      "plain": "how hard the front of the shoulder worked",
+      "technical": "shoulder flexors peak moment",
+      "tier": "measured",
+      "because": "measured from this session's video over 880 frames",
+      "value": 7.2,
+      "spread": 1.036,
+      "samples": 880,
+      "unit": "Nm",
+      "source": "load",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "shoulder symmetry",
+      "plain": "the difference between the two shoulders",
+      "technical": "shoulder symmetry gap",
+      "tier": "measured",
+      "because": "measured from this session's video over 900 frames",
+      "value": 2.8,
+      "spread": 1.2,
+      "samples": 900,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "shoulder_tilt",
+      "plain": "whether the shoulders were level",
+      "technical": "shoulder line tilt",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 2.2,
+      "spread": 1.4,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "shoulder_tilt",
+      "plain": "whether the shoulders were level",
+      "technical": "shoulder line tilt",
+      "tier": "measured",
+      "because": "measured from this session's video over 50 frames",
+      "value": 2.2,
+      "spread": 1.4,
+      "samples": 50,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "shoulder_tilt",
+      "plain": "whether the shoulders were level",
+      "technical": "shoulder line tilt",
+      "tier": "measured",
+      "because": "measured from this session's video over 46 frames",
+      "value": 2.2,
+      "spread": 1.4,
+      "samples": 46,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "shoulder_tilt",
+      "plain": "whether the shoulders were level",
+      "technical": "shoulder line tilt",
+      "tier": "measured",
+      "because": "measured from this session's video over 36 frames",
+      "value": 2.2,
+      "spread": 1.4,
+      "samples": 36,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "shoulder_tilt",
+      "plain": "whether the shoulders were level",
+      "technical": "shoulder line tilt",
+      "tier": "measured",
+      "because": "measured from this session's video over 60 frames",
+      "value": 2.2,
+      "spread": 1.4,
+      "samples": 60,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "shoulder_tilt",
+      "plain": "whether the shoulders were level",
+      "technical": "shoulder line tilt",
+      "tier": "measured",
+      "because": "measured from this session's video over 43 frames",
+      "value": 2.2,
+      "spread": 1.4,
+      "samples": 43,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "shoulder_tilt",
+      "plain": "whether the shoulders were level",
+      "technical": "shoulder line tilt",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 2.2,
+      "spread": 1.4,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "tempo ratio",
+      "plain": "whether you lowered as slowly as you lifted",
+      "technical": "tempo ratio",
+      "tier": "measured",
+      "because": "measured from this session's video over 900 frames",
+      "value": 0.94,
+      "spread": 0.2,
+      "samples": 900,
+      "unit": "",
+      "source": "quality",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "trunk",
+      "plain": "how upright the body was",
+      "technical": "trunk angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 6.86,
+      "spread": 3.3,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "trunk",
+      "plain": "how upright the body was",
+      "technical": "trunk angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 50 frames",
+      "value": 6.86,
+      "spread": 3.3,
+      "samples": 50,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "trunk",
+      "plain": "how upright the body was",
+      "technical": "trunk angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 46 frames",
+      "value": 6.86,
+      "spread": 3.3,
+      "samples": 46,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "trunk",
+      "plain": "how upright the body was",
+      "technical": "trunk angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 36 frames",
+      "value": 6.86,
+      "spread": 3.3,
+      "samples": 36,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "trunk",
+      "plain": "how upright the body was",
+      "technical": "trunk angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 60 frames",
+      "value": 6.86,
+      "spread": 3.3,
+      "samples": 60,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "trunk",
+      "plain": "how upright the body was",
+      "technical": "trunk angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 43 frames",
+      "value": 6.86,
+      "spread": 3.3,
+      "samples": 43,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    },
+    {
+      "name": "trunk",
+      "plain": "how upright the body was",
+      "technical": "trunk angle",
+      "tier": "measured",
+      "because": "measured from this session's video over 30 frames",
+      "value": 6.86,
+      "spread": 3.3,
+      "samples": 30,
+      "unit": "deg",
+      "source": "standard",
+      "valid": true,
+      "invalid_reason": ""
+    }
+  ],
+  "history": {
+    "control": {
+      "unit": "",
+      "lower_is_better": false,
+      "noise_floor": 3.0,
+      "verdict": "steady",
+      "change": 0.0,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 1.9,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 1.9,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 1.9,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 1.9,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 1.9,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 1.9,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 1.9,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 1.9,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 1.9,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 1.9,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 1.9,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 1.9,
+          "spread": 0.2,
+          "samples": 900,
+          "current": true
+        }
+      ]
+    },
+    "elbow extensors peak moment": {
+      "unit": "Nm",
+      "lower_is_better": false,
+      "noise_floor": 3.0,
+      "verdict": "steady",
+      "change": -0.2,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 3.1,
+          "spread": 0.434,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 3.5,
+          "spread": 0.434,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 2.8,
+          "spread": 0.434,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 3.25,
+          "spread": 0.434,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 2.65,
+          "spread": 0.434,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 3.35,
+          "spread": 0.434,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 3.0,
+          "spread": 0.434,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 3.45,
+          "spread": 0.434,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 2.85,
+          "spread": 0.434,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 3.15,
+          "spread": 0.434,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 3.4,
+          "spread": 0.434,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 2.9,
+          "spread": 0.434,
+          "samples": 880,
+          "current": true
+        }
+      ]
+    },
+    "elbow flexors peak moment": {
+      "unit": "Nm",
+      "lower_is_better": false,
+      "noise_floor": 3.0,
+      "verdict": "steady",
+      "change": -0.2,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 4.2,
+          "spread": 0.588,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 4.6,
+          "spread": 0.588,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 3.9,
+          "spread": 0.588,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 4.35,
+          "spread": 0.588,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 3.75,
+          "spread": 0.588,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 4.45,
+          "spread": 0.588,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 4.1,
+          "spread": 0.588,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 4.55,
+          "spread": 0.588,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 3.95,
+          "spread": 0.588,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 4.25,
+          "spread": 0.588,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 4.5,
+          "spread": 0.588,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 4.0,
+          "spread": 0.588,
+          "samples": 880,
+          "current": true
+        }
+      ]
+    },
+    "elbow symmetry": {
+      "unit": "deg",
+      "lower_is_better": true,
+      "noise_floor": 3.0,
+      "verdict": "steady",
+      "change": -0.2,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 3.0,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 3.4,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 2.7,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 3.15,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 2.55,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 3.25,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 2.9,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 3.35,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 2.75,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 3.05,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 3.3,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 2.8,
+          "spread": 1.2,
+          "samples": 900,
+          "current": true
+        }
+      ]
+    },
+    "hip extensors peak moment": {
+      "unit": "Nm",
+      "lower_is_better": false,
+      "noise_floor": 4.648,
+      "verdict": "changed",
+      "change": 7.5,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 33.2,
+          "spread": 4.648,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 34.3,
+          "spread": 4.648,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 34.3,
+          "spread": 4.648,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 35.45,
+          "spread": 4.648,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 35.55,
+          "spread": 4.648,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 36.95,
+          "spread": 4.648,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 37.3,
+          "spread": 4.648,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 38.45,
+          "spread": 4.648,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 38.55,
+          "spread": 4.648,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 39.55,
+          "spread": 4.648,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 40.5,
+          "spread": 4.648,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 40.7,
+          "spread": 4.648,
+          "samples": 880,
+          "current": true
+        }
+      ]
+    },
+    "hip flexors peak moment": {
+      "unit": "Nm",
+      "lower_is_better": false,
+      "noise_floor": 5.852,
+      "verdict": "changed",
+      "change": 9.7,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 41.8,
+          "spread": 5.852,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 43.1,
+          "spread": 5.852,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 43.3,
+          "spread": 5.852,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 44.65,
+          "spread": 5.852,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 44.95,
+          "spread": 5.852,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 46.55,
+          "spread": 5.852,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 47.1,
+          "spread": 5.852,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 48.45,
+          "spread": 5.852,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 48.75,
+          "spread": 5.852,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 49.95,
+          "spread": 5.852,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 51.1,
+          "spread": 5.852,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 51.5,
+          "spread": 5.852,
+          "samples": 880,
+          "current": true
+        }
+      ]
+    },
+    "hip symmetry": {
+      "unit": "deg",
+      "lower_is_better": true,
+      "noise_floor": 3.0,
+      "verdict": "steady",
+      "change": -0.2,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 4.0,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 4.4,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 3.7,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 4.15,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 3.55,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 4.25,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 3.9,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 4.35,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 3.75,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 4.05,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 4.3,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 3.8,
+          "spread": 1.2,
+          "samples": 900,
+          "current": true
+        }
+      ]
+    },
+    "knee extensors peak moment": {
+      "unit": "Nm",
+      "lower_is_better": false,
+      "noise_floor": 3.164,
+      "verdict": "steady",
+      "change": -0.2,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 22.6,
+          "spread": 3.164,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 23.0,
+          "spread": 3.164,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 22.3,
+          "spread": 3.164,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 22.75,
+          "spread": 3.164,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 22.15,
+          "spread": 3.164,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 22.85,
+          "spread": 3.164,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 22.5,
+          "spread": 3.164,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 22.95,
+          "spread": 3.164,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 22.35,
+          "spread": 3.164,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 22.65,
+          "spread": 3.164,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 22.9,
+          "spread": 3.164,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 22.4,
+          "spread": 3.164,
+          "samples": 880,
+          "current": true
+        }
+      ]
+    },
+    "knee flexors peak moment": {
+      "unit": "Nm",
+      "lower_is_better": false,
+      "noise_floor": 3.0,
+      "verdict": "steady",
+      "change": -0.2,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 12.4,
+          "spread": 1.736,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 12.8,
+          "spread": 1.736,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 12.1,
+          "spread": 1.736,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 12.55,
+          "spread": 1.736,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 11.95,
+          "spread": 1.736,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 12.65,
+          "spread": 1.736,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 12.3,
+          "spread": 1.736,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 12.75,
+          "spread": 1.736,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 12.15,
+          "spread": 1.736,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 12.45,
+          "spread": 1.736,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 12.7,
+          "spread": 1.736,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 12.2,
+          "spread": 1.736,
+          "samples": 880,
+          "current": true
+        }
+      ]
+    },
+    "knee symmetry": {
+      "unit": "deg",
+      "lower_is_better": true,
+      "noise_floor": 3.0,
+      "verdict": "steady",
+      "change": -1.74,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 3.0,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 3.26,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 2.42,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 2.73,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 1.99,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 2.55,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 2.06,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 2.37,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 1.63,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 1.79,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 1.9,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 1.26,
+          "spread": 1.2,
+          "samples": 900,
+          "current": true
+        }
+      ]
+    },
+    "left_elbow": {
+      "unit": "deg",
+      "lower_is_better": false,
+      "noise_floor": 3.0,
+      "verdict": "steady",
+      "change": -0.2,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 172.0,
+          "spread": 3.0,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 172.4,
+          "spread": 3.0,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 171.7,
+          "spread": 3.0,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 172.15,
+          "spread": 3.0,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 171.55,
+          "spread": 3.0,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 172.25,
+          "spread": 3.0,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 171.9,
+          "spread": 3.0,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 172.35,
+          "spread": 3.0,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 171.75,
+          "spread": 3.0,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 172.05,
+          "spread": 3.0,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 172.3,
+          "spread": 3.0,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 171.8,
+          "spread": 3.0,
+          "samples": 30,
+          "current": true
+        }
+      ]
+    },
+    "left_hip": {
+      "unit": "deg",
+      "lower_is_better": false,
+      "noise_floor": 6.2,
+      "verdict": "steady",
+      "change": 5.85,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 128.0,
+          "spread": 6.2,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 128.95,
+          "spread": 6.2,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 128.8,
+          "spread": 6.2,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 129.8,
+          "spread": 6.2,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 129.75,
+          "spread": 6.2,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 131.0,
+          "spread": 6.2,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 131.2,
+          "spread": 6.2,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 132.2,
+          "spread": 6.2,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 132.15,
+          "spread": 6.2,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 133.0,
+          "spread": 6.2,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 133.8,
+          "spread": 6.2,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 133.85,
+          "spread": 6.2,
+          "samples": 30,
+          "current": true
+        }
+      ]
+    },
+    "left_knee": {
+      "unit": "deg",
+      "lower_is_better": false,
+      "noise_floor": 4.1,
+      "verdict": "steady",
+      "change": 0.46,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 168.0,
+          "spread": 4.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 168.46,
+          "spread": 4.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 167.82,
+          "spread": 4.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 168.33,
+          "spread": 4.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 167.79,
+          "spread": 4.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 168.55,
+          "spread": 4.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 168.26,
+          "spread": 4.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 168.77,
+          "spread": 4.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 168.23,
+          "spread": 4.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 168.59,
+          "spread": 4.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 168.9,
+          "spread": 4.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 168.46,
+          "spread": 4.1,
+          "samples": 30,
+          "current": true
+        }
+      ]
+    },
+    "left_shoulder": {
+      "unit": "deg",
+      "lower_is_better": false,
+      "noise_floor": 7.7,
+      "verdict": "steady",
+      "change": -0.2,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 58.0,
+          "spread": 7.7,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 58.4,
+          "spread": 7.7,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 57.7,
+          "spread": 7.7,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 58.15,
+          "spread": 7.7,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 57.55,
+          "spread": 7.7,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 58.25,
+          "spread": 7.7,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 57.9,
+          "spread": 7.7,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 58.35,
+          "spread": 7.7,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 57.75,
+          "spread": 7.7,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 58.05,
+          "spread": 7.7,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 58.3,
+          "spread": 7.7,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 57.8,
+          "spread": 7.7,
+          "samples": 30,
+          "current": true
+        }
+      ]
+    },
+    "longest hold": {
+      "unit": "s",
+      "lower_is_better": false,
+      "noise_floor": 3.0,
+      "verdict": "steady",
+      "change": 0.0,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 41.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 41.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 41.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 41.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 41.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 41.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 41.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 41.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 41.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 41.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 41.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 41.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": true
+        }
+      ]
+    },
+    "neck": {
+      "unit": "deg",
+      "lower_is_better": false,
+      "noise_floor": 3.0,
+      "verdict": "steady",
+      "change": -0.2,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 12.0,
+          "spread": 2.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 12.4,
+          "spread": 2.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 11.7,
+          "spread": 2.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 12.15,
+          "spread": 2.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 11.55,
+          "spread": 2.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 12.25,
+          "spread": 2.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 11.9,
+          "spread": 2.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 12.35,
+          "spread": 2.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 11.75,
+          "spread": 2.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 12.05,
+          "spread": 2.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 12.3,
+          "spread": 2.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 11.8,
+          "spread": 2.9,
+          "samples": 30,
+          "current": true
+        }
+      ]
+    },
+    "pelvis_tilt": {
+      "unit": "deg",
+      "lower_is_better": false,
+      "noise_floor": 3.0,
+      "verdict": "steady",
+      "change": -0.2,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 3.1,
+          "spread": 1.6,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 3.5,
+          "spread": 1.6,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 2.8,
+          "spread": 1.6,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 3.25,
+          "spread": 1.6,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 2.65,
+          "spread": 1.6,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 3.35,
+          "spread": 1.6,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 3.0,
+          "spread": 1.6,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 3.45,
+          "spread": 1.6,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 2.85,
+          "spread": 1.6,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 3.15,
+          "spread": 1.6,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 3.4,
+          "spread": 1.6,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 2.9,
+          "spread": 1.6,
+          "samples": 30,
+          "current": true
+        }
+      ]
+    },
+    "range consistency": {
+      "unit": "",
+      "lower_is_better": false,
+      "noise_floor": 3.0,
+      "verdict": "steady",
+      "change": 0.0,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 0.19,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 0.19,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 0.19,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 0.19,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 0.19,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 0.19,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 0.19,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 0.19,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 0.19,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 0.19,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 0.19,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 0.19,
+          "spread": 0.2,
+          "samples": 900,
+          "current": true
+        }
+      ]
+    },
+    "range of motion": {
+      "unit": "deg",
+      "lower_is_better": false,
+      "noise_floor": 3.0,
+      "verdict": "steady",
+      "change": 0.0,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 62.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 62.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 62.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 62.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 62.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 62.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 62.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 62.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 62.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 62.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 62.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 62.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": true
+        }
+      ]
+    },
+    "repetitions": {
+      "unit": "",
+      "lower_is_better": false,
+      "noise_floor": 3.0,
+      "verdict": "steady",
+      "change": 0.0,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 45.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 45.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 45.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 45.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 45.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 45.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 45.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 45.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 45.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 45.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 45.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 45.0,
+          "spread": 0.2,
+          "samples": 900,
+          "current": true
+        }
+      ]
+    },
+    "right_elbow": {
+      "unit": "deg",
+      "lower_is_better": false,
+      "noise_floor": 3.4,
+      "verdict": "steady",
+      "change": -0.2,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 169.0,
+          "spread": 3.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 169.4,
+          "spread": 3.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 168.7,
+          "spread": 3.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 169.15,
+          "spread": 3.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 168.55,
+          "spread": 3.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 169.25,
+          "spread": 3.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 168.9,
+          "spread": 3.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 169.35,
+          "spread": 3.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 168.75,
+          "spread": 3.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 169.05,
+          "spread": 3.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 169.3,
+          "spread": 3.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 168.8,
+          "spread": 3.4,
+          "samples": 30,
+          "current": true
+        }
+      ]
+    },
+    "right_hip": {
+      "unit": "deg",
+      "lower_is_better": false,
+      "noise_floor": 5.9,
+      "verdict": "steady",
+      "change": 5.3,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 124.0,
+          "spread": 5.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 124.9,
+          "spread": 5.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 124.7,
+          "spread": 5.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 125.65,
+          "spread": 5.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 125.55,
+          "spread": 5.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 126.75,
+          "spread": 5.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 126.9,
+          "spread": 5.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 127.85,
+          "spread": 5.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 127.75,
+          "spread": 5.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 128.55,
+          "spread": 5.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 129.3,
+          "spread": 5.9,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 129.3,
+          "spread": 5.9,
+          "samples": 30,
+          "current": true
+        }
+      ]
+    },
+    "right_knee": {
+      "unit": "deg",
+      "lower_is_better": false,
+      "noise_floor": 3.8,
+      "verdict": "steady",
+      "change": 0.35,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 171.0,
+          "spread": 3.8,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 171.45,
+          "spread": 3.8,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 170.8,
+          "spread": 3.8,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 171.3,
+          "spread": 3.8,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 170.75,
+          "spread": 3.8,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 171.5,
+          "spread": 3.8,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 171.2,
+          "spread": 3.8,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 171.7,
+          "spread": 3.8,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 171.15,
+          "spread": 3.8,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 171.5,
+          "spread": 3.8,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 171.8,
+          "spread": 3.8,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 171.35,
+          "spread": 3.8,
+          "samples": 30,
+          "current": true
+        }
+      ]
+    },
+    "right_shoulder": {
+      "unit": "deg",
+      "lower_is_better": false,
+      "noise_floor": 8.1,
+      "verdict": "steady",
+      "change": -0.2,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 61.0,
+          "spread": 8.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 61.4,
+          "spread": 8.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 60.7,
+          "spread": 8.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 61.15,
+          "spread": 8.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 60.55,
+          "spread": 8.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 61.25,
+          "spread": 8.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 60.9,
+          "spread": 8.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 61.35,
+          "spread": 8.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 60.75,
+          "spread": 8.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 61.05,
+          "spread": 8.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 61.3,
+          "spread": 8.1,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 60.8,
+          "spread": 8.1,
+          "samples": 30,
+          "current": true
+        }
+      ]
+    },
+    "seconds per repetition": {
+      "unit": "s",
+      "lower_is_better": false,
+      "noise_floor": 3.0,
+      "verdict": "steady",
+      "change": 0.0,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 3.4,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 3.4,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 3.4,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 3.4,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 3.4,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 3.4,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 3.4,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 3.4,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 3.4,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 3.4,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 3.4,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 3.4,
+          "spread": 0.2,
+          "samples": 900,
+          "current": true
+        }
+      ]
+    },
+    "shoulder extensors peak moment": {
+      "unit": "Nm",
+      "lower_is_better": false,
+      "noise_floor": 3.0,
+      "verdict": "steady",
+      "change": -0.2,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 9.1,
+          "spread": 1.274,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 9.5,
+          "spread": 1.274,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 8.8,
+          "spread": 1.274,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 9.25,
+          "spread": 1.274,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 8.65,
+          "spread": 1.274,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 9.35,
+          "spread": 1.274,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 9.0,
+          "spread": 1.274,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 9.45,
+          "spread": 1.274,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 8.85,
+          "spread": 1.274,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 9.15,
+          "spread": 1.274,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 9.4,
+          "spread": 1.274,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 8.9,
+          "spread": 1.274,
+          "samples": 880,
+          "current": true
+        }
+      ]
+    },
+    "shoulder flexors peak moment": {
+      "unit": "Nm",
+      "lower_is_better": false,
+      "noise_floor": 3.0,
+      "verdict": "steady",
+      "change": -0.2,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 7.4,
+          "spread": 1.036,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 7.8,
+          "spread": 1.036,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 7.1,
+          "spread": 1.036,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 7.55,
+          "spread": 1.036,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 6.95,
+          "spread": 1.036,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 7.65,
+          "spread": 1.036,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 7.3,
+          "spread": 1.036,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 7.75,
+          "spread": 1.036,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 7.15,
+          "spread": 1.036,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 7.45,
+          "spread": 1.036,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 7.7,
+          "spread": 1.036,
+          "samples": 880,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 7.2,
+          "spread": 1.036,
+          "samples": 880,
+          "current": true
+        }
+      ]
+    },
+    "shoulder symmetry": {
+      "unit": "deg",
+      "lower_is_better": false,
+      "noise_floor": 3.0,
+      "verdict": "steady",
+      "change": -0.2,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 3.0,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 3.4,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 2.7,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 3.15,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 2.55,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 3.25,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 2.9,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 3.35,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 2.75,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 3.05,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 3.3,
+          "spread": 1.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 2.8,
+          "spread": 1.2,
+          "samples": 900,
+          "current": true
+        }
+      ]
+    },
+    "shoulder_tilt": {
+      "unit": "deg",
+      "lower_is_better": false,
+      "noise_floor": 3.0,
+      "verdict": "steady",
+      "change": -0.2,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 2.4,
+          "spread": 1.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 2.8,
+          "spread": 1.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 2.1,
+          "spread": 1.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 2.55,
+          "spread": 1.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 1.95,
+          "spread": 1.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 2.65,
+          "spread": 1.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 2.3,
+          "spread": 1.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 2.75,
+          "spread": 1.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 2.15,
+          "spread": 1.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 2.45,
+          "spread": 1.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 2.7,
+          "spread": 1.4,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 2.2,
+          "spread": 1.4,
+          "samples": 30,
+          "current": true
+        }
+      ]
+    },
+    "tempo ratio": {
+      "unit": "",
+      "lower_is_better": false,
+      "noise_floor": 3.0,
+      "verdict": "steady",
+      "change": 0.0,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 0.94,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 0.94,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 0.94,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 0.94,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 0.94,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 0.94,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 0.94,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 0.94,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 0.94,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 0.94,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 0.94,
+          "spread": 0.2,
+          "samples": 900,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 0.94,
+          "spread": 0.2,
+          "samples": 900,
+          "current": true
+        }
+      ]
+    },
+    "trunk": {
+      "unit": "deg",
+      "lower_is_better": false,
+      "noise_floor": 3.3,
+      "verdict": "steady",
+      "change": -0.64,
+      "sessions": 12,
+      "points": [
+        {
+          "date": "2026-06-09",
+          "value": 7.5,
+          "spread": 3.3,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-16",
+          "value": 7.86,
+          "spread": 3.3,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-23",
+          "value": 7.12,
+          "spread": 3.3,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-06-30",
+          "value": 7.53,
+          "spread": 3.3,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-07",
+          "value": 6.89,
+          "spread": 3.3,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-14",
+          "value": 7.55,
+          "spread": 3.3,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-21",
+          "value": 7.16,
+          "spread": 3.3,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-07-28",
+          "value": 7.57,
+          "spread": 3.3,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-04",
+          "value": 6.93,
+          "spread": 3.3,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-11",
+          "value": 7.19,
+          "spread": 3.3,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-18",
+          "value": 7.4,
+          "spread": 3.3,
+          "samples": 30,
+          "current": false
+        },
+        {
+          "date": "2026-08-25",
+          "value": 6.86,
+          "spread": 3.3,
+          "samples": 30,
+          "current": true
+        }
+      ]
+    }
+  },
+  "structures": [
+    {
+      "fma": "FMA37705",
+      "name": "anconeus",
+      "layer": "muscles_deep",
+      "tier": "measured",
+      "because": "the elbow extensors carried up to 3 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them",
+      "plain": "the back of the upper arm worked up to 3 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them",
+      "value": 2.9,
+      "unit": "Nm",
+      "from": "elbow extensors peak moment",
+      "level": 0.7169,
+      "share": 0.0563
+    },
+    {
+      "fma": "FMA37668",
+      "name": "brachialis",
+      "layer": "muscles_deep",
+      "tier": "measured",
+      "because": "the elbow flexors carried up to 4 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them",
+      "plain": "the front of the upper arm worked up to 4 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them",
+      "value": 4.0,
+      "unit": "Nm",
+      "from": "elbow flexors peak moment",
+      "level": 0.7233,
+      "share": 0.0777
+    },
+    {
+      "fma": "FMA37665",
+      "name": "coracobrachialis",
+      "layer": "muscles_deep",
+      "tier": "measured",
+      "because": "the shoulder flexors carried up to 7 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them",
+      "plain": "the front of the shoulder worked up to 7 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them",
+      "value": 7.2,
+      "unit": "Nm",
+      "from": "shoulder flexors peak moment",
+      "level": 0.7419,
+      "share": 0.1398
+    },
+    {
+      "fma": "FMA22342",
+      "name": "psoas major",
+      "layer": "muscles_deep",
+      "tier": "measured",
+      "because": "the hip flexors carried up to 52 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them",
+      "plain": "the front of the hip worked up to 52 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them",
+      "value": 51.5,
+      "unit": "Nm",
+      "from": "hip flexors peak moment",
+      "level": 1.0,
+      "share": 1.0
+    },
+    {
+      "fma": "FMA22448",
+      "name": "semimembranosus",
+      "layer": "muscles_deep",
+      "tier": "measured",
+      "because": "the hip extensors carried up to 41 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them. It is also one of the knee flexors, which carried 12 Nm",
+      "plain": "the glutes and hamstrings worked up to 41 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them. It also works as part of the back of the thigh, which reached 12 newton metres",
+      "value": 40.7,
+      "unit": "Nm",
+      "from": "hip extensors peak moment",
+      "also": [
+        "knee flexors peak moment"
+      ],
+      "level": 0.9371,
+      "share": 0.7903
+    },
+    {
+      "fma": "FMA32551",
+      "name": "teres major",
+      "layer": "muscles_deep",
+      "tier": "measured",
+      "because": "the shoulder extensors carried up to 9 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them",
+      "plain": "the back of the shoulder worked up to 9 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them",
+      "value": 8.9,
+      "unit": "Nm",
+      "from": "shoulder extensors peak moment",
+      "level": 0.7518,
+      "share": 0.1728
+    },
+    {
+      "fma": "FMA38934",
+      "name": "vastus intermedius",
+      "layer": "muscles_deep",
+      "tier": "measured",
+      "because": "the knee extensors carried up to 22 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them",
+      "plain": "the front of the thigh worked up to 22 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them",
+      "value": 22.4,
+      "unit": "Nm",
+      "from": "knee extensors peak moment",
+      "level": 0.8305,
+      "share": 0.435
+    },
+    {
+      "fma": "FMA37684",
+      "name": "biceps brachii",
+      "layer": "muscles_superficial",
+      "tier": "measured",
+      "because": "the elbow flexors carried up to 4 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them",
+      "plain": "the front of the upper arm worked up to 4 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them",
+      "value": 4.0,
+      "unit": "Nm",
+      "from": "elbow flexors peak moment",
+      "level": 0.7233,
+      "share": 0.0777
+    },
+    {
+      "fma": "FMA45888",
+      "name": "biceps femoris",
+      "layer": "muscles_superficial",
+      "tier": "measured",
+      "because": "the hip extensors carried up to 41 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them. It is also one of the knee flexors, which carried 12 Nm",
+      "plain": "the glutes and hamstrings worked up to 41 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them. It also works as part of the back of the thigh, which reached 12 newton metres",
+      "value": 40.7,
+      "unit": "Nm",
+      "from": "hip extensors peak moment",
+      "also": [
+        "knee flexors peak moment"
+      ],
+      "level": 0.9371,
+      "share": 0.7903
+    },
+    {
+      "fma": "FMA38486",
+      "name": "brachioradialis",
+      "layer": "muscles_superficial",
+      "tier": "measured",
+      "because": "the elbow flexors carried up to 4 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them",
+      "plain": "the front of the upper arm worked up to 4 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them",
+      "value": 4.0,
+      "unit": "Nm",
+      "from": "elbow flexors peak moment",
+      "level": 0.7233,
+      "share": 0.0777
+    },
+    {
+      "fma": "FMA34680",
+      "name": "deltoid",
+      "layer": "muscles_superficial",
+      "tier": "measured",
+      "because": "the shoulder extensors carried up to 9 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them. It is also one of the shoulder flexors, which carried 7 Nm",
+      "plain": "the back of the shoulder worked up to 9 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them. It also works as part of the front of the shoulder, which reached 7 newton metres",
+      "value": 8.9,
+      "unit": "Nm",
+      "from": "shoulder extensors peak moment",
+      "also": [
+        "shoulder flexors peak moment"
+      ],
+      "level": 0.7518,
+      "share": 0.1728
+    },
+    {
+      "fma": "FMA45957",
+      "name": "gastrocnemius",
+      "layer": "muscles_superficial",
+      "tier": "measured",
+      "because": "the knee flexors carried up to 12 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them",
+      "plain": "the back of the thigh worked up to 12 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them",
+      "value": 12.2,
+      "unit": "Nm",
+      "from": "knee flexors peak moment",
+      "level": 0.7711,
+      "share": 0.2369
+    },
+    {
+      "fma": "FMA22328",
+      "name": "gluteus maximus",
+      "layer": "muscles_superficial",
+      "tier": "measured",
+      "because": "the hip extensors carried up to 41 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them",
+      "plain": "the glutes and hamstrings worked up to 41 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them",
+      "value": 40.7,
+      "unit": "Nm",
+      "from": "hip extensors peak moment",
+      "level": 0.9371,
+      "share": 0.7903
+    },
+    {
+      "fma": "FMA13358",
+      "name": "latissimus dorsi",
+      "layer": "muscles_superficial",
+      "tier": "measured",
+      "because": "the shoulder extensors carried up to 9 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them",
+      "plain": "the back of the shoulder worked up to 9 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them",
+      "value": 8.9,
+      "unit": "Nm",
+      "from": "shoulder extensors peak moment",
+      "level": 0.7518,
+      "share": 0.1728
+    },
+    {
+      "fma": "FMA34690",
+      "name": "pectoralis major",
+      "layer": "muscles_superficial",
+      "tier": "measured",
+      "because": "the shoulder flexors carried up to 7 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them",
+      "plain": "the front of the shoulder worked up to 7 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them",
+      "value": 7.2,
+      "unit": "Nm",
+      "from": "shoulder flexors peak moment",
+      "level": 0.7419,
+      "share": 0.1398
+    },
+    {
+      "fma": "FMA38928",
+      "name": "rectus femoris",
+      "layer": "muscles_superficial",
+      "tier": "measured",
+      "because": "the hip flexors carried up to 52 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them. It is also one of the knee extensors, which carried 22 Nm",
+      "plain": "the front of the hip worked up to 52 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them. It also works as part of the front of the thigh, which reached 22 newton metres",
+      "value": 51.5,
+      "unit": "Nm",
+      "from": "hip flexors peak moment",
+      "also": [
+        "knee extensors peak moment"
+      ],
+      "level": 1.0,
+      "share": 1.0
+    },
+    {
+      "fma": "FMA22354",
+      "name": "sartorius",
+      "layer": "muscles_superficial",
+      "tier": "measured",
+      "because": "the hip flexors carried up to 52 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them",
+      "plain": "the front of the hip worked up to 52 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them",
+      "value": 51.5,
+      "unit": "Nm",
+      "from": "hip flexors peak moment",
+      "level": 1.0,
+      "share": 1.0
+    },
+    {
+      "fma": "FMA22358",
+      "name": "semitendinosus",
+      "layer": "muscles_superficial",
+      "tier": "measured",
+      "because": "the hip extensors carried up to 41 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them. It is also one of the knee flexors, which carried 12 Nm",
+      "plain": "the glutes and hamstrings worked up to 41 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them. It also works as part of the back of the thigh, which reached 12 newton metres",
+      "value": 40.7,
+      "unit": "Nm",
+      "from": "hip extensors peak moment",
+      "also": [
+        "knee flexors peak moment"
+      ],
+      "level": 0.9371,
+      "share": 0.7903
+    },
+    {
+      "fma": "FMA22425",
+      "name": "tensor fasciae latae",
+      "layer": "muscles_superficial",
+      "tier": "measured",
+      "because": "the hip flexors carried up to 52 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them",
+      "plain": "the front of the hip worked up to 52 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them",
+      "value": 51.5,
+      "unit": "Nm",
+      "from": "hip flexors peak moment",
+      "level": 1.0,
+      "share": 1.0
+    },
+    {
+      "fma": "FMA37695",
+      "name": "triceps brachii",
+      "layer": "muscles_superficial",
+      "tier": "measured",
+      "because": "the elbow extensors carried up to 3 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them",
+      "plain": "the back of the upper arm worked up to 3 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them",
+      "value": 2.9,
+      "unit": "Nm",
+      "from": "elbow extensors peak moment",
+      "level": 0.7169,
+      "share": 0.0563
+    },
+    {
+      "fma": "FMA38930",
+      "name": "vastus lateralis",
+      "layer": "muscles_superficial",
+      "tier": "measured",
+      "because": "the knee extensors carried up to 22 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them",
+      "plain": "the front of the thigh worked up to 22 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them",
+      "value": 22.4,
+      "unit": "Nm",
+      "from": "knee extensors peak moment",
+      "level": 0.8305,
+      "share": 0.435
+    },
+    {
+      "fma": "FMA38932",
+      "name": "vastus medialis",
+      "layer": "muscles_superficial",
+      "tier": "measured",
+      "because": "the knee extensors carried up to 22 Nm in this session \u2014 the highest moment either side reached \u2014 and this muscle is one of them",
+      "plain": "the front of the thigh worked up to 22 newton metres in this class \u2014 the hardest either side got to \u2014 and this muscle is one of them",
+      "value": 22.4,
+      "unit": "Nm",
+      "from": "knee extensors peak moment",
+      "level": 0.8305,
+      "share": 0.435
+    },
+    {
+      "fma": "",
+      "name": "axillary nerve",
+      "layer": "nervous",
+      "tier": "reference",
+      "because": "supplies a muscle that was measured here. Nothing in this recording observed a nerve.",
+      "plain": "this nerve feeds the back of the shoulder, which we did measure. The nerve itself was not measured \u2014 no camera can see one.",
+      "from": "shoulder extensors peak moment",
+      "level": 0.3
+    },
+    {
+      "fma": "",
+      "name": "femoral nerve",
+      "layer": "nervous",
+      "tier": "reference",
+      "because": "supplies a muscle that was measured here. Nothing in this recording observed a nerve.",
+      "plain": "this nerve feeds the front of the hip, which we did measure. The nerve itself was not measured \u2014 no camera can see one.",
+      "from": "hip flexors peak moment",
+      "level": 0.3
+    },
+    {
+      "fma": "",
+      "name": "musculocutaneous nerve",
+      "layer": "nervous",
+      "tier": "reference",
+      "because": "supplies a muscle that was measured here. Nothing in this recording observed a nerve.",
+      "plain": "this nerve feeds the front of the upper arm, which we did measure. The nerve itself was not measured \u2014 no camera can see one.",
+      "from": "elbow flexors peak moment",
+      "level": 0.3
+    },
+    {
+      "fma": "",
+      "name": "radial nerve",
+      "layer": "nervous",
+      "tier": "reference",
+      "because": "supplies a muscle that was measured here. Nothing in this recording observed a nerve.",
+      "plain": "this nerve feeds the back of the upper arm, which we did measure. The nerve itself was not measured \u2014 no camera can see one.",
+      "from": "elbow extensors peak moment",
+      "level": 0.3
+    },
+    {
+      "fma": "",
+      "name": "sciatic nerve",
+      "layer": "nervous",
+      "tier": "reference",
+      "because": "supplies a muscle that was measured here. Nothing in this recording observed a nerve.",
+      "plain": "this nerve feeds the glutes and hamstrings, which we did measure. The nerve itself was not measured \u2014 no camera can see one.",
+      "from": "hip extensors peak moment",
+      "level": 0.3
+    },
+    {
+      "fma": "",
+      "name": "tibial nerve",
+      "layer": "nervous",
+      "tier": "reference",
+      "because": "supplies a muscle that was measured here. Nothing in this recording observed a nerve.",
+      "plain": "this nerve feeds the back of the thigh, which we did measure. The nerve itself was not measured \u2014 no camera can see one.",
+      "from": "knee flexors peak moment",
+      "level": 0.3
+    },
+    {
+      "fma": "FMA13322",
+      "name": "clavicle",
+      "layer": "skeleton",
+      "tier": "reference",
+      "because": "articulates the shoulder, which was measured. No load on this bone was estimated.",
+      "plain": "this bone meets the shoulder, which we did measure. We did not work out what the bone itself carried.",
+      "from": "left_shoulder",
+      "level": 0.3
+    },
+    {
+      "fma": "FMA24474",
+      "name": "femur",
+      "layer": "skeleton",
+      "tier": "reference",
+      "because": "articulates the hip, which was measured. No load on this bone was estimated.",
+      "plain": "this bone meets the hip, which we did measure. We did not work out what the bone itself carried.",
+      "from": "left_hip",
+      "level": 0.3
+    },
+    {
+      "fma": "FMA23130",
+      "name": "humerus",
+      "layer": "skeleton",
+      "tier": "reference",
+      "because": "articulates the elbow, which was measured. No load on this bone was estimated.",
+      "plain": "this bone meets the elbow, which we did measure. We did not work out what the bone itself carried.",
+      "from": "left_elbow",
+      "level": 0.3
+    },
+    {
+      "fma": "FMA23464",
+      "name": "radius",
+      "layer": "skeleton",
+      "tier": "reference",
+      "because": "articulates the elbow, which was measured. No load on this bone was estimated.",
+      "plain": "this bone meets the elbow, which we did measure. We did not work out what the bone itself carried.",
+      "from": "left_elbow",
+      "level": 0.3
+    },
+    {
+      "fma": "FMA13395",
+      "name": "scapula",
+      "layer": "skeleton",
+      "tier": "reference",
+      "because": "articulates the shoulder, which was measured. No load on this bone was estimated.",
+      "plain": "this bone meets the shoulder, which we did measure. We did not work out what the bone itself carried.",
+      "from": "left_shoulder",
+      "level": 0.3
+    },
+    {
+      "fma": "FMA24477",
+      "name": "tibia",
+      "layer": "skeleton",
+      "tier": "reference",
+      "because": "articulates the knee, which was measured. No load on this bone was estimated.",
+      "plain": "this bone meets the knee, which we did measure. We did not work out what the bone itself carried.",
+      "from": "left_knee",
+      "level": 0.3
+    },
+    {
+      "fma": "FMA23467",
+      "name": "ulna",
+      "layer": "skeleton",
+      "tier": "reference",
+      "because": "articulates the elbow, which was measured. No load on this bone was estimated.",
+      "plain": "this bone meets the elbow, which we did measure. We did not work out what the bone itself carried.",
+      "from": "left_elbow",
+      "level": 0.3
+    }
+  ],
+  "lighting": {
+    "measured_band": [
+      0.7,
+      1.0
+    ],
+    "reference_level": 0.3,
+    "unlit": 0.0,
+    "note": "Level is not an activation percentage and not EMG. Within the measured band it is this group's share of the largest joint moment measured in this one session; every muscle in a group shares its level, because the measurement is of the joint and cannot tell them apart. Reference structures are all one level: they show where to look, not how much.",
+    "scale": {
+      "from": "hip flexors peak moment",
+      "value": 51.5,
+      "unit": "Nm"
+    }
+  },
+  "events": [
+    {
+      "id": 573,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "exercise",
+      "start_s": 0.0,
+      "end_s": 180.0,
+      "label": "breathing",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 574,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "exercise",
+      "start_s": 180.0,
+      "end_s": 480.0,
+      "label": "pelvicCurl",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 575,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 198.75,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 576,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 236.25,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 577,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 273.75,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 578,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 311.25,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 579,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 348.75,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 580,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 386.25,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 581,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 423.75,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 582,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 461.25,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 583,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "exercise",
+      "start_s": 480.0,
+      "end_s": 760.0,
+      "label": "chestLift",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 584,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 494.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 585,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 522.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 586,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 550.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 587,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 578.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 588,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 606.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 589,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 634.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 590,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 662.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 591,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 690.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 592,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 718.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 593,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 746.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 594,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "exercise",
+      "start_s": 760.0,
+      "end_s": 980.0,
+      "label": "rollingLikeABall",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 595,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 778.3333333333334,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 596,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 815.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 597,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 851.6666666666666,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 598,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 888.3333333333334,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 599,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 925.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 600,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 961.6666666666666,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 601,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "exercise",
+      "start_s": 980.0,
+      "end_s": 1340.0,
+      "label": "oneLegCircle",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 602,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 995.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 603,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 1025.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 604,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 1055.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 605,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 1085.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 606,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 1115.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 607,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 1145.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 608,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 1175.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 609,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 1205.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 610,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 1235.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 611,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 1265.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 612,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 1295.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 613,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 1325.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 614,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "exercise",
+      "start_s": 1340.0,
+      "end_s": 1600.0,
+      "label": "swan",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 615,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 1361.6666666666667,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 616,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 1405.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 617,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 1448.3333333333333,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 618,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 1491.6666666666667,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 619,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 1535.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 620,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 1578.3333333333333,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 621,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "exercise",
+      "start_s": 1600.0,
+      "end_s": 1780.0,
+      "label": "plank",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 622,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 1630.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 623,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 1690.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    },
+    {
+      "id": 624,
+      "session_id": 12,
+      "track_id": 1,
+      "kind": "repetition",
+      "start_s": 1750.0,
+      "end_s": null,
+      "label": "left_hip",
+      "value": null,
+      "detail": ""
+    }
+  ],
+  "notice": "Every value carries a tier. 'measured' came from this person's video in this session. 'reference' is anatomy: it says where to look, not what was observed. Nothing here measured a nerve, a bone's load, or anything about a brain."
+}

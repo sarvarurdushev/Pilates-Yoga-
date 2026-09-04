@@ -163,9 +163,46 @@ function brain(session, nw) {
  * the grid it has already made, at the top, because they are the panels about
  * the person and everything else on that screen is about the model.
  */
+/**
+ * Where the application's own writing goes once the panel stops carrying it.
+ *
+ * The reading is good and it is the wrong thing in a three-hundred-pixel column
+ * that somebody opened to find out how their hip is doing. It arrives here as
+ * the panel renders it, keyed by structure, and the most recent one is on top --
+ * so "read about this in the lab" lands on the thing that was just clicked.
+ */
+const READING_CSS = `
+.sessread{max-height:none}
+.sessread .blk{margin:0 0 13px}
+.sessread .who{color:var(--dim)}
+.sessreadempty{font-size:12px;color:var(--dim2);line-height:1.7}
+`;
+
+let readingFor = null;
+
+function reading(html, record) {
+  return panel(record?.name?.en ?? 'Reading', 'moved here from the panel',
+    `<div class="sessread">${html}</div>`,
+    'The application\'s own writing about the structure you last chose. It '
+  + 'used to sit in the right-hand column; with a session loaded that column '
+  + 'shows your numbers instead, and this is where the reading lives.');
+}
+
+/** Called by the panel each time it lifts prose out of the column. */
+export function showReading(html, id, record) {
+  readingFor = { html, id, record };
+  const host = document.getElementById('sessReading');
+  if (!host) return;
+  host.innerHTML = html
+    ? reading(html, record)
+    : panel(record?.name?.en ?? 'Reading', '',
+        '<p class="sessreadempty">Nothing written about this structure yet.</p>',
+        'Not every structure in the model has an article.');
+}
+
 export function attachLab(session, nw) {
   const style = document.createElement('style');
-  style.textContent = CSS;
+  style.textContent = CSS + READING_CSS;
   document.head.appendChild(style);
 
   let added = false;
@@ -188,7 +225,9 @@ export function attachLab(session, nw) {
         + 'here about a person. Everything below them is the model, as before.';
     }
     grid.insertAdjacentHTML('afterbegin',
-      ranked(session) + thumbnails(session, nw) + exercises(session) + brain(session, nw));
+      ranked(session) + thumbnails(session, nw) + exercises(session)
+      + brain(session, nw) + '<div id="sessReading"></div>');
+    if (readingFor) showReading(readingFor.html, readingFor.id, readingFor.record);
     wire(grid, session, nw);
     paintThumbs(grid, nw);
   };

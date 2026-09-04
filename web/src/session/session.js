@@ -196,6 +196,34 @@ export class Session {
     };
   }
 
+  /**
+   * One quantity's line across every session this person has.
+   *
+   * Computed on the measurement side and carried in the file, verdict and noise
+   * floor included, so the sparkline here, the chart on the printable page and
+   * the sentence in the written report are the same rule rather than three
+   * implementations of "did this change".
+   */
+  history(subject) {
+    return this.bundle.history?.[subject] ?? null;
+  }
+
+  /** Every quantity measured at the joints a muscle group acts across. */
+  jointsOf(source) {
+    const group = source.replace(/ peak moment$/, '');
+    const word = group.split(' ')[0];
+    return [...this.quantities.values()].filter(
+      (q) => q.valid && q.name.includes(word) && /^(left|right)_/.test(q.name));
+  }
+
+  /** Both sides of a joint, given one of them. */
+  jointPair(name) {
+    const bare = name.replace(/^(left|right)_/, '');
+    return [...this.quantities.values()].filter(
+      (q) => q.valid && q.name.replace(/^(left|right)_/, '') === bare
+             && /^(left|right)_/.test(q.name));
+  }
+
   /** Where a group sits among the ones measured this session, hardest first. */
   rankOf(group) {
     const order = [...this.groups.values()].sort((a, b) => b.value - a.value);

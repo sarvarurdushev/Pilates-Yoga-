@@ -25,7 +25,7 @@ import { registry } from '../structures.js';
 import { apply } from './bundle.js';
 import { attachPanel } from './panel.js';
 import { Session } from './session.js';
-import { attachLab } from './lab.js';
+import { attachLab, showReading } from './lab.js';
 
 const BANNER_CSS = `
 #sessbar{position:fixed;left:0;right:0;top:0;z-index:60;display:flex;gap:14px;
@@ -36,13 +36,15 @@ const BANNER_CSS = `
 #sessbar .sep{color:var(--dim2)}
 #sessbar .warn{margin-left:auto;color:var(--gold);letter-spacing:.1em;
   text-transform:uppercase;font-size:9.5px}
-/* A demonstration is amber from end to end, not a blue bar with a footnote.
-   Somebody scrolling past a screenshot reads the colour and the first three
-   words, and those have to carry it on their own. */
-#sessbar.synthetic{background:linear-gradient(90deg,rgba(233,180,92,.22),rgba(233,180,92,.05));
-  border-bottom-color:rgba(233,180,92,.5)}
-#sessbar.synthetic b{color:var(--gold)}
-#sessbar.synthetic .warn{color:var(--gold)}
+/* Sample data gets one muted word, not a banner. The full-width amber bar was
+   correct about the risk and wrong about the dose: it shouted over the thing it
+   was labelling on every screen and every screenshot. The marking that matters
+   is in the file -- the bundle carries a synthetic block, the validator
+   enforces it, and it travels with the file -- so the bar only has to be
+   honest, not loud. */
+#sessbar .sample{color:var(--gold);letter-spacing:.11em;text-transform:uppercase;
+  font-size:9px;border:1px solid rgba(233,180,92,.4);border-radius:3px;
+  padding:1px 6px}
 #demochip{position:fixed;left:22px;bottom:22px;z-index:60;display:flex;gap:10px;
   align-items:center;padding:9px 14px;border-radius:4px;cursor:pointer;
   background:rgba(233,180,92,.10);border:1px solid rgba(233,180,92,.45);
@@ -76,14 +78,15 @@ function banner(session) {
   const fake = session.synthetic;
   const person = session.person.display_name || session.person.username;
   if (fake) bar.classList.add('synthetic');
-  bar.innerHTML = fake
-    ? `<b>${esc(fake.label ?? 'Demonstration data')}</b><span class="sep">·</span>
-       <span>${esc(fake.why ?? '')}</span>`
-    : `<b>${esc(person)}</b><span class="sep">·</span>
-       <span>${esc(session.key)} · ${esc(session.date)}</span><span class="sep">·</span>
-       <span>${session.ranked().length} muscle groups measured</span>
-       ${score != null ? `<span class="sep">·</span><span>score ${Math.round(score)}/100</span>` : ''}
-       <span class="warn">Measured muscles are this person. Everything else is anatomy</span>`;
+  const sessions = Object.values(session.bundle.history ?? {})
+    .reduce((most, h) => Math.max(most, h.sessions ?? 0), 0);
+  bar.innerHTML = `<b>${esc(person)}</b><span class="sep">·</span>
+    <span>${esc(session.date)}</span><span class="sep">·</span>
+    <span>${session.ranked().length} muscle groups</span>
+    ${sessions > 1 ? `<span class="sep">·</span><span>${sessions} sessions on record</span>` : ''}
+    ${score != null ? `<span class="sep">·</span><span>${Math.round(score)}/100</span>` : ''}
+    ${fake ? '<span class="sample">Sample</span>' : ''}
+    <span class="warn">Blue structures are measured. Everything else is anatomy</span>`;
   document.body.appendChild(bar);
   document.body.classList.add('hassess');
 }
@@ -223,8 +226,13 @@ async function boot() {
 
   banner(session);
   const lit = light(session, { registry: reg, palette: nw.gfx.palette });
-  attachPanel(session, nw);
   attachLab(session, nw);
+  attachPanel(session, nw, {
+    onProse: showReading,
+    // "Read about this in the lab" has to open the lab, or the button is a
+    // promise the interface does not keep.
+    openLab: () => document.getElementById('labBtn')?.click(),
+  });
 
   // For the render harness and for anybody poking at it in a console.
   globalThis.__session = { session, lit };

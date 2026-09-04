@@ -9,8 +9,9 @@ whether it is worth their time.
 So this builds a session with no video behind it. **Every number in it is made
 up.** That is not a caveat tucked into a docstring: the bundle carries a
 ``synthetic`` block, the validator refuses a bundle that claims to be synthetic
-without saying why, and the viewer paints the banner amber and says
-"demonstration data" rather than a person's name in the ordinary way.
+without saying why, and the viewer tags the session bar. The tag is deliberately
+small: the marking that has to hold is the one in the file, which travels with
+it, not a banner that shouts over the screen it is labelling.
 
 The reason to be this careful is that a bundle drives a rendering of somebody's
 body. A demonstration that cannot be told from a measurement is the single most
@@ -81,14 +82,30 @@ QUALITY: tuple[tuple[str, float, str], ...] = (
 
 
 def marker() -> dict:
-    """The block a synthetic bundle carries, and the viewer reads."""
-    return {"not_a_person": True, "why": WHY,
-            "label": "Demonstration data — not a real person"}
+    """The block a synthetic bundle carries, and the viewer reads.
+
+    Kept in the file even though the viewer no longer paints a banner with it.
+    The first version put a full-width amber bar on every screen, which was
+    right about the risk and wrong about the dose -- it shouted over the thing
+    it was labelling. The honest marking is the one that survives the file being
+    passed around, not the one that survives being looked at once.
+    """
+    return {"not_a_person": True, "why": WHY, "label": "Sample data"}
 
 
-def fill(store: Store, username: str = "anna", display: str = "Demo Student",
-         session: str = "tue-14", date: str = "2026-08-25") -> None:
-    """Write one made-up class into a store, in the shape a capture produces."""
+def fill(store: Store, username: str = "anna", display: str = "Sample Student",
+         session: str = "tue-14", date: str = "2026-08-25",
+         drift: int = 0) -> None:
+    """Write one made-up class into a store, in the shape a capture produces.
+
+    ``drift`` is which week this is, and moves a few quantities a little. See
+    :data:`DRIFT`: most of them move less than they wobble within one session,
+    so the viewer's noise floor refuses to call them a change -- which is the
+    behaviour worth demonstrating.
+    """
+    def shift(subject: str, base: float) -> float:
+        return base + DRIFT.get(subject, 0.0) * drift + WOBBLE[drift % len(WOBBLE)]
+
     store.enrol(username, display)
     store.record_session(SessionMeta(key=session, date=date, studio="Demo studio",
                                      duration_s=1800, video=""))
@@ -105,16 +122,19 @@ def fill(store: Store, username: str = "anna", display: str = "Demo Student",
 
     for subject, (value, spread) in ANGLES.items():
         for key, start, end, _ in PLAN:
-            store.add_measurement(session, 1, subject, value, spread=spread,
+            store.add_measurement(session, 1, subject, shift(subject, value),
+                                  spread=spread,
                                   samples=int((end - start) / 6), unit="deg",
                                   source="standard", exercise=key,
                                   at_time=float(start))
     for subject, value in SYMMETRY.items():
-        store.add_measurement(session, 1, subject, value, spread=1.2, samples=900,
+        store.add_measurement(session, 1, subject, max(0.0, shift(subject, value)),
+                              spread=1.2, samples=900,
                               unit="deg", source="standard",
                               exercise="oneLegCircle")
     for group, moment in MOMENTS.items():
-        store.add_measurement(session, 1, f"{group} peak moment", moment,
+        store.add_measurement(session, 1, f"{group} peak moment",
+                              shift(f"{group} peak moment", moment),
                               spread=moment * 0.14, samples=880, unit="Nm",
                               source="load", exercise="oneLegCircle")
     for subject, value, unit in QUALITY:
@@ -122,8 +142,49 @@ def fill(store: Store, username: str = "anna", display: str = "Demo Student",
                               unit=unit, source="quality", exercise="plank")
 
 
+#: Twelve weeks of Tuesdays. One session shows what the instrument produces;
+#: a run of them shows the thing the instrument is for, which is whether
+#: anything changed. The drift is deliberately smaller than the within-session
+#: spread on most quantities, so the viewer's own noise floor refuses to call
+#: most of them a change -- a demonstration where every line marches upward
+#: would teach the reader that the instrument always finds progress.
+WEEKS = 12
+DRIFT: dict[str, float] = {
+    "hip flexors peak moment": 0.9,     # clears the floor over twelve weeks
+    "hip extensors peak moment": 0.7,
+    "left_hip": 0.55, "right_hip": 0.5,
+    "knee symmetry": -0.14,             # lower is better, and it clears
+    "left_knee": 0.06, "right_knee": 0.05,   # never clears: stays "steady"
+    "trunk": -0.04,
+}
+#: A little wobble, so the series is not a straight line -- a noise floor tested
+#: against a perfectly smooth series is not tested at all.
+WOBBLE = (0.0, 0.4, -0.3, 0.15, -0.45, 0.25, -0.1, 0.35, -0.25, 0.05, 0.3, -0.2)
+
+
+def weeks(store: Store, username: str = "anna", display: str = "Sample Student",
+          count: int = WEEKS) -> list[str]:
+    """A run of classes, so there is a history to draw.
+
+    Dates go backwards from the most recent so the last session is the one the
+    bundle is built for -- the same shape a studio would have, where today's
+    class is the newest row and the record grows behind it.
+    """
+    from datetime import date, timedelta
+
+    last = date(2026, 8, 25)
+    keys = []
+    for week in range(count):
+        at = last - timedelta(weeks=count - 1 - week)
+        key = f"tue-{week + 1:02d}"
+        fill(store, username=username, display=display, session=key,
+             date=at.isoformat(), drift=week)
+        keys.append(key)
+    return keys
+
+
 def build(out_dir: str | Path, username: str = "anna",
-          session: str = "tue-14") -> tuple[Path, Path]:
+          session: str | None = None) -> tuple[Path, Path]:
     """Write the demo bundle and the manifest the viewer looks for.
 
     The manifest is what lets the application offer a demonstration without one
@@ -137,10 +198,11 @@ def build(out_dir: str | Path, username: str = "anna",
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     with Store.memory() as store:
-        fill(store, username=username, session=session)
-        bundle = build_bundle(store, username, session, include_poses=False,
+        keys = weeks(store, username=username)
+        latest = session or keys[-1]
+        bundle = build_bundle(store, username, latest, include_poses=False,
                               synthetic=marker())
-    path = write_bundle(bundle, out / f"{username}-{session}.json")
+    path = write_bundle(bundle, out / f"{username}-{latest}.json")
 
     manifest = out / "index.json"
     manifest.write_text(
