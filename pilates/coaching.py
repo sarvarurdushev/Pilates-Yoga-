@@ -326,6 +326,16 @@ UNSUITABLE: dict[str, str] = {
     "triangle": "like a side bend, it is confusable with a back bend from one "
                 "camera; the plane of the lean is not recorded",
     "savasana": "lying still has nothing to measure beyond that it is still",
+    # Moved here from the standards after a review against a second library.
+    # Its only targets were "the knees stayed straight" and "the arms stayed
+    # straight", which the general movement-quality check already covers
+    # without needing a name -- and the trunk, the one thing that would make it
+    # this exercise rather than any other, is exactly what a single camera
+    # cannot place, for the same reason as triangle above.
+    "standing_back_bend": "the arch is in the camera's depth axis when filmed "
+                          "from the side and confusable with a side bend when "
+                          "filmed from the front; what is left to check is true "
+                          "of any standing movement",
 }
 
 
@@ -532,18 +542,6 @@ DEFAULT_STANDARDS: dict[str, ExerciseStandard] = {
               "bend look alike from one camera, so a trunk target here would "
               "confidently measure the wrong thing.",
     ),
-    "standing_back_bend": ExerciseStandard(
-        exercise="standing_back_bend",
-        angles=[
-            _straight("left_knee", "the knees bent as the torso arched"),
-            _straight("right_knee", "the knees bent as the torso arched"),
-            _straight("left_elbow", "the arms stayed bent", "the arms reached long overhead"),
-            _straight("right_elbow", "the arms stayed bent"),
-        ],
-        notes="Trunk angle is deliberately not checked, for the same reason as "
-              "the side bend.",
-    ),
-    # ---- Pilates mat, in the classical order ----
     "the_hundred": ExerciseStandard(
         exercise="the_hundred",
         angles=[

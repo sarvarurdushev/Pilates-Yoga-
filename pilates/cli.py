@@ -21,6 +21,7 @@
     python -m pilates describe VIDEO --model m.joblib # what each student did
     python -m pilates describe VIDEO --anatomy        # ...with muscles and nerves
     python -m pilates crosscheck nw.json              # our targets against theirs
+    python -m pilates merge nw.json --policy          # combine the two libraries
 """
 from __future__ import annotations
 
@@ -729,6 +730,7 @@ def cmd_describe(args: argparse.Namespace) -> int:
     from .interaction import ContactLog, find_contacts
     from .movement import SessionRecorder
     from .recognition import OpenSetRecogniser, describe as describe_movement
+    from .universal import assess_unnamed, build_baseline
 
     config = _load_config(args.config)
     if args.stride is not None:
@@ -783,6 +785,12 @@ def cmd_describe(args: argparse.Namespace) -> int:
         print("No student was tracked long enough to describe.")
         return 1
 
+    # The room is the standard when no library entry is. Built from everyone
+    # measured, before any one student is judged against it.
+    baseline = build_baseline(
+        [recorder.histories[t] for t in summaries if t in recorder.histories],
+        keypoint_threshold=config.keypoint_threshold)
+
     # Behaviour, not appearance: whoever circulated putting hands on several
     # different people. Nothing here recognises a face or a uniform, and when
     # the evidence is thin nobody is named.
@@ -815,6 +823,10 @@ def cmd_describe(args: argparse.Namespace) -> int:
             if window is not None:
                 recognition = recogniser.recognise(window)
 
+        assessment = assess_unnamed(
+            recorder.histories[track_id], summary, description.summarise(),
+            baseline if baseline.usable else None,
+            keypoint_threshold=config.keypoint_threshold)
         headline = (recognition.headline(description.summarise())
                     if recognition else description.summarise())
         who = (f"Instructor? (track #{track_id})" if track_id == instructor
@@ -826,6 +838,12 @@ def cmd_describe(args: argparse.Namespace) -> int:
         elif recognition is not None:
             # The reason is for whoever is tuning the model, not for a student.
             print(f"  [name withheld: {recognition.withheld_reason}]")
+        for finding in assessment.improve:
+            detail = (f" — measured {finding.measured:.0f}, {finding.target}"
+                      if finding.measured is not None and finding.target else "")
+            print(f"  work on: {finding.message}{detail}")
+        for finding in assessment.good:
+            print(f"  going well: {finding.message}")
         if args.anatomy:
             _print_anatomy(library, recognition, report)
         for adjustment in contacts.for_student(track_id):
@@ -837,8 +855,10 @@ def cmd_describe(args: argparse.Namespace) -> int:
             print(f"  no load estimated: {why}")
         print()
 
-    print("Names are withheld rather than guessed. What is printed instead is "
-          "measured\ndirectly and does not depend on knowing the exercise.")
+    print(baseline.explain())
+    print("\nNames are withheld rather than guessed. Everything above is "
+          "measured directly\nor compared against the rest of the room, and "
+          "neither depends on knowing what\nthe exercise is called.")
     if args.anatomy:
         print("\n[measured] came from this student's video. [reference] is "
               "anatomy, true of\neverybody and looked up by exercise name. "
@@ -971,6 +991,57 @@ def cmd_crosscheck(args: argparse.Namespace) -> int:
           f"are outside what one camera\nmeasures, so nothing is claimed about "
           f"them either way.")
     return 2 if result.disagreed else 0
+
+
+def cmd_merge(args: argparse.Namespace) -> int:
+    """Combine this system's standards with a curated library, field by field.
+
+    Each field comes from whichever source is in a position to know it, and the
+    policy says why. Angle targets are the exception: two independently written
+    targets that disagree mean one source is wrong about an exercise, and
+    picking one would destroy the only evidence of that.
+    """
+    from .coaching import DEFAULT_STANDARDS, UNSUITABLE, load_standards
+    from .merge import POLICY, merge_libraries, review_local_only
+
+    standards = load_standards(args.standards) if args.standards else DEFAULT_STANDARDS
+    report = merge_libraries(standards, args.library, tolerance=args.tolerance)
+    print(report.describe())
+
+    if args.policy:
+        print("\nWhere each field comes from:")
+        for name, (source, reason) in sorted(POLICY.items()):
+            print(f"  {name:22} {source:9} {reason}")
+
+    verdicts = review_local_only(report.local_only, standards)
+    if verdicts:
+        print("\nExercises the imported library does not have:")
+        for verdict in verdicts:
+            print(f"  {verdict.describe()}")
+        print("\nAbsence from one library is weak evidence. The question asked "
+              "here is\nwhether the standard says something a camera can check "
+              "that a general\nmovement-quality check does not already cover.")
+
+    if args.out:
+        payload = {
+            "standards": [m.standard.to_dict() for m in report.merged.values()],
+            "contested": [
+                {"exercise": c.exercise, "joint": c.joint,
+                 "ours": list(c.ours), "theirs": list(c.theirs)}
+                for m in report.contested for c in m.conflicts
+            ],
+        }
+        Path(args.out).write_text(json.dumps(payload, indent=2) + "\n")
+        print(f"\nmerged standards -> {args.out}")
+        if report.contested:
+            print("Contested targets are listed in the file and left as this "
+                  "side had them.\nA teacher settles those, not a merge.")
+    unnamed = len(report.imported_only)
+    if unnamed:
+        print(f"\n{unnamed} imported exercises have no standard here. They are "
+              f"not lost:\n`pilates describe` coaches an unnamed movement from "
+              f"movement quality and\nfrom the rest of the class.")
+    return 0
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
@@ -1463,6 +1534,16 @@ def main(argv: list[str] | None = None) -> int:
                     help="degrees either side of a target pose that still count "
                          "as doing it (default 20)")
     xc.set_defaults(func=cmd_crosscheck)
+
+    mg = sub.add_parser("merge",
+                        help="combine our standards with a curated library")
+    mg.add_argument("library", help="a JSON export of the reference library")
+    mg.add_argument("--standards", default=None)
+    mg.add_argument("--tolerance", type=float, default=20.0)
+    mg.add_argument("--policy", action="store_true",
+                    help="print which source each field comes from, and why")
+    mg.add_argument("--out", default=None, help="write the merged standards")
+    mg.set_defaults(func=cmd_merge)
 
     dr = sub.add_parser("doctor", help="check this machine can run an analysis")
     dr.set_defaults(func=cmd_doctor)

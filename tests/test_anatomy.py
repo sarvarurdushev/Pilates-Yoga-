@@ -63,9 +63,13 @@ class TestCoverage:
         assert missing == []
 
     def test_no_anatomy_entry_is_orphaned(self):
-        from pilates.coaching import DEFAULT_STANDARDS
+        """An exercise this system refuses to measure still has anatomy —
+        reference does not depend on measurability — so an entry may name an
+        unsuitable exercise, but not one nothing knows about at all."""
+        from pilates.coaching import DEFAULT_STANDARDS, UNSUITABLE
 
-        assert sorted(set(DEFAULT_ANATOMY) - set(DEFAULT_STANDARDS)) == []
+        known = set(DEFAULT_STANDARDS) | set(UNSUITABLE)
+        assert sorted(set(DEFAULT_ANATOMY) - known) == []
 
     def test_every_entry_names_its_source(self):
         assert all(e.source for e in DEFAULT_ANATOMY.values())

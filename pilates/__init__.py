@@ -18,7 +18,12 @@ from .anatomy import (DEFAULT_ANATOMY, EMG, INFERRED, MEASURED, MUSCLE_SYNONYMS,
                       AnatomyLibrary, Innervation, Reconciliation, ResearchNote,
                       bones_for, canonical, extract_roots, groups_for,
                       innervation, reconcile)
-from .neurowellness import ImportReport, load_export, normalise
+from .merge import (POLICY, Merged, MergeReport, Verdict, merge_libraries,
+                    merge_standard, review_local_only)
+from .neurowellness import (Crosscheck, ImportReport, crosscheck_poses,
+                            load_export, normalise, pose_angles, pose_targets)
+from .universal import (ClassBaseline, UnnamedAssessment, assess_against_class,
+                        assess_quality, assess_unnamed, build_baseline)
 from .biomechanics import (MUSCLE_GROUPS, SEGMENTS, JointLoad, LoadReport,
                            MuscleGroup, NotComputable, analyse_frame,
                            classify_contraction, gravitational_moment)
@@ -64,7 +69,11 @@ __all__ = [
     "Innervation", "Reconciliation", "ResearchNote", "bones_for", "innervation",
     "reconcile", "MEASURED", "REFERENCE", "RESEARCH", "EMG", "INFERRED",
     "MUSCLE_SYNONYMS", "canonical", "extract_roots", "groups_for",
-    "ImportReport", "load_export", "normalise",
+    "ImportReport", "load_export", "normalise", "Crosscheck", "crosscheck_poses",
+    "pose_angles", "pose_targets", "POLICY", "Merged", "MergeReport", "Verdict",
+    "merge_libraries", "merge_standard", "review_local_only",
+    "ClassBaseline", "UnnamedAssessment", "assess_against_class",
+    "assess_quality", "assess_unnamed", "build_baseline",
     "JointLoad", "LoadReport", "MuscleGroup", "MUSCLE_GROUPS", "SEGMENTS",
     "analyse_frame", "gravitational_moment", "classify_contraction", "NotComputable",
     "Check", "VideoFacts", "check_environment", "environment_ready",

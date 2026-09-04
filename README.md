@@ -566,6 +566,80 @@ python -m pilates describe class.mp4 --anatomy --anatomy-file our_library.json
 Bones are derived from the joints when a file does not list them, so the two
 cannot drift apart.
 
+## Coaching an exercise that is not in any library
+
+A library of named exercises will never be finished. There are hundreds of
+Pilates and yoga movements before anyone counts machine variations, prop
+variations, and whatever a teacher invented last week. A system that can only
+speak about what somebody has entered says nothing for most of a real class.
+
+Two things can be said without a name, and between them they cover most of what
+a teacher actually corrects.
+
+### Movement quality does not need a name
+
+Whether the repetitions were the same size as each other, whether the movement
+was smooth or wobbled, whether it was lowered under control or dropped, whether
+a hold drifted — none of these need to know what the exercise is. They are
+properties of *how* a movement was performed, and they are wrong in the same
+way in a teaser and in a squat.
+
+These are guarded so they never fire where they would be meaningless: no
+repetition qualities for a held position, nothing at all for a sequence, and
+nothing invented from a number that was not measured.
+
+### The class is the standard
+
+Everyone in the room is doing the same thing at the same time, on the teacher's
+count. That makes the cohort a reference that needs no library and is better
+than one in two ways: it is whatever the teacher actually taught rather than
+what a book says, and it adapts automatically to a variation, a prop or a
+machine.
+
+```
+Student #5 — 3 repetitions of a movement, lying, led by the left hip through 23 degrees
+  work on: the left hip travelled less far than the rest of the class through
+           the same movement — measured 27, class median 66deg of travel
+  work on: the left hip was open further than the rest of the class
+           — measured 164, class median 131deg
+  work on: the movement changed direction inside a repetition rather than
+           travelling smoothly — measured 2, below 1.6
+
+Class baseline from 6 students. The hip gap is large across the whole class, so
+this movement is uneven by design and a student matching it is doing it right.
+```
+
+Nothing in that output required knowing the exercise. It works on the 158
+imported exercises with no standard written for them, and on the ones nobody
+has written down anywhere.
+
+**Position and travel are different questions.** A student swinging twice as far
+as everyone else has the same median angle as them, so comparing middles alone
+cannot see it — and travel is what most differs across a room. Both are
+compared.
+
+### The room settles what one camera cannot
+
+A single camera cannot tell an exercise that is asymmetric by design from a
+student who is lopsided. A room can: if fifteen of eighteen students show the
+same left-right gap, the gap belongs to the exercise. Symmetry is then judged
+against the class's gap rather than against zero, so a student matching a lunge
+is not corrected for doing a lunge.
+
+That inference is only available with a room full of people — which is the
+setting this system is built for, and it holds for a variation nobody has named.
+
+### Where it refuses
+
+| Condition | Behaviour |
+|---|---|
+| Fewer than 4 students measured | No class comparison. With three people the median is one person's opinion |
+| The class spread on a joint exceeds 25° | Nothing judged there. A class strung out that far was not doing one thing, and calling its middle "correct" invents a target nobody aimed at |
+| A student below the deviation floor | Nothing said. Normal human variation is not a fault |
+| A student inside twice the class's own spread | Nothing said. A tight class and a loose one cannot use the same absolute bar |
+
+The last two are both gates, and both have to clear.
+
 ## Importing Neuro Wellness
 
 [Neuro Wellness](https://github.com/sarvarurdushev/Neuro_Wellness) holds 190
@@ -707,6 +781,68 @@ Jackknife was reported missing on the first pass and is not — their key is one
 word, `jackknife`, where this side writes `jack_knife`. Names are now also
 compared with every separator removed, which is an exact letter-for-letter
 match and so adds no fuzziness.
+
+### Merging two libraries
+
+Where two curated sources overlap, one is better on each field, and it is not
+the same one every time. Picking a winner per source throws away what the loser
+was good at; picking per field keeps both.
+
+```bash
+python -m pilates merge nw.json --policy --out merged.json
+```
+
+| Field | From | Because |
+|---|---|---|
+| muscle roles | imported | marked measured or inferred per muscle |
+| nerve supply | imported | sourced to an anatomy text |
+| contraindications | imported | this side records none |
+| expected activation | imported | this side records none |
+| research claims | imported | tiered, cited, with caveats |
+| hold targets | imported | it records seconds; this side does not |
+| **angle targets** | **neither** | see below |
+| coaching cues | local | the imported records carry no prose |
+| symmetry targets | local | the imported schema has no such idea |
+| asymmetric by design | local | likewise, and it protects a student |
+| camera refusals | local | the imported side has no camera model |
+
+The policy is data, not prose: the command prints it, and a test checks the
+merge obeys it.
+
+**Angle targets are the case a merge must not resolve.** Two independently
+written targets that agree are mutually confirming and either will do. Two that
+disagree mean one source is wrong about an exercise, and quietly taking one
+would destroy the only evidence that anything is wrong. Conflicts are carried
+on the merged record and left for a teacher.
+
+The merge added 34 targets this side did not have — Warrior II gained hip and
+knee targets where it previously had only a trunk angle. It added them **only
+for joints the record's own `actions` list says the exercise is about**: a
+target pose sets every joint the rig needs, and importing the incidental ones
+wholesale would flag a student for resting their arms differently during a leg
+exercise.
+
+### Keeping or dropping what the other library lacks
+
+Absence from one library is weak evidence of anything, so the review asks a
+different question: does this standard say something a camera can check that
+the general movement-quality check does not already cover?
+
+```
+keep   the_hundred: part of the classical mat repertoire, so its absence
+       elsewhere is a gap there rather than a case against it
+keep   standing_side_bend: no angle target beyond "the limb stayed straight",
+       but 1 left/right target, which the general check cannot make without
+       knowing the exercise is meant to be even
+drop   standing_back_bend: every target is "the limb stayed straight", which the
+       general check already covers. Keeping the name costs a class the
+       recogniser can confuse and buys nothing
+```
+
+`standing_back_bend` was acted on: **moved to the refusal list, not deleted**,
+so labelling a video with it still explains itself rather than failing
+silently. Its arch is in the depth axis from the side and confusable with a side
+bend from the front — the same reason triangle is already refused.
 
 ### What their table corrected here
 

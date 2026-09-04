@@ -446,3 +446,110 @@ class TestCrosscheckCommand:
         path.write_text('{"exercises": []}')
         assert main(["crosscheck", str(path)]) == 1
         assert "export_neuro_wellness" in capsys.readouterr().err
+
+
+class TestMergeCommand:
+    LIBRARY = str(Path(__file__).parent / "data" / "neuro_wellness_sample.json")
+
+    def test_it_reports_what_was_merged(self, capsys):
+        assert main(["merge", self.LIBRARY]) == 0
+        assert "exercises merged" in capsys.readouterr().out
+
+    def test_the_policy_can_be_printed(self, capsys):
+        main(["merge", self.LIBRARY, "--policy"])
+        out = capsys.readouterr().out
+        assert "Where each field comes from" in out
+        assert "imported" in out and "local" in out
+
+    def test_it_reviews_what_the_import_lacks(self, capsys):
+        main(["merge", self.LIBRARY])
+        out = capsys.readouterr().out
+        assert "does not have" in out
+        assert "keep" in out or "drop" in out
+
+    def test_it_says_unmatched_imports_are_not_lost(self, capsys):
+        main(["merge", self.LIBRARY])
+        assert "coaches an unnamed movement" in capsys.readouterr().out
+
+    def test_merged_standards_can_be_written_out(self, tmp_path, capsys):
+        import json
+
+        out = tmp_path / "merged.json"
+        main(["merge", self.LIBRARY, "--out", str(out)])
+        payload = json.loads(out.read_text())
+        assert payload["standards"]
+        assert "contested" in payload
+
+    def test_contested_targets_reach_the_file(self, tmp_path):
+        import json
+
+        out = tmp_path / "merged.json"
+        main(["merge", self.LIBRARY, "--out", str(out)])
+        payload = json.loads(out.read_text())
+        for item in payload["contested"]:
+            assert item["ours"] and item["theirs"]
+
+
+class TestUnnamedCoaching:
+    """The answer to "how do you measure something not in the library"."""
+
+    def _class(self, n=90, odd_amplitude=6.0):
+        frames = []
+        for i in range(n):
+            people = []
+            for track_id in range(6):
+                base = make_detection(x=100 + track_id * 200, y=100, lying=True)
+                points = base.keypoints.copy()
+                amplitude = odd_amplitude if track_id == 5 else 30.0
+                swing = amplitude * np.sin(2 * np.pi * 3 * i / n)
+                points[kp.L_KNEE] = points[kp.L_KNEE] + np.array([0.0, -swing])
+                points[kp.L_ANKLE] = points[kp.L_ANKLE] + np.array([0.0, -swing * 1.8])
+                people.append(TrackedPerson(
+                    track_id=track_id,
+                    detection=Detection(points, base.scores.copy())))
+            frames.append(FrameResult(frame_index=i, timestamp=i / 10.0,
+                                      people=people))
+        return frames
+
+    def test_a_student_is_coached_with_no_model_and_no_standard(
+            self, monkeypatch, capsys):
+        install(monkeypatch, self._class())
+        main(["describe", "clip.mov", "--student", "5"])
+        out = capsys.readouterr().out
+        assert "work on:" in out
+
+    def test_the_finding_names_the_class_as_the_reference(self, monkeypatch, capsys):
+        install(monkeypatch, self._class())
+        main(["describe", "clip.mov", "--student", "5"])
+        assert "rest of the class" in capsys.readouterr().out
+
+    def test_a_student_matching_the_class_is_not_corrected(self, monkeypatch, capsys):
+        install(monkeypatch, self._class())
+        main(["describe", "clip.mov", "--student", "2"])
+        out = capsys.readouterr().out
+        assert "rest of the class" not in out
+
+    def test_the_class_baseline_is_explained(self, monkeypatch, capsys):
+        install(monkeypatch, self._class())
+        main(["describe", "clip.mov"])
+        assert "Class baseline from 6 students" in capsys.readouterr().out
+
+    def test_an_asymmetric_movement_is_recognised_as_such(self, monkeypatch, capsys):
+        """Only the left leg moves, so the whole room is uneven — which makes
+        it the exercise, not the students."""
+        install(monkeypatch, self._class())
+        main(["describe", "clip.mov"])
+        assert "uneven by design" in capsys.readouterr().out
+
+    def test_the_footer_says_none_of_it_needed_a_name(self, monkeypatch, capsys):
+        install(monkeypatch, self._class())
+        main(["describe", "clip.mov"])
+        assert "neither depends on knowing what" in capsys.readouterr().out
+
+    def test_one_student_alone_gets_quality_but_no_class_comparison(
+            self, monkeypatch, capsys):
+        install(monkeypatch, leg_raise())
+        main(["describe", "clip.mov"])
+        out = capsys.readouterr().out
+        assert "rest of the class" not in out
+        assert "at least 4 are needed" in out
