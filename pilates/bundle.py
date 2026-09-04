@@ -312,6 +312,31 @@ def _history(store: Store, username: str, session: str) -> dict:
     return out
 
 
+def _score_history(store: Store, username: str) -> list[dict]:
+    """The score for every session this person has, oldest first.
+
+    Derived rather than stored, like every other score in this system: a change
+    to how one is computed applies to every session ever recorded instead of
+    only to new ones. A session whose score is withheld -- too few checks to
+    stand on -- carries its reason rather than a number, because a gap in the
+    line is a fact about the recording and filling it in would be an invention.
+    """
+    out = []
+    for row in store.sessions():
+        links = [l for l in store.links(session=row["key"], status="confirmed")
+                 if l.username == username]
+        if not links:
+            continue
+        score = score_from_store(store, username, row["key"])
+        out.append({
+            "session": row["key"], "date": row["date"],
+            "value": None if score.value is None else round(score.value, 1),
+            "withheld_reason": score.withheld_reason,
+            "checks": score.checks, "coverage": round(score.coverage, 3),
+        })
+    return sorted(out, key=lambda s: s["date"])
+
+
 def _date_of(store: Store, session: str) -> str:
     row = next((s for s in store.sessions() if s["key"] == session), None)
     return row["date"] if row else ""
@@ -383,6 +408,7 @@ def build(
         **({"synthetic": synthetic} if synthetic else {}),
         "quantities": quantities,
         "history": _history(store, username, session),
+        "score_history": _score_history(store, username),
         "structures": structures,
         "lighting": activation_plan(structures).scheme(),
         "events": [],

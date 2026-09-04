@@ -26,6 +26,7 @@ import { apply } from './bundle.js';
 import { attachPanel } from './panel.js';
 import { Session } from './session.js';
 import { attachLab, showReading } from './lab.js';
+import { capabilities, mount as mountRecorder } from './record.js';
 
 const BANNER_CSS = `
 #sessbar{position:fixed;left:0;right:0;top:0;z-index:60;display:flex;gap:14px;
@@ -181,7 +182,14 @@ function measuredColour(share) {
  * load. Choosing an exercise afterwards is the reader asking for the authored
  * roles, and they get them.
  */
-function light(session, model) {
+async function light(session, model) {
+  /* Most of what a Pilates class measures is under the superficial layer -- the
+   * psoas, the deep quadriceps -- and a body with that layer off shows half the
+   * answer and none of the hardest-working muscle. It is also what
+   * `renderStructureInto` needs before it can draw a thumbnail of one: with the
+   * layer unloaded it returns null and the tile stays black. */
+  await Promise.all([nw.setLayer('muscles_deep', true),
+                     nw.setLayer('muscles_superficial', true)]).catch(() => {});
   const result = apply(session.bundle, model);
   const original = new Map();
   for (const entry of result.lit) {
@@ -200,32 +208,25 @@ function light(session, model) {
   return { ...result, original };
 }
 
-async function boot() {
-  const url = new URLSearchParams(location.search).get('session');
-  if (!url) { offerDemo(); return; }
-  let bundle;
-  try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-    bundle = await response.json();
-  } catch (error) {
-    console.error(`[session] could not read ${url}:`, error);
-    return;
-  }
-
+/**
+ * Put a bundle onto the body.
+ *
+ * Called at load with whatever the URL names, and again whenever a clip has
+ * just been analysed. The second case is why this is a function rather than the
+ * body of `boot`: after a recording the reader is standing in front of their own
+ * measurements, and a page reload to show them would throw away the camera
+ * position, the layers they turned on and the structure they were looking at.
+ */
+export async function install(bundle) {
   const reg = await readyRegistry();
-  let session;
-  try {
-    session = new Session(bundle, reg);
-  } catch (error) {
-    // A bundle that fails its own checks is not shown at all. A picture drawn
-    // from a file that contradicts itself is worse than no picture.
-    console.error('[session] this bundle will not be shown:', error.message);
-    return;
-  }
+  // A bundle that fails its own checks is not shown at all. A picture drawn
+  // from a file that contradicts itself is worse than no picture.
+  const session = new Session(bundle, reg);
 
+  document.getElementById('sessbar')?.remove();
+  document.getElementById('demochip')?.remove();
   banner(session);
-  const lit = light(session, { registry: reg, palette: nw.gfx.palette });
+  const lit = await light(session, { registry: reg, palette: nw.gfx.palette });
   attachLab(session, nw);
   attachPanel(session, nw, {
     onProse: showReading,
@@ -239,6 +240,32 @@ async function boot() {
   console.info(`[session] ${session.person.username}: ${lit.lit.length} structures lit, `
              + `${session.ranked().length} groups measured, `
              + `${session.brainRegions().length} brain regions with claims`);
+  return session;
+}
+
+async function boot() {
+  /* The recorder is offered first and independently of any session: "where do I
+   * start recording" must have an answer on an empty page, which is the page
+   * somebody sees before they have ever recorded anything. */
+  const can = await capabilities();
+  if (can?.analyse) mountRecorder(nw, install);
+
+  const url = new URLSearchParams(location.search).get('session');
+  if (!url) { if (!can?.analyse) offerDemo(); return; }
+  let bundle;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+    bundle = await response.json();
+  } catch (error) {
+    console.error(`[session] could not read ${url}:`, error);
+    return;
+  }
+  try {
+    await install(bundle);
+  } catch (error) {
+    console.error('[session] this bundle will not be shown:', error.message);
+  }
 }
 
 boot();

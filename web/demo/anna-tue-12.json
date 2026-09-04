@@ -21,13 +21,24 @@
     }
   },
   "score": {
-    "value": null,
-    "withheld_reason": "only 0 check(s) could be made; a score from that few swings on any one of them",
-    "checks": 0,
+    "value": 80.0,
+    "withheld_reason": "",
+    "checks": 5,
     "measured": 12,
     "measurable": 12,
     "coverage": 1.0,
-    "components": [],
+    "components": [
+      {
+        "name": "form",
+        "score": 66.7,
+        "checks": 3
+      },
+      {
+        "name": "symmetry",
+        "score": 100.0,
+        "checks": 2
+      }
+    ],
     "missing": []
   },
   "exercises": [
@@ -422,7 +433,7 @@
       "technical": "left knee angle",
       "tier": "measured",
       "because": "measured from this session's video over 30 frames",
-      "value": 168.46,
+      "value": 170.5,
       "spread": 4.1,
       "samples": 30,
       "unit": "deg",
@@ -436,7 +447,7 @@
       "technical": "left knee angle",
       "tier": "measured",
       "because": "measured from this session's video over 50 frames",
-      "value": 168.46,
+      "value": 170.5,
       "spread": 4.1,
       "samples": 50,
       "unit": "deg",
@@ -450,7 +461,7 @@
       "technical": "left knee angle",
       "tier": "measured",
       "because": "measured from this session's video over 46 frames",
-      "value": 168.46,
+      "value": 170.5,
       "spread": 4.1,
       "samples": 46,
       "unit": "deg",
@@ -464,7 +475,7 @@
       "technical": "left knee angle",
       "tier": "measured",
       "because": "measured from this session's video over 36 frames",
-      "value": 168.46,
+      "value": 170.5,
       "spread": 4.1,
       "samples": 36,
       "unit": "deg",
@@ -478,7 +489,7 @@
       "technical": "left knee angle",
       "tier": "measured",
       "because": "measured from this session's video over 60 frames",
-      "value": 168.46,
+      "value": 170.5,
       "spread": 4.1,
       "samples": 60,
       "unit": "deg",
@@ -492,7 +503,7 @@
       "technical": "left knee angle",
       "tier": "measured",
       "because": "measured from this session's video over 43 frames",
-      "value": 168.46,
+      "value": 170.5,
       "spread": 4.1,
       "samples": 43,
       "unit": "deg",
@@ -506,7 +517,7 @@
       "technical": "left knee angle",
       "tier": "measured",
       "because": "measured from this session's video over 30 frames",
-      "value": 168.46,
+      "value": 170.5,
       "spread": 4.1,
       "samples": 30,
       "unit": "deg",
@@ -2656,90 +2667,90 @@
       "unit": "deg",
       "lower_is_better": false,
       "noise_floor": 4.1,
-      "verdict": "steady",
-      "change": 0.46,
+      "verdict": "changed",
+      "change": 18.5,
       "sessions": 12,
       "points": [
         {
           "date": "2026-06-09",
-          "value": 168.0,
+          "value": 152.0,
           "spread": 4.1,
           "samples": 30,
           "current": false
         },
         {
           "date": "2026-06-16",
-          "value": 168.46,
+          "value": 154.1,
           "spread": 4.1,
           "samples": 30,
           "current": false
         },
         {
           "date": "2026-06-23",
-          "value": 167.82,
+          "value": 155.1,
           "spread": 4.1,
           "samples": 30,
           "current": false
         },
         {
           "date": "2026-06-30",
-          "value": 168.33,
+          "value": 157.25,
           "spread": 4.1,
           "samples": 30,
           "current": false
         },
         {
           "date": "2026-07-07",
-          "value": 167.79,
+          "value": 158.35,
           "spread": 4.1,
           "samples": 30,
           "current": false
         },
         {
           "date": "2026-07-14",
-          "value": 168.55,
+          "value": 160.75,
           "spread": 4.1,
           "samples": 30,
           "current": false
         },
         {
           "date": "2026-07-21",
-          "value": 168.26,
+          "value": 162.1,
           "spread": 4.1,
           "samples": 30,
           "current": false
         },
         {
           "date": "2026-07-28",
-          "value": 168.77,
+          "value": 164.25,
           "spread": 4.1,
           "samples": 30,
           "current": false
         },
         {
           "date": "2026-08-04",
-          "value": 168.23,
+          "value": 165.35,
           "spread": 4.1,
           "samples": 30,
           "current": false
         },
         {
           "date": "2026-08-11",
-          "value": 168.59,
+          "value": 167.35,
           "spread": 4.1,
           "samples": 30,
           "current": false
         },
         {
           "date": "2026-08-18",
-          "value": 168.9,
+          "value": 169.3,
           "spread": 4.1,
           "samples": 30,
           "current": false
         },
         {
           "date": "2026-08-25",
-          "value": 168.46,
+          "value": 170.5,
           "spread": 4.1,
           "samples": 30,
           "current": true
@@ -4439,6 +4450,104 @@
       ]
     }
   },
+  "score_history": [
+    {
+      "session": "tue-01",
+      "date": "2026-06-09",
+      "value": 74.7,
+      "withheld_reason": "",
+      "checks": 5,
+      "coverage": 1.0
+    },
+    {
+      "session": "tue-02",
+      "date": "2026-06-16",
+      "value": 76.1,
+      "withheld_reason": "",
+      "checks": 5,
+      "coverage": 1.0
+    },
+    {
+      "session": "tue-03",
+      "date": "2026-06-23",
+      "value": null,
+      "withheld_reason": "only 4 check(s) could be made; a score from that few swings on any one of them",
+      "checks": 4,
+      "coverage": 1.0
+    },
+    {
+      "session": "tue-04",
+      "date": "2026-06-30",
+      "value": null,
+      "withheld_reason": "only 4 check(s) could be made; a score from that few swings on any one of them",
+      "checks": 4,
+      "coverage": 1.0
+    },
+    {
+      "session": "tue-05",
+      "date": "2026-07-07",
+      "value": null,
+      "withheld_reason": "only 4 check(s) could be made; a score from that few swings on any one of them",
+      "checks": 4,
+      "coverage": 1.0
+    },
+    {
+      "session": "tue-06",
+      "date": "2026-07-14",
+      "value": 80.0,
+      "withheld_reason": "",
+      "checks": 5,
+      "coverage": 1.0
+    },
+    {
+      "session": "tue-07",
+      "date": "2026-07-21",
+      "value": 80.0,
+      "withheld_reason": "",
+      "checks": 5,
+      "coverage": 1.0
+    },
+    {
+      "session": "tue-08",
+      "date": "2026-07-28",
+      "value": 80.0,
+      "withheld_reason": "",
+      "checks": 5,
+      "coverage": 1.0
+    },
+    {
+      "session": "tue-09",
+      "date": "2026-08-04",
+      "value": 80.0,
+      "withheld_reason": "",
+      "checks": 5,
+      "coverage": 1.0
+    },
+    {
+      "session": "tue-10",
+      "date": "2026-08-11",
+      "value": 80.0,
+      "withheld_reason": "",
+      "checks": 5,
+      "coverage": 1.0
+    },
+    {
+      "session": "tue-11",
+      "date": "2026-08-18",
+      "value": 80.0,
+      "withheld_reason": "",
+      "checks": 5,
+      "coverage": 1.0
+    },
+    {
+      "session": "tue-12",
+      "date": "2026-08-25",
+      "value": 80.0,
+      "withheld_reason": "",
+      "checks": 5,
+      "coverage": 1.0
+    }
+  ],
   "structures": [
     {
       "fma": "FMA37705",

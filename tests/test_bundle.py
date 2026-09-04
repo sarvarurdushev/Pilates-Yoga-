@@ -470,3 +470,71 @@ class TestSynthetic:
         moments = {s["name"]: s["value"] for s in self._demo()["structures"]
                    if s["tier"] == MEASURED}
         assert moments["psoas major"] > moments["triceps brachii"] * 5
+
+
+class TestHistory:
+    """A bundle that only ever shows the latest class can print a number. One
+    that carries the series can say whether it moved, which is the question the
+    person actually has."""
+
+    def _weeks(self, store, n=4):
+        from pilates.demo import fill
+
+        for week in range(n):
+            fill(store, session=f"w{week}", date=f"2026-0{week + 1}-05", drift=week)
+
+    def test_every_quantity_carries_its_series(self):
+        with Store.memory() as store:
+            self._weeks(store)
+            history = build(store, "anna", "w3", include_poses=False)["history"]
+        assert history["left_hip"]["sessions"] == 4
+        assert len(history["left_hip"]["points"]) == 4
+
+    def test_the_current_session_is_marked_on_the_line(self):
+        with Store.memory() as store:
+            self._weeks(store)
+            history = build(store, "anna", "w2", include_poses=False)["history"]
+        current = [p for p in history["left_hip"]["points"] if p["current"]]
+        assert len(current) == 1 and current[0]["date"] == "2026-03-05"
+
+    def test_the_verdict_is_the_same_rule_the_report_uses(self):
+        """Not recomputed here: the chart and the sentence must not be able to
+        disagree in front of the person they are about."""
+        from pilates.dashboard import collect
+
+        with Store.memory() as store:
+            self._weeks(store, 8)
+            history = build(store, "anna", "w7", include_poses=False)["history"]
+            for series in collect(store, "anna"):
+                assert history[series.subject]["verdict"] == series.verdict
+                assert history[series.subject]["noise_floor"] == round(series.floor, 3)
+
+    def test_the_score_is_carried_for_every_session(self):
+        with Store.memory() as store:
+            self._weeks(store)
+            runs = build(store, "anna", "w3", include_poses=False)["score_history"]
+        assert [r["session"] for r in runs] == ["w0", "w1", "w2", "w3"]
+
+    def test_a_withheld_score_carries_its_reason_rather_than_a_number(self):
+        with Store.memory() as store:
+            store.enrol("anna")
+            store.record_session(SessionMeta(key="s1", date="2026-03-03",
+                                             studio="", duration_s=0, video=""))
+            store.put_link(Link(session="s1", track_id=1,
+                                username="anna").confirm("coach"))
+            store.add_measurement("s1", 1, "left_hip", 120.0, unit="deg",
+                                  source="standard")
+            runs = build(store, "anna", "s1", include_poses=False)["score_history"]
+        assert runs[0]["value"] is None
+        assert runs[0]["withheld_reason"]
+
+    def test_another_person_s_sessions_do_not_appear(self):
+        with Store.memory() as store:
+            self._weeks(store)
+            store.enrol("ben")
+            store.record_session(SessionMeta(key="ben1", date="2026-05-05",
+                                             studio="", duration_s=0, video=""))
+            store.put_link(Link(session="ben1", track_id=1,
+                                username="ben").confirm("coach"))
+            runs = build(store, "anna", "w3", include_poses=False)["score_history"]
+        assert all(r["session"] != "ben1" for r in runs)

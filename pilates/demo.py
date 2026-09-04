@@ -50,7 +50,11 @@ PLAN: tuple[tuple[str, int, int, int], ...] = (
 
 #: Joint angles, in degrees, with the spread they varied by inside the session.
 ANGLES: dict[str, tuple[float, float]] = {
-    "left_knee": (168.0, 4.1), "right_knee": (171.0, 3.8),
+    # Starts outside the standard's band and comes into it, so the score
+    # has something to do over twelve weeks. Its neighbour barely moves, so
+    # the two together show the instrument both finding a change and
+    # refusing to call one.
+    "left_knee": (152.0, 4.1), "right_knee": (171.0, 3.8),
     "left_hip": (128.0, 6.2), "right_hip": (124.0, 5.9),
     "left_elbow": (172.0, 3.0), "right_elbow": (169.0, 3.4),
     "left_shoulder": (58.0, 7.7), "right_shoulder": (61.0, 8.1),
@@ -79,6 +83,46 @@ QUALITY: tuple[tuple[str, float, str], ...] = (
     ("seconds per repetition", 3.4, "s"), ("longest hold", 41.0, "s"),
     ("range consistency", 0.19, ""),
 )
+
+
+#: The standard the demo is judged against. Standing, so the angles this file
+#: makes up are the ones it actually names.
+JUDGED_AGAINST = "mountain"
+
+
+def _judge(shift):
+    """Findings from the demo's own numbers, using the real comparison.
+
+    Returns tuples rather than Finding objects so this file does not have to
+    import the coaching module's dataclass; what matters is that the deviation
+    and the threshold are the standard's own, not a second opinion written here.
+    """
+    from .coaching import DEFAULT_STANDARDS, NOTABLE_DEGREES
+
+    standard = DEFAULT_STANDARDS[JUDGED_AGAINST]
+    out = []
+    for target in standard.angles:
+        if target.joint not in ANGLES:
+            continue
+        median = shift(target.joint, ANGLES[target.joint][0])
+        deviation = target.deviation(median)
+        band = f"{target.low:.0f}-{target.high:.0f}deg"
+        if deviation >= NOTABLE_DEGREES:
+            out.append(("improve", target.cue, target.joint, median, band, deviation))
+        elif deviation == 0.0 and target.praise:
+            out.append(("good", target.praise, target.joint, median, band, 0.0))
+    for target in standard.symmetry:
+        name = f"{target.pair} symmetry"
+        if name not in SYMMETRY:
+            continue
+        gap = max(0.0, shift(name, SYMMETRY[name]))
+        band = f"within {target.tolerance:.0f}deg"
+        if gap > target.tolerance:
+            out.append(("improve", target.cue, name, gap, band, gap - target.tolerance))
+        else:
+            out.append(("good", f"left and right {target.pair} matched closely",
+                        name, gap, band, 0.0))
+    return out
 
 
 def marker() -> dict:
@@ -141,6 +185,18 @@ def fill(store: Store, username: str = "anna", display: str = "Sample Student",
         store.add_measurement(session, 1, subject, value, spread=0.2, samples=900,
                               unit=unit, source="quality", exercise="plank")
 
+    # A score is derived from findings, not from measurements, because the
+    # question it answers is "how close to the standard" rather than "what were
+    # the numbers". So the demo has to be assessed as well as measured -- and it
+    # is assessed by the real rule: the standard's own AngleTarget.deviation and
+    # the same NOTABLE_DEGREES threshold `assess` applies to a capture. Made-up
+    # inputs, real judgement.
+    for finding in _judge(shift):
+        store.add_finding(session, 1, finding[0], finding[1], subject=finding[2],
+                          exercise="mountain", measured=finding[3],
+                          target=finding[4], deviation=finding[5],
+                          source="standard")
+
 
 #: Twelve weeks of Tuesdays. One session shows what the instrument produces;
 #: a run of them shows the thing the instrument is for, which is whether
@@ -154,7 +210,8 @@ DRIFT: dict[str, float] = {
     "hip extensors peak moment": 0.7,
     "left_hip": 0.55, "right_hip": 0.5,
     "knee symmetry": -0.14,             # lower is better, and it clears
-    "left_knee": 0.06, "right_knee": 0.05,   # never clears: stays "steady"
+    "left_knee": 1.7,                   # crosses into the band around week 6
+    "right_knee": 0.05,                 # never clears: stays "steady"
     "trunk": -0.04,
 }
 #: A little wobble, so the series is not a straight line -- a noise floor tested

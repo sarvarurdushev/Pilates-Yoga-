@@ -1631,8 +1631,11 @@ def cmd_web(args: argparse.Namespace) -> int:
                 print(f"  {problem}", file=sys.stderr)
             return 1
 
-    url = run(bundle, port=args.port)
+    url = run(bundle, port=args.port, analyse=not args.no_analyse)
     print(f"the body -> {url}")
+    if not args.no_analyse:
+        print("  the Record button is live: point a camera at yourself, or drop "
+              "in a clip, and this runs the pipeline over it")
     if bundle is None:
         print("  no session: this is the anatomy application on its own, which "
               "is how it is meant to work without one")
@@ -2289,6 +2292,8 @@ def main(argv: list[str] | None = None) -> int:
     wb.add_argument("--bundle", help="a file written by 'pilates bundle'")
     wb.add_argument("--db", default="studio.db")
     wb.add_argument("--port", type=int, default=8000)
+    wb.add_argument("--no-analyse", action="store_true",
+                    help="serve the viewer only, with no upload endpoint")
     wb.set_defaults(func=cmd_web)
 
     dm = sub.add_parser("demo",
