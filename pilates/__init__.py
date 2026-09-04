@@ -30,6 +30,10 @@ from .biomechanics import (MUSCLE_GROUPS, SEGMENTS, JointLoad, LoadReport,
 from .classroom import (ClassPattern, ClassResult, CoverageCheck, Roster,
                         StudentResult, check_coverage, class_patterns, run_class)
 from .config import StudioConfig
+from .dashboard import Point, Series, collect, render as render_dashboard
+from .identity import (CONFIRMED, PROPOSED, REJECTED, Candidate, Directory,
+                       Link, Person, Proposal, Signature, propose)
+from .store import Row, SessionMeta, Store
 from .diagnostics import (Check, VideoFacts, check_environment, environment_ready,
                           inspect_video, quickstart)
 from .dataset import (Example, LoadedDataset, build_from_video, feature_vector,
@@ -60,6 +64,10 @@ __version__ = "0.1.0"
 
 __all__ = [
     "StudioConfig", "ExclusionZone", "ExerciseStandard", "AngleTarget",
+    "Candidate", "Directory", "Link", "Person", "Proposal", "Signature",
+    "propose", "CONFIRMED", "PROPOSED", "REJECTED",
+    "Store", "SessionMeta", "Row", "Point", "Series", "collect",
+    "render_dashboard",
     "SymmetryTarget", "Assessment", "Finding", "assess", "assess_tempo",
     "narrate", "DEFAULT_STANDARDS", "UNSUITABLE", "ExerciseClassifier", "Evaluation", "evaluate",
     "featurise", "window_features", "majority_baseline", "LabelSet", "Segment", "LabelError", "VOCABULARY",

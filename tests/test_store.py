@@ -287,3 +287,108 @@ class TestPersistence:
     def test_opening_creates_the_folder_and_schema(self, tmp_path):
         with Store.open(tmp_path / "nested" / "studio.db") as db:
             assert db.people() == []
+
+
+class TestLearningFromConfirmation:
+    """Confirming is what makes a shape belong to a person. Learning from an
+    unconfirmed link would let one wrong guess drag a signature towards
+    somebody else, and every later proposal would inherit the error."""
+
+    def _with_signature(self, store, key, track_id=4):
+        signature = Signature({"shoulder_to_torso": 1.2, "hip_to_torso": 0.8,
+                               "thigh_to_torso": 1.1, "shank_to_thigh": 1.0},
+                              frames=60)
+        store.put_link(Link(session=key, track_id=track_id, username=""),
+                       signature)
+        return signature
+
+    def test_a_signature_is_held_against_the_track_before_anyone_is_named(self, store):
+        key = a_session(store)
+        self._with_signature(store, key)
+        assert store.link_signature(key, 4).usable
+
+    def test_confirming_folds_it_into_the_person(self, store):
+        key = a_session(store)
+        self._with_signature(store, key)
+        assert store.settle(Link(session=key, track_id=4,
+                                 username="anna").confirm("teacher"))
+        assert store.signature("anna").usable
+
+    def test_a_rejection_teaches_nothing(self, store):
+        """It says this shape was *not* that person; the way to use that is to
+        stop proposing it, never to average it in."""
+        key = a_session(store)
+        self._with_signature(store, key)
+        assert not store.settle(Link(session=key, track_id=4,
+                                     username="anna").reject("teacher"))
+        assert not store.signature("anna").usable
+
+    def test_a_proposal_teaches_nothing_until_it_is_confirmed(self, store):
+        key = a_session(store)
+        self._with_signature(store, key)
+        assert not store.settle(Link(session=key, track_id=4, username="anna"))
+        assert not store.signature("anna").usable
+
+    def test_confirmations_accumulate_across_sessions(self, store):
+        for i in range(3):
+            key = a_session(store, key=f"s{i}", date=f"2026-01-0{i + 1}")
+            self._with_signature(store, key)
+            store.settle(Link(session=key, track_id=4,
+                              username="anna").confirm("teacher"))
+        assert store.signature("anna").frames == 180
+
+    def test_a_link_with_no_signature_settles_without_error(self, store):
+        key = a_session(store)
+        store.put_link(Link(session=key, track_id=4, username="anna"))
+        assert not store.settle(Link(session=key, track_id=4,
+                                     username="anna").confirm("teacher"))
+
+    def test_re_saving_a_link_keeps_the_signature_it_already_had(self, store):
+        """Confirming goes through put_link, which must not wipe the shape it
+        is about to learn from."""
+        key = a_session(store)
+        self._with_signature(store, key)
+        store.put_link(Link(session=key, track_id=4, username="anna"))
+        assert store.link_signature(key, 4).usable
+
+
+class TestMigration:
+    """A store that has been collecting for a year has to stay usable when the
+    schema grows. CREATE TABLE IF NOT EXISTS leaves an old table alone."""
+
+    def test_a_missing_column_is_added_rather_than_silently_absent(self, tmp_path):
+        import sqlite3
+
+        path = tmp_path / "old.db"
+        old = sqlite3.connect(str(path))
+        old.executescript(
+            "CREATE TABLE links (session_id INTEGER, track_id INTEGER, "
+            "username TEXT, status TEXT, method TEXT, distance REAL, "
+            "confirmed_by TEXT, confirmed_at TEXT, "
+            "PRIMARY KEY (session_id, track_id));")
+        old.commit()
+        old.close()
+
+        with Store.open(path) as store:
+            columns = {r["name"] for r in store.db.execute("PRAGMA table_info(links)")}
+            assert "signature" in columns
+
+    def test_an_old_store_still_takes_new_writes(self, tmp_path):
+        import sqlite3
+
+        path = tmp_path / "old.db"
+        old = sqlite3.connect(str(path))
+        old.executescript(
+            "CREATE TABLE measurements (id INTEGER PRIMARY KEY, session_id INTEGER, "
+            "track_id INTEGER, exercise TEXT, subject TEXT, value REAL, "
+            "spread REAL, samples INTEGER, unit TEXT, source TEXT, valid INTEGER, "
+            "invalid_reason TEXT);")
+        old.commit()
+        old.close()
+
+        with Store.open(path) as store:
+            store.enrol("anna")
+            key = a_session(store)
+            store.add_measurement(key, 4, "left_hip", 60.0, at_time=12.5)
+            confirmed(store, key)
+            assert len(store.history("anna")) == 1

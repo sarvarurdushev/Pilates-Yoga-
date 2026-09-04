@@ -553,3 +553,139 @@ class TestUnnamedCoaching:
         out = capsys.readouterr().out
         assert "rest of the class" not in out
         assert "at least 4 are needed" in out
+
+
+class TestPersonPipeline:
+    """Enrol, identify, confirm, chart. The loop that turns a camera into a
+    long-term record."""
+
+    def _people(self, builds, n=60):
+        """A class of bodies with different limb proportions."""
+        frames = []
+        for i in range(n):
+            people = []
+            for track_id, (arm, leg) in builds.items():
+                base = make_detection(x=100 + track_id * 250, y=100, lying=True)
+                points = base.keypoints.copy()
+                for joint, anchor in ((kp.L_WRIST, kp.L_ELBOW),
+                                      (kp.R_WRIST, kp.R_ELBOW)):
+                    points[joint] = points[anchor] + \
+                        (points[joint] - points[anchor]) * arm
+                for joint, anchor in ((kp.L_ANKLE, kp.L_KNEE),
+                                      (kp.R_ANKLE, kp.R_KNEE)):
+                    points[joint] = points[anchor] + \
+                        (points[joint] - points[anchor]) * leg
+                people.append(TrackedPerson(
+                    track_id=track_id,
+                    detection=Detection(points, base.scores.copy())))
+            frames.append(FrameResult(frame_index=i, timestamp=i / 10.0,
+                                      people=people))
+        return frames
+
+    def _db(self, tmp_path):
+        return str(tmp_path / "studio.db")
+
+    def test_enrolling_holds_no_measurements_yet(self, tmp_path, capsys):
+        db = self._db(tmp_path)
+        main(["enrol", "anna", "--name", "Anna Smith", "--db", db])
+        assert "No body measurements are held" in capsys.readouterr().out
+
+    def test_the_first_session_has_nothing_to_match_against(
+            self, monkeypatch, tmp_path, capsys):
+        """Cold start is a real state and says so rather than guessing."""
+        db = self._db(tmp_path)
+        main(["enrol", "anna", "--db", db])
+        install(monkeypatch, self._people({1: (1.0, 1.0)}))
+        main(["identify", "clip.mov", "--session", "w1", "--db", db])
+        captured = capsys.readouterr()
+        assert "nothing to match against" in captured.err
+        assert "no proposal" in captured.out
+
+    def test_confirming_teaches_the_signature(self, monkeypatch, tmp_path, capsys):
+        db = self._db(tmp_path)
+        main(["enrol", "anna", "--db", db])
+        install(monkeypatch, self._people({1: (1.0, 1.0)}))
+        main(["identify", "clip.mov", "--session", "w1", "--db", db])
+        main(["confirm", "w1", "--track", "1", "--user", "anna",
+              "--by", "teacher", "--db", db])
+        assert "build is now known" in capsys.readouterr().out
+
+    def test_the_next_session_is_proposed_rather_than_typed(
+            self, monkeypatch, tmp_path, capsys):
+        """Track ids and mat positions both change between weeks; proportions
+        do not, which is the whole reason they are the signal."""
+        db = self._db(tmp_path)
+        for user in ("anna", "ben"):
+            main(["enrol", user, "--name", user.title(), "--db", db])
+        install(monkeypatch, self._people({1: (1.0, 1.0), 2: (1.7, 0.65)}))
+        main(["identify", "clip.mov", "--session", "w1", "--db", db])
+        main(["confirm", "w1", "--track", "1", "--user", "anna",
+              "--by", "t", "--db", db])
+        main(["confirm", "w1", "--track", "2", "--user", "ben",
+              "--by", "t", "--db", db])
+        capsys.readouterr()
+
+        # Same two people, ids swapped.
+        install(monkeypatch, self._people({1: (1.7, 0.65), 2: (1.0, 1.0)}))
+        main(["identify", "clip.mov", "--session", "w2", "--db", db])
+        out = capsys.readouterr().out
+        assert "track 1: probably Ben" in out
+        assert "track 2: probably Anna" in out
+
+    def test_a_proposal_is_never_shown_as_certain(
+            self, monkeypatch, tmp_path, capsys):
+        db = self._db(tmp_path)
+        for user in ("anna", "ben"):
+            main(["enrol", user, "--name", user.title(), "--db", db])
+        install(monkeypatch, self._people({1: (1.0, 1.0), 2: (1.7, 0.65)}))
+        main(["identify", "clip.mov", "--session", "w1", "--db", db])
+        main(["confirm", "w1", "--track", "1", "--user", "anna", "--by", "t",
+              "--db", db])
+        main(["confirm", "w1", "--track", "2", "--user", "ben", "--by", "t",
+              "--db", db])
+        capsys.readouterr()
+        install(monkeypatch, self._people({1: (1.0, 1.0), 2: (1.7, 0.65)}))
+        main(["identify", "clip.mov", "--session", "w2", "--db", db])
+        assert "100% confident" not in capsys.readouterr().out
+
+    def test_nothing_is_confirmed_by_identifying(self, monkeypatch, tmp_path, capsys):
+        db = self._db(tmp_path)
+        main(["enrol", "anna", "--db", db])
+        install(monkeypatch, self._people({1: (1.0, 1.0)}))
+        main(["identify", "clip.mov", "--session", "w1", "--db", db])
+        assert "none confirmed" in capsys.readouterr().out
+
+    def test_confirming_a_session_that_was_never_recorded_explains_itself(
+            self, tmp_path, capsys):
+        db = self._db(tmp_path)
+        assert main(["confirm", "never", "--track", "1", "--user", "anna",
+                     "--by", "t", "--db", db]) == 1
+        assert "Run `pilates identify`" in capsys.readouterr().err
+
+    def test_a_dashboard_is_written(self, monkeypatch, tmp_path, capsys):
+        db = self._db(tmp_path)
+        main(["enrol", "anna", "--name", "Anna Smith", "--db", db])
+        out = tmp_path / "anna.html"
+        assert main(["dashboard", "anna", "--db", db, "--out", str(out)]) == 0
+        assert "Anna Smith" in out.read_text()
+
+    def test_a_dashboard_for_somebody_unknown_says_who_is_enrolled(
+            self, tmp_path, capsys):
+        db = self._db(tmp_path)
+        main(["enrol", "anna", "--db", db])
+        assert main(["dashboard", "ghost", "--db", db]) == 1
+        assert "Enrolled: anna" in capsys.readouterr().err
+
+    def test_everything_held_about_a_person_can_be_exported(
+            self, tmp_path, capsys):
+        db = self._db(tmp_path)
+        main(["enrol", "anna", "--db", db])
+        out = tmp_path / "anna.json"
+        assert main(["export", "anna", "--db", db, "--out", str(out)]) == 0
+        assert "measurements" in out.read_text()
+
+    def test_a_person_can_be_erased(self, tmp_path, capsys):
+        db = self._db(tmp_path)
+        main(["enrol", "anna", "--db", db])
+        assert main(["export", "anna", "--db", db, "--forget"]) == 0
+        assert "erased" in capsys.readouterr().out

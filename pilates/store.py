@@ -76,6 +76,12 @@ CREATE TABLE IF NOT EXISTS links (
     distance     REAL,
     confirmed_by TEXT NOT NULL DEFAULT '',
     confirmed_at TEXT NOT NULL DEFAULT '',
+    -- The body proportions measured for this track. Held here rather than
+    -- folded straight into the person, because confirming is what makes it
+    -- theirs: learning from an unconfirmed link would let one wrong guess drag
+    -- a person's signature towards somebody else, and every later proposal
+    -- would inherit the error.
+    signature TEXT NOT NULL DEFAULT '{}',
     PRIMARY KEY (session_id, track_id)
 );
 
@@ -179,7 +185,28 @@ class Store:
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA foreign_keys = ON")
         self.db.executescript(SCHEMA)
+        self._migrate()
         self.db.commit()
+
+    def _migrate(self) -> None:
+        """Add columns a newer version needs to a database an older one made.
+
+        CREATE TABLE IF NOT EXISTS leaves an existing table alone, so a store
+        that has been collecting for a year would silently keep the old shape
+        and every write against a new column would fail. Adding them here keeps
+        a long-lived file usable across versions, which is the whole point of
+        it being long-lived.
+        """
+        wanted = {
+            "links": {"signature": "TEXT NOT NULL DEFAULT '{}'"},
+            "measurements": {"at_time": "REAL"},
+        }
+        for table, columns in wanted.items():
+            have = {row["name"] for row in
+                    self.db.execute(f"PRAGMA table_info({table})")}
+            for name, spec in columns.items():
+                if name not in have:
+                    self.db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {spec}")
 
     @classmethod
     def open(cls, path: str | Path) -> "Store":
@@ -258,16 +285,56 @@ class Store:
                 self.db.execute("SELECT * FROM sessions ORDER BY date, key")]
 
     # -- identity -------------------------------------------------------
-    def put_link(self, link: Link) -> None:
+    def put_link(self, link: Link, signature: Signature | None = None) -> None:
+        """Record a link, optionally with the proportions measured for the track.
+
+        Confirming a link is what folds that signature into the person: see
+        :meth:`settle`.
+        """
+        kept = (json.dumps(signature.to_dict()) if signature is not None
+                else self._link_signature_json(link))
         self.db.execute(
             "INSERT INTO links (session_id, track_id, username, status, method, "
-            "distance, confirmed_by, confirmed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+            "distance, confirmed_by, confirmed_at, signature) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(session_id, track_id) DO UPDATE SET username=excluded.username, "
             "status=excluded.status, method=excluded.method, distance=excluded.distance, "
-            "confirmed_by=excluded.confirmed_by, confirmed_at=excluded.confirmed_at",
+            "confirmed_by=excluded.confirmed_by, confirmed_at=excluded.confirmed_at, "
+            "signature=excluded.signature",
             (self.session_id(link.session), link.track_id, link.username, link.status,
-             link.method, link.distance, link.confirmed_by, link.confirmed_at))
+             link.method, link.distance, link.confirmed_by, link.confirmed_at, kept))
         self.db.commit()
+
+    def _link_signature_json(self, link: Link) -> str:
+        row = self.db.execute(
+            "SELECT signature FROM links WHERE session_id = ? AND track_id = ?",
+            (self.session_id(link.session), link.track_id)).fetchone()
+        return row["signature"] if row else "{}"
+
+    def link_signature(self, session: str, track_id: int) -> Signature:
+        """The proportions measured for one track, whether or not it is settled."""
+        row = self.db.execute(
+            "SELECT signature FROM links WHERE session_id = ? AND track_id = ?",
+            (self.session_id(session), track_id)).fetchone()
+        return Signature.from_dict(json.loads(row["signature"])) if row else Signature()
+
+    def settle(self, link: Link) -> bool:
+        """Record a settled link, learning from it only if it was confirmed.
+
+        The one place a person's signature grows. A rejection is stored and
+        teaches nothing, which is the point: it says this shape was *not* that
+        person, and the way to use that is to stop proposing it, never to
+        average it in.
+        """
+        self.put_link(link)
+        if not link.trustworthy:
+            return False
+        signature = self.link_signature(link.session, link.track_id)
+        if not signature.ratios:
+            return False
+        self.save_signature(link.username,
+                            self.signature(link.username).merge(signature))
+        return True
 
     def links(self, session: str | None = None,
               status: str | None = None) -> list[Link]:

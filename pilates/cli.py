@@ -22,6 +22,10 @@
     python -m pilates describe VIDEO --anatomy        # ...with muscles and nerves
     python -m pilates crosscheck nw.json              # our targets against theirs
     python -m pilates merge nw.json --policy          # combine the two libraries
+    python -m pilates enrol anna --name "Anna Smith"  # add a person
+    python -m pilates identify class.mp4 --session tue-01  # who is each track?
+    python -m pilates confirm tue-01 --track 4 --user anna --by me
+    python -m pilates dashboard anna --out anna.html  # charts and history
 """
 from __future__ import annotations
 
@@ -1044,6 +1048,184 @@ def cmd_merge(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_enrol(args: argparse.Namespace) -> int:
+    """Add a person to the studio's directory."""
+    from .store import Store
+
+    with Store.open(args.db) as store:
+        store.enrol(args.username, args.name or "")
+        print(f"{args.username} enrolled. "
+              f"{len(store.people())} person(s) in {args.db}.")
+        print("No body measurements are held for them yet. A signature is "
+              "learned\nonly from sessions somebody confirms.")
+    return 0
+
+
+def cmd_identify(args: argparse.Namespace) -> int:
+    """Propose which enrolled person each tracked body is.
+
+    A proposal, never a decision: a wrong identity corrupts two histories at
+    once and neither is detectable later. Nothing here writes a confirmed link.
+    """
+    from .identity import Link, Person, Signature, propose
+    from .movement import SessionRecorder
+    from .store import SessionMeta, Store
+
+    config = _load_config(args.config)
+    if args.stride is not None:
+        config.frame_stride = args.stride
+    pipeline = Pipeline(config)
+    recorder = SessionRecorder(keypoint_threshold=config.keypoint_threshold)
+    frames: dict[int, list] = {}
+
+    with VideoSource(args.video, stride=config.frame_stride,
+                     start_frame=args.start, end_frame=args.end) as source:
+        for result in pipeline.run(source):
+            recorder.observe(result)
+            for person in result.people:
+                frames.setdefault(person.track_id, []).append(person.detection)
+
+    with Store.open(args.db) as store:
+        store.record_session(SessionMeta(
+            key=args.session, video=Path(args.video).name, date=args.date or "",
+            studio=args.studio or "", students=len(recorder.histories)))
+        roster = [
+            Person(username=row["username"], display_name=row["display_name"],
+                   signature=store.signature(row["username"]),
+                   confirmations=row["confirmations"])
+            for row in store.people()
+        ]
+        roster = [p for p in roster if p.signature.usable]
+        if not roster:
+            print("Nobody enrolled has a signature yet, so there is nothing to "
+                  "match against.\nConfirm a first session by hand with "
+                  "`pilates confirm`; each confirmation\nteaches the signature "
+                  "that makes the next one a proposal.", file=sys.stderr)
+
+        proposed = 0
+        for track_id, history in sorted(recorder.histories.items()):
+            if len(history.samples) < args.min_samples:
+                continue
+            signature = Signature.from_history(
+                history, frames.get(track_id, []), config.keypoint_threshold)
+            result = propose(signature, roster, track_id=track_id)
+            print(result.describe())
+            if result.named:
+                store.put_link(Link(session=args.session, track_id=track_id,
+                                    username=result.best.person.username,
+                                    distance=result.best.distance), signature)
+                proposed += 1
+            else:
+                # Held against the track with no name on it, so confirming by
+                # hand still teaches the signature. Otherwise the first session
+                # of every new person would teach nothing and the second would
+                # be as blind as the first.
+                store.put_link(Link(session=args.session, track_id=track_id,
+                                    username="", method="unproposed"), signature)
+
+    print(f"\n{proposed} proposal(s) written, none confirmed. Confirm or "
+          f"correct each one with\n  pilates confirm {args.session} "
+          f"--track N --user USERNAME --by YOU\nNothing reaches a history "
+          f"until it is confirmed.")
+    return 0
+
+
+def cmd_confirm(args: argparse.Namespace) -> int:
+    """Confirm or reject who a tracked body was."""
+    from .identity import Link, Signature
+    from .store import Store
+
+    with Store.open(args.db) as store:
+        try:
+            store.session_id(args.session)
+        except KeyError:
+            known = [row["key"] for row in store.sessions()]
+            print(f"No session recorded under {args.session!r}. "
+                  f"Run `pilates identify` on the video first;\nit is what "
+                  f"records the session and the tracks in it.", file=sys.stderr)
+            if known:
+                print(f"Recorded so far: {', '.join(known)}", file=sys.stderr)
+            return 1
+        existing = {l.track_id: l for l in store.links(session=args.session)}
+        link = existing.get(args.track) or Link(
+            session=args.session, track_id=args.track, username=args.user,
+            method="manual")
+        if args.user:
+            link = Link(session=args.session, track_id=args.track,
+                        username=args.user, method=link.method,
+                        distance=link.distance)
+        settled = link.reject(args.by) if args.reject else link.confirm(args.by)
+        learned = store.settle(settled)
+        verb = "rejected" if args.reject else "confirmed"
+        print(f"track {args.track} in {args.session}: {verb} as "
+              f"{settled.username}, by {args.by}")
+        if learned:
+            signature = store.signature(settled.username)
+            print(f"{settled.username}'s build is now known from "
+                  f"{signature.frames} frames across "
+                  f"{[p['confirmations'] for p in store.people() if p['username'] == settled.username][0]} "
+                  f"confirmed session(s); the next one can be proposed rather "
+                  f"than typed.")
+        if not args.reject:
+            attributed = len(store.history(settled.username, valid_only=False))
+            print(f"{attributed} measurement(s) now attributed to "
+                  f"{settled.username}, including any\nrecorded before this "
+                  f"was confirmed.")
+        remaining = len(store.pending())
+        if remaining:
+            print(f"{remaining} link(s) still waiting to be settled.")
+    return 0
+
+
+def cmd_dashboard(args: argparse.Namespace) -> int:
+    """Write one person's whole record as a page."""
+    from .dashboard import render
+    from .store import Store
+
+    with Store.open(args.db) as store:
+        names = {p["username"]: p["display_name"] for p in store.people()}
+        if args.username not in names:
+            print(f"{args.username!r} is not enrolled. Enrolled: "
+                  f"{', '.join(sorted(names)) or 'nobody'}", file=sys.stderr)
+            return 1
+        html = render(store, args.username, names[args.username],
+                      studio=args.studio or "", exercise=args.exercise)
+        out = Path(args.out or f"{args.username}_progress.html")
+        out.write_text(html, encoding="utf-8")
+        coverage = store.coverage()
+    print(f"dashboard -> {out}")
+    print(f"  {coverage['attributed']} of {coverage['measurements']} measurements "
+          f"attributed ({coverage['share']:.0%})")
+    if coverage["pending_links"]:
+        print(f"  {coverage['pending_links']} identity link(s) unconfirmed; their "
+              f"measurements are stored\n  but appear nowhere until somebody "
+              f"settles them.")
+    return 0
+
+
+def cmd_export(args: argparse.Namespace) -> int:
+    """Everything held about one person, or erase them."""
+    from .store import Store
+
+    with Store.open(args.db) as store:
+        if args.forget:
+            removed = store.forget(args.username)
+            print(f"{args.username} erased: {removed['measurements']} "
+                  f"measurement(s), {removed['findings']} finding(s), "
+                  f"{removed['links']} link(s).")
+            print("The measurements were deleted rather than orphaned: a row "
+                  "saying a track had\na hip range of 62 degrees is still "
+                  "about that person.")
+            return 0
+        payload = store.export_person(args.username)
+    out = Path(args.out or f"{args.username}_data.json")
+    out.write_text(json.dumps(payload, indent=2) + "\n")
+    print(f"everything held about {args.username} -> {out}")
+    print(f"  {len(payload['measurements'])} measurement(s), "
+          f"{len(payload['findings'])} finding(s)")
+    return 0
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     """Check this machine can actually run an analysis."""
     from .diagnostics import check_environment, environment_ready
@@ -1544,6 +1726,51 @@ def main(argv: list[str] | None = None) -> int:
                     help="print which source each field comes from, and why")
     mg.add_argument("--out", default=None, help="write the merged standards")
     mg.set_defaults(func=cmd_merge)
+
+    en = sub.add_parser("enrol", help="add a person to the studio directory")
+    en.add_argument("username")
+    en.add_argument("--name", default=None, help="display name")
+    en.add_argument("--db", default="studio.db")
+    en.set_defaults(func=cmd_enrol)
+
+    idc = sub.add_parser("identify",
+                         help="propose which enrolled person each track is")
+    idc.add_argument("video")
+    idc.add_argument("--session", required=True, help="a key for this recording")
+    idc.add_argument("--db", default="studio.db")
+    idc.add_argument("--date", default=None)
+    idc.add_argument("--studio", default=None)
+    idc.add_argument("--config", default=None)
+    idc.add_argument("--min-samples", type=int, default=20)
+    idc.add_argument("--start", type=int, default=0)
+    idc.add_argument("--end", type=int, default=None)
+    idc.add_argument("--stride", type=int, default=None)
+    idc.set_defaults(func=cmd_identify)
+
+    cf = sub.add_parser("confirm", help="settle who a tracked body was")
+    cf.add_argument("session")
+    cf.add_argument("--track", type=int, required=True)
+    cf.add_argument("--user", default="")
+    cf.add_argument("--by", required=True, help="who is confirming this")
+    cf.add_argument("--reject", action="store_true")
+    cf.add_argument("--db", default="studio.db")
+    cf.set_defaults(func=cmd_confirm)
+
+    db = sub.add_parser("dashboard", help="one person's whole record as a page")
+    db.add_argument("username")
+    db.add_argument("--db", dest="db", default="studio.db")
+    db.add_argument("--exercise", default=None)
+    db.add_argument("--studio", default=None)
+    db.add_argument("--out", default=None)
+    db.set_defaults(func=cmd_dashboard)
+
+    ex = sub.add_parser("export", help="everything held about a person, or erase it")
+    ex.add_argument("username")
+    ex.add_argument("--db", default="studio.db")
+    ex.add_argument("--out", default=None)
+    ex.add_argument("--forget", action="store_true",
+                    help="erase the person and every measurement about them")
+    ex.set_defaults(func=cmd_export)
 
     dr = sub.add_parser("doctor", help="check this machine can run an analysis")
     dr.set_defaults(func=cmd_doctor)

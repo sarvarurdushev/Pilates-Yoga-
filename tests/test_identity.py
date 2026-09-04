@@ -230,3 +230,29 @@ class TestDirectory:
 
     def test_a_missing_file_is_an_empty_directory_not_an_error(self, tmp_path):
         assert Directory.load(tmp_path / "nope.json").people == {}
+
+
+class TestConfidenceIsNeverCertainty:
+    """A proposal that reads as certain stops being checked, and being checked
+    is the entire safeguard."""
+
+    def test_a_perfect_match_still_does_not_print_as_certain(self):
+        from pilates.identity import Candidate
+
+        assert Candidate(person=Person("x"), distance=0.0).confidence < 1.0
+
+    def test_the_cap_is_explicit(self):
+        from pilates.identity import Candidate
+
+        assert Candidate(person=Person("x"), distance=0.0).confidence \
+            == Candidate.MAX_SHOWN_CONFIDENCE
+
+    def test_a_poor_match_still_scores_low(self):
+        from pilates.identity import Candidate
+
+        assert Candidate(person=Person("x"), distance=2.9).confidence < 0.1
+
+    def test_it_never_goes_negative(self):
+        from pilates.identity import Candidate
+
+        assert Candidate(person=Person("x"), distance=99.0).confidence == 0.0

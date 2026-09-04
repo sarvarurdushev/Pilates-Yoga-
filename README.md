@@ -566,6 +566,151 @@ python -m pilates describe class.mp4 --anatomy --anatomy-file our_library.json
 Bones are derived from the joints when a file does not list them, so the two
 cannot drift apart.
 
+## Who is this? The identity problem
+
+Everything long-term rests on one question, and it is not a computer-vision
+question. Measurements filed against the wrong person corrupt two histories at
+once — one gains a stranger's numbers, the other loses its own — and neither is
+detectable later, because both still look like plausible records of a real
+person. A trend built on that is worse than no trend, and a model trained on it
+is worse than no model.
+
+So: **a wrong identity is worse than no identity.** Everything below follows.
+
+### What the camera can and cannot contribute
+
+| Signal | Verdict |
+|---|---|
+| **Faces** | Out — on practical grounds before legal ones. A student is 15–60 px tall in a wide shot, so a face is a handful of pixels. The capability does not exist, so the privacy question never arises |
+| **Clothing colour** | Holds identity through an occlusion within a session. Worthless a week later |
+| **Body proportions** | The one signal that survives distance *and* a change of clothes, because limb-length ratios are scale-invariant. Also weak: plenty of people share a build |
+| **Who booked** | The studio already knows. This turns open-set recognition into matching against a small roster — a completely different problem |
+
+### The system proposes; a person decides
+
+```bash
+python -m pilates enrol anna --name "Anna Smith"
+python -m pilates identify class.mp4 --session tue-01
+```
+
+```
+track 1: probably Ben Jones (95% confident)
+    body proportions 0.3 typical-variations away
+    confirmed 4 time(s) before
+    or Anna Smith (42%)
+
+2 proposal(s) written, none confirmed.
+Nothing reaches a history until it is confirmed.
+```
+
+It refuses in three ways, all useful answers: a signature too thin to compare
+(the student was barely visible), nobody enrolled close enough (a guest or a
+drop-in), or **two candidates too alike in build** — where a coin flip would put
+a session in the wrong history.
+
+Confidence never prints as 100%, however good the match. A proposal that reads
+as certain stops being checked, and being checked is the entire safeguard.
+
+### Confirming is what teaches it
+
+```bash
+python -m pilates confirm tue-01 --track 1 --user ben --by "teacher@studio"
+```
+
+```
+track 1 in tue-01: confirmed as ben, by teacher@studio
+ben's build is now known from 240 frames across 4 confirmed session(s);
+the next one can be proposed rather than typed.
+12 measurement(s) now attributed to ben, including any recorded before
+this was confirmed.
+```
+
+The first session of a new member has nothing to match against, and says so
+rather than guessing. Each confirmation folds that session's proportions into
+the person, so the cold start is a one-off per member.
+
+A **rejection teaches nothing** and is kept anyway. It says this shape was *not*
+that person; the way to use that is to stop proposing it, never to average it
+in.
+
+## The long-term record
+
+SQLite — stdlib, no server, one file. It answers "how has this hip range moved
+over eighteen months" without loading eighteen months into memory.
+
+### Measurements key to a track, not to a person
+
+A row records that *track 4 in Tuesday's session* had a hip range of 62 degrees.
+Which **person** that was is a separate fact, in a separate table, with its own
+provenance. Joining at query time rather than write time buys three things:
+
+- **Nothing is lost while an assignment is unconfirmed.** The measurement is
+  already stored; confirming attributes it retroactively.
+- **A mistake is reversible** — unpicking it changes one row in one table
+  rather than hunting through a history.
+- **Identity and analysis stay independent.** Changing how identity is decided
+  never requires re-deriving a measurement.
+
+### Every row carries where it came from
+
+`source` says which mechanism produced it — a library standard, the class
+baseline, the general movement checks, or the load model. `valid` and
+`invalid_reason` carry the interaction rules: a load measured while an
+instructor's hands were on somebody is **stored and flagged**, never silently
+dropped and never silently averaged in.
+
+That matters most for the long game. A training set assembled from this can
+filter on both. One assembled without them would be quietly poisoned in a way
+nothing downstream could detect.
+
+### What is held, and erasing it
+
+```bash
+python -m pilates export anna --out anna.json     # everything held
+python -m pilates export anna --forget            # erase it
+```
+
+Forgetting deletes the measurements rather than orphaning them. A row saying
+track 4 had a hip range of 62 degrees is still about that person, and leaving it
+behind because the name column is gone would be erasure in name only.
+
+## The dashboard
+
+```bash
+python -m pilates dashboard anna --out anna.html
+```
+
+Self-contained HTML with inline SVG and no external asset of any kind — a
+studio emails it, prints it, or opens it on a tablet with no network, and
+nothing about a person's body measurements is fetched from somebody else's
+server.
+
+**Every line carries the band it varied by within each session, drawn behind
+it.** That is the whole design. A rise that stays inside its own band is
+*visibly* not a rise, which is harder to misread than a sentence saying so
+underneath:
+
+```
+hip symmetry  ● improved    moved -9.8deg, clear of the 3.0deg noise floor
+left hip      ● changed     moved +21.8deg, clear of the 4.8deg noise floor
+left knee     ● steady      moved +0.9deg, inside the 5.0deg it varies anyway
+```
+
+Three rules the charts hold to:
+
+- **The verdict uses the same rule as the written report**, so the picture and
+  the sentence can never disagree.
+- **Only genuine judgements get a status colour.** A bare joint angle moving has
+  no universally good direction — that is why its verdict is "changed" rather
+  than "improved" — so it is drawn neutral. Colouring it amber would assert
+  exactly what the wording refuses to.
+- **A table carries every number in every chart**, and each point names its own
+  spread and frame count on hover.
+
+The palette was validated with the colour checker in both light and dark: worst
+adjacent-pair CVD ΔE 24.7 light / 26.8 dark, both slots above 3:1 against their
+surface.
+
 ## Coaching an exercise that is not in any library
 
 A library of named exercises will never be finished. There are hundreds of

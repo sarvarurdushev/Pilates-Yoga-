@@ -218,11 +218,22 @@ class Candidate:
     #: Plain-language reasons, for whoever has to make the call.
     reasons: list[str] = field(default_factory=list)
 
+    #: Nothing here is ever certain, so nothing here ever prints as certain.
+    #: A perfect proportion match is still a proposal about a person seen from
+    #: across a room, and "100% confident" invites a reader to stop checking.
+    MAX_SHOWN_CONFIDENCE = 0.95
+
     @property
     def confidence(self) -> float:
-        """Zero to one, from the distance. Presentation only -- the decision is
-        made on distance and margin, which are the quantities with meaning."""
-        return max(0.0, 1.0 - self.distance / MAX_DISTANCE)
+        """Zero to one, from the distance.
+
+        Presentation only: the decision is made on distance and margin, which
+        are the quantities with meaning. Capped below one, because a proposal
+        that reads as certain stops being checked, and being checked is the
+        entire safeguard.
+        """
+        raw = max(0.0, 1.0 - self.distance / MAX_DISTANCE)
+        return min(raw, self.MAX_SHOWN_CONFIDENCE)
 
 
 @dataclass
