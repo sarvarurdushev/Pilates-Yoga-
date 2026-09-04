@@ -1,0 +1,4719 @@
+{
+ "source": "Rajagopal2016.osim",
+ "citation": "Rajagopal A, Dembia CL, DeMers MS, Delp DD, Hicks JL, Delp SL. Full-Body Musculoskeletal Model for Muscle-Driven Simulation of Human Gait. IEEE Trans Biomed Eng. 2016;63(10):2068-79",
+ "licence": "Apache-2.0 (OpenSim); model files redistributable via opensim-org/opensim-models",
+ "units": "metres, OpenSim axes; the root node carries the registration below",
+ "registration": {
+  "scale": 0.570510830877697,
+  "rotation": [
+   [
+    -0.0013043795152123069,
+    0.0066549171719102185,
+    -0.999977005071374
+   ],
+   [
+    -0.04375086471690616,
+    0.9990199680368103,
+    0.0067056170672652685
+   ],
+   [
+    0.9990416209701191,
+    0.04375860533843407,
+    -0.0010119428007050934
+   ]
+  ],
+  "translation": [
+   -0.0030007622634259973,
+   -0.5479713005890918,
+   -0.025580475987496992
+  ],
+  "bones": [
+   "hip bone.R",
+   "hip bone.L",
+   "sacrum.M",
+   "femur.R",
+   "femur.L",
+   "tibia.R",
+   "tibia.L",
+   "fibula.R",
+   "fibula.L"
+  ],
+  "residualMm": {
+   "mean": 11.36,
+   "max": 18.97
+  }
+ },
+ "segments": {
+  "pelvis": {
+   "name": "pelvis",
+   "parent": "ground",
+   "joint": "ground_pelvis",
+   "translation": [
+    0,
+    0,
+    0
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "pelvis_tilt",
+     "axis": [
+      0,
+      0,
+      1
+     ],
+     "fn": {
+      "kind": "linear",
+      "a": 1,
+      "b": 0
+     }
+    },
+    {
+     "coordinate": "pelvis_list",
+     "axis": [
+      1,
+      0,
+      0
+     ],
+     "fn": {
+      "kind": "linear",
+      "a": 1,
+      "b": 0
+     }
+    },
+    {
+     "coordinate": "pelvis_rotation",
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "fn": {
+      "kind": "linear",
+      "a": 1,
+      "b": 0
+     }
+    }
+   ],
+   "translationAxes": [
+    {
+     "coordinate": "pelvis_tx",
+     "axis": [
+      1,
+      0,
+      0
+     ],
+     "fn": {
+      "kind": "linear",
+      "a": 1,
+      "b": 0
+     }
+    },
+    {
+     "coordinate": "pelvis_ty",
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "fn": {
+      "kind": "linear",
+      "a": 1,
+      "b": 0
+     }
+    },
+    {
+     "coordinate": "pelvis_tz",
+     "axis": [
+      0,
+      0,
+      1
+     ],
+     "fn": {
+      "kind": "linear",
+      "a": 1,
+      "b": 0
+     }
+    }
+   ],
+   "worldAtDefault": [
+    0,
+    0.94,
+    0
+   ]
+  },
+  "femur_r": {
+   "name": "femur_r",
+   "parent": "pelvis",
+   "joint": "hip_r",
+   "translation": [
+    -0.058775999999999995,
+    -0.06659000000000001,
+    0.07726
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    -0.0025000000000000005,
+    0.011899999999999999,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "hip_flexion_r",
+     "axis": [
+      0,
+      0,
+      1
+     ],
+     "fn": {
+      "kind": "linear",
+      "a": 1,
+      "b": 0
+     }
+    },
+    {
+     "coordinate": "hip_adduction_r",
+     "axis": [
+      1,
+      0,
+      0
+     ],
+     "fn": {
+      "kind": "linear",
+      "a": 1,
+      "b": 0
+     }
+    },
+    {
+     "coordinate": "hip_rotation_r",
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "fn": {
+      "kind": "linear",
+      "a": 1,
+      "b": 0
+     }
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.056276,
+    0.86151,
+    0.07726
+   ]
+  },
+  "tibia_r": {
+   "name": "tibia_r",
+   "parent": "femur_r",
+   "joint": "walker_knee_r",
+   "translation": [
+    -0.00809,
+    -0.40796,
+    -0.00275
+   ],
+   "orientation": [
+    -1.64157,
+    1.44618,
+    1.5708
+   ],
+   "childTranslation": [
+    -0.00808954,
+    -0.0035348,
+    -0.00148474
+   ],
+   "childOrientation": [
+    -1.64157,
+    1.44618,
+    1.5708
+   ],
+   "axes": [
+    {
+     "coordinate": "knee_angle_r",
+     "axis": [
+      1,
+      0,
+      0
+     ],
+     "fn": {
+      "kind": "linear",
+      "a": 1,
+      "b": 0
+     }
+    },
+    {
+     "coordinate": "knee_angle_r",
+     "axis": [
+      0,
+      0,
+      1
+     ],
+     "fn": {
+      "kind": "spline",
+      "x": [
+       0,
+       0.174533,
+       0.349066,
+       0.523599,
+       0.698132,
+       0.872665,
+       1.0472,
+       1.22173,
+       1.39626,
+       1.5708,
+       1.74533,
+       1.91986,
+       2.0944
+      ],
+      "y": [
+       0,
+       0.0126809,
+       0.0226969,
+       0.0296054,
+       0.0332049,
+       0.0335354,
+       0.0308779,
+       0.0257548,
+       0.0189295,
+       0.011407,
+       0.00443314,
+       -0.00050475,
+       -0.0016782
+      ]
+     }
+    },
+    {
+     "coordinate": "knee_angle_r",
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "fn": {
+      "kind": "spline",
+      "x": [
+       0,
+       0.174533,
+       0.349066,
+       0.523599,
+       0.698132,
+       0.872665,
+       1.0472,
+       1.22173,
+       1.39626,
+       1.5708,
+       1.74533,
+       1.91986,
+       2.0944
+      ],
+      "y": [
+       0,
+       0.059461,
+       0.109399,
+       0.150618,
+       0.18392,
+       0.210107,
+       0.229983,
+       0.24435,
+       0.254012,
+       0.25977,
+       0.262428,
+       0.262788,
+       0.261654
+      ]
+     }
+    }
+   ],
+   "translationAxes": [
+    {
+     "coordinate": "knee_angle_r",
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "fn": {
+      "kind": "spline",
+      "x": [
+       0,
+       0.174533,
+       0.349066,
+       0.523599,
+       0.698132,
+       0.872665,
+       1.0472,
+       1.22173,
+       1.39626,
+       1.5708,
+       1.74533,
+       1.91986,
+       2.0944
+      ],
+      "y": [
+       0,
+       0.000479,
+       0.000835,
+       0.001086,
+       0.001251,
+       0.001346,
+       0.001391,
+       0.001403,
+       0.0014,
+       0.0014,
+       0.001421,
+       0.001481,
+       0.001599
+      ]
+     }
+    },
+    {
+     "coordinate": "knee_angle_r",
+     "axis": [
+      0,
+      0,
+      1
+     ],
+     "fn": {
+      "kind": "spline",
+      "x": [
+       0,
+       0.174533,
+       0.349066,
+       0.523599,
+       0.698132,
+       0.872665,
+       1.0472,
+       1.22173,
+       1.39626,
+       1.5708,
+       1.74533,
+       1.91986,
+       2.0944
+      ],
+      "y": [
+       0,
+       0.000988,
+       0.001899,
+       0.002734,
+       0.003492,
+       0.004173,
+       0.004777,
+       0.005305,
+       0.005756,
+       0.00613,
+       0.006427,
+       0.006648,
+       0.006792
+      ]
+     }
+    }
+   ],
+   "worldAtDefault": [
+    -0.05627646000000001,
+    0.4570848,
+    0.07599473999999999
+   ]
+  },
+  "patella_r": {
+   "name": "patella_r",
+   "parent": "femur_r",
+   "joint": "patellofemoral_r",
+   "translation": [
+    -0.00809,
+    -0.40796,
+    -0.00275
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "knee_angle_r_beta",
+     "axis": [
+      0,
+      0,
+      1
+     ],
+     "fn": {
+      "kind": "spline",
+      "x": [
+       0,
+       0.174533,
+       0.349066,
+       0.523599,
+       0.698132,
+       0.872665,
+       1.0472,
+       1.22173,
+       1.39626,
+       1.5708,
+       1.74533,
+       1.91986,
+       2.0944
+      ],
+      "y": [
+       0.00113686,
+       -0.00629212,
+       -0.105582,
+       -0.253683,
+       -0.414245,
+       -0.579047,
+       -0.747244,
+       -0.91799,
+       -1.09044,
+       -1.26379,
+       -1.43763,
+       -1.61186,
+       -1.78634
+      ]
+     }
+    }
+   ],
+   "translationAxes": [
+    {
+     "coordinate": "knee_angle_r_beta",
+     "axis": [
+      1,
+      0,
+      0
+     ],
+     "fn": {
+      "kind": "spline",
+      "x": [
+       0,
+       0.174533,
+       0.349066,
+       0.523599,
+       0.698132,
+       0.872665,
+       1.0472,
+       1.22173,
+       1.39626,
+       1.5708,
+       1.74533,
+       1.91986,
+       2.0944
+      ],
+      "y": [
+       0.0524,
+       0.0488,
+       0.0437,
+       0.0371,
+       0.0296,
+       0.0216,
+       0.0136,
+       0.0057,
+       -0.0019,
+       -0.0088,
+       -0.0148,
+       -0.0196,
+       -0.0227
+      ]
+     }
+    },
+    {
+     "coordinate": "knee_angle_r_beta",
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "fn": {
+      "kind": "spline",
+      "x": [
+       0,
+       0.174533,
+       0.349066,
+       0.523599,
+       0.698132,
+       0.872665,
+       1.0472,
+       1.22173,
+       1.39626,
+       1.5708,
+       1.74533,
+       1.91986,
+       2.0944
+      ],
+      "y": [
+       -0.0108,
+       -0.019,
+       -0.0263,
+       -0.0322,
+       -0.0367,
+       -0.0395,
+       -0.0408,
+       -0.0404,
+       -0.0384,
+       -0.0349,
+       -0.0301,
+       -0.0245,
+       -0.0187
+      ]
+     }
+    }
+   ],
+   "worldAtDefault": [
+    -0.011966000000000004,
+    0.44275000000000003,
+    0.07450999999999999
+   ]
+  },
+  "talus_r": {
+   "name": "talus_r",
+   "parent": "tibia_r",
+   "joint": "ankle_r",
+   "translation": [
+    0,
+    -0.39,
+    0.0075
+   ],
+   "orientation": [
+    0.175895,
+    -0.105208,
+    0.0186622
+   ],
+   "childTranslation": [
+    0.01,
+    0.009999999999999998,
+    0.0075
+   ],
+   "childOrientation": [
+    0.175895,
+    -0.105208,
+    0.0186622
+   ],
+   "axes": [
+    {
+     "coordinate": "ankle_angle_r",
+     "axis": [
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.06627646000000001,
+    0.05708480000000005,
+    0.07599473999999999
+   ]
+  },
+  "calcn_r": {
+   "name": "calcn_r",
+   "parent": "talus_r",
+   "joint": "subtalar_r",
+   "translation": [
+    -0.04877,
+    -0.04195,
+    0.00792
+   ],
+   "orientation": [
+    -1.76819,
+    0.906223,
+    1.8196
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    -1.76819,
+    0.906223,
+    1.8196
+   ],
+   "axes": [
+    {
+     "coordinate": "subtalar_angle_r",
+     "axis": [
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.11504646000000002,
+    0.015134800000000052,
+    0.08391473999999999
+   ]
+  },
+  "toes_r": {
+   "name": "toes_r",
+   "parent": "calcn_r",
+   "joint": "mtp_r",
+   "translation": [
+    0.14880000000000002,
+    0.024200000000000003,
+    -0.02392
+   ],
+   "orientation": [
+    -3.14159,
+    0.619901,
+    0
+   ],
+   "childTranslation": [
+    -0.029999999999999992,
+    0.026200000000000005,
+    -0.024999999999999998
+   ],
+   "childOrientation": [
+    -3.14159,
+    0.619901,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "mtp_angle_r",
+     "axis": [
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    0.06375353999999997,
+    0.013134800000000063,
+    0.08499473999999999
+   ]
+  },
+  "femur_l": {
+   "name": "femur_l",
+   "parent": "pelvis",
+   "joint": "hip_l",
+   "translation": [
+    -0.056276,
+    -0.06849,
+    -0.07726
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0.01,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "hip_flexion_l",
+     "axis": [
+      0,
+      0,
+      1
+     ],
+     "fn": {
+      "kind": "linear",
+      "a": 1,
+      "b": 0
+     }
+    },
+    {
+     "coordinate": "hip_adduction_l",
+     "axis": [
+      1,
+      0,
+      0
+     ],
+     "fn": {
+      "kind": "linear",
+      "a": -1,
+      "b": 0
+     }
+    },
+    {
+     "coordinate": "hip_rotation_l",
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "fn": {
+      "kind": "linear",
+      "a": -1,
+      "b": 0
+     }
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.056276,
+    0.86151,
+    -0.07726
+   ]
+  },
+  "tibia_l": {
+   "name": "tibia_l",
+   "parent": "femur_l",
+   "joint": "walker_knee_l",
+   "translation": [
+    -0.00809,
+    -0.40796,
+    0.00275
+   ],
+   "orientation": [
+    1.64157,
+    -1.44618,
+    1.5708
+   ],
+   "childTranslation": [
+    -0.00808954,
+    -0.0035348,
+    0.00148474
+   ],
+   "childOrientation": [
+    1.64157,
+    -1.44618,
+    1.5708
+   ],
+   "axes": [
+    {
+     "coordinate": "knee_angle_l",
+     "axis": [
+      -1,
+      0,
+      0
+     ],
+     "fn": {
+      "kind": "linear",
+      "a": 1,
+      "b": 0
+     }
+    },
+    {
+     "coordinate": "knee_angle_l",
+     "axis": [
+      0,
+      0,
+      1
+     ],
+     "fn": {
+      "kind": "spline",
+      "x": [
+       0,
+       0.174533,
+       0.349066,
+       0.523599,
+       0.698132,
+       0.872665,
+       1.0472,
+       1.22173,
+       1.39626,
+       1.5708,
+       1.74533,
+       1.91986,
+       2.0944
+      ],
+      "y": [
+       0,
+       0.0126809,
+       0.0226969,
+       0.0296054,
+       0.0332049,
+       0.0335354,
+       0.0308779,
+       0.0257548,
+       0.0189295,
+       0.011407,
+       0.00443314,
+       -0.00050475,
+       -0.0016782
+      ]
+     }
+    },
+    {
+     "coordinate": "knee_angle_l",
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "fn": {
+      "kind": "spline",
+      "x": [
+       0,
+       0.174533,
+       0.349066,
+       0.523599,
+       0.698132,
+       0.872665,
+       1.0472,
+       1.22173,
+       1.39626,
+       1.5708,
+       1.74533,
+       1.91986,
+       2.0944
+      ],
+      "y": [
+       0,
+       -0.059461,
+       -0.109399,
+       -0.150618,
+       -0.18392,
+       -0.210107,
+       -0.229983,
+       -0.24435,
+       -0.254012,
+       -0.25977,
+       -0.262428,
+       -0.262788,
+       -0.261654
+      ]
+     }
+    }
+   ],
+   "translationAxes": [
+    {
+     "coordinate": "knee_angle_l",
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "fn": {
+      "kind": "spline",
+      "x": [
+       0,
+       0.174533,
+       0.349066,
+       0.523599,
+       0.698132,
+       0.872665,
+       1.0472,
+       1.22173,
+       1.39626,
+       1.5708,
+       1.74533,
+       1.91986,
+       2.0944
+      ],
+      "y": [
+       0,
+       0.000479,
+       0.000835,
+       0.001086,
+       0.001251,
+       0.001346,
+       0.001391,
+       0.001403,
+       0.0014,
+       0.0014,
+       0.001421,
+       0.001481,
+       0.001599
+      ]
+     }
+    },
+    {
+     "coordinate": "knee_angle_l",
+     "axis": [
+      0,
+      0,
+      1
+     ],
+     "fn": {
+      "kind": "spline",
+      "x": [
+       0,
+       0.174533,
+       0.349066,
+       0.523599,
+       0.698132,
+       0.872665,
+       1.0472,
+       1.22173,
+       1.39626,
+       1.5708,
+       1.74533,
+       1.91986,
+       2.0944
+      ],
+      "y": [
+       0,
+       -0.000988,
+       -0.001899,
+       -0.002734,
+       -0.003492,
+       -0.004173,
+       -0.004777,
+       -0.005305,
+       -0.005756,
+       -0.00613,
+       -0.006427,
+       -0.006648,
+       -0.006792
+      ]
+     }
+    }
+   ],
+   "worldAtDefault": [
+    -0.05627646000000001,
+    0.4570848,
+    -0.07599473999999999
+   ]
+  },
+  "patella_l": {
+   "name": "patella_l",
+   "parent": "femur_l",
+   "joint": "patellofemoral_l",
+   "translation": [
+    -0.00809,
+    -0.40796,
+    0.00275
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "knee_angle_l_beta",
+     "axis": [
+      0,
+      0,
+      1
+     ],
+     "fn": {
+      "kind": "spline",
+      "x": [
+       0,
+       0.174533,
+       0.349066,
+       0.523599,
+       0.698132,
+       0.872665,
+       1.0472,
+       1.22173,
+       1.39626,
+       1.5708,
+       1.74533,
+       1.91986,
+       2.0944
+      ],
+      "y": [
+       0.00113686,
+       -0.00629212,
+       -0.105582,
+       -0.253683,
+       -0.414245,
+       -0.579047,
+       -0.747244,
+       -0.91799,
+       -1.09044,
+       -1.26379,
+       -1.43763,
+       -1.61186,
+       -1.78634
+      ]
+     }
+    }
+   ],
+   "translationAxes": [
+    {
+     "coordinate": "knee_angle_l_beta",
+     "axis": [
+      1,
+      0,
+      0
+     ],
+     "fn": {
+      "kind": "spline",
+      "x": [
+       0,
+       0.174533,
+       0.349066,
+       0.523599,
+       0.698132,
+       0.872665,
+       1.0472,
+       1.22173,
+       1.39626,
+       1.5708,
+       1.74533,
+       1.91986,
+       2.0944
+      ],
+      "y": [
+       0.0524,
+       0.0488,
+       0.0437,
+       0.0371,
+       0.0296,
+       0.0216,
+       0.0136,
+       0.0057,
+       -0.0019,
+       -0.0088,
+       -0.0148,
+       -0.0196,
+       -0.0227
+      ]
+     }
+    },
+    {
+     "coordinate": "knee_angle_l_beta",
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "fn": {
+      "kind": "spline",
+      "x": [
+       0,
+       0.174533,
+       0.349066,
+       0.523599,
+       0.698132,
+       0.872665,
+       1.0472,
+       1.22173,
+       1.39626,
+       1.5708,
+       1.74533,
+       1.91986,
+       2.0944
+      ],
+      "y": [
+       -0.0108,
+       -0.019,
+       -0.0263,
+       -0.0322,
+       -0.0367,
+       -0.0395,
+       -0.0408,
+       -0.0404,
+       -0.0384,
+       -0.0349,
+       -0.0301,
+       -0.0245,
+       -0.0187
+      ]
+     }
+    }
+   ],
+   "worldAtDefault": [
+    -0.011966000000000004,
+    0.44275000000000003,
+    -0.07450999999999999
+   ]
+  },
+  "talus_l": {
+   "name": "talus_l",
+   "parent": "tibia_l",
+   "joint": "ankle_l",
+   "translation": [
+    0,
+    -0.3862,
+    -0.005
+   ],
+   "orientation": [
+    -0.175895,
+    0.105208,
+    0.0186622
+   ],
+   "childTranslation": [
+    0.01,
+    0.013799999999999998,
+    -0.005
+   ],
+   "childOrientation": [
+    -0.175895,
+    0.105208,
+    0.0186622
+   ],
+   "axes": [
+    {
+     "coordinate": "ankle_angle_l",
+     "axis": [
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.06627646000000001,
+    0.05708480000000005,
+    -0.07599473999999999
+   ]
+  },
+  "calcn_l": {
+   "name": "calcn_l",
+   "parent": "talus_l",
+   "joint": "subtalar_l",
+   "translation": [
+    -0.045070000000000006,
+    -0.04445,
+    -0.01412
+   ],
+   "orientation": [
+    1.76819,
+    -0.906223,
+    1.8196
+   ],
+   "childTranslation": [
+    0.003700000000000001,
+    -0.0025,
+    -0.006200000000000001
+   ],
+   "childOrientation": [
+    1.76819,
+    -0.906223,
+    1.8196
+   ],
+   "axes": [
+    {
+     "coordinate": "subtalar_angle_l",
+     "axis": [
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.11504646000000002,
+    0.015134800000000052,
+    -0.08391473999999999
+   ]
+  },
+  "toes_l": {
+   "name": "toes_l",
+   "parent": "calcn_l",
+   "joint": "mtp_l",
+   "translation": [
+    0.14379999999999998,
+    0.023000000000000003,
+    0.020819999999999998
+   ],
+   "orientation": [
+    -3.14159,
+    -0.619901,
+    0
+   ],
+   "childTranslation": [
+    -0.034999999999999996,
+    0.025000000000000005,
+    0.0219
+   ],
+   "childOrientation": [
+    -3.14159,
+    -0.619901,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "mtp_angle_l",
+     "axis": [
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    0.06375353999999997,
+    0.013134800000000063,
+    -0.08499473999999999
+   ]
+  },
+  "torso": {
+   "name": "torso",
+   "parent": "T1",
+   "joint": "torso_ride",
+   "translation": [
+    0.003967822996851639,
+    -0.4278692164662352,
+    -0.010008718657456112
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.1007,
+    1.0214999999999999,
+    0
+   ]
+  },
+  "humerus_r": {
+   "name": "humerus_r",
+   "parent": "torso",
+   "joint": "acromial_r",
+   "translation": [
+    -0.005644999999999999,
+    0.3865,
+    0.17
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    -0.0088,
+    0.015,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "arm_flex_r",
+     "axis": [
+      0,
+      0,
+      1
+     ],
+     "fn": {
+      "kind": "linear",
+      "a": 1,
+      "b": 0
+     }
+    },
+    {
+     "coordinate": "arm_add_r",
+     "axis": [
+      1,
+      0,
+      0
+     ],
+     "fn": {
+      "kind": "linear",
+      "a": 1,
+      "b": 0
+     }
+    },
+    {
+     "coordinate": "arm_rot_r",
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "fn": {
+      "kind": "linear",
+      "a": 1,
+      "b": 0
+     }
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.09754499999999999,
+    1.3929999999999998,
+    0.17
+   ]
+  },
+  "ulna_r": {
+   "name": "ulna_r",
+   "parent": "humerus_r",
+   "joint": "elbow_r",
+   "translation": [
+    -0.026856,
+    -0.282473,
+    -0.037195
+   ],
+   "orientation": [
+    -0.0228627,
+    0.228018,
+    0.0051689
+   ],
+   "childTranslation": [
+    -0.039999999999999994,
+    0.0038000000000000004,
+    -0.027599999999999993
+   ],
+   "childOrientation": [
+    -0.0228627,
+    0.228018,
+    0.0051689
+   ],
+   "axes": [
+    {
+     "coordinate": "elbow_flex_r",
+     "axis": [
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.08440099999999999,
+    1.1067269999999998,
+    0.16040500000000002
+   ]
+  },
+  "radius_r": {
+   "name": "radius_r",
+   "parent": "ulna_r",
+   "joint": "radioulnar_r",
+   "translation": [
+    0.032073,
+    0.005793000000000001,
+    0.077283
+   ],
+   "orientation": [
+    -1.56884,
+    0.056428,
+    1.53614
+   ],
+   "childTranslation": [
+    0.03880000000000001,
+    0.018799999999999997,
+    0.05120000000000001
+   ],
+   "childOrientation": [
+    -1.56884,
+    0.056428,
+    1.53614
+   ],
+   "axes": [
+    {
+     "coordinate": "pro_sup_r",
+     "axis": [
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.09112799999999999,
+    1.0937199999999998,
+    0.18648800000000001
+   ]
+  },
+  "hand_r": {
+   "name": "hand_r",
+   "parent": "radius_r",
+   "joint": "radius_hand_r",
+   "translation": [
+    0.057402999999999996,
+    -0.225841,
+    0.09611
+   ],
+   "orientation": [
+    -1.5708,
+    0,
+    -1.5708
+   ],
+   "childTranslation": [
+    0.0662,
+    0.010000000000000012,
+    0.0825
+   ],
+   "childOrientation": [
+    -1.5708,
+    0,
+    -1.5708
+   ],
+   "axes": [
+    {
+     "coordinate": "wrist_flex_r",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "wrist_dev_r",
+     "axis": [
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.09992499999999999,
+    0.8578789999999998,
+    0.20009800000000003
+   ]
+  },
+  "humerus_l": {
+   "name": "humerus_l",
+   "parent": "torso",
+   "joint": "acromial_l",
+   "translation": [
+    -0.003745,
+    0.38970000000000005,
+    -0.15180000000000002
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    -0.0069,
+    0.0182,
+    0.0182
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "arm_flex_l",
+     "axis": [
+      0,
+      0,
+      1
+     ],
+     "fn": {
+      "kind": "linear",
+      "a": 1,
+      "b": 0
+     }
+    },
+    {
+     "coordinate": "arm_add_l",
+     "axis": [
+      -1,
+      0,
+      0
+     ],
+     "fn": {
+      "kind": "linear",
+      "a": 1,
+      "b": 0
+     }
+    },
+    {
+     "coordinate": "arm_rot_l",
+     "axis": [
+      0,
+      -1,
+      0
+     ],
+     "fn": {
+      "kind": "linear",
+      "a": 1,
+      "b": 0
+     }
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.09754499999999999,
+    1.3929999999999998,
+    -0.17
+   ]
+  },
+  "ulna_l": {
+   "name": "ulna_l",
+   "parent": "humerus_l",
+   "joint": "elbow_l",
+   "translation": [
+    -0.016856000000000003,
+    -0.278773,
+    0.012095000000000002
+   ],
+   "orientation": [
+    0.0228627,
+    -0.228018,
+    0.0051689
+   ],
+   "childTranslation": [
+    -0.029999999999999995,
+    0.0075,
+    0.0024999999999999996
+   ],
+   "childOrientation": [
+    0.0228627,
+    -0.228018,
+    0.0051689
+   ],
+   "axes": [
+    {
+     "coordinate": "elbow_flex_l",
+     "axis": [
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.08440099999999999,
+    1.1067269999999998,
+    -0.16040500000000002
+   ]
+  },
+  "radius_l": {
+   "name": "radius_l",
+   "parent": "ulna_l",
+   "joint": "radioulnar_l",
+   "translation": [
+    0.033273,
+    0.001993000000000001,
+    -0.076083
+   ],
+   "orientation": [
+    1.56884,
+    -0.056428,
+    1.53614
+   ],
+   "childTranslation": [
+    0.04000000000000001,
+    0.014999999999999998,
+    -0.05000000000000001
+   ],
+   "childOrientation": [
+    1.56884,
+    -0.056428,
+    1.53614
+   ],
+   "axes": [
+    {
+     "coordinate": "pro_sup_l",
+     "axis": [
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.09112799999999999,
+    1.0937199999999998,
+    -0.18648800000000001
+   ]
+  },
+  "hand_l": {
+   "name": "hand_l",
+   "parent": "radius_l",
+   "joint": "radius_hand_l",
+   "translation": [
+    0.054902999999999993,
+    -0.22084099999999998,
+    -0.08671000000000001
+   ],
+   "orientation": [
+    1.5708,
+    0,
+    1.5708
+   ],
+   "childTranslation": [
+    0.06369999999999994,
+    0.014999999999999996,
+    -0.07309999999999997
+   ],
+   "childOrientation": [
+    1.5708,
+    0,
+    1.5708
+   ],
+   "axes": [
+    {
+     "coordinate": "wrist_flex_l",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "wrist_dev_l",
+     "axis": [
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.09992499999999999,
+    0.8578789999999998,
+    -0.20009800000000003
+   ]
+  },
+  "L5": {
+   "name": "L5",
+   "parent": "pelvis",
+   "joint": "L5_joint",
+   "translation": [
+    -0.07306739489733888,
+    0.03523372311595774,
+    0.0003615858607716409
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "L5_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "L5_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "L5_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.07306739489733888,
+    0.9752337231159577,
+    0.0003615858607716409
+   ],
+   "jointSource": "disc"
+  },
+  "L4": {
+   "name": "L4",
+   "parent": "L5",
+   "joint": "L4_joint",
+   "translation": [
+    0.009037298436139443,
+    0.036402222067770995,
+    -0.0005057282660840812
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "L4_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "L4_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "L4_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.06403009646119943,
+    1.0116359451837287,
+    -0.00014414240531244028
+   ],
+   "jointSource": "disc"
+  },
+  "L3": {
+   "name": "L3",
+   "parent": "L4",
+   "joint": "L3_joint",
+   "translation": [
+    0.00558419730337182,
+    0.035154858225515895,
+    0.000735002037898747
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "L3_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "L3_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "L3_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.058445899157827615,
+    1.0467908034092446,
+    0.0005908596325863067
+   ],
+   "jointSource": "disc"
+  },
+  "L2": {
+   "name": "L2",
+   "parent": "L3",
+   "joint": "L2_joint",
+   "translation": [
+    -0.0031345956793514887,
+    0.036361289692316,
+    0.001981402586373338
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "L2_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "L2_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "L2_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.0615804948371791,
+    1.0831520931015606,
+    0.0025722622189596448
+   ],
+   "jointSource": "disc"
+  },
+  "L1": {
+   "name": "L1",
+   "parent": "L2",
+   "joint": "L1_joint",
+   "translation": [
+    -0.006539112418823753,
+    0.033108414706501055,
+    -0.0008929589567122306
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "L1_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "L1_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "L1_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.06811960725600286,
+    1.1162605078080616,
+    0.0016793032622474142
+   ],
+   "jointSource": "disc"
+  },
+  "T12": {
+   "name": "T12",
+   "parent": "L1",
+   "joint": "T12_joint",
+   "translation": [
+    -0.01100970485810504,
+    0.033048133007452796,
+    -0.00016885793491234515
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "T12_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "T12_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "T12_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.0791293121141079,
+    1.1493086408155144,
+    0.001510445327335069
+   ],
+   "jointSource": "disc"
+  },
+  "T11": {
+   "name": "T11",
+   "parent": "T12",
+   "joint": "T11_joint",
+   "translation": [
+    -0.009368137026256912,
+    0.03284910131264729,
+    0.0009845607880416246
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "T11_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "T11_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "T11_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.08849744914036481,
+    1.1821577421281617,
+    0.0024950061153766936
+   ],
+   "jointSource": "disc"
+  },
+  "T10": {
+   "name": "T10",
+   "parent": "T11",
+   "joint": "T10_joint",
+   "translation": [
+    -0.010457056022469338,
+    0.030912372877802463,
+    0.002725947529039096
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "T10_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "T10_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "T10_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.09895450516283415,
+    1.2130701150059642,
+    0.005220953644415789
+   ],
+   "jointSource": "disc"
+  },
+  "T9": {
+   "name": "T9",
+   "parent": "T10",
+   "joint": "T9_joint",
+   "translation": [
+    -0.007062310516231879,
+    0.029503010510057548,
+    0.0022038119167780154
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "T9_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "T9_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "T9_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.10601681567906603,
+    1.2425731255160217,
+    0.007424765561193805
+   ],
+   "jointSource": "disc"
+  },
+  "T8": {
+   "name": "T8",
+   "parent": "T9",
+   "joint": "T8_joint",
+   "translation": [
+    -0.009425586702524122,
+    0.03014695773602849,
+    0.0006336102431430263
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "T8_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "T8_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "T8_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.11544240238159015,
+    1.2727200832520502,
+    0.008058375804336831
+   ],
+   "jointSource": "disc"
+  },
+  "T7": {
+   "name": "T7",
+   "parent": "T8",
+   "joint": "T7_joint",
+   "translation": [
+    -0.005437957801384216,
+    0.027205745106504198,
+    -0.00044287847949748237
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "T7_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "T7_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "T7_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.12088036018297436,
+    1.2999258283585544,
+    0.007615497324839349
+   ],
+   "jointSource": "disc"
+  },
+  "T6": {
+   "name": "T6",
+   "parent": "T7",
+   "joint": "T6_joint",
+   "translation": [
+    -0.005883472235401296,
+    0.028987085790768585,
+    0.0004985709675339647
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "T6_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "T6_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "T6_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.12676383241837566,
+    1.328912914149323,
+    0.008114068292373313
+   ],
+   "jointSource": "disc"
+  },
+  "T5": {
+   "name": "T5",
+   "parent": "T6",
+   "joint": "T5_joint",
+   "translation": [
+    0.00043516802768792107,
+    0.026902624296107014,
+    -0.0006103137177125824
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "T5_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "T5_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "T5_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.12632866439068774,
+    1.35581553844543,
+    0.007503754574660731
+   ],
+   "jointSource": "disc"
+  },
+  "T4": {
+   "name": "T4",
+   "parent": "T5",
+   "joint": "T4_joint",
+   "translation": [
+    0.0009786125012636593,
+    0.026950575171997837,
+    0.0010194520544096796
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "T4_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "T4_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "T4_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.12535005188942408,
+    1.3827661136174279,
+    0.00852320662907041
+   ],
+   "jointSource": "disc"
+  },
+  "T3": {
+   "name": "T3",
+   "parent": "T4",
+   "joint": "T3_joint",
+   "translation": [
+    0.006162691072752163,
+    0.023923764233493294,
+    -0.0004097380729956978
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "T3_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "T3_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "T3_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.11918736081667192,
+    1.4066898778509211,
+    0.008113468556074713
+   ],
+   "jointSource": "disc"
+  },
+  "T2": {
+   "name": "T2",
+   "parent": "T3",
+   "joint": "T2_joint",
+   "translation": [
+    0.0075870874489392115,
+    0.021873041261028847,
+    0.0007316407950199513
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "T2_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "T2_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "T2_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.1116002733677327,
+    1.42856291911195,
+    0.008845109351094664
+   ],
+   "jointSource": "disc"
+  },
+  "T1": {
+   "name": "T1",
+   "parent": "T2",
+   "joint": "T1_joint",
+   "translation": [
+    0.006932450370881069,
+    0.020806297354285075,
+    0.0011636093063614478
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "T1_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "T1_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "T1_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.10466782299685164,
+    1.449369216466235,
+    0.010008718657456112
+   ],
+   "jointSource": "disc"
+  },
+  "C7": {
+   "name": "C7",
+   "parent": "T1",
+   "joint": "C7_joint",
+   "translation": [
+    0.0060809586976466184,
+    0.017417048925132184,
+    0.0012823927466326483
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "C7_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "C7_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "C7_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.09858686429920502,
+    1.4667862653913672,
+    0.01129111140408876
+   ],
+   "jointSource": "disc"
+  },
+  "C6": {
+   "name": "C6",
+   "parent": "C7",
+   "joint": "C6_joint",
+   "translation": [
+    0.004629003476642857,
+    0.015222648386250537,
+    -0.0027794131922273604
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "C6_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "C6_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "C6_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.09395786082256216,
+    1.4820089137776178,
+    0.0085116982118614
+   ],
+   "jointSource": "disc"
+  },
+  "C5": {
+   "name": "C5",
+   "parent": "C6",
+   "joint": "C5_joint",
+   "translation": [
+    0.005470814462095269,
+    0.014515251381669536,
+    0.0009308344306073104
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "C5_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "C5_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "C5_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.08848704636046689,
+    1.4965241651592873,
+    0.00944253264246871
+   ],
+   "jointSource": "disc"
+  },
+  "C4": {
+   "name": "C4",
+   "parent": "C5",
+   "joint": "C4_joint",
+   "translation": [
+    0.0011809675239444761,
+    0.016660765632035,
+    -0.0016610458628114602
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "C4_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "C4_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "C4_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.08730607883652242,
+    1.5131849307913223,
+    0.00778148677965725
+   ],
+   "jointSource": "disc"
+  },
+  "C3": {
+   "name": "C3",
+   "parent": "C4",
+   "joint": "C3_joint",
+   "translation": [
+    -0.0024453723387861115,
+    0.01656399024375177,
+    -0.00044748944581186716
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "C3_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "C3_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "C3_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.08975145117530853,
+    1.529748921035074,
+    0.007333997333845383
+   ],
+   "jointSource": "disc"
+  },
+  "C2": {
+   "name": "C2",
+   "parent": "C3",
+   "joint": "C2_joint",
+   "translation": [
+    -0.0008861303462646131,
+    0.01584997202647065,
+    0.0010882375821372704
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "C2_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "C2_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "C2_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.09063758152157314,
+    1.5455988930615447,
+    0.008422234915982653
+   ],
+   "jointSource": "disc"
+  },
+  "C1": {
+   "name": "C1",
+   "parent": "C2",
+   "joint": "C1_joint",
+   "translation": [
+    -0.009652370823156814,
+    0.015038443240110944,
+    -0.0018592897946258426
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [
+    {
+     "coordinate": "C1_flex",
+     "axis": [
+      0,
+      0,
+      -1
+     ]
+    },
+    {
+     "coordinate": "C1_bend",
+     "axis": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "coordinate": "C1_rot",
+     "axis": [
+      0,
+      1,
+      0
+     ]
+    }
+   ],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.10028995234472995,
+    1.5606373363016557,
+    0.006562945121356811
+   ],
+   "jointSource": "midpoint"
+  },
+  "skull": {
+   "name": "skull",
+   "parent": "C1",
+   "joint": "skull_joint",
+   "translation": [
+    -0.04289475896069045,
+    0.061794040909475934,
+    -0.0013820664438594314
+   ],
+   "orientation": [
+    0,
+    0,
+    0
+   ],
+   "childTranslation": [
+    0,
+    0,
+    0
+   ],
+   "childOrientation": [
+    0,
+    0,
+    0
+   ],
+   "axes": [],
+   "translationAxes": [],
+   "worldAtDefault": [
+    -0.1431847113054204,
+    1.6224313772111316,
+    0.005180878677497379
+   ],
+   "jointSource": "occipital centroid"
+  }
+ },
+ "coordinates": {
+  "pelvis_tilt": {
+   "default": 0,
+   "range": [
+    -3.141592653589793,
+    3.141592653589793
+   ],
+   "rangeSource": "world",
+   "worldPlacement": true,
+   "joint": "ground_pelvis",
+   "segment": "pelvis"
+  },
+  "pelvis_list": {
+   "default": 0,
+   "range": [
+    -3.141592653589793,
+    3.141592653589793
+   ],
+   "rangeSource": "world",
+   "worldPlacement": true,
+   "joint": "ground_pelvis",
+   "segment": "pelvis"
+  },
+  "pelvis_rotation": {
+   "default": 0,
+   "range": [
+    -3.141592653589793,
+    3.141592653589793
+   ],
+   "rangeSource": "world",
+   "worldPlacement": true,
+   "joint": "ground_pelvis",
+   "segment": "pelvis"
+  },
+  "pelvis_tx": {
+   "default": 0,
+   "range": [
+    -5,
+    5
+   ],
+   "rangeSource": "model",
+   "worldPlacement": true,
+   "joint": "ground_pelvis",
+   "segment": "pelvis"
+  },
+  "pelvis_ty": {
+   "default": 0.94,
+   "range": [
+    -1,
+    2
+   ],
+   "rangeSource": "model",
+   "worldPlacement": true,
+   "joint": "ground_pelvis",
+   "segment": "pelvis"
+  },
+  "pelvis_tz": {
+   "default": 0,
+   "range": [
+    -3,
+    3
+   ],
+   "rangeSource": "model",
+   "worldPlacement": true,
+   "joint": "ground_pelvis",
+   "segment": "pelvis"
+  },
+  "hip_flexion_r": {
+   "default": 0,
+   "range": [
+    -0.52359878,
+    2.356194490192345
+   ],
+   "rangeSource": "published",
+   "worldPlacement": false,
+   "joint": "hip_r",
+   "segment": "femur_r"
+  },
+  "hip_adduction_r": {
+   "default": 0,
+   "range": [
+    -0.87266463,
+    0.52359878
+   ],
+   "rangeSource": "model",
+   "worldPlacement": false,
+   "joint": "hip_r",
+   "segment": "femur_r"
+  },
+  "hip_rotation_r": {
+   "default": 0,
+   "range": [
+    -0.7853981633974483,
+    0.7853981633974483
+   ],
+   "rangeSource": "published",
+   "worldPlacement": false,
+   "joint": "hip_r",
+   "segment": "femur_r"
+  },
+  "knee_angle_r": {
+   "default": 0,
+   "range": [
+    0,
+    2.6179938779914944
+   ],
+   "rangeSource": "published",
+   "worldPlacement": false,
+   "joint": "walker_knee_r",
+   "segment": "tibia_r"
+  },
+  "knee_angle_r_beta": {
+   "default": 0,
+   "range": [
+    -99999.9,
+    99999.9
+   ],
+   "rangeSource": "model",
+   "worldPlacement": false,
+   "joint": "patellofemoral_r",
+   "segment": "patella_r"
+  },
+  "ankle_angle_r": {
+   "default": 0,
+   "range": [
+    -0.8726646259971648,
+    0.52359878
+   ],
+   "rangeSource": "published",
+   "worldPlacement": false,
+   "joint": "ankle_r",
+   "segment": "talus_r"
+  },
+  "subtalar_angle_r": {
+   "default": 0,
+   "range": [
+    -0.34906585,
+    0.34906585
+   ],
+   "rangeSource": "model",
+   "worldPlacement": false,
+   "joint": "subtalar_r",
+   "segment": "calcn_r"
+  },
+  "mtp_angle_r": {
+   "default": 0,
+   "range": [
+    -0.7853981633974483,
+    1.2217304763960306
+   ],
+   "rangeSource": "published",
+   "worldPlacement": false,
+   "joint": "mtp_r",
+   "segment": "toes_r"
+  },
+  "hip_flexion_l": {
+   "default": 0,
+   "range": [
+    -0.52359878,
+    2.356194490192345
+   ],
+   "rangeSource": "published",
+   "worldPlacement": false,
+   "joint": "hip_l",
+   "segment": "femur_l"
+  },
+  "hip_adduction_l": {
+   "default": 0,
+   "range": [
+    -0.87266463,
+    0.52359878
+   ],
+   "rangeSource": "model",
+   "worldPlacement": false,
+   "joint": "hip_l",
+   "segment": "femur_l"
+  },
+  "hip_rotation_l": {
+   "default": 0,
+   "range": [
+    -0.7853981633974483,
+    0.7853981633974483
+   ],
+   "rangeSource": "published",
+   "worldPlacement": false,
+   "joint": "hip_l",
+   "segment": "femur_l"
+  },
+  "knee_angle_l": {
+   "default": 0,
+   "range": [
+    0,
+    2.6179938779914944
+   ],
+   "rangeSource": "published",
+   "worldPlacement": false,
+   "joint": "walker_knee_l",
+   "segment": "tibia_l"
+  },
+  "knee_angle_l_beta": {
+   "default": 0,
+   "range": [
+    -99999.9,
+    99999.9
+   ],
+   "rangeSource": "model",
+   "worldPlacement": false,
+   "joint": "patellofemoral_l",
+   "segment": "patella_l"
+  },
+  "ankle_angle_l": {
+   "default": 0,
+   "range": [
+    -0.8726646259971648,
+    0.52359878
+   ],
+   "rangeSource": "published",
+   "worldPlacement": false,
+   "joint": "ankle_l",
+   "segment": "talus_l"
+  },
+  "subtalar_angle_l": {
+   "default": 0,
+   "range": [
+    -0.34906585,
+    0.34906585
+   ],
+   "rangeSource": "model",
+   "worldPlacement": false,
+   "joint": "subtalar_l",
+   "segment": "calcn_l"
+  },
+  "mtp_angle_l": {
+   "default": 0,
+   "range": [
+    -0.7853981633974483,
+    1.2217304763960306
+   ],
+   "rangeSource": "published",
+   "worldPlacement": false,
+   "joint": "mtp_l",
+   "segment": "toes_l"
+  },
+  "arm_flex_r": {
+   "default": 0,
+   "range": [
+    -1.57079633,
+    3.141592653589793
+   ],
+   "rangeSource": "published",
+   "worldPlacement": false,
+   "joint": "acromial_r",
+   "segment": "humerus_r"
+  },
+  "arm_add_r": {
+   "default": 0,
+   "range": [
+    -3.141592653589793,
+    1.57079633
+   ],
+   "rangeSource": "published",
+   "worldPlacement": false,
+   "joint": "acromial_r",
+   "segment": "humerus_r"
+  },
+  "arm_rot_r": {
+   "default": 0,
+   "range": [
+    -1.57079633,
+    1.57079633
+   ],
+   "rangeSource": "model",
+   "worldPlacement": false,
+   "joint": "acromial_r",
+   "segment": "humerus_r"
+  },
+  "elbow_flex_r": {
+   "default": 0,
+   "range": [
+    0,
+    2.618
+   ],
+   "rangeSource": "model",
+   "worldPlacement": false,
+   "joint": "elbow_r",
+   "segment": "ulna_r"
+  },
+  "pro_sup_r": {
+   "default": 0,
+   "range": [
+    -1.3962634015954636,
+    1.57079633
+   ],
+   "rangeSource": "published",
+   "worldPlacement": false,
+   "joint": "radioulnar_r",
+   "segment": "radius_r"
+  },
+  "wrist_flex_r": {
+   "default": 0,
+   "range": [
+    -1.22173048,
+    1.22173048
+   ],
+   "rangeSource": "model",
+   "worldPlacement": false,
+   "joint": "radius_hand_r",
+   "segment": "hand_r"
+  },
+  "wrist_dev_r": {
+   "default": 0,
+   "range": [
+    -0.43633231,
+    0.61086524
+   ],
+   "rangeSource": "model",
+   "worldPlacement": false,
+   "joint": "radius_hand_r",
+   "segment": "hand_r"
+  },
+  "arm_flex_l": {
+   "default": 0,
+   "range": [
+    -1.57079633,
+    3.141592653589793
+   ],
+   "rangeSource": "published",
+   "worldPlacement": false,
+   "joint": "acromial_l",
+   "segment": "humerus_l"
+  },
+  "arm_add_l": {
+   "default": 0,
+   "range": [
+    -3.141592653589793,
+    1.57079633
+   ],
+   "rangeSource": "published",
+   "worldPlacement": false,
+   "joint": "acromial_l",
+   "segment": "humerus_l"
+  },
+  "arm_rot_l": {
+   "default": 0,
+   "range": [
+    -1.57079633,
+    1.57079633
+   ],
+   "rangeSource": "model",
+   "worldPlacement": false,
+   "joint": "acromial_l",
+   "segment": "humerus_l"
+  },
+  "elbow_flex_l": {
+   "default": 0,
+   "range": [
+    0,
+    2.618
+   ],
+   "rangeSource": "model",
+   "worldPlacement": false,
+   "joint": "elbow_l",
+   "segment": "ulna_l"
+  },
+  "pro_sup_l": {
+   "default": 0,
+   "range": [
+    -1.3962634015954636,
+    1.57079633
+   ],
+   "rangeSource": "published",
+   "worldPlacement": false,
+   "joint": "radioulnar_l",
+   "segment": "radius_l"
+  },
+  "wrist_flex_l": {
+   "default": 0,
+   "range": [
+    -1.22173048,
+    1.22173048
+   ],
+   "rangeSource": "model",
+   "worldPlacement": false,
+   "joint": "radius_hand_l",
+   "segment": "hand_l"
+  },
+  "wrist_dev_l": {
+   "default": 0,
+   "range": [
+    -0.43633231,
+    0.61086524
+   ],
+   "rangeSource": "model",
+   "worldPlacement": false,
+   "joint": "radius_hand_l",
+   "segment": "hand_l"
+  },
+  "L5_flex": {
+   "default": 0,
+   "range": [
+    -0.13962634015954636,
+    0.20943951023931956
+   ],
+   "rangeSource": "published",
+   "joint": "L5_joint",
+   "segment": "L5"
+  },
+  "L5_bend": {
+   "default": 0,
+   "range": [
+    -0.05235987755982989,
+    0.05235987755982989
+   ],
+   "rangeSource": "published",
+   "joint": "L5_joint",
+   "segment": "L5"
+  },
+  "L5_rot": {
+   "default": 0,
+   "range": [
+    -0.08726646259971647,
+    0.08726646259971647
+   ],
+   "rangeSource": "published",
+   "joint": "L5_joint",
+   "segment": "L5"
+  },
+  "L4_flex": {
+   "default": 0,
+   "range": [
+    -0.11868238913561442,
+    0.1780235837034216
+   ],
+   "rangeSource": "published",
+   "joint": "L4_joint",
+   "segment": "L4"
+  },
+  "L4_bend": {
+   "default": 0,
+   "range": [
+    -0.10471975511965978,
+    0.10471975511965978
+   ],
+   "rangeSource": "published",
+   "joint": "L4_joint",
+   "segment": "L4"
+  },
+  "L4_rot": {
+   "default": 0,
+   "range": [
+    -0.03490658503988659,
+    0.03490658503988659
+   ],
+   "rangeSource": "published",
+   "joint": "L4_joint",
+   "segment": "L4"
+  },
+  "L3_flex": {
+   "default": 0,
+   "range": [
+    -0.10471975511965978,
+    0.15707963267948966
+   ],
+   "rangeSource": "published",
+   "joint": "L3_joint",
+   "segment": "L3"
+  },
+  "L3_bend": {
+   "default": 0,
+   "range": [
+    -0.13962634015954636,
+    0.13962634015954636
+   ],
+   "rangeSource": "published",
+   "joint": "L3_joint",
+   "segment": "L3"
+  },
+  "L3_rot": {
+   "default": 0,
+   "range": [
+    -0.03490658503988659,
+    0.03490658503988659
+   ],
+   "rangeSource": "published",
+   "joint": "L3_joint",
+   "segment": "L3"
+  },
+  "L2_flex": {
+   "default": 0,
+   "range": [
+    -0.09773843811168247,
+    0.1466076571675237
+   ],
+   "rangeSource": "published",
+   "joint": "L2_joint",
+   "segment": "L2"
+  },
+  "L2_bend": {
+   "default": 0,
+   "range": [
+    -0.10471975511965978,
+    0.10471975511965978
+   ],
+   "rangeSource": "published",
+   "joint": "L2_joint",
+   "segment": "L2"
+  },
+  "L2_rot": {
+   "default": 0,
+   "range": [
+    -0.03490658503988659,
+    0.03490658503988659
+   ],
+   "rangeSource": "published",
+   "joint": "L2_joint",
+   "segment": "L2"
+  },
+  "L1_flex": {
+   "default": 0,
+   "range": [
+    -0.08377580409572782,
+    0.1256637061435917
+   ],
+   "rangeSource": "published",
+   "joint": "L1_joint",
+   "segment": "L1"
+  },
+  "L1_bend": {
+   "default": 0,
+   "range": [
+    -0.10471975511965978,
+    0.10471975511965978
+   ],
+   "rangeSource": "published",
+   "joint": "L1_joint",
+   "segment": "L1"
+  },
+  "L1_rot": {
+   "default": 0,
+   "range": [
+    -0.03490658503988659,
+    0.03490658503988659
+   ],
+   "rangeSource": "published",
+   "joint": "L1_joint",
+   "segment": "L1"
+  },
+  "T12_flex": {
+   "default": 0,
+   "range": [
+    -0.10471975511965978,
+    0.10471975511965978
+   ],
+   "rangeSource": "published",
+   "joint": "T12_joint",
+   "segment": "T12"
+  },
+  "T12_bend": {
+   "default": 0,
+   "range": [
+    -0.13962634015954636,
+    0.13962634015954636
+   ],
+   "rangeSource": "published",
+   "joint": "T12_joint",
+   "segment": "T12"
+  },
+  "T12_rot": {
+   "default": 0,
+   "range": [
+    -0.03490658503988659,
+    0.03490658503988659
+   ],
+   "rangeSource": "published",
+   "joint": "T12_joint",
+   "segment": "T12"
+  },
+  "T11_flex": {
+   "default": 0,
+   "range": [
+    -0.10471975511965978,
+    0.10471975511965978
+   ],
+   "rangeSource": "published",
+   "joint": "T11_joint",
+   "segment": "T11"
+  },
+  "T11_bend": {
+   "default": 0,
+   "range": [
+    -0.15707963267948966,
+    0.15707963267948966
+   ],
+   "rangeSource": "published",
+   "joint": "T11_joint",
+   "segment": "T11"
+  },
+  "T11_rot": {
+   "default": 0,
+   "range": [
+    -0.03490658503988659,
+    0.03490658503988659
+   ],
+   "rangeSource": "published",
+   "joint": "T11_joint",
+   "segment": "T11"
+  },
+  "T10_flex": {
+   "default": 0,
+   "range": [
+    -0.07853981633974483,
+    0.07853981633974483
+   ],
+   "rangeSource": "published",
+   "joint": "T10_joint",
+   "segment": "T10"
+  },
+  "T10_bend": {
+   "default": 0,
+   "range": [
+    -0.12217304763960307,
+    0.12217304763960307
+   ],
+   "rangeSource": "published",
+   "joint": "T10_joint",
+   "segment": "T10"
+  },
+  "T10_rot": {
+   "default": 0,
+   "range": [
+    -0.03490658503988659,
+    0.03490658503988659
+   ],
+   "rangeSource": "published",
+   "joint": "T10_joint",
+   "segment": "T10"
+  },
+  "T9_flex": {
+   "default": 0,
+   "range": [
+    -0.05235987755982989,
+    0.05235987755982989
+   ],
+   "rangeSource": "published",
+   "joint": "T9_joint",
+   "segment": "T9"
+  },
+  "T9_bend": {
+   "default": 0,
+   "range": [
+    -0.10471975511965978,
+    0.10471975511965978
+   ],
+   "rangeSource": "published",
+   "joint": "T9_joint",
+   "segment": "T9"
+  },
+  "T9_rot": {
+   "default": 0,
+   "range": [
+    -0.06981317007977318,
+    0.06981317007977318
+   ],
+   "rangeSource": "published",
+   "joint": "T9_joint",
+   "segment": "T9"
+  },
+  "T8_flex": {
+   "default": 0,
+   "range": [
+    -0.05235987755982989,
+    0.05235987755982989
+   ],
+   "rangeSource": "published",
+   "joint": "T8_joint",
+   "segment": "T8"
+  },
+  "T8_bend": {
+   "default": 0,
+   "range": [
+    -0.10471975511965978,
+    0.10471975511965978
+   ],
+   "rangeSource": "published",
+   "joint": "T8_joint",
+   "segment": "T8"
+  },
+  "T8_rot": {
+   "default": 0,
+   "range": [
+    -0.10471975511965978,
+    0.10471975511965978
+   ],
+   "rangeSource": "published",
+   "joint": "T8_joint",
+   "segment": "T8"
+  },
+  "T7_flex": {
+   "default": 0,
+   "range": [
+    -0.05235987755982989,
+    0.05235987755982989
+   ],
+   "rangeSource": "published",
+   "joint": "T7_joint",
+   "segment": "T7"
+  },
+  "T7_bend": {
+   "default": 0,
+   "range": [
+    -0.10471975511965978,
+    0.10471975511965978
+   ],
+   "rangeSource": "published",
+   "joint": "T7_joint",
+   "segment": "T7"
+  },
+  "T7_rot": {
+   "default": 0,
+   "range": [
+    -0.13962634015954636,
+    0.13962634015954636
+   ],
+   "rangeSource": "published",
+   "joint": "T7_joint",
+   "segment": "T7"
+  },
+  "T6_flex": {
+   "default": 0,
+   "range": [
+    -0.04363323129985824,
+    0.04363323129985824
+   ],
+   "rangeSource": "published",
+   "joint": "T6_joint",
+   "segment": "T6"
+  },
+  "T6_bend": {
+   "default": 0,
+   "range": [
+    -0.10471975511965978,
+    0.10471975511965978
+   ],
+   "rangeSource": "published",
+   "joint": "T6_joint",
+   "segment": "T6"
+  },
+  "T6_rot": {
+   "default": 0,
+   "range": [
+    -0.13962634015954636,
+    0.13962634015954636
+   ],
+   "rangeSource": "published",
+   "joint": "T6_joint",
+   "segment": "T6"
+  },
+  "T5_flex": {
+   "default": 0,
+   "range": [
+    -0.03490658503988659,
+    0.03490658503988659
+   ],
+   "rangeSource": "published",
+   "joint": "T5_joint",
+   "segment": "T5"
+  },
+  "T5_bend": {
+   "default": 0,
+   "range": [
+    -0.10471975511965978,
+    0.10471975511965978
+   ],
+   "rangeSource": "published",
+   "joint": "T5_joint",
+   "segment": "T5"
+  },
+  "T5_rot": {
+   "default": 0,
+   "range": [
+    -0.13962634015954636,
+    0.13962634015954636
+   ],
+   "rangeSource": "published",
+   "joint": "T5_joint",
+   "segment": "T5"
+  },
+  "T4_flex": {
+   "default": 0,
+   "range": [
+    -0.03490658503988659,
+    0.03490658503988659
+   ],
+   "rangeSource": "published",
+   "joint": "T4_joint",
+   "segment": "T4"
+  },
+  "T4_bend": {
+   "default": 0,
+   "range": [
+    -0.10471975511965978,
+    0.10471975511965978
+   ],
+   "rangeSource": "published",
+   "joint": "T4_joint",
+   "segment": "T4"
+  },
+  "T4_rot": {
+   "default": 0,
+   "range": [
+    -0.15707963267948966,
+    0.15707963267948966
+   ],
+   "rangeSource": "published",
+   "joint": "T4_joint",
+   "segment": "T4"
+  },
+  "T3_flex": {
+   "default": 0,
+   "range": [
+    -0.03490658503988659,
+    0.03490658503988659
+   ],
+   "rangeSource": "published",
+   "joint": "T3_joint",
+   "segment": "T3"
+  },
+  "T3_bend": {
+   "default": 0,
+   "range": [
+    -0.10471975511965978,
+    0.10471975511965978
+   ],
+   "rangeSource": "published",
+   "joint": "T3_joint",
+   "segment": "T3"
+  },
+  "T3_rot": {
+   "default": 0,
+   "range": [
+    -0.15707963267948966,
+    0.15707963267948966
+   ],
+   "rangeSource": "published",
+   "joint": "T3_joint",
+   "segment": "T3"
+  },
+  "T2_flex": {
+   "default": 0,
+   "range": [
+    -0.03490658503988659,
+    0.03490658503988659
+   ],
+   "rangeSource": "published",
+   "joint": "T2_joint",
+   "segment": "T2"
+  },
+  "T2_bend": {
+   "default": 0,
+   "range": [
+    -0.10471975511965978,
+    0.10471975511965978
+   ],
+   "rangeSource": "published",
+   "joint": "T2_joint",
+   "segment": "T2"
+  },
+  "T2_rot": {
+   "default": 0,
+   "range": [
+    -0.15707963267948966,
+    0.15707963267948966
+   ],
+   "rangeSource": "published",
+   "joint": "T2_joint",
+   "segment": "T2"
+  },
+  "T1_flex": {
+   "default": 0,
+   "range": [
+    -0.03490658503988659,
+    0.03490658503988659
+   ],
+   "rangeSource": "published",
+   "joint": "T1_joint",
+   "segment": "T1"
+  },
+  "T1_bend": {
+   "default": 0,
+   "range": [
+    -0.10471975511965978,
+    0.10471975511965978
+   ],
+   "rangeSource": "published",
+   "joint": "T1_joint",
+   "segment": "T1"
+  },
+  "T1_rot": {
+   "default": 0,
+   "range": [
+    -0.15707963267948966,
+    0.15707963267948966
+   ],
+   "rangeSource": "published",
+   "joint": "T1_joint",
+   "segment": "T1"
+  },
+  "C7_flex": {
+   "default": 0,
+   "range": [
+    -0.07853981633974483,
+    0.07853981633974483
+   ],
+   "rangeSource": "published",
+   "joint": "C7_joint",
+   "segment": "C7"
+  },
+  "C7_bend": {
+   "default": 0,
+   "range": [
+    -0.06981317007977318,
+    0.06981317007977318
+   ],
+   "rangeSource": "published",
+   "joint": "C7_joint",
+   "segment": "C7"
+  },
+  "C7_rot": {
+   "default": 0,
+   "range": [
+    -0.03490658503988659,
+    0.03490658503988659
+   ],
+   "rangeSource": "published",
+   "joint": "C7_joint",
+   "segment": "C7"
+  },
+  "C6_flex": {
+   "default": 0,
+   "range": [
+    -0.14835298641951802,
+    0.14835298641951802
+   ],
+   "rangeSource": "published",
+   "joint": "C6_joint",
+   "segment": "C6"
+  },
+  "C6_bend": {
+   "default": 0,
+   "range": [
+    -0.12217304763960307,
+    0.12217304763960307
+   ],
+   "rangeSource": "published",
+   "joint": "C6_joint",
+   "segment": "C6"
+  },
+  "C6_rot": {
+   "default": 0,
+   "range": [
+    -0.10471975511965978,
+    0.10471975511965978
+   ],
+   "rangeSource": "published",
+   "joint": "C6_joint",
+   "segment": "C6"
+  },
+  "C5_flex": {
+   "default": 0,
+   "range": [
+    -0.17453292519943295,
+    0.17453292519943295
+   ],
+   "rangeSource": "published",
+   "joint": "C5_joint",
+   "segment": "C5"
+  },
+  "C5_bend": {
+   "default": 0,
+   "range": [
+    -0.13962634015954636,
+    0.13962634015954636
+   ],
+   "rangeSource": "published",
+   "joint": "C5_joint",
+   "segment": "C5"
+  },
+  "C5_rot": {
+   "default": 0,
+   "range": [
+    -0.12217304763960307,
+    0.12217304763960307
+   ],
+   "rangeSource": "published",
+   "joint": "C5_joint",
+   "segment": "C5"
+  },
+  "C4_flex": {
+   "default": 0,
+   "range": [
+    -0.17453292519943295,
+    0.17453292519943295
+   ],
+   "rangeSource": "published",
+   "joint": "C4_joint",
+   "segment": "C4"
+  },
+  "C4_bend": {
+   "default": 0,
+   "range": [
+    -0.19198621771937624,
+    0.19198621771937624
+   ],
+   "rangeSource": "published",
+   "joint": "C4_joint",
+   "segment": "C4"
+  },
+  "C4_rot": {
+   "default": 0,
+   "range": [
+    -0.12217304763960307,
+    0.12217304763960307
+   ],
+   "rangeSource": "published",
+   "joint": "C4_joint",
+   "segment": "C4"
+  },
+  "C3_flex": {
+   "default": 0,
+   "range": [
+    -0.1308996938995747,
+    0.1308996938995747
+   ],
+   "rangeSource": "published",
+   "joint": "C3_joint",
+   "segment": "C3"
+  },
+  "C3_bend": {
+   "default": 0,
+   "range": [
+    -0.19198621771937624,
+    0.19198621771937624
+   ],
+   "rangeSource": "published",
+   "joint": "C3_joint",
+   "segment": "C3"
+  },
+  "C3_rot": {
+   "default": 0,
+   "range": [
+    -0.12217304763960307,
+    0.12217304763960307
+   ],
+   "rangeSource": "published",
+   "joint": "C3_joint",
+   "segment": "C3"
+  },
+  "C2_flex": {
+   "default": 0,
+   "range": [
+    -0.17453292519943295,
+    0.17453292519943295
+   ],
+   "rangeSource": "published",
+   "joint": "C2_joint",
+   "segment": "C2"
+  },
+  "C2_bend": {
+   "default": 0,
+   "range": [
+    -0.08726646259971647,
+    0.08726646259971647
+   ],
+   "rangeSource": "published",
+   "joint": "C2_joint",
+   "segment": "C2"
+  },
+  "C2_rot": {
+   "default": 0,
+   "range": [
+    -0.6981317007977318,
+    0.6981317007977318
+   ],
+   "rangeSource": "published",
+   "joint": "C2_joint",
+   "segment": "C2"
+  },
+  "C1_flex": {
+   "default": 0,
+   "range": [
+    -0.2181661564992912,
+    0.2181661564992912
+   ],
+   "rangeSource": "published",
+   "joint": "C1_joint",
+   "segment": "C1"
+  },
+  "C1_bend": {
+   "default": 0,
+   "range": [
+    -0.08726646259971647,
+    0.08726646259971647
+   ],
+   "rangeSource": "published",
+   "joint": "C1_joint",
+   "segment": "C1"
+  },
+  "C1_rot": {
+   "default": 0,
+   "range": [
+    -0.08726646259971647,
+    0.08726646259971647
+   ],
+   "rangeSource": "published",
+   "joint": "C1_joint",
+   "segment": "C1"
+  }
+ },
+ "binding": {
+  "hip bone|L": "pelvis",
+  "hip bone|R": "pelvis",
+  "sacrum|M": "pelvis",
+  "femur|L": "femur_l",
+  "femur|R": "femur_r",
+  "tibia|L": "tibia_l",
+  "tibia|R": "tibia_r",
+  "fibula|L": "tibia_l",
+  "fibula|R": "tibia_r",
+  "interosseous membrane of leg|L": "tibia_l",
+  "interosseous membrane of leg|R": "tibia_r",
+  "patella|L": "patella_l",
+  "patella|R": "patella_r",
+  "talus|L": "talus_l",
+  "talus|R": "talus_r",
+  "calcaneus|L": "calcn_l",
+  "calcaneus|R": "calcn_r",
+  "cuboid bone|L": "calcn_l",
+  "cuboid bone|R": "calcn_r",
+  "navicular bone of foot|L": "calcn_l",
+  "navicular bone of foot|R": "calcn_r",
+  "lateral cuneiform bone|L": "calcn_l",
+  "lateral cuneiform bone|R": "calcn_r",
+  "intermediate cuneiform bone|L": "calcn_l",
+  "intermediate cuneiform bone|R": "calcn_r",
+  "medial cuneiform bone|L": "calcn_l",
+  "medial cuneiform bone|R": "calcn_r",
+  "long plantar ligament|L": "calcn_l",
+  "long plantar ligament|R": "calcn_r",
+  "first metatarsal bone|L": "toes_l",
+  "first metatarsal bone|R": "toes_r",
+  "second metatarsal bone|L": "toes_l",
+  "second metatarsal bone|R": "toes_r",
+  "third metatarsal bone|L": "toes_l",
+  "third metatarsal bone|R": "toes_r",
+  "fourth metatarsal bone|L": "toes_l",
+  "fourth metatarsal bone|R": "toes_r",
+  "fifth metatarsal bone|L": "toes_l",
+  "fifth metatarsal bone|R": "toes_r",
+  "sesamoid bone of foot|L": "toes_l",
+  "sesamoid bone of foot|R": "toes_r",
+  "proximal phalanx of big toe|L": "toes_l",
+  "proximal phalanx of big toe|R": "toes_r",
+  "distal phalanx of big toe|L": "toes_l",
+  "distal phalanx of big toe|R": "toes_r",
+  "proximal phalanx of second toe|L": "toes_l",
+  "proximal phalanx of second toe|R": "toes_r",
+  "middle phalanx of second toe|L": "toes_l",
+  "middle phalanx of second toe|R": "toes_r",
+  "distal phalanx of second toe|L": "toes_l",
+  "distal phalanx of second toe|R": "toes_r",
+  "proximal phalanx of third toe|L": "toes_l",
+  "proximal phalanx of third toe|R": "toes_r",
+  "middle phalanx of third toe|L": "toes_l",
+  "middle phalanx of third toe|R": "toes_r",
+  "distal phalanx of third toe|L": "toes_l",
+  "distal phalanx of third toe|R": "toes_r",
+  "proximal phalanx of fourth toe|L": "toes_l",
+  "proximal phalanx of fourth toe|R": "toes_r",
+  "middle phalanx of fourth toe|L": "toes_l",
+  "middle phalanx of fourth toe|R": "toes_r",
+  "distal phalanx of fourth toe|L": "toes_l",
+  "distal phalanx of fourth toe|R": "toes_r",
+  "proximal phalanx of little toe|L": "toes_l",
+  "proximal phalanx of little toe|R": "toes_r",
+  "middle phalanx of little toe|L": "toes_l",
+  "middle phalanx of little toe|R": "toes_r",
+  "distal phalanx of little toe|L": "toes_l",
+  "distal phalanx of little toe|R": "toes_r",
+  "humerus|L": "humerus_l",
+  "humerus|R": "humerus_r",
+  "ulna|L": "ulna_l",
+  "ulna|R": "ulna_r",
+  "interosseous membrane of forearm|L": "ulna_l",
+  "interosseous membrane of forearm|R": "ulna_r",
+  "radius|L": "radius_l",
+  "radius|R": "radius_r",
+  "scaphoid|L": "hand_l",
+  "scaphoid|R": "hand_r",
+  "lunate|L": "hand_l",
+  "lunate|R": "hand_r",
+  "capitate|L": "hand_l",
+  "capitate|R": "hand_r",
+  "hamate|L": "hand_l",
+  "hamate|R": "hand_r",
+  "trapezium|L": "hand_l",
+  "trapezium|R": "hand_r",
+  "trapezoid|L": "hand_l",
+  "trapezoid|R": "hand_r",
+  "triquetral|L": "hand_l",
+  "triquetral|R": "hand_r",
+  "pisiform|L": "hand_l",
+  "pisiform|R": "hand_r",
+  "first metacarpal bone|L": "hand_l",
+  "first metacarpal bone|R": "hand_r",
+  "second metacarpal bone|L": "hand_l",
+  "second metacarpal bone|R": "hand_r",
+  "third metacarpal bone|L": "hand_l",
+  "third metacarpal bone|R": "hand_r",
+  "fourth metacarpal bone|L": "hand_l",
+  "fourth metacarpal bone|R": "hand_r",
+  "fifth metacarpal bone|L": "hand_l",
+  "fifth metacarpal bone|R": "hand_r",
+  "proximal phalanx of thumb|L": "hand_l",
+  "proximal phalanx of thumb|R": "hand_r",
+  "distal phalanx of thumb|L": "hand_l",
+  "distal phalanx of thumb|R": "hand_r",
+  "proximal phalanx of index finger|L": "hand_l",
+  "proximal phalanx of index finger|R": "hand_r",
+  "middle phalanx of index finger|L": "hand_l",
+  "middle phalanx of index finger|R": "hand_r",
+  "distal phalanx of index finger|L": "hand_l",
+  "distal phalanx of index finger|R": "hand_r",
+  "proximal phalanx of middle finger|L": "hand_l",
+  "proximal phalanx of middle finger|R": "hand_r",
+  "middle phalanx of middle finger|L": "hand_l",
+  "middle phalanx of middle finger|R": "hand_r",
+  "distal phalanx of middle finger|L": "hand_l",
+  "distal phalanx of middle finger|R": "hand_r",
+  "proximal phalanx of ring finger|L": "hand_l",
+  "proximal phalanx of ring finger|R": "hand_r",
+  "middle phalanx of ring finger|L": "hand_l",
+  "middle phalanx of ring finger|R": "hand_r",
+  "distal phalanx of ring finger|L": "hand_l",
+  "distal phalanx of ring finger|R": "hand_r",
+  "proximal phalanx of little finger|L": "hand_l",
+  "proximal phalanx of little finger|R": "hand_r",
+  "middle phalanx of little finger|L": "hand_l",
+  "middle phalanx of little finger|R": "hand_r",
+  "distal phalanx of little finger|L": "hand_l",
+  "distal phalanx of little finger|R": "hand_r",
+  "manubrium|M": "torso",
+  "body of sternum|M": "torso",
+  "xiphoid process|M": "torso",
+  "clavicle|L": "torso",
+  "clavicle|R": "torso",
+  "scapula|L": "torso",
+  "scapula|R": "torso",
+  "first costal cartilage|L": "torso",
+  "first costal cartilage|R": "torso",
+  "second costal cartilage|L": "torso",
+  "second costal cartilage|R": "torso",
+  "third costal cartilage|L": "torso",
+  "third costal cartilage|R": "torso",
+  "fourth costal cartilage|L": "torso",
+  "fourth costal cartilage|R": "torso",
+  "fifth costal cartilage|L": "torso",
+  "fifth costal cartilage|R": "torso",
+  "sixth costal cartilage|L": "torso",
+  "sixth costal cartilage|R": "torso",
+  "seventh costal cartilage|L": "torso",
+  "seventh costal cartilage|R": "torso",
+  "atlas|M": "C1",
+  "axis|M": "C2",
+  "eighth rib|L": "T8",
+  "eighth rib|R": "T8",
+  "eighth thoracic vertebra|M": "T8",
+  "eleventh rib|L": "T11",
+  "eleventh rib|R": "T11",
+  "eleventh thoracic vertebra|M": "T11",
+  "ethmoid|M": "skull",
+  "eyeball|M": "skull",
+  "fifth cervical vertebra|M": "C5",
+  "fifth lumbar vertebra|M": "L5",
+  "fifth rib|L": "T5",
+  "fifth rib|R": "T5",
+  "fifth thoracic vertebra|M": "T5",
+  "first lumbar vertebra|M": "L1",
+  "first rib|L": "T1",
+  "first rib|R": "T1",
+  "first thoracic vertebra|M": "T1",
+  "fourth cervical vertebra|M": "C4",
+  "fourth lumbar vertebra|M": "L4",
+  "fourth rib|L": "T4",
+  "fourth rib|R": "T4",
+  "fourth thoracic vertebra|M": "T4",
+  "frontal bone|M": "skull",
+  "hyoid bone|M": "skull",
+  "inferior nasal concha|L": "skull",
+  "inferior nasal concha|R": "skull",
+  "intervertebral disk of axis|M": "C2",
+  "intervertebral disk of eighth thoracic vertebra|M": "T8",
+  "intervertebral disk of eleventh thoracic vertebra|M": "T11",
+  "intervertebral disk of fifth cervical vertebra|M": "C5",
+  "intervertebral disk of fifth lumbar vertebra|M": "L5",
+  "intervertebral disk of fifth thoracic vertebra|M": "T5",
+  "intervertebral disk of first lumbar vertebra|M": "L1",
+  "intervertebral disk of first thoracic vertebra|M": "T1",
+  "intervertebral disk of fourth cervical vertebra|M": "C4",
+  "intervertebral disk of fourth lumbar vertebra|M": "L4",
+  "intervertebral disk of fourth thoracic vertebra|M": "T4",
+  "intervertebral disk of ninth thoracic vertebra|M": "T9",
+  "intervertebral disk of second lumbar vertebra|M": "L2",
+  "intervertebral disk of second thoracic vertebra|M": "T2",
+  "intervertebral disk of seventh cervical vertebra|M": "C7",
+  "intervertebral disk of seventh thoracic vertebra|M": "T7",
+  "intervertebral disk of sixth cervical vertebra|M": "C6",
+  "intervertebral disk of sixth thoracic vertebra|M": "T6",
+  "intervertebral disk of tenth thoracic vertebra|M": "T10",
+  "intervertebral disk of third cervical vertebra|M": "C3",
+  "intervertebral disk of third lumbar vertebra|M": "L3",
+  "intervertebral disk of third thoracic vertebra|M": "T3",
+  "intervertebral disk of twelfth thoracic vertebra|M": "T12",
+  "mandible|M": "skull",
+  "maxilla|L": "skull",
+  "maxilla|R": "skull",
+  "nasal bone|L": "skull",
+  "nasal bone|R": "skull",
+  "ninth rib|L": "T9",
+  "ninth rib|R": "T9",
+  "ninth thoracic vertebra|M": "T9",
+  "occipital bone|M": "skull",
+  "palatine bone|L": "skull",
+  "palatine bone|R": "skull",
+  "parietal bone|L": "skull",
+  "parietal bone|R": "skull",
+  "second lumbar vertebra|M": "L2",
+  "second rib|L": "T2",
+  "second rib|R": "T2",
+  "second thoracic vertebra|M": "T2",
+  "seventh cervical vertebra|M": "C7",
+  "seventh rib|L": "T7",
+  "seventh rib|R": "T7",
+  "seventh thoracic vertebra|M": "T7",
+  "sixth cervical vertebra|M": "C6",
+  "sixth rib|L": "T6",
+  "sixth rib|R": "T6",
+  "sixth thoracic vertebra|M": "T6",
+  "sphenoid bone|M": "skull",
+  "temporal bone|L": "skull",
+  "temporal bone|R": "skull",
+  "tenth rib|L": "T10",
+  "tenth rib|R": "T10",
+  "tenth thoracic vertebra|M": "T10",
+  "third cervical vertebra|M": "C3",
+  "third lumbar vertebra|M": "L3",
+  "third rib|L": "T3",
+  "third rib|R": "T3",
+  "third thoracic vertebra|M": "T3",
+  "twelfth rib|L": "T12",
+  "twelfth rib|R": "T12",
+  "twelfth thoracic vertebra|M": "T12",
+  "vomer|M": "skull",
+  "zygomatic bone|L": "skull",
+  "zygomatic bone|R": "skull"
+ },
+ "romCitation": "Norkin CC, White DJ. Measurement of Joint Motion: A Guide to Goniometry, 5th ed. F.A. Davis, 2016 — normal adult range",
+ "spine": {
+  "chain": [
+   "L5",
+   "L4",
+   "L3",
+   "L2",
+   "L1",
+   "T12",
+   "T11",
+   "T10",
+   "T9",
+   "T8",
+   "T7",
+   "T6",
+   "T5",
+   "T4",
+   "T3",
+   "T2",
+   "T1",
+   "C7",
+   "C6",
+   "C5",
+   "C4",
+   "C3",
+   "C2",
+   "C1"
+  ],
+  "regions": {
+   "lumbar": [
+    "L5",
+    "L4",
+    "L3",
+    "L2",
+    "L1"
+   ],
+   "thoracic": [
+    "T12",
+    "T11",
+    "T10",
+    "T9",
+    "T8",
+    "T7",
+    "T6",
+    "T5",
+    "T4",
+    "T3",
+    "T2",
+    "T1"
+   ],
+   "cervical": [
+    "C7",
+    "C6",
+    "C5",
+    "C4",
+    "C3",
+    "C2",
+    "C1"
+   ]
+  },
+  "citation": "White AA, Panjabi MM. Clinical Biomechanics of the Spine, 2nd ed. Lippincott, 1990 — segmental range of motion",
+  "jointSource": "intervertebral disc centroids, BodyParts3D; C1-C2 and C0-C1 midpoints",
+  "share": {
+   "lumbar": {
+    "flex": {
+     "L5": 0.2564102564102564,
+     "L4": 0.21794871794871795,
+     "L3": 0.19230769230769232,
+     "L2": 0.1794871794871795,
+     "L1": 0.15384615384615385
+    },
+    "bend": {
+     "L5": 0.10344827586206896,
+     "L4": 0.20689655172413793,
+     "L3": 0.27586206896551724,
+     "L2": 0.20689655172413793,
+     "L1": 0.20689655172413793
+    },
+    "rot": {
+     "L5": 0.38461538461538464,
+     "L4": 0.15384615384615385,
+     "L3": 0.15384615384615385,
+     "L2": 0.15384615384615385,
+     "L1": 0.15384615384615385
+    }
+   },
+   "thoracic": {
+    "flex": {
+     "T12": 0.15789473684210525,
+     "T11": 0.15789473684210525,
+     "T10": 0.11842105263157894,
+     "T9": 0.07894736842105263,
+     "T8": 0.07894736842105263,
+     "T7": 0.07894736842105263,
+     "T6": 0.06578947368421052,
+     "T5": 0.05263157894736842,
+     "T4": 0.05263157894736842,
+     "T3": 0.05263157894736842,
+     "T2": 0.05263157894736842,
+     "T1": 0.05263157894736842
+    },
+    "bend": {
+     "T12": 0.10256410256410256,
+     "T11": 0.11538461538461539,
+     "T10": 0.08974358974358974,
+     "T9": 0.07692307692307693,
+     "T8": 0.07692307692307693,
+     "T7": 0.07692307692307693,
+     "T6": 0.07692307692307693,
+     "T5": 0.07692307692307693,
+     "T4": 0.07692307692307693,
+     "T3": 0.07692307692307693,
+     "T2": 0.07692307692307693,
+     "T1": 0.07692307692307693
+    },
+    "rot": {
+     "T12": 0.02631578947368421,
+     "T11": 0.02631578947368421,
+     "T10": 0.02631578947368421,
+     "T9": 0.05263157894736842,
+     "T8": 0.07894736842105263,
+     "T7": 0.10526315789473684,
+     "T6": 0.10526315789473684,
+     "T5": 0.10526315789473684,
+     "T4": 0.11842105263157894,
+     "T3": 0.11842105263157894,
+     "T2": 0.11842105263157894,
+     "T1": 0.11842105263157894
+    }
+   },
+   "cervical": {
+    "flex": {
+     "C7": 0.07142857142857142,
+     "C6": 0.1349206349206349,
+     "C5": 0.15873015873015872,
+     "C4": 0.15873015873015872,
+     "C3": 0.11904761904761904,
+     "C2": 0.15873015873015872,
+     "C1": 0.1984126984126984
+    },
+    "bend": {
+     "C7": 0.0784313725490196,
+     "C6": 0.13725490196078433,
+     "C5": 0.1568627450980392,
+     "C4": 0.21568627450980393,
+     "C3": 0.21568627450980393,
+     "C2": 0.09803921568627451,
+     "C1": 0.09803921568627451
+    },
+    "rot": {
+     "C7": 0.02702702702702703,
+     "C6": 0.08108108108108109,
+     "C5": 0.0945945945945946,
+     "C4": 0.0945945945945946,
+     "C3": 0.0945945945945946,
+     "C2": 0.5405405405405406,
+     "C1": 0.06756756756756757
+    }
+   }
+  },
+  "regionRange": {
+   "lumbar": {
+    "flex": [
+     -0.5445427266222308,
+     0.816814089933346
+    ],
+    "bend": [
+     -0.5061454830783556,
+     0.5061454830783556
+    ],
+    "rot": [
+     -0.22689280275926282,
+     0.22689280275926282
+    ]
+   },
+   "thoracic": {
+    "flex": [
+     -0.6632251157578453,
+     0.6632251157578453
+    ],
+    "bend": [
+     -1.361356816555577,
+     1.361356816555577
+    ],
+    "rot": [
+     -1.3264502315156905,
+     1.3264502315156905
+    ]
+   },
+   "cervical": {
+    "flex": [
+     -1.0995574287564276,
+     1.0995574287564276
+    ],
+    "bend": [
+     -0.890117918517108,
+     0.890117918517108
+    ],
+    "rot": [
+     -1.2915436464758037,
+     1.2915436464758037
+    ]
+   }
+  }
+ }
+}

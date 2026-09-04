@@ -1,0 +1,6 @@
+# only needed to REBUILD the brain model, not to run the app
+numpy
+nibabel
+scikit-image
+scipy
+fast-simplification

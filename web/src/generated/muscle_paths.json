@@ -1,0 +1,3272 @@
+{
+ "source": "Rajagopal2016.osim",
+ "citation": "Rajagopal A, Dembia CL, DeMers MS, Delp DD, Hicks JL, Delp SL. Full-Body Musculoskeletal Model for Muscle-Driven Simulation of Human Gait. IEEE Trans Biomed Eng. 2016;63(10):2068-79",
+ "licence": "Apache-2.0 (OpenSim); model files redistributable via opensim-org/opensim-models",
+ "note": "path points are in the local frame of the named segment, in metres",
+ "muscles": [
+  {
+   "name": "addbrev_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0191,
+      -0.094,
+      0.0154
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      -0.002,
+      -0.118,
+      0.0249
+     ]
+    }
+   ],
+   "maxIsometricForce": 625.819672131148,
+   "optimalFiberLength": 0.1031,
+   "tendonSlackLength": 0.035450291324676,
+   "pennationAngle": 0.11478092,
+   "side": "R",
+   "base": "addbrev",
+   "mapsTo": "adductor brevis"
+  },
+  {
+   "name": "addlong_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.00758,
+      -0.0889,
+      0.01888
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      0.01126,
+      -0.23937,
+      0.01583
+     ]
+    }
+   ],
+   "maxIsometricForce": 916.8,
+   "optimalFiberLength": 0.1082,
+   "tendonSlackLength": 0.131799363342026,
+   "pennationAngle": 0.13777039,
+   "side": "R",
+   "base": "addlong",
+   "mapsTo": "adductor longus"
+  },
+  {
+   "name": "addmagDist_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.07404,
+      -0.12767,
+      0.03982
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      0.01125,
+      -0.2625,
+      0.0193
+     ]
+    }
+   ],
+   "maxIsometricForce": 597.295081967214,
+   "optimalFiberLength": 0.1772,
+   "tendonSlackLength": 0.0873806954617727,
+   "pennationAngle": 0.19470502,
+   "side": "R",
+   "base": "addmagDist",
+   "mapsTo": null
+  },
+  {
+   "name": "addmagIsch_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.08962,
+      -0.12976,
+      0.04171
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      0.00481,
+      -0.38797,
+      -0.03273
+     ]
+    }
+   ],
+   "maxIsometricForce": 597.295081967214,
+   "optimalFiberLength": 0.1562,
+   "tendonSlackLength": 0.216343023454343,
+   "pennationAngle": 0.16804429,
+   "side": "R",
+   "base": "addmagIsch",
+   "mapsTo": null
+  },
+  {
+   "name": "addmagMid_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.05266,
+      -0.12075,
+      0.02854
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      0.00242,
+      -0.1624,
+      0.02922
+     ]
+    }
+   ],
+   "maxIsometricForce": 597.295081967214,
+   "optimalFiberLength": 0.1377,
+   "tendonSlackLength": 0.0466276999070464,
+   "pennationAngle": 0.20730759,
+   "side": "R",
+   "base": "addmagMid",
+   "mapsTo": null
+  },
+  {
+   "name": "addmagProx_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.03098,
+      -0.10755,
+      0.01365
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      -0.01527,
+      -0.07886,
+      0.03202
+     ]
+    }
+   ],
+   "maxIsometricForce": 597.295081967214,
+   "optimalFiberLength": 0.1056,
+   "tendonSlackLength": 0.0403240979232675,
+   "pennationAngle": 0.31148326,
+   "side": "R",
+   "base": "addmagProx",
+   "mapsTo": null
+  },
+  {
+   "name": "bflh_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.104,
+      -0.1191,
+      0.0586
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.0337,
+      -0.035,
+      0.0253
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.0287,
+      -0.0455,
+      0.0303
+     ]
+    }
+   ],
+   "maxIsometricForce": 1313.18360655738,
+   "optimalFiberLength": 0.0976,
+   "tendonSlackLength": 0.325226647516457,
+   "pennationAngle": 0.17591823,
+   "side": "R",
+   "base": "bflh",
+   "mapsTo": "biceps femoris"
+  },
+  {
+   "name": "bfsh_r",
+   "points": [
+    {
+     "body": "femur_r",
+     "p": [
+      0.005,
+      -0.2111,
+      0.0234
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.0301,
+      -0.0419,
+      0.0318
+     ]
+    }
+   ],
+   "maxIsometricForce": 557.11475409836,
+   "optimalFiberLength": 0.1103,
+   "tendonSlackLength": 0.105817218589115,
+   "pennationAngle": 0.26422317,
+   "side": "R",
+   "base": "bfsh",
+   "mapsTo": "biceps femoris"
+  },
+  {
+   "name": "edl_r",
+   "points": [
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.016,
+      -0.1157,
+      0.0205
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      0.0164,
+      -0.376,
+      0.0112
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.0919,
+      0.036,
+      0.0008
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.1616,
+      0.0055,
+      0.013
+     ]
+    },
+    {
+     "body": "toes_r",
+     "p": [
+      0.0003,
+      0.0047,
+      0.0153
+     ]
+    },
+    {
+     "body": "toes_r",
+     "p": [
+      0.0443,
+      -0.0004,
+      0.025
+     ]
+    }
+   ],
+   "maxIsometricForce": 603.4981556,
+   "optimalFiberLength": 0.0693,
+   "tendonSlackLength": 0.368875245465225,
+   "pennationAngle": 0.21825825,
+   "side": "R",
+   "base": "edl",
+   "mapsTo": "extensor digitorum longus"
+  },
+  {
+   "name": "ehl_r",
+   "points": [
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.014,
+      -0.155,
+      0.0189
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      0.0071,
+      -0.2909,
+      0.0164
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      0.02,
+      -0.3693,
+      -0.0028
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.097,
+      0.0389,
+      -0.0211
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.1293,
+      0.0309,
+      -0.0257
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.1734,
+      0.0139,
+      -0.028
+     ]
+    },
+    {
+     "body": "toes_r",
+     "p": [
+      0.0298,
+      0.0041,
+      -0.0245
+     ]
+    },
+    {
+     "body": "toes_r",
+     "p": [
+      0.0563,
+      0.0034,
+      -0.0186
+     ]
+    }
+   ],
+   "maxIsometricForce": 285.8675474,
+   "optimalFiberLength": 0.0748,
+   "tendonSlackLength": 0.326795279537187,
+   "pennationAngle": 0.19726811,
+   "side": "R",
+   "base": "ehl",
+   "mapsTo": "extensor hallucis longus"
+  },
+  {
+   "name": "fdl_r",
+   "points": [
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.0023,
+      -0.1832,
+      -0.0018
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.0176,
+      -0.3645,
+      -0.0124
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.0436,
+      0.0315,
+      -0.028
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.0708,
+      0.0176,
+      -0.0263
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.1658,
+      -0.0081,
+      0.0116
+     ]
+    },
+    {
+     "body": "toes_r",
+     "p": [
+      -0.0019,
+      -0.0078,
+      0.0147
+     ]
+    },
+    {
+     "body": "toes_r",
+     "p": [
+      0.0285,
+      -0.0071,
+      0.0215
+     ]
+    },
+    {
+     "body": "toes_r",
+     "p": [
+      0.0441,
+      -0.006,
+      0.0242
+     ]
+    }
+   ],
+   "maxIsometricForce": 423.177049180328,
+   "optimalFiberLength": 0.0446,
+   "tendonSlackLength": 0.378772856793842,
+   "pennationAngle": 0.22483915,
+   "side": "R",
+   "base": "fdl",
+   "mapsTo": "flexor digitorum longus"
+  },
+  {
+   "name": "fhl_r",
+   "points": [
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.031,
+      -0.2163,
+      0.02
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.0242,
+      -0.3671,
+      -0.0076
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.0374,
+      0.0276,
+      -0.0241
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.1038,
+      0.0068,
+      -0.0256
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.1726,
+      -0.0053,
+      -0.0269
+     ]
+    },
+    {
+     "body": "toes_r",
+     "p": [
+      0.0155,
+      -0.0064,
+      -0.0265
+     ]
+    },
+    {
+     "body": "toes_r",
+     "p": [
+      0.0562,
+      -0.0102,
+      -0.0181
+     ]
+    }
+   ],
+   "maxIsometricForce": 907.839344262294,
+   "optimalFiberLength": 0.0527,
+   "tendonSlackLength": 0.354339676836818,
+   "pennationAngle": 0.25802551,
+   "side": "R",
+   "base": "fhl",
+   "mapsTo": "flexor hallucis longus"
+  },
+  {
+   "name": "gaslat_r",
+   "points": [
+    {
+     "body": "femur_r",
+     "p": [
+      -0.003,
+      -0.3814,
+      0.0277
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.0044,
+      0.031,
+      -0.0053
+     ]
+    }
+   ],
+   "maxIsometricForce": 1575.05901639344,
+   "optimalFiberLength": 0.0588,
+   "tendonSlackLength": 0.376070169933794,
+   "pennationAngle": 0.21022682,
+   "side": "R",
+   "base": "gaslat",
+   "mapsTo": "gastrocnemius"
+  },
+  {
+   "name": "gasmed_r",
+   "points": [
+    {
+     "body": "femur_r",
+     "p": [
+      0.008,
+      -0.3788,
+      -0.0208
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.0044,
+      0.031,
+      -0.0053
+     ]
+    }
+   ],
+   "maxIsometricForce": 3115.51475409836,
+   "optimalFiberLength": 0.051,
+   "tendonSlackLength": 0.398716332626429,
+   "pennationAngle": 0.16568155,
+   "side": "R",
+   "base": "gasmed",
+   "mapsTo": "gastrocnemius"
+  },
+  {
+   "name": "glmax1_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.1231,
+      0.0345,
+      0.0563
+     ]
+    },
+    {
+     "body": "pelvis",
+     "p": [
+      -0.1257,
+      -0.0242,
+      0.0779
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      -0.0444,
+      -0.0326,
+      0.0302
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      -0.0277,
+      -0.0566,
+      0.047
+     ]
+    }
+   ],
+   "maxIsometricForce": 983.783606557378,
+   "optimalFiberLength": 0.147,
+   "tendonSlackLength": 0.0488408889462853,
+   "pennationAngle": 0.35401178,
+   "side": "R",
+   "base": "glmax1",
+   "mapsTo": "gluteus maximus"
+  },
+  {
+   "name": "glmax2_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.1317,
+      0.0087,
+      0.0462
+     ]
+    },
+    {
+     "body": "pelvis",
+     "p": [
+      -0.1344,
+      -0.0609,
+      0.0813
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      -0.045,
+      -0.0584,
+      0.0252
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      -0.0156,
+      -0.1016,
+      0.0419
+     ]
+    }
+   ],
+   "maxIsometricForce": 1406.04590163935,
+   "optimalFiberLength": 0.157,
+   "tendonSlackLength": 0.0678871511792641,
+   "pennationAngle": 0.36738206,
+   "side": "R",
+   "base": "glmax2",
+   "mapsTo": "gluteus maximus"
+  },
+  {
+   "name": "glmax3_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.13,
+      -0.0525,
+      0.009
+     ]
+    },
+    {
+     "body": "pelvis",
+     "p": [
+      -0.1273,
+      -0.1263,
+      0.0435
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      -0.0281,
+      -0.1125,
+      0.0094
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      -0.006,
+      -0.1419,
+      0.0411
+     ]
+    }
+   ],
+   "maxIsometricForce": 947.754098360656,
+   "optimalFiberLength": 0.167,
+   "tendonSlackLength": 0.0697166058843707,
+   "pennationAngle": 0.38241613,
+   "side": "R",
+   "base": "glmax3",
+   "mapsTo": "gluteus maximus"
+  },
+  {
+   "name": "glmed1_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0445,
+      0.0245,
+      0.1172
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      -0.0218,
+      -0.0117,
+      0.0555
+     ]
+    }
+   ],
+   "maxIsometricForce": 1093.4667688,
+   "optimalFiberLength": 0.073,
+   "tendonSlackLength": 0.0558168319436554,
+   "pennationAngle": 0.31655591,
+   "side": "R",
+   "base": "glmed1",
+   "mapsTo": "gluteus medius"
+  },
+  {
+   "name": "glmed2_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.085,
+      0.0316,
+      0.0675
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      -0.0258,
+      -0.0058,
+      0.0527
+     ]
+    }
+   ],
+   "maxIsometricForce": 765.0916616,
+   "optimalFiberLength": 0.073,
+   "tendonSlackLength": 0.0652488111992348,
+   "pennationAngle": 0.31655591,
+   "side": "R",
+   "base": "glmed2",
+   "mapsTo": "gluteus medius"
+  },
+  {
+   "name": "glmed3_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.1152,
+      -0.0073,
+      0.0526
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      -0.0309,
+      -0.0047,
+      0.0518
+     ]
+    }
+   ],
+   "maxIsometricForce": 871.1992642,
+   "optimalFiberLength": 0.073,
+   "tendonSlackLength": 0.0452328436013583,
+   "pennationAngle": 0.31655591,
+   "side": "R",
+   "base": "glmed3",
+   "mapsTo": "gluteus medius"
+  },
+  {
+   "name": "glmin1_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0464,
+      -0.0149,
+      0.1042
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      -0.0072,
+      -0.0104,
+      0.056
+     ]
+    }
+   ],
+   "maxIsometricForce": 374.045901639344,
+   "optimalFiberLength": 0.068,
+   "tendonSlackLength": 0.0161377823749703,
+   "pennationAngle": 0.17453293,
+   "side": "R",
+   "base": "glmin1",
+   "mapsTo": "gluteus minimus"
+  },
+  {
+   "name": "glmin2_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0616,
+      -0.0142,
+      0.0971
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      -0.0096,
+      -0.0104,
+      0.056
+     ]
+    }
+   ],
+   "maxIsometricForce": 394.819672131148,
+   "optimalFiberLength": 0.056,
+   "tendonSlackLength": 0.0260990524098789,
+   "pennationAngle": 0.0,
+   "side": "R",
+   "base": "glmin2",
+   "mapsTo": "gluteus minimus"
+  },
+  {
+   "name": "glmin3_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0789,
+      -0.0155,
+      0.0798
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      -0.0135,
+      -0.0083,
+      0.055
+     ]
+    }
+   ],
+   "maxIsometricForce": 446.773770491804,
+   "optimalFiberLength": 0.038,
+   "tendonSlackLength": 0.0508725,
+   "pennationAngle": 0.01745329,
+   "side": "R",
+   "base": "glmin3",
+   "mapsTo": "gluteus minimus"
+  },
+  {
+   "name": "grac_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.04736,
+      -0.12932,
+      0.02456
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.01842,
+      -0.04755,
+      -0.02961
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      0.00178,
+      -0.06962,
+      -0.01573
+     ]
+    }
+   ],
+   "maxIsometricForce": 281.311475409836,
+   "optimalFiberLength": 0.2278,
+   "tendonSlackLength": 0.172013810564373,
+   "pennationAngle": 0.17200156,
+   "side": "R",
+   "base": "grac",
+   "mapsTo": "gracilis"
+  },
+  {
+   "name": "iliacus_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0605,
+      0.0309,
+      0.0843
+     ]
+    },
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0135,
+      -0.0557,
+      0.0756
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      -0.0023,
+      -0.0565,
+      0.0139
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      -0.0122,
+      -0.0637,
+      0.0196
+     ]
+    }
+   ],
+   "maxIsometricForce": 1021.14098360656,
+   "optimalFiberLength": 0.1066,
+   "tendonSlackLength": 0.0961207083983258,
+   "pennationAngle": 0.27991397,
+   "side": "R",
+   "base": "iliacus",
+   "mapsTo": "iliacus"
+  },
+  {
+   "name": "perbrev_r",
+   "points": [
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.0243,
+      -0.2532,
+      0.0251
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.0339,
+      -0.3893,
+      0.0249
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.0285,
+      -0.4004,
+      0.0255
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.0471,
+      0.027,
+      0.0233
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.0677,
+      0.0219,
+      0.0343
+     ]
+    }
+   ],
+   "maxIsometricForce": 521.2015988,
+   "optimalFiberLength": 0.0454,
+   "tendonSlackLength": 0.147527533956538,
+   "pennationAngle": 0.20523612,
+   "side": "R",
+   "base": "perbrev",
+   "mapsTo": "fibularis brevis"
+  },
+  {
+   "name": "perlong_r",
+   "points": [
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.02,
+      -0.1373,
+      0.0282
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.0317,
+      -0.39,
+      0.0237
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.0272,
+      -0.4014,
+      0.024
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.0438,
+      0.023,
+      0.0221
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.0681,
+      0.0106,
+      0.0284
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.0852,
+      0.0069,
+      0.0118
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.1203,
+      0.0085,
+      -0.0184
+     ]
+    }
+   ],
+   "maxIsometricForce": 1115.3714214,
+   "optimalFiberLength": 0.0508,
+   "tendonSlackLength": 0.332220762637978,
+   "pennationAngle": 0.24795247,
+   "side": "R",
+   "base": "perlong",
+   "mapsTo": "fibularis longus"
+  },
+  {
+   "name": "piri_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.10181,
+      -0.00653,
+      0.01351
+     ]
+    },
+    {
+     "body": "pelvis",
+     "p": [
+      -0.10202,
+      -0.03066,
+      0.06092
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      -0.0148,
+      -0.0036,
+      0.0437
+     ]
+    }
+   ],
+   "maxIsometricForce": 1029.7868852459,
+   "optimalFiberLength": 0.026,
+   "tendonSlackLength": 0.114906238342785,
+   "pennationAngle": 0.17453293,
+   "side": "R",
+   "base": "piri",
+   "mapsTo": "piriformis"
+  },
+  {
+   "name": "psoas_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0606,
+      0.062,
+      0.039
+     ]
+    },
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0205,
+      -0.0654,
+      0.0656
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      -0.0132,
+      -0.0467,
+      0.0046
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      -0.0235,
+      -0.0524,
+      0.0088
+     ]
+    }
+   ],
+   "maxIsometricForce": 1426.79016393443,
+   "optimalFiberLength": 0.1169,
+   "tendonSlackLength": 0.0995431658555083,
+   "pennationAngle": 0.21552513,
+   "side": "R",
+   "base": "psoas",
+   "mapsTo": "psoas major"
+  },
+  {
+   "name": "recfem_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.024,
+      -0.0388,
+      0.0933
+     ]
+    },
+    {
+     "body": "patella_r",
+     "p": [
+      0.01,
+      0.049,
+      0.0007
+     ]
+    },
+    {
+     "body": "patella_r",
+     "p": [
+      0.0121,
+      0.0437,
+      -0.001
+     ]
+    },
+    {
+     "body": "patella_r",
+     "p": [
+      0.005,
+      0.00247,
+      3e-05
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      0.0326,
+      -0.06312,
+      -0.00047
+     ]
+    }
+   ],
+   "maxIsometricForce": 2191.74098360656,
+   "optimalFiberLength": 0.0759,
+   "tendonSlackLength": 0.448493537399412,
+   "pennationAngle": 0.2170149,
+   "side": "R",
+   "base": "recfem",
+   "mapsTo": "rectus femoris"
+  },
+  {
+   "name": "sart_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0195,
+      -0.0156,
+      0.1056
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      -0.003,
+      -0.3568,
+      -0.0421
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.0251,
+      -0.0401,
+      -0.0365
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.0159,
+      -0.0599,
+      -0.0264
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      0.0136,
+      -0.081,
+      -0.0026
+     ]
+    }
+   ],
+   "maxIsometricForce": 249.413114754098,
+   "optimalFiberLength": 0.403,
+   "tendonSlackLength": 0.123999830194402,
+   "pennationAngle": 0.02613542,
+   "side": "R",
+   "base": "sart",
+   "mapsTo": "sartorius"
+  },
+  {
+   "name": "semimem_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0987,
+      -0.114,
+      0.0614
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.029,
+      -0.0417,
+      -0.0196
+     ]
+    }
+   ],
+   "maxIsometricForce": 2200.9868852459,
+   "optimalFiberLength": 0.069,
+   "tendonSlackLength": 0.347585979533214,
+   "pennationAngle": 0.25456146,
+   "side": "R",
+   "base": "semimem",
+   "mapsTo": "semimembranosus"
+  },
+  {
+   "name": "semiten_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.1038,
+      -0.1253,
+      0.0515
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.0312,
+      -0.0508,
+      -0.0229
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      0.0019,
+      -0.0773,
+      -0.0117
+     ]
+    }
+   ],
+   "maxIsometricForce": 591.295081967214,
+   "optimalFiberLength": 0.193,
+   "tendonSlackLength": 0.24719894503751,
+   "pennationAngle": 0.241295,
+   "side": "R",
+   "base": "semiten",
+   "mapsTo": "semitendinosus"
+  },
+  {
+   "name": "soleus_r",
+   "points": [
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.0076,
+      -0.0916,
+      0.0098
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.0044,
+      0.031,
+      -0.0053
+     ]
+    }
+   ],
+   "maxIsometricForce": 6194.84262295082,
+   "optimalFiberLength": 0.044,
+   "tendonSlackLength": 0.276755872375976,
+   "pennationAngle": 0.38142888,
+   "side": "R",
+   "base": "soleus",
+   "mapsTo": "soleus"
+  },
+  {
+   "name": "tfl_r",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0311,
+      0.0214,
+      0.1241
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      0.0294,
+      -0.0995,
+      0.0597
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      0.0107,
+      -0.405,
+      0.0324
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      0.0108,
+      -0.041,
+      0.0346
+     ]
+    }
+   ],
+   "maxIsometricForce": 411.20655737705,
+   "optimalFiberLength": 0.095,
+   "tendonSlackLength": 0.449497053805428,
+   "pennationAngle": 0.05235988,
+   "side": "R",
+   "base": "tfl",
+   "mapsTo": "tensor fasciae latae"
+  },
+  {
+   "name": "tibant_r",
+   "points": [
+    {
+     "body": "tibia_r",
+     "p": [
+      0.0154,
+      -0.1312,
+      0.0162
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      0.0251,
+      -0.1906,
+      0.0128
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      0.0233,
+      -0.3659,
+      -0.0132
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.1166,
+      0.0178,
+      -0.0305
+     ]
+    }
+   ],
+   "maxIsometricForce": 1227.45245901639,
+   "optimalFiberLength": 0.0683,
+   "tendonSlackLength": 0.240461026409367,
+   "pennationAngle": 0.19518281,
+   "side": "R",
+   "base": "tibant",
+   "mapsTo": "tibialis anterior"
+  },
+  {
+   "name": "tibpost_r",
+   "points": [
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.0041,
+      -0.1304,
+      0.0103
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      -0.0164,
+      -0.3655,
+      -0.0175
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.0417,
+      0.0334,
+      -0.0286
+     ]
+    },
+    {
+     "body": "calcn_r",
+     "p": [
+      0.0772,
+      0.0159,
+      -0.0281
+     ]
+    }
+   ],
+   "maxIsometricForce": 1730.15409836065,
+   "optimalFiberLength": 0.0378,
+   "tendonSlackLength": 0.280779613883954,
+   "pennationAngle": 0.22648907,
+   "side": "R",
+   "base": "tibpost",
+   "mapsTo": "tibialis posterior"
+  },
+  {
+   "name": "vasint_r",
+   "points": [
+    {
+     "body": "femur_r",
+     "p": [
+      0.029,
+      -0.1924,
+      0.031
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      0.0335,
+      -0.2084,
+      0.0285
+     ]
+    },
+    {
+     "body": "patella_r",
+     "p": [
+      0.0058,
+      0.048,
+      -0.0006
+     ]
+    },
+    {
+     "body": "patella_r",
+     "p": [
+      0.005,
+      0.00247,
+      -0.00039
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      0.03257,
+      -0.0632,
+      0.00043
+     ]
+    }
+   ],
+   "maxIsometricForce": 1697.36065573771,
+   "optimalFiberLength": 0.0993,
+   "tendonSlackLength": 0.202210670345763,
+   "pennationAngle": 0.06309973,
+   "side": "R",
+   "base": "vasint",
+   "mapsTo": "vastus intermedius"
+  },
+  {
+   "name": "vaslat_r",
+   "points": [
+    {
+     "body": "femur_r",
+     "p": [
+      0.0048,
+      -0.1854,
+      0.0349
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      0.0269,
+      -0.2591,
+      0.0409
+     ]
+    },
+    {
+     "body": "patella_r",
+     "p": [
+      0.0103,
+      0.0423,
+      0.0141
+     ]
+    },
+    {
+     "body": "patella_r",
+     "p": [
+      0.005,
+      0.00247,
+      0.00733
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      0.03254,
+      -0.06338,
+      0.00511
+     ]
+    }
+   ],
+   "maxIsometricForce": 5148.76721311476,
+   "optimalFiberLength": 0.0994,
+   "tendonSlackLength": 0.220601284834603,
+   "pennationAngle": 0.25286729,
+   "side": "R",
+   "base": "vaslat",
+   "mapsTo": "vastus lateralis"
+  },
+  {
+   "name": "vasmed_r",
+   "points": [
+    {
+     "body": "femur_r",
+     "p": [
+      0.014,
+      -0.2099,
+      0.0188
+     ]
+    },
+    {
+     "body": "femur_r",
+     "p": [
+      0.0356,
+      -0.2769,
+      0.0009
+     ]
+    },
+    {
+     "body": "patella_r",
+     "p": [
+      0.0063,
+      0.0445,
+      -0.017
+     ]
+    },
+    {
+     "body": "patella_r",
+     "p": [
+      0.005,
+      0.00247,
+      -0.0085
+     ]
+    },
+    {
+     "body": "tibia_r",
+     "p": [
+      0.0319,
+      -0.06357,
+      -0.00678
+     ]
+    }
+   ],
+   "maxIsometricForce": 2747.82295081966,
+   "optimalFiberLength": 0.0968,
+   "tendonSlackLength": 0.199904270842317,
+   "pennationAngle": 0.42222253,
+   "side": "R",
+   "base": "vasmed",
+   "mapsTo": "vastus medialis"
+  },
+  {
+   "name": "addbrev_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0191,
+      -0.094,
+      -0.0154
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      -0.002,
+      -0.118,
+      -0.0249
+     ]
+    }
+   ],
+   "maxIsometricForce": 625.819672131148,
+   "optimalFiberLength": 0.1031,
+   "tendonSlackLength": 0.035450291324676,
+   "pennationAngle": 0.11478092,
+   "side": "L",
+   "base": "addbrev",
+   "mapsTo": "adductor brevis"
+  },
+  {
+   "name": "addlong_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.00758,
+      -0.0889,
+      -0.01888
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      0.01126,
+      -0.23937,
+      -0.01583
+     ]
+    }
+   ],
+   "maxIsometricForce": 916.8,
+   "optimalFiberLength": 0.1082,
+   "tendonSlackLength": 0.131799363342026,
+   "pennationAngle": 0.13777039,
+   "side": "L",
+   "base": "addlong",
+   "mapsTo": "adductor longus"
+  },
+  {
+   "name": "addmagDist_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.07404,
+      -0.12767,
+      -0.03982
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      0.01125,
+      -0.2625,
+      -0.0193
+     ]
+    }
+   ],
+   "maxIsometricForce": 597.295081967214,
+   "optimalFiberLength": 0.1772,
+   "tendonSlackLength": 0.0873806954617727,
+   "pennationAngle": 0.19470502,
+   "side": "L",
+   "base": "addmagDist",
+   "mapsTo": null
+  },
+  {
+   "name": "addmagIsch_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.08962,
+      -0.12976,
+      -0.04171
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      0.00481,
+      -0.38797,
+      0.03273
+     ]
+    }
+   ],
+   "maxIsometricForce": 597.295081967214,
+   "optimalFiberLength": 0.1562,
+   "tendonSlackLength": 0.216343023454343,
+   "pennationAngle": 0.16804429,
+   "side": "L",
+   "base": "addmagIsch",
+   "mapsTo": null
+  },
+  {
+   "name": "addmagMid_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.05266,
+      -0.12075,
+      -0.02854
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      0.00242,
+      -0.1624,
+      -0.02922
+     ]
+    }
+   ],
+   "maxIsometricForce": 597.295081967214,
+   "optimalFiberLength": 0.1377,
+   "tendonSlackLength": 0.0466276999070464,
+   "pennationAngle": 0.20730759,
+   "side": "L",
+   "base": "addmagMid",
+   "mapsTo": null
+  },
+  {
+   "name": "addmagProx_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.03098,
+      -0.10755,
+      -0.01365
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      -0.01527,
+      -0.07886,
+      -0.03202
+     ]
+    }
+   ],
+   "maxIsometricForce": 597.295081967214,
+   "optimalFiberLength": 0.1056,
+   "tendonSlackLength": 0.0403240979232675,
+   "pennationAngle": 0.31148326,
+   "side": "L",
+   "base": "addmagProx",
+   "mapsTo": null
+  },
+  {
+   "name": "bflh_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.104,
+      -0.1191,
+      -0.0586
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.0337,
+      -0.035,
+      -0.0253
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.0287,
+      -0.0455,
+      -0.0303
+     ]
+    }
+   ],
+   "maxIsometricForce": 1313.18360655738,
+   "optimalFiberLength": 0.0976,
+   "tendonSlackLength": 0.325226647516457,
+   "pennationAngle": 0.17591823,
+   "side": "L",
+   "base": "bflh",
+   "mapsTo": "biceps femoris"
+  },
+  {
+   "name": "bfsh_l",
+   "points": [
+    {
+     "body": "femur_l",
+     "p": [
+      0.005,
+      -0.2111,
+      -0.0234
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.0301,
+      -0.0419,
+      -0.0318
+     ]
+    }
+   ],
+   "maxIsometricForce": 557.11475409836,
+   "optimalFiberLength": 0.1103,
+   "tendonSlackLength": 0.105817218589115,
+   "pennationAngle": 0.26422317,
+   "side": "L",
+   "base": "bfsh",
+   "mapsTo": "biceps femoris"
+  },
+  {
+   "name": "edl_l",
+   "points": [
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.016,
+      -0.1157,
+      -0.0205
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      0.0164,
+      -0.376,
+      -0.0112
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.0919,
+      0.036,
+      -0.0008
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.1616,
+      0.0055,
+      -0.013
+     ]
+    },
+    {
+     "body": "toes_l",
+     "p": [
+      0.0003,
+      0.0047,
+      -0.0153
+     ]
+    },
+    {
+     "body": "toes_l",
+     "p": [
+      0.0443,
+      -0.0004,
+      -0.025
+     ]
+    }
+   ],
+   "maxIsometricForce": 603.4981556,
+   "optimalFiberLength": 0.0693,
+   "tendonSlackLength": 0.368875245465225,
+   "pennationAngle": 0.21825825,
+   "side": "L",
+   "base": "edl",
+   "mapsTo": "extensor digitorum longus"
+  },
+  {
+   "name": "ehl_l",
+   "points": [
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.014,
+      -0.155,
+      -0.0189
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      0.0071,
+      -0.2909,
+      -0.0164
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      0.02,
+      -0.3693,
+      0.0028
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.097,
+      0.0389,
+      0.0211
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.1293,
+      0.0309,
+      0.0257
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.1734,
+      0.0139,
+      0.028
+     ]
+    },
+    {
+     "body": "toes_l",
+     "p": [
+      0.0298,
+      0.0041,
+      0.0245
+     ]
+    },
+    {
+     "body": "toes_l",
+     "p": [
+      0.0563,
+      0.0034,
+      0.0186
+     ]
+    }
+   ],
+   "maxIsometricForce": 285.8675474,
+   "optimalFiberLength": 0.0748,
+   "tendonSlackLength": 0.326795279537187,
+   "pennationAngle": 0.19726811,
+   "side": "L",
+   "base": "ehl",
+   "mapsTo": "extensor hallucis longus"
+  },
+  {
+   "name": "fdl_l",
+   "points": [
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.0023,
+      -0.1832,
+      0.0018
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.0176,
+      -0.3645,
+      0.0124
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.0436,
+      0.0315,
+      0.028
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.0708,
+      0.0176,
+      0.0263
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.1658,
+      -0.0081,
+      -0.0116
+     ]
+    },
+    {
+     "body": "toes_l",
+     "p": [
+      -0.0019,
+      -0.0078,
+      -0.0147
+     ]
+    },
+    {
+     "body": "toes_l",
+     "p": [
+      0.0285,
+      -0.0071,
+      -0.0215
+     ]
+    },
+    {
+     "body": "toes_l",
+     "p": [
+      0.0441,
+      -0.006,
+      -0.0242
+     ]
+    }
+   ],
+   "maxIsometricForce": 423.177049180328,
+   "optimalFiberLength": 0.0446,
+   "tendonSlackLength": 0.378772856793842,
+   "pennationAngle": 0.22483915,
+   "side": "L",
+   "base": "fdl",
+   "mapsTo": "flexor digitorum longus"
+  },
+  {
+   "name": "fhl_l",
+   "points": [
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.031,
+      -0.2163,
+      -0.02
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.0242,
+      -0.3671,
+      0.0076
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.0374,
+      0.0276,
+      0.0241
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.1038,
+      0.0068,
+      0.0256
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.1726,
+      -0.0053,
+      0.0269
+     ]
+    },
+    {
+     "body": "toes_l",
+     "p": [
+      0.0155,
+      -0.0064,
+      0.0265
+     ]
+    },
+    {
+     "body": "toes_l",
+     "p": [
+      0.0562,
+      -0.0102,
+      0.0181
+     ]
+    }
+   ],
+   "maxIsometricForce": 907.839344262294,
+   "optimalFiberLength": 0.0527,
+   "tendonSlackLength": 0.354339676836818,
+   "pennationAngle": 0.25802551,
+   "side": "L",
+   "base": "fhl",
+   "mapsTo": "flexor hallucis longus"
+  },
+  {
+   "name": "gaslat_l",
+   "points": [
+    {
+     "body": "femur_l",
+     "p": [
+      -0.003,
+      -0.3814,
+      -0.0277
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.0044,
+      0.031,
+      0.0053
+     ]
+    }
+   ],
+   "maxIsometricForce": 1575.05901639344,
+   "optimalFiberLength": 0.0588,
+   "tendonSlackLength": 0.376070169933794,
+   "pennationAngle": 0.21022682,
+   "side": "L",
+   "base": "gaslat",
+   "mapsTo": "gastrocnemius"
+  },
+  {
+   "name": "gasmed_l",
+   "points": [
+    {
+     "body": "femur_l",
+     "p": [
+      0.008,
+      -0.3788,
+      0.0208
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.0044,
+      0.031,
+      0.0053
+     ]
+    }
+   ],
+   "maxIsometricForce": 3115.51475409836,
+   "optimalFiberLength": 0.051,
+   "tendonSlackLength": 0.398716332626429,
+   "pennationAngle": 0.16568155,
+   "side": "L",
+   "base": "gasmed",
+   "mapsTo": "gastrocnemius"
+  },
+  {
+   "name": "glmax1_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.1231,
+      0.0345,
+      -0.0563
+     ]
+    },
+    {
+     "body": "pelvis",
+     "p": [
+      -0.1257,
+      -0.0242,
+      -0.0779
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      -0.0444,
+      -0.0326,
+      -0.0302
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      -0.0277,
+      -0.0566,
+      -0.047
+     ]
+    }
+   ],
+   "maxIsometricForce": 983.783606557378,
+   "optimalFiberLength": 0.147,
+   "tendonSlackLength": 0.0488408889462853,
+   "pennationAngle": 0.35401178,
+   "side": "L",
+   "base": "glmax1",
+   "mapsTo": "gluteus maximus"
+  },
+  {
+   "name": "glmax2_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.1317,
+      0.0087,
+      -0.0462
+     ]
+    },
+    {
+     "body": "pelvis",
+     "p": [
+      -0.1344,
+      -0.0609,
+      -0.0813
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      -0.045,
+      -0.0584,
+      -0.0252
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      -0.0156,
+      -0.1016,
+      -0.0419
+     ]
+    }
+   ],
+   "maxIsometricForce": 1406.04590163935,
+   "optimalFiberLength": 0.157,
+   "tendonSlackLength": 0.0678871511792641,
+   "pennationAngle": 0.36738206,
+   "side": "L",
+   "base": "glmax2",
+   "mapsTo": "gluteus maximus"
+  },
+  {
+   "name": "glmax3_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.13,
+      -0.0525,
+      -0.009
+     ]
+    },
+    {
+     "body": "pelvis",
+     "p": [
+      -0.1273,
+      -0.1263,
+      -0.0435
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      -0.0281,
+      -0.1125,
+      -0.0094
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      -0.006,
+      -0.1419,
+      -0.0411
+     ]
+    }
+   ],
+   "maxIsometricForce": 947.754098360656,
+   "optimalFiberLength": 0.167,
+   "tendonSlackLength": 0.0697166058843707,
+   "pennationAngle": 0.38241613,
+   "side": "L",
+   "base": "glmax3",
+   "mapsTo": "gluteus maximus"
+  },
+  {
+   "name": "glmed1_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0445,
+      0.0245,
+      -0.1172
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      -0.0218,
+      -0.0117,
+      -0.0555
+     ]
+    }
+   ],
+   "maxIsometricForce": 1093.4667688,
+   "optimalFiberLength": 0.073,
+   "tendonSlackLength": 0.0558168319436554,
+   "pennationAngle": 0.31655591,
+   "side": "L",
+   "base": "glmed1",
+   "mapsTo": "gluteus medius"
+  },
+  {
+   "name": "glmed2_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.085,
+      0.0316,
+      -0.0675
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      -0.0258,
+      -0.0058,
+      -0.0527
+     ]
+    }
+   ],
+   "maxIsometricForce": 765.0916616,
+   "optimalFiberLength": 0.073,
+   "tendonSlackLength": 0.0652488111992348,
+   "pennationAngle": 0.31655591,
+   "side": "L",
+   "base": "glmed2",
+   "mapsTo": "gluteus medius"
+  },
+  {
+   "name": "glmed3_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.1152,
+      -0.0073,
+      -0.0526
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      -0.0309,
+      -0.0047,
+      -0.0518
+     ]
+    }
+   ],
+   "maxIsometricForce": 871.1992642,
+   "optimalFiberLength": 0.073,
+   "tendonSlackLength": 0.0452328436013583,
+   "pennationAngle": 0.31655591,
+   "side": "L",
+   "base": "glmed3",
+   "mapsTo": "gluteus medius"
+  },
+  {
+   "name": "glmin1_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0464,
+      -0.0149,
+      -0.1042
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      -0.0072,
+      -0.0104,
+      -0.056
+     ]
+    }
+   ],
+   "maxIsometricForce": 374.045901639344,
+   "optimalFiberLength": 0.068,
+   "tendonSlackLength": 0.0161377823749703,
+   "pennationAngle": 0.17453293,
+   "side": "L",
+   "base": "glmin1",
+   "mapsTo": "gluteus minimus"
+  },
+  {
+   "name": "glmin2_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0616,
+      -0.0142,
+      -0.0971
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      -0.0096,
+      -0.0104,
+      -0.056
+     ]
+    }
+   ],
+   "maxIsometricForce": 394.819672131148,
+   "optimalFiberLength": 0.056,
+   "tendonSlackLength": 0.0260990524098789,
+   "pennationAngle": 0.0,
+   "side": "L",
+   "base": "glmin2",
+   "mapsTo": "gluteus minimus"
+  },
+  {
+   "name": "glmin3_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0789,
+      -0.0155,
+      -0.0798
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      -0.0135,
+      -0.0083,
+      -0.055
+     ]
+    }
+   ],
+   "maxIsometricForce": 446.773770491804,
+   "optimalFiberLength": 0.038,
+   "tendonSlackLength": 0.0508725,
+   "pennationAngle": 0.01745329,
+   "side": "L",
+   "base": "glmin3",
+   "mapsTo": "gluteus minimus"
+  },
+  {
+   "name": "grac_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.04736,
+      -0.12932,
+      -0.02456
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.01842,
+      -0.04755,
+      0.02961
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      0.00178,
+      -0.06962,
+      0.01573
+     ]
+    }
+   ],
+   "maxIsometricForce": 281.311475409836,
+   "optimalFiberLength": 0.2278,
+   "tendonSlackLength": 0.172013810564373,
+   "pennationAngle": 0.17200156,
+   "side": "L",
+   "base": "grac",
+   "mapsTo": "gracilis"
+  },
+  {
+   "name": "iliacus_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0605,
+      0.0309,
+      -0.0843
+     ]
+    },
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0135,
+      -0.0557,
+      -0.0756
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      -0.0023,
+      -0.0565,
+      -0.0139
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      -0.0122,
+      -0.0637,
+      -0.0196
+     ]
+    }
+   ],
+   "maxIsometricForce": 1021.14098360656,
+   "optimalFiberLength": 0.1066,
+   "tendonSlackLength": 0.0961207083983258,
+   "pennationAngle": 0.27991397,
+   "side": "L",
+   "base": "iliacus",
+   "mapsTo": "iliacus"
+  },
+  {
+   "name": "perbrev_l",
+   "points": [
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.0243,
+      -0.2532,
+      -0.0251
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.0339,
+      -0.3893,
+      -0.0249
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.0285,
+      -0.4004,
+      -0.0255
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.0471,
+      0.027,
+      -0.0233
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.0677,
+      0.0219,
+      -0.0343
+     ]
+    }
+   ],
+   "maxIsometricForce": 521.2015988,
+   "optimalFiberLength": 0.0454,
+   "tendonSlackLength": 0.147527533956538,
+   "pennationAngle": 0.20523612,
+   "side": "L",
+   "base": "perbrev",
+   "mapsTo": "fibularis brevis"
+  },
+  {
+   "name": "perlong_l",
+   "points": [
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.02,
+      -0.1373,
+      -0.0282
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.0317,
+      -0.39,
+      -0.0237
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.0272,
+      -0.4014,
+      -0.024
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.0438,
+      0.023,
+      -0.0221
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.0681,
+      0.0106,
+      -0.0284
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.0852,
+      0.0069,
+      -0.0118
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.1203,
+      0.0085,
+      0.0184
+     ]
+    }
+   ],
+   "maxIsometricForce": 1115.3714214,
+   "optimalFiberLength": 0.0508,
+   "tendonSlackLength": 0.332220762637978,
+   "pennationAngle": 0.24795247,
+   "side": "L",
+   "base": "perlong",
+   "mapsTo": "fibularis longus"
+  },
+  {
+   "name": "piri_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.10181,
+      -0.00653,
+      -0.01351
+     ]
+    },
+    {
+     "body": "pelvis",
+     "p": [
+      -0.10202,
+      -0.03066,
+      -0.06092
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      -0.0148,
+      -0.0036,
+      -0.0437
+     ]
+    }
+   ],
+   "maxIsometricForce": 1029.7868852459,
+   "optimalFiberLength": 0.026,
+   "tendonSlackLength": 0.114906238342785,
+   "pennationAngle": 0.17453293,
+   "side": "L",
+   "base": "piri",
+   "mapsTo": "piriformis"
+  },
+  {
+   "name": "psoas_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0606,
+      0.062,
+      -0.039
+     ]
+    },
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0205,
+      -0.0654,
+      -0.0656
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      -0.0132,
+      -0.0467,
+      -0.0046
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      -0.0235,
+      -0.0524,
+      -0.0088
+     ]
+    }
+   ],
+   "maxIsometricForce": 1426.79016393443,
+   "optimalFiberLength": 0.1169,
+   "tendonSlackLength": 0.0995431658555083,
+   "pennationAngle": 0.21552513,
+   "side": "L",
+   "base": "psoas",
+   "mapsTo": "psoas major"
+  },
+  {
+   "name": "recfem_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.024,
+      -0.0388,
+      -0.0933
+     ]
+    },
+    {
+     "body": "patella_l",
+     "p": [
+      0.01,
+      0.049,
+      -0.0007
+     ]
+    },
+    {
+     "body": "patella_l",
+     "p": [
+      0.0121,
+      0.0437,
+      0.001
+     ]
+    },
+    {
+     "body": "patella_l",
+     "p": [
+      0.005,
+      0.00247,
+      -3e-05
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      0.0326,
+      -0.06312,
+      0.00047
+     ]
+    }
+   ],
+   "maxIsometricForce": 2191.74098360656,
+   "optimalFiberLength": 0.0759,
+   "tendonSlackLength": 0.448493537399412,
+   "pennationAngle": 0.2170149,
+   "side": "L",
+   "base": "recfem",
+   "mapsTo": "rectus femoris"
+  },
+  {
+   "name": "sart_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0195,
+      -0.0156,
+      -0.1056
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      -0.003,
+      -0.3568,
+      0.0421
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.0251,
+      -0.0401,
+      0.0365
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.0159,
+      -0.0599,
+      0.0264
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      0.0136,
+      -0.081,
+      0.0026
+     ]
+    }
+   ],
+   "maxIsometricForce": 249.413114754098,
+   "optimalFiberLength": 0.403,
+   "tendonSlackLength": 0.123999830194402,
+   "pennationAngle": 0.02613542,
+   "side": "L",
+   "base": "sart",
+   "mapsTo": "sartorius"
+  },
+  {
+   "name": "semimem_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0987,
+      -0.114,
+      -0.0614
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.029,
+      -0.0417,
+      0.0196
+     ]
+    }
+   ],
+   "maxIsometricForce": 2200.9868852459,
+   "optimalFiberLength": 0.069,
+   "tendonSlackLength": 0.347585979533214,
+   "pennationAngle": 0.25456146,
+   "side": "L",
+   "base": "semimem",
+   "mapsTo": "semimembranosus"
+  },
+  {
+   "name": "semiten_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.1038,
+      -0.1253,
+      -0.0515
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.0312,
+      -0.0508,
+      0.0229
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      0.0019,
+      -0.0773,
+      0.0117
+     ]
+    }
+   ],
+   "maxIsometricForce": 591.295081967214,
+   "optimalFiberLength": 0.193,
+   "tendonSlackLength": 0.24719894503751,
+   "pennationAngle": 0.241295,
+   "side": "L",
+   "base": "semiten",
+   "mapsTo": "semitendinosus"
+  },
+  {
+   "name": "soleus_l",
+   "points": [
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.0076,
+      -0.0916,
+      -0.0098
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.0044,
+      0.031,
+      0.0053
+     ]
+    }
+   ],
+   "maxIsometricForce": 6194.84262295082,
+   "optimalFiberLength": 0.044,
+   "tendonSlackLength": 0.276755872375976,
+   "pennationAngle": 0.38142888,
+   "side": "L",
+   "base": "soleus",
+   "mapsTo": "soleus"
+  },
+  {
+   "name": "tfl_l",
+   "points": [
+    {
+     "body": "pelvis",
+     "p": [
+      -0.0311,
+      0.0214,
+      -0.1241
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      0.0294,
+      -0.0995,
+      -0.0597
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      0.0107,
+      -0.405,
+      -0.0324
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      0.0108,
+      -0.041,
+      -0.0346
+     ]
+    }
+   ],
+   "maxIsometricForce": 411.20655737705,
+   "optimalFiberLength": 0.095,
+   "tendonSlackLength": 0.449497053805428,
+   "pennationAngle": 0.05235988,
+   "side": "L",
+   "base": "tfl",
+   "mapsTo": "tensor fasciae latae"
+  },
+  {
+   "name": "tibant_l",
+   "points": [
+    {
+     "body": "tibia_l",
+     "p": [
+      0.0154,
+      -0.1312,
+      -0.0162
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      0.0251,
+      -0.1906,
+      -0.0128
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      0.0233,
+      -0.3659,
+      0.0132
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.1166,
+      0.0178,
+      0.0305
+     ]
+    }
+   ],
+   "maxIsometricForce": 1227.45245901639,
+   "optimalFiberLength": 0.0683,
+   "tendonSlackLength": 0.240461026409367,
+   "pennationAngle": 0.19518281,
+   "side": "L",
+   "base": "tibant",
+   "mapsTo": "tibialis anterior"
+  },
+  {
+   "name": "tibpost_l",
+   "points": [
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.0041,
+      -0.1304,
+      -0.0103
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      -0.0164,
+      -0.3655,
+      0.0175
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.0417,
+      0.0334,
+      0.0286
+     ]
+    },
+    {
+     "body": "calcn_l",
+     "p": [
+      0.0772,
+      0.0159,
+      0.0281
+     ]
+    }
+   ],
+   "maxIsometricForce": 1730.15409836065,
+   "optimalFiberLength": 0.0378,
+   "tendonSlackLength": 0.280779613883954,
+   "pennationAngle": 0.22648907,
+   "side": "L",
+   "base": "tibpost",
+   "mapsTo": "tibialis posterior"
+  },
+  {
+   "name": "vasint_l",
+   "points": [
+    {
+     "body": "femur_l",
+     "p": [
+      0.029,
+      -0.1924,
+      -0.031
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      0.0335,
+      -0.2084,
+      -0.0285
+     ]
+    },
+    {
+     "body": "patella_l",
+     "p": [
+      0.0058,
+      0.048,
+      0.0006
+     ]
+    },
+    {
+     "body": "patella_l",
+     "p": [
+      0.005,
+      0.00247,
+      0.00039
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      0.03257,
+      -0.0632,
+      -0.00043
+     ]
+    }
+   ],
+   "maxIsometricForce": 1697.36065573771,
+   "optimalFiberLength": 0.0993,
+   "tendonSlackLength": 0.202210670345763,
+   "pennationAngle": 0.06309973,
+   "side": "L",
+   "base": "vasint",
+   "mapsTo": "vastus intermedius"
+  },
+  {
+   "name": "vaslat_l",
+   "points": [
+    {
+     "body": "femur_l",
+     "p": [
+      0.0048,
+      -0.1854,
+      -0.0349
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      0.0269,
+      -0.2591,
+      -0.0409
+     ]
+    },
+    {
+     "body": "patella_l",
+     "p": [
+      0.0103,
+      0.0423,
+      -0.0141
+     ]
+    },
+    {
+     "body": "patella_l",
+     "p": [
+      0.005,
+      0.00247,
+      -0.00733
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      0.03254,
+      -0.06338,
+      -0.00511
+     ]
+    }
+   ],
+   "maxIsometricForce": 5148.76721311476,
+   "optimalFiberLength": 0.0994,
+   "tendonSlackLength": 0.220601284834603,
+   "pennationAngle": 0.25286729,
+   "side": "L",
+   "base": "vaslat",
+   "mapsTo": "vastus lateralis"
+  },
+  {
+   "name": "vasmed_l",
+   "points": [
+    {
+     "body": "femur_l",
+     "p": [
+      0.014,
+      -0.2099,
+      -0.0188
+     ]
+    },
+    {
+     "body": "femur_l",
+     "p": [
+      0.0356,
+      -0.2769,
+      -0.0009
+     ]
+    },
+    {
+     "body": "patella_l",
+     "p": [
+      0.0063,
+      0.0445,
+      0.017
+     ]
+    },
+    {
+     "body": "patella_l",
+     "p": [
+      0.005,
+      0.00247,
+      0.0085
+     ]
+    },
+    {
+     "body": "tibia_l",
+     "p": [
+      0.0319,
+      -0.06357,
+      0.00678
+     ]
+    }
+   ],
+   "maxIsometricForce": 2747.82295081966,
+   "optimalFiberLength": 0.0968,
+   "tendonSlackLength": 0.199904270842317,
+   "pennationAngle": 0.42222253,
+   "side": "L",
+   "base": "vasmed",
+   "mapsTo": "vastus medialis"
+  }
+ ]
+}

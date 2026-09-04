@@ -1,0 +1,24 @@
+# Static site. There is no build step and no backend — see docs/DECISIONS.md §6.
+#
+# Everything the app needs is in the repository: index.html, src/, vendor/three, models/.
+# `npm run build` exists (vite) but is not required; serving the folder as-is works, which
+# is what this blueprint does.
+services:
+  - type: web
+    name: neuro-wellness
+    runtime: static
+    staticPublishPath: .
+    buildCommand: ""
+    headers:
+      # the GLBs are content-addressed by the build and change only when it re-runs
+      - path: /models/*
+        name: Cache-Control
+        value: public, max-age=604800
+      - path: /vendor/*
+        name: Cache-Control
+        value: public, max-age=604800
+
+# There is no `routes:` block on purpose. Render evaluates rewrite rules *before* it looks
+# for a file, so the usual single-page-app catch-all — /* rewritten to /index.html — would
+# return the HTML page for src/main.js and for every GLB, and the app would not start. This
+# app has no client-side routing: it is one page that fetches its own assets by path.

@@ -1,0 +1,142 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<title>render harness</title>
+<style>html,body{margin:0;background:#080b11}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"/vendor/three.module.js","three/addons/":"/vendor/addons/"}}</script>
+</head><body>
+<canvas id="view" width="640" height="480"></canvas>
+<script type="module">
+/**
+ * Headless render harness. Reproduces main.js's renderer, scene, lights and camera exactly,
+ * so a change to brainMaterial.js can be proved pixel-identical rather than eyeballed.
+ *
+ * It never touches shader uniforms directly — see setActive() — so the same page works
+ * against both the old uColors[16] material and the palette-texture one.
+ */
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { makeBrainMaterial } from '/src/brainMaterial.js';
+import { loadDeepStructures } from '/src/deepStructures.js';
+
+const canvas = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, preserveDrawingBuffer:true });
+renderer.setPixelRatio(1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.06;
+renderer.localClippingEnabled = true;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x080b11);
+const camera = new THREE.PerspectiveCamera(34, 640/480, 0.01, 100);
+camera.position.set(1.62, 0.40, 1.05);
+camera.lookAt(0, -0.02, 0);
+
+function buildEnvironment() {
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const env = new THREE.Scene();
+  env.add(new THREE.Mesh(new THREE.SphereGeometry(12, 16, 8),
+    new THREE.MeshBasicMaterial({ color:0x0e1422, side:THREE.BackSide })));
+  const panel = (hex, gain, pos, size) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size),
+      new THREE.MeshBasicMaterial({ color:new THREE.Color(hex).multiplyScalar(gain) }));
+    m.position.set(...pos); m.lookAt(0, 0, 0); env.add(m);
+  };
+  panel(0xffffff, 3.4, [ 5,  5,  4], 8);
+  panel(0x9dc2ff, 1.5, [-6,  1, -4], 9);
+  panel(0xffb59c, 1.0, [-1,  4, -6], 6);
+  const tex = pmrem.fromScene(env, 0.04).texture;
+  pmrem.dispose();
+  return tex;
+}
+scene.environment = buildEnvironment();
+scene.environmentIntensity = 0.85;
+scene.add(new THREE.HemisphereLight(0xd8e8ff, 0x2a2024, 0.55));
+const L = (c,i,p)=>{const d=new THREE.DirectionalLight(c,i);d.position.set(...p);scene.add(d);return d;};
+L(0xffffff, 1.35, [2.6, 2.6, 2.4]); L(0x93b4ff, 0.55, [-2.6, -0.4, -2.0]); L(0xffd9c4, 0.45, [-0.6, 1.6, -3.0]);
+
+const clipPlane = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0.5);
+const brainMat = makeBrainMaterial();
+const U = brainMat.userData.uniforms;
+const root = new THREE.Group(); scene.add(root);
+
+/** Set a region's activation without knowing how the material stores it. */
+function setActive(id, v) {
+  if (typeof brainMat.userData.setActivation === 'function') brainMat.userData.setActivation(id, v);
+  else if (U.uActive && U.uActive.value.length > id) U.uActive.value[id] = v;
+}
+function clearActive() {
+  if (typeof brainMat.userData.clearActivation === 'function') brainMat.userData.clearActivation();
+  else if (U.uActive) U.uActive.value.fill(0);
+}
+
+const regionAttr = g => g.getAttribute('_region') || g.getAttribute('_REGION');
+
+let ids = [];
+let done = 0;
+const finish = () => { if (++done === 2) run(); };
+
+new GLTFLoader().load('/models/cortex.glb', (gltf) => {
+  const meshes = [];
+  gltf.scene.traverse(o => { if (o.isMesh) meshes.push(o); });
+  const seen = new Set();
+  for (const o of meshes) {
+    o.material = brainMat;
+    const a = regionAttr(o.geometry);
+    if (a) for (let i = 0; i < a.count; i += 97) seen.add(Math.round(a.getX(i)));
+    root.add(o);
+  }
+  ids = [...seen].filter(n => n > 0).sort((a, b) => a - b);
+  finish();
+}, undefined, e => { window.__error = String(e); });
+
+const segmented = loadDeepStructures('/models/subcortical.glb', () => finish());
+root.add(segmented);
+
+/* Each scenario exercises one branch of the fragment shader. Together they cover every
+ * place the old uColors[16] / uActive[16] arrays were read. */
+const SCENARIOS = {
+  anatomical: () => {},
+  atlas:      () => { U.uAtlas.value = 1; },
+  selected:   () => { U.uSelected.value = ids[2]; },
+  hover:      () => { U.uHover.value = ids[4]; },
+  active:     () => { for (const id of [ids[0], ids[3], ids[6], ids[9]]) setActive(id, 1); },
+  activeSel:  () => { for (const id of [ids[0], ids[3]]) setActive(id, 1);
+                      U.uSelected.value = ids[3]; },
+  xray:       () => { U.uXray.value = 1; brainMat.clippingPlanes = null; },
+  inside:     () => { U.uXray.value = 1; U.uShell.value = 0.3; },
+  cutaway:    () => { brainMat.clippingPlanes = [clipPlane]; },
+  atlasXray:  () => { U.uAtlas.value = 1; U.uXray.value = 1; U.uSelected.value = ids[7]; },
+  // A palette grown past the old 16-id ceiling must reallocate its texture, re-point the
+  // uniform, and still render the cortex exactly as `atlas` does. grown.bin and atlas.bin
+  // being byte-identical is the whole claim that the id cap is gone.
+  grown:      () => { U.uAtlas.value = 1;
+                      brainMat.userData.palette?.setColor(4000, '#ff00ff'); },
+};
+
+function reset() {
+  U.uSelected.value = -1; U.uHover.value = -1; U.uAtlas.value = 0;
+  U.uXray.value = 0; U.uShell.value = 1; U.uPulse.value = 0;
+  brainMat.clippingPlanes = null;
+  clearActive();
+}
+
+function run() {
+  window.__ids = ids;
+  window.__shot = (name) => {
+    reset();
+    (SCENARIOS[name] || (() => {}))();
+    if (brainMat.userData.sync) brainMat.userData.sync();
+    renderer.render(scene, camera);
+    const gl = renderer.getContext();
+    const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+    const px = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    let bin = '';
+    for (let i = 0; i < px.length; i += 8192)
+      bin += String.fromCharCode.apply(null, px.subarray(i, i + 8192));
+    return { w, h, b64: btoa(bin), png: canvas.toDataURL('image/png') };
+  };
+  window.__names = Object.keys(SCENARIOS);
+  window.__ready = true;
+}
+</script></body></html>

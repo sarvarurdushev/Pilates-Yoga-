@@ -1,0 +1,1037 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Neuro Wellness</title><style>
+/* The palette is a room, not a set of swatches.
+ *
+ * Everything cool and nearly black, one steel-blue accent, and amber held back for the two
+ * things that have earned it: an evidence tier and a contraindication. The old tokens were a
+ * dark SaaS ramp — `--card` was a solid #131a26 fill on every surface, which is what made four
+ * hundred structures of anatomy look like content inside widgets. There are no solid fills
+ * here. `--glass` and `--glass2` are translucent and always sit over the scene. */
+:root{
+ --bg:#04070c;--deep:#020408;
+ --glass:rgba(146,178,222,.045);--glass2:rgba(146,178,222,.085);
+ --line:rgba(150,185,230,.10);--line2:rgba(150,185,230,.19);--hair:rgba(150,185,230,.055);
+ --txt:#e6ecf6;--dim:#93a1b8;--dim2:#5f6c82;
+ --acc:#5AA9E6;--acc2:#7FD4E8;--gold:#E9B45C;
+ --warn:#E9A13B;--danger:#E2685F;--ok:#3FBF97;
+ --r:6px;
+ /* one width, used by the grid *and* by the header's right edge, so the two cannot drift */
+ --panelw:clamp(312px,21vw,376px);
+ /* the header's own height, so the view bar can clear it instead of guessing */
+ --barh:84px;
+ /* one shared blur, so every pane reads as the same material */
+ --blur:blur(22px) saturate(115%);
+}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--deep);color:var(--txt);overflow:hidden;
+ font:13.5px/1.6 system-ui,-apple-system,"Segoe UI","Noto Sans KR",sans-serif;
+ -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button{font:inherit;cursor:pointer}
+/* The header floats *over* the scene rather than sitting above it in a row, so the
+ * visualisation runs the full height of the window and the interface layers onto it. The
+ * panel stays a real grid column: the right-hand label lane is placed at the stage's own
+ * width, and a panel floating over the stage would put every label on that side underneath
+ * it. Layered where it can be, honest about the one place it cannot. */
+/* One full-bleed stage. The panel used to be a real grid column, on the reasoning that a
+   floating panel would put the right-hand label lane underneath it — true, and the fix is to
+   tell the lane about the panel rather than to give a quarter of the window away to a
+   document. The subject is the product; the console is projected over it. */
+#app{display:block;height:100vh;position:relative}
+
+/* ------------------------------------------------------------------ top bar */
+/* Stops at the panel's edge rather than running under it. Full width put the disclaimer
+   chips on top of the tabs — the four lines that must not move, unreadable, which is the one
+   failure mode this header is not allowed to have. */
+#topbar{position:fixed;top:0;left:0;right:0;z-index:8;display:flex;
+ align-items:flex-start;gap:18px;padding:14px 22px;min-height:var(--barh);pointer-events:none;
+ background:linear-gradient(180deg,rgba(2,4,8,.86) 0%,rgba(2,4,8,.52) 55%,transparent 100%)}
+#topbar>*{pointer-events:auto}
+.wm{display:flex;align-items:baseline;gap:12px;min-width:0;flex:0 1 auto;padding-top:2px}
+.wm b{font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
+ color:var(--txt)}
+.wm span{color:var(--dim2);font-size:11px;letter-spacing:.02em;white-space:nowrap;
+ overflow:hidden;text-overflow:ellipsis}
+#discBar{display:flex;gap:5px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
+/* The four lines that must not move, as instrument annunciators: hairline, amber, and lit
+   rather than filled. They have to stay legible against a moving 3D scene, which is what the
+   backdrop blur is for — not decoration, contrast insurance. */
+.disc{background:rgba(233,180,92,.05);border:1px solid rgba(233,180,92,.22);color:#dbbc86;
+ border-radius:3px;padding:3px 8px;font-size:9px;letter-spacing:.06em;line-height:1.5;
+ text-transform:uppercase;white-space:nowrap;backdrop-filter:var(--blur)}
+.disc:hover{background:rgba(233,180,92,.13);border-color:rgba(233,180,92,.5);color:#fff}
+#bodyPick{display:flex;gap:2px;margin-left:auto;background:var(--glass);border:1px solid var(--line);
+  border-radius:3px;padding:2px}
+/* The picker only has content when there is more than one body to pick, and with one body it
+   was still drawing its own pill — a small empty dot in the header, a control for nothing. */
+#bodyPick:empty{display:none}
+#bodyPick a,#bodyPick span{font:inherit;font-size:12px;padding:3px 10px;border-radius:2px;
+  color:var(--dim);text-decoration:none;white-space:nowrap}
+#bodyPick a:hover{color:var(--txt)}
+#bodyPick .on{background:var(--line);color:var(--txt)}
+#langBtn{flex:none;white-space:nowrap;background:var(--glass);border:1px solid var(--line);
+ color:var(--dim);border-radius:3px;padding:4px 10px;font-size:9.5px;letter-spacing:.1em;
+ text-transform:uppercase;backdrop-filter:var(--blur)}
+#langBtn:hover{color:var(--txt);border-color:var(--line2);background:var(--glass2)}
+
+/* -------------------------------------------------------------------- stage */
+/* The room. The canvas is transparent, so this gradient *is* the environment behind the
+   subject — a cool wash high and toward the light, falling to near-black at the floor. */
+/* The stage is the window. The gradient behind it is the un-composed fallback only — with
+   bloom on, the room is drawn in the scene by `backdrop.js`, because the bloom pass blits
+   through an opaque material and the canvas stops being transparent. */
+#stage{position:absolute;inset:0;overflow:hidden;
+ background:
+  radial-gradient(78% 58% at 46% 40%,rgba(58,96,146,.18) 0%,transparent 62%),
+  linear-gradient(178deg,#0a1220 0%,#060b14 46%,#02050a 100%)}
+#view{width:100%;height:100%;display:block;cursor:grab}
+/* A faint measurement grid behind the subject. It is the one background element that is not
+   pure gradient, and it is kept below the threshold where you would call it a pattern — it
+   reads as the room having a floor rather than as graph paper. */
+#stage::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:1;
+ background:
+  linear-gradient(rgba(120,165,215,.028) 1px,transparent 1px) 0 0/100% 68px,
+  linear-gradient(90deg,rgba(120,165,215,.028) 1px,transparent 1px) 0 0/68px 100%;
+ -webkit-mask-image:radial-gradient(85% 70% at 50% 48%,#000 0%,transparent 78%);
+ mask-image:radial-gradient(85% 70% at 50% 48%,#000 0%,transparent 78%)}
+/* Vignette, deepened. The scene is lit from within its own environment map; this is what puts
+   the walls of the room in and stops the render reading as a cut-out on a flat page. */
+#stage::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:2;
+ background:
+  radial-gradient(58% 46% at 50% 42%,rgba(96,150,210,.055) 0%,transparent 68%),
+  radial-gradient(130% 105% at 50% 44%,transparent 42%,rgba(1,3,6,.82) 100%)}
+#labels{position:absolute;inset:0;pointer-events:none;z-index:4}
+
+/* ----------------------------------------------------------------- sections
+ * The strip of sections along the bottom of the stage. It sits to the right of the layer
+ * panel rather than centred, because the layer panel is the thing it must not cover and the
+ * stage's own centre belongs to the subject. */
+/* Bounded on the right by the console, not by the window. `max-width:calc(100% - 300px)` let
+ * the strip run underneath the panel, so at nine cuts the last of them were behind the glass
+ * with no way to reach them — which is what "why can't I scroll to see all the cuts" was. */
+#sections{position:absolute;left:284px;bottom:14px;z-index:4;
+ right:calc(var(--panelw) + 30px)}
+/* Which way the subject is facing, in the corner, the way an atlas plate captions itself.
+ * A lateral view of a brain is ambiguous without it — front could be either end. */
+#orient{position:absolute;right:calc(var(--panelw) + 30px);bottom:18px;z-index:3;
+ pointer-events:none;text-align:right;
+ font-size:8.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--dim2)}
+.secthead{display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
+.secthead b{font-size:8.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--dim2);
+ font-weight:600}
+.secthead em{font-style:normal;font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;
+ color:#F0C08A}
+/* Nine cuts are wider than the space beside the console on any screen this runs on, so the
+ * row scrolls. Two things make that discoverable rather than a guess: the scrollbar is drawn
+ * rather than hidden, and there are arrows, because a horizontal scroller with no visible
+ * affordance is exactly the thing a reader tries to drag the picture in. */
+.sectwrap{position:relative}
+.sectrow{display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;scroll-behavior:smooth;
+ padding-bottom:7px;overscroll-behavior-x:contain;
+ scrollbar-width:thin;scrollbar-color:rgba(150,190,235,.34) rgba(255,255,255,.05)}
+.sectrow::-webkit-scrollbar{height:7px}
+.sectrow::-webkit-scrollbar-track{background:rgba(255,255,255,.05);border-radius:4px}
+.sectrow::-webkit-scrollbar-thumb{background:rgba(150,190,235,.34);border-radius:4px}
+.sectrow::-webkit-scrollbar-thumb:hover{background:rgba(150,190,235,.6)}
+.sectnav{position:absolute;top:calc(50% - 18px);width:22px;height:44px;z-index:2;padding:0;
+ display:none;place-items:center;cursor:pointer;
+ background:linear-gradient(rgba(8,14,24,.86),rgba(6,11,20,.94));
+ border:1px solid var(--line);color:var(--dim2);font-size:13px;line-height:1}
+.sectnav:hover{color:var(--txt);border-color:var(--line2)}
+.sectnav.on{display:grid}
+.sectnav.prev{left:-2px}
+.sectnav.next{right:-2px}
+/* Same rule the camera flights follow: a reader who has asked for less motion gets the jump
+   rather than the animation, and so does anything measuring this without a compositor. */
+@media (prefers-reduced-motion:reduce){ .sectrow{scroll-behavior:auto} }
+.sect{position:relative;flex:0 0 auto;padding:0;background:rgba(6,11,20,.5);
+ border:1px solid var(--line);
+ border-left:1px solid rgba(255,196,132,.3);line-height:0;cursor:pointer}
+.sect canvas{display:block;width:122px;height:122px}
+.sect span{position:absolute;left:0;right:0;bottom:0;padding:4px 5px;font-size:9.5px;
+ line-height:1.25;color:var(--dim2);font-variant-numeric:tabular-nums;letter-spacing:.02em;
+ background:linear-gradient(transparent,rgba(4,8,15,.85) 45%);text-align:left}
+.sect span i{display:block;font-style:normal;font-variant-numeric:normal;font-size:9px;
+ color:var(--dim);letter-spacing:0;margin-top:1px}
+.sect:hover{border-color:var(--line2)}
+.sect[aria-current="true"]{border-color:rgba(255,196,132,.75)}
+.sect[aria-current="true"] span{color:#F0C08A}
+/* Which cuts the selected structure actually crosses. The structure is already lit inside
+   them by setFocus; without a mark on the outside a reader has to find it by looking. */
+.sect.hasit{box-shadow:inset 0 0 0 1px rgba(255,196,132,.5)}
+.sect.hasit span{color:#F0C08A}
+.sectlegend{display:flex;flex-wrap:wrap;gap:3px 12px;margin:8px 0 0;max-width:760px}
+.sectkey{display:flex;align-items:center;gap:5px;padding:0;background:none;border:0;
+ font-size:10px;color:var(--dim);white-space:nowrap}
+.sectkey:hover{color:var(--txt)}
+.sectkey i{width:8px;height:8px;flex:none;border-radius:2px}
+.cortexkey{color:var(--dim2);pointer-events:none}
+.sectnote{margin:7px 0 0;max-width:760px;font-size:10px;line-height:1.45;color:var(--dim2)}
+@media (max-width:1180px){#sections{display:none}}
+
+/* ---------------------------------------------------------------------- hud */
+/* The apparatus around the specimen — see `hud.js`. It never takes a pointer event: the
+   picture is the control surface, and a HUD that swallows clicks turns the render back into
+   a background image. */
+#hud{position:absolute;inset:0;pointer-events:none;z-index:3}
+/* The corners of the glass. Two borders on a small box, anchored by inset — see hud.js for
+   why this is not SVG. The lit dot is the box's own shadow, so there is one element each. */
+.hudc{position:absolute;width:26px;height:26px;
+ border-color:rgba(150,190,235,.34);border-style:solid;border-width:0}
+.hudc::after{content:"";position:absolute;width:3px;height:3px;border-radius:50%;
+ background:rgba(127,212,232,.85);box-shadow:0 0 7px rgba(127,212,232,.7)}
+.hudc.tl{left:10px;top:10px;border-left-width:1px;border-top-width:1px}
+.hudc.tr{right:10px;top:10px;border-right-width:1px;border-top-width:1px}
+.hudc.bl{left:10px;bottom:10px;border-left-width:1px;border-bottom-width:1px}
+.hudc.br{right:10px;bottom:10px;border-right-width:1px;border-bottom-width:1px}
+.hudc.tl::after{left:-2px;top:-2px}
+.hudc.tr::after{right:-2px;top:-2px}
+.hudc.bl::after{left:-2px;bottom:-2px}
+.hudc.br::after{right:-2px;bottom:-2px}
+/* One positioned column, and the readouts flow under the trace inside it.
+ * They used to be two absolutely positioned boxes at hand-written offsets — the trace at
+ * +62 and the readouts at +160 — which held only while the note under the trace was the
+ * length it happened to be on the day. Saying what the trace is took it to three lines and
+ * the two boxes overlapped: the sentence ran straight through STRUCTURES / REGIONS / CELLS.
+ * A column cannot do that, whatever the text does or however it wraps. */
+#hudCol{position:absolute;left:22px;top:calc(var(--barh) + 62px);width:268px;
+ display:flex;flex-direction:column;gap:16px}
+#hudTrace{width:268px}
+#hudTrace canvas{display:block;width:268px;height:54px;opacity:.9}
+.hudlab{display:flex;justify-content:space-between;align-items:baseline;margin-top:5px;
+ font-size:8.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--dim2)}
+.hudlab b{color:#F0C08A;font-weight:600;letter-spacing:.06em;font-size:10px}
+/* What the trace is, under the trace. Small and dim: it is furniture, and it only has to be
+ * legible to someone who has stopped to ask what the number means. */
+.hudnote{margin:6px 0 0;max-width:268px;font-size:9.5px;line-height:1.5;color:var(--dim2);
+ border-left:1px solid rgba(150,185,230,.16);padding-left:8px}
+#hudRead{width:268px;display:flex;flex-direction:column;gap:3px}
+.hudrow{display:flex;justify-content:space-between;align-items:baseline;
+ font-size:8.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--dim2);
+ border-top:1px solid var(--hair);padding-top:4px}
+.hudrow b{color:var(--dim);font-weight:600;letter-spacing:.04em;font-size:10.5px;
+ text-transform:none}
+.hudrow.sel b{color:var(--acc2)}
+@media (max-width:1100px){ #hudCol{display:none} }
+
+/* ------------------------------------------------------------- cell probe */
+/* The annotation on a single cell — see `cellNote.js`. Anchored to the cell and joined to it
+   by a wire, because a probe has one; a plate floating near the pointer would be a tooltip. */
+#cellnote{position:absolute;inset:0;pointer-events:none;z-index:5}
+.cnwire{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.cnwire path{stroke:rgba(255,196,132,.62)}
+.cnbox{position:absolute;width:212px;padding:9px 11px 10px;border-radius:3px;
+ border:1px solid var(--line);border-left:1px solid rgba(255,196,132,.5);
+ background:linear-gradient(200deg,rgba(7,13,22,.90),rgba(5,9,16,.92));
+ backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+ box-shadow:0 18px 50px rgba(0,0,0,.5)}
+.cnkick{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+.cntier{width:14px;height:14px;border:1px solid;border-radius:2px;display:grid;
+ place-items:center;font-size:9px;font-weight:700;line-height:1}
+.cnid{font-size:8.5px;letter-spacing:.17em;color:var(--dim2)}
+.cnname{font-size:12.5px;color:var(--txt);line-height:1.3;margin-bottom:3px}
+.cndoes{font-size:10.5px;line-height:1.45;color:var(--dim)}
+.cnstate{display:flex;align-items:center;gap:8px;margin-top:8px}
+.cnlab{font-size:8.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--dim2)}
+.cnbar{flex:1;height:2px;background:rgba(150,185,230,.14);display:block;position:relative}
+.cnbar b{position:absolute;left:0;top:0;bottom:0;background:#FFC484;
+ box-shadow:0 0 8px rgba(255,196,132,.6)}
+@media (max-width:1100px){ #cellnote{display:none} }
+#leaders{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+/* Annotation on a specimen, not a chip in a list. Glass, hairline, and a lit left edge that
+   is the only thing pointing back at the rope — so the plate reads as the far end of a leader
+   line rather than as a button that happens to sit near the body. */
+.lab3d{position:absolute;transform:translateY(-50%);background:rgba(6,11,19,.62);
+ border:1px solid var(--hair);border-left:1px solid rgba(150,190,235,.34);border-radius:2px;
+ color:#c9d6e8;font-size:10.5px;letter-spacing:.045em;
+ padding:0 10px;display:flex;align-items:center;gap:8px;white-space:nowrap;
+ width:auto;max-width:300px;overflow:hidden;
+ backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+ pointer-events:auto;opacity:0;transition:opacity .18s,color .18s,border-color .18s}
+/* The name is the field that gives way when the plate hits its cap. text-overflow only acts
+   on the element whose own text overflows, so it belongs here and not on the button. */
+.labname{overflow:hidden;text-overflow:ellipsis;min-width:0}
+/* What the loaded exercise is asking this muscle to do. A second field, deliberately smaller
+   and dimmer than the name and separated by a hairline rather than a bullet, so it reads as
+   a column in a table rather than as part of the name. Absent at rest. */
+.labrole{flex:none;font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;
+ color:var(--dim2);padding-left:8px;border-left:1px solid var(--hair)}
+.lab3d.sel .labrole,.lab3d.working .labrole{color:var(--dim)}
+.lab3d:hover{color:#fff;border-left-color:var(--acc2)}
+.lab3d.sel{background:rgba(12,22,36,.86);color:#fff;
+ border-left-color:currentColor;box-shadow:0 0 18px rgba(90,169,230,.14)}
+/* `working`, not `act`: the panel's primary-button rule below is `.act{width:100%}`, and a
+   label is a <button>, so the two class names collided. Same specificity, and the panel rule
+   is later in the sheet, so every activated muscle label was stretched to its 240px max-width
+   and the right-hand lane — placed from the width the label reported before the class was
+   applied — hung up to 150px past the edge of the stage, under the panel. */
+.lab3d.working{background:rgba(18,26,38,.97)}
+/* The anchor. A ring with a lit core rather than a filled disc: on a translucent surface a
+   solid dot reads as a blemish on the tissue, a ring reads as a marker placed on it. */
+.labdot{position:absolute;width:5px;height:5px;border-radius:50%;transform:translate(-50%,-50%);
+ border:1px solid rgba(215,235,255,.85);background:transparent;opacity:0;
+ box-shadow:0 0 0 2px rgba(6,11,19,.55),0 0 9px 1px currentColor;transition:opacity .18s}
+
+/* view + layer bars: instrument controls floating in the scene, not toolbars */
+#viewbar,#layerbar{position:absolute;z-index:5;display:flex;gap:4px;align-items:center;
+ background:rgba(4,8,15,.55);border:1px solid var(--line);border-radius:4px;padding:6px 8px;
+ backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
+#viewbar{left:22px;top:calc(var(--barh) + 14px)}
+#layerbar{left:22px;bottom:22px;flex-direction:column;align-items:stretch;
+ padding:11px 12px;min-width:196px}
+#viewbar b,#layerbar b{color:var(--dim2);font-size:9.5px;text-transform:uppercase;
+ letter-spacing:.16em;font-weight:600;padding:0 6px 0 2px}
+#viewbar button{background:transparent;border:1px solid transparent;color:var(--dim);
+ border-radius:3px;padding:4px 9px;font-size:11px;letter-spacing:.02em}
+#viewbar button:hover{color:var(--txt);background:var(--glass2)}
+.layerrow{display:flex;align-items:center;gap:8px;margin-top:5px}
+.lyr{flex:1;display:flex;align-items:center;gap:7px;background:transparent;border:1px solid transparent;
+ color:var(--dim);border-radius:3px;padding:3px 6px;font-size:11.5px;text-align:left}
+.lyr i{width:9px;height:9px;border-radius:2px;flex:none;opacity:.45}
+.lyr[aria-pressed=true]{color:var(--txt);background:var(--glass2);border-color:var(--line2)}
+.lyr[aria-pressed=true] i{opacity:1}
+.lyop{width:52px;flex:none}
+
+#loading{position:absolute;inset:0;display:grid;place-items:center;z-index:6;color:var(--dim);
+ font-size:12.5px;background:var(--bg)}
+body.ready #loading{background:transparent}
+body.busy #stage{cursor:progress}
+
+/* ------------------------------------------------------------------- panel */
+/* The analysis console. Not a column of page — a pane of instrument glass with the scene
+   continuing behind it. The hard 1px left border is gone: a rule that sharp is what made it
+   read as the edge of a document. What separates it now is the material itself, plus a
+   gradient falloff wide enough to see the render through. */
+/* A pane of projected glass standing in the room, not the right-hand column of a document.
+   It floats clear of all four edges so the scene runs behind and around it, and it is thin
+   enough to read the render through. */
+#panel{position:fixed;right:14px;top:calc(var(--barh) - 6px);bottom:14px;width:var(--panelw);
+ z-index:6;display:flex;flex-direction:column;min-height:0;border-radius:3px;
+ border:1px solid var(--line);
+ background:linear-gradient(200deg,rgba(7,13,22,.72) 0%,rgba(5,9,16,.80) 100%);
+ box-shadow:0 30px 90px rgba(0,0,0,.55), inset 0 1px 0 rgba(160,200,245,.07);
+ backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
+/* the lit top edge of a projected surface */
+#panel::before{content:"";position:absolute;left:12%;right:12%;top:-1px;height:1px;
+ background:linear-gradient(90deg,transparent,rgba(127,212,232,.55),transparent);
+ pointer-events:none}
+#tabs{display:flex;flex:none;padding:0 14px;border-bottom:1px solid var(--hair)}
+#tabs button{flex:1;background:transparent;border:0;border-bottom:1px solid transparent;
+ color:var(--dim2);padding:15px 4px 12px;font-size:10.5px;letter-spacing:.13em;
+ text-transform:uppercase;margin-bottom:-1px;transition:color .18s}
+#tabs button:hover{color:var(--dim)}
+#tabs button[aria-selected=true]{color:var(--txt);border-bottom-color:var(--acc)}
+#panelBody{overflow:auto;padding:20px 20px 30px;flex:1;min-height:0}
+#controls{border-top:1px solid var(--hair);padding:13px 20px 16px;flex:none;
+ background:rgba(2,5,10,.42);max-height:39vh;overflow:auto}
+/* thin, unobtrusive scrollbars — a console does not have chrome scrollbars */
+#panelBody::-webkit-scrollbar,#controls::-webkit-scrollbar{width:9px}
+#panelBody::-webkit-scrollbar-thumb,#controls::-webkit-scrollbar-thumb{
+ background:rgba(150,190,235,.13);border-radius:4px;border:3px solid transparent;
+ background-clip:content-box}
+
+/* A section heading in an instrument is a rule with a word on it, not a title. */
+h3{font-size:9.5px;text-transform:uppercase;letter-spacing:.19em;color:var(--dim2);
+ margin:26px 0 11px;font-weight:600;display:flex;align-items:center;gap:10px}
+h3::after{content:"";flex:1;height:1px;background:var(--hair)}
+h3:first-child{margin-top:0}
+h4{font-size:9.5px;text-transform:uppercase;letter-spacing:.15em;color:var(--dim2);
+ margin:0 0 5px;font-weight:600}
+h4.sechead{margin:24px 0 10px}
+p{margin:0 0 10px}
+.intro{color:var(--dim);font-size:12.5px;line-height:1.65}
+.note{color:var(--dim2);font-size:11px;line-height:1.6}
+.lead{font-size:14px;line-height:1.7;color:#dce4f0}
+
+.callout{background:var(--glass);border:1px solid var(--line);border-left:3px solid var(--acc);
+ border-radius:4px;padding:10px 12px;font-size:12.5px;color:var(--dim);margin-bottom:14px}
+.callout b{color:var(--txt);display:block;margin-bottom:3px}
+.callout.warn{border-left-color:var(--warn);background:rgba(233,161,59,.08)}
+.callout.ok{border-left-color:var(--ok);background:rgba(40,180,135,.08)}
+
+.empty{text-align:center;padding:22px 10px;color:var(--dim2)}
+.empty h2{font-size:14px;color:var(--dim);margin:0 0 5px}
+.empty p{font-size:12.5px}
+.empty.small{padding:14px 6px}
+
+.chipwrap{display:flex;flex-wrap:wrap;gap:6px}
+/* One labelled group per facet. Four unlabelled rows of chips ask the reader to work out
+   what each row filters by; the heading answers it before they have to. */
+.facetgrp{margin:0 0 10px}
+.facetgrp h4{margin:0 0 5px}
+.fchip[aria-pressed=true]{color:var(--txt);border-color:rgba(90,169,230,.55);
+ background:rgba(90,169,230,.13)}
+.xrayChip[aria-pressed=true]{border-color:var(--warn);background:rgba(233,161,59,.16);color:#f0cf9a}
+/* One shape rule, everywhere: a control has square corners, and the only round things in
+   the console are the ones that stand for a point on the body — a structure's colour dot and
+   a label's anchor. Pills were the last of the SaaS ramp: four hundred structures rendered as
+   rounded capsules is a tag cloud, and a tag cloud is what a dashboard does with data it has
+   not decided how to show. */
+.chip{display:flex;align-items:center;gap:6px;background:var(--glass);border:1px solid var(--line);
+ color:var(--dim);border-radius:3px;padding:4px 11px;font-size:11.5px}
+.chip:hover,.chip[aria-current=true]{color:var(--txt);border-color:var(--line2);background:var(--glass2)}
+.chip i{width:8px;height:8px;border-radius:50%;flex:none}
+.chip em{font-style:normal;font-size:9.5px;font-weight:700;letter-spacing:.4px}
+.mini{background:var(--glass);border:1px solid var(--line);color:var(--dim);border-radius:3px;
+ padding:3px 9px;font-size:11.5px}
+.mini:hover{color:var(--txt);border-color:var(--line2)}
+
+.detail{margin-bottom:10px}
+.dko{color:var(--dim2);font-size:11px;font-style:italic}
+/* The name of what is selected is the largest thing in the console and the only thing set in
+   a display size. Everything else steps down from it. */
+.dname{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:500;margin:2px 0 4px;
+ letter-spacing:.005em;line-height:1.25}
+.dname .dot{width:7px;height:7px;border-radius:50%;flex:none;
+ box-shadow:0 0 0 3px rgba(255,255,255,.05),0 0 12px currentColor}
+.dwhere{color:var(--dim2);font-size:10px;letter-spacing:.13em;text-transform:uppercase;
+ margin-bottom:14px}
+.rolechip{display:inline-block;border:1px solid;border-radius:3px;padding:3px 11px;
+ font-size:10px;letter-spacing:.13em;text-transform:uppercase;margin-bottom:11px}
+.blk{margin:0 0 13px}
+.blk p{font-size:13px}
+.blk.sci p{color:var(--dim);font-size:12.5px}
+.blk.feels p{color:#cfd8e6;font-style:italic}
+.blk.warn{background:rgba(233,161,59,.07);border-left:2px solid rgba(233,161,59,.5);
+ border-radius:0 6px 6px 0;padding:8px 11px}
+.blk.danger{background:rgba(226,104,95,.08);border-left:2px solid rgba(226,104,95,.55);
+ border-radius:0 6px 6px 0;padding:8px 11px}
+.blk.math{background:var(--glass);border:1px solid var(--line);border-radius:4px;padding:10px 12px}
+.blk.nerve{background:rgba(76,141,246,.07);border-left:2px solid rgba(76,141,246,.5);
+ border-radius:0 6px 6px 0;padding:8px 11px}
+.blk.grid2,.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.blk ul{margin:0;padding-left:17px;font-size:12.5px;color:var(--dim)}
+.roots{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 8px}
+.roots span{background:rgba(76,141,246,.16);border:1px solid rgba(76,141,246,.32);
+ color:#bcd3fb;border-radius:3px;padding:2px 7px;font-size:10.5px;font-weight:600}
+.fault{margin-bottom:9px}
+.fault b{display:block;font-size:12.5px;color:#f0d5a8}
+.fault p{font-size:12.5px;color:var(--dim);margin:2px 0 0}
+.roleblk{margin-bottom:12px}
+
+.claim{background:var(--glass);border:1px solid var(--line);border-left:3px solid var(--dim2);
+ border-radius:4px;padding:11px 13px;margin-bottom:12px}
+.ctier{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:8px;
+ font-size:11px;color:var(--dim2)}
+.tierbadge{color:#08101a;font-weight:700;border-radius:3px;width:19px;height:19px;
+ display:grid;place-items:center;font-size:11px}
+.pill{background:var(--glass2);border:1px solid var(--line);border-radius:3px;padding:1px 8px}
+.cclaim{font-size:13.5px;font-weight:600;line-height:1.5}
+.cite{color:var(--dim2);font-size:11px;border-top:1px solid var(--line);padding-top:7px;
+ margin-top:4px;margin-bottom:8px}
+.cite b{color:var(--dim)}
+
+.exrow{width:100%;display:flex;align-items:center;gap:10px;background:var(--glass);
+ border:1px solid var(--line);border-radius:4px;padding:10px 13px;margin-bottom:7px;
+ color:var(--txt);text-align:left}
+.exrow:hover{background:var(--glass2);border-color:var(--line2)}
+.exname{flex:1;font-size:13.5px}
+.exname small{display:block;color:var(--dim2);font-size:11px;font-weight:400;margin-top:1px}
+.exgo{color:var(--dim2)}
+.exname .sans{display:block;color:var(--dim);font-size:11.5px;font-style:normal;
+ letter-spacing:.02em;margin-top:1px}
+
+/* the library browser: search, then facets that only offer what is still reachable */
+.libbar{display:flex;align-items:center;gap:8px;margin:2px 0 8px}
+.libbar input{flex:1;min-width:0;background:var(--glass);border:1px solid var(--line);
+ border-radius:4px;padding:8px 11px;color:var(--txt);font-size:13px;font-family:inherit}
+.libbar input:focus{outline:0;border-color:var(--acc)}
+.libcount{color:var(--dim2);font-size:11px;white-space:nowrap}
+.facet{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
+.fchip{background:var(--glass);border:1px solid var(--line);border-radius:3px;
+ padding:4px 9px;color:var(--dim);font-size:11.5px;display:flex;align-items:center;gap:5px}
+.fchip:hover{border-color:var(--line2);color:var(--txt)}
+.fchip[aria-pressed="true"]{background:rgba(90,169,230,.15);
+ border-color:rgba(90,169,230,.55);color:#dbeaf8}
+.fchip em{font-style:normal;opacity:.65;font-size:10.5px}
+.back{background:transparent;border:0;color:var(--dim);font-size:12px;padding:0 0 12px}
+.back:hover{color:var(--txt)}
+
+.act{width:100%;background:rgba(90,169,230,.16);border:1px solid rgba(90,169,230,.45);
+ color:#cfe4f6;border-radius:3px;padding:10px;font-size:11px;letter-spacing:.1em;
+ text-transform:uppercase;margin-top:12px}
+.act:hover{background:rgba(90,169,230,.26);color:#fff}
+.act.ghost{background:var(--glass2);border:1px solid var(--line2);color:var(--dim)}
+.act.ghost:hover{color:var(--txt)}
+.act.small{padding:6px;font-size:12px;margin-top:8px}
+
+/* controls */
+.crow{display:flex;align-items:center;gap:9px;margin-top:8px}
+.crow label{color:var(--dim2);font-size:11px;flex:none;min-width:96px}
+.crow input[type=range]{flex:1}
+/* A calibrated slider, not a toggle switch. `accent-color` alone gives Chromium's default —
+   a 4px rounded track with a 14px disc on it, which is the single most product-looking
+   control in the console. This is a 2px rule with a small square handle: the thing you set a
+   value on in an instrument, and it has to be spelled out per engine because the two
+   pseudo-elements below are not interchangeable and neither inherits from the other. */
+input[type=range]{-webkit-appearance:none;appearance:none;background:transparent;
+ height:16px;margin:0;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:2px;border-radius:0;
+ background:linear-gradient(90deg,rgba(90,169,230,.55),rgba(150,185,230,.14))}
+input[type=range]::-moz-range-track{height:2px;border-radius:0;
+ background:linear-gradient(90deg,rgba(90,169,230,.55),rgba(150,185,230,.14))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+ width:7px;height:12px;border-radius:1px;margin-top:-5px;background:#cfe0f4;
+ box-shadow:0 0 0 1px rgba(4,8,15,.9),0 0 9px rgba(90,169,230,.35)}
+input[type=range]::-moz-range-thumb{width:7px;height:12px;border-radius:1px;border:0;
+ background:#cfe0f4;box-shadow:0 0 0 1px rgba(4,8,15,.9),0 0 9px rgba(90,169,230,.35)}
+input[type=range]:focus{outline:0}
+input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 1px var(--acc2)}
+.seg{display:flex;gap:5px;flex-wrap:wrap}
+.seg button,.tgl{background:var(--glass);border:1px solid var(--line);color:var(--dim);
+ border-radius:3px;padding:5px 11px;font-size:11.5px}
+.seg button[aria-pressed=true],.tgl[aria-pressed=true]{background:var(--glass2);color:var(--txt);
+ border-color:var(--line2)}
+#pathPanel{display:none;margin-top:12px;border-top:1px solid var(--line);padding-top:11px}
+#pathPanel.on{display:block}
+.schem{background:rgba(233,161,59,.1);border:1px solid rgba(233,161,59,.3);color:#e9c78b;
+ border-radius:3px;padding:5px 9px;font-size:11px;margin-bottom:9px}
+.pstep{display:flex;gap:9px;margin-bottom:9px}
+.pstep .num{width:20px;height:20px;flex:none;border:1px solid;border-radius:2px;
+ display:grid;place-items:center;font-size:10.5px;color:var(--txt)}
+.pt{font-size:12.5px;font-weight:600}
+.pn{color:var(--dim);font-size:12px;margin-top:2px}
+
+/* timeline */
+.timeline{background:var(--glass);border:1px solid var(--line);border-radius:4px;
+ padding:11px 12px;margin-bottom:14px}
+.tlhead{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.tlplay{width:28px;height:28px;flex:none;border-radius:3px;background:rgba(90,169,230,.18);
+ border:1px solid rgba(90,169,230,.45);color:#cfe4f6;font-size:11px;line-height:1;
+ display:grid;place-items:center}
+.tlplay:hover{background:rgba(90,169,230,.3);color:#fff}
+.tlnow{flex:1;font-size:11.5px;color:var(--dim);display:flex;align-items:center;gap:6px;
+ min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tlnow i{width:8px;height:8px;border-radius:50%;flex:none}
+.tlsecs{color:var(--dim2);font-size:11px;font-variant-numeric:tabular-nums;flex:none}
+.tltrack{position:relative;height:22px;display:flex;align-items:center}
+.tltrack input{width:100%;position:relative;z-index:2}
+.pmark{position:absolute;top:1px;width:2px;height:7px;border-radius:1px;z-index:1;opacity:.9}
+.tlopts{margin-top:9px}
+.ramp{margin-top:10px}
+.rampbar{height:9px;border-radius:3px;border:1px solid var(--line)}
+.ramplabels{display:flex;justify-content:space-between;color:var(--dim2);font-size:10px;
+ margin-top:2px}
+/* The three cutting planes, each shown as a picture of the cut it makes. */
+.scanpick{display:flex;gap:6px;flex:1;min-width:0}
+.planebtn{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;
+ padding:8px 4px 7px;background:var(--glass);border:1px solid var(--line);color:var(--dim)}
+.planebtn:hover{border-color:var(--line2);background:var(--glass2);color:var(--txt)}
+.planebtn[aria-pressed="true"]{border-color:rgba(255,196,132,.55);background:rgba(255,196,132,.07);
+ color:var(--txt)}
+.planebtn svg{width:30px;height:26px;display:block;overflow:visible}
+.planebtn svg ellipse,.planebtn svg path{fill:rgba(146,178,222,.14);
+ stroke:rgba(150,185,230,.5);stroke-width:1}
+.planebtn svg .nose{fill:rgba(150,185,230,.5);stroke:none}
+.planebtn svg .cut{stroke:#FFC98A;stroke-width:1.6;stroke-linecap:round}
+.planebtn[aria-pressed="true"] svg .cut{stroke:#FFE0B4;stroke-width:2}
+.planebtn b{font-size:10.5px;font-weight:600;line-height:1}
+.planebtn i{font-style:normal;font-size:8.5px;letter-spacing:.06em;color:var(--dim2);
+ line-height:1.2;text-align:center}
+.planebtn[aria-pressed="true"] i{color:#E0B183}
+
+/* An explanation under a control. Indented to the control column so it reads as belonging to
+ * the row above it rather than as a new section. */
+.chelp{margin:-2px 0 9px 0;font-size:10.5px;line-height:1.5;color:var(--dim);
+ border-left:1px solid rgba(255,196,132,.28);padding-left:9px}
+.chelp b{display:block;color:var(--dim2);font-weight:600;font-size:8.5px;letter-spacing:.15em;
+ text-transform:uppercase;margin-bottom:2px}
+.chelp b:not(:first-child){margin-top:6px}
+/* The "why" affordance: the technical half is one click away on the control it belongs to,
+ * rather than permanently under every control turning the console into an essay. */
+.whybtn{float:right;margin:-1px 0 2px 8px;width:16px;height:16px;flex:none;padding:0;
+ background:var(--glass);border:1px solid var(--line);color:var(--dim2);
+ font-size:9px;line-height:1;display:grid;place-items:center}
+.whybtn:hover{color:var(--txt);border-color:rgba(255,196,132,.5);background:var(--glass2)}
+.whybtn[aria-expanded="true"]{color:#E0B183;border-color:rgba(255,196,132,.5)}
+/* A glossary entry: the control's own printed name, then what it means. */
+.gloss{margin:0 0 12px}
+.gloss>b{display:block;font-size:12.5px;font-weight:600;color:var(--txt);margin-bottom:3px}
+.gloss .chelp{margin:0}
+/* An author `display` beats the user agent's `[hidden]{display:none}`, so any element given a
+ * layout display here stops honouring the attribute. That is how the lab's Reference tab hid
+ * nothing: `.labgrid{display:grid}` won and the charts stayed on screen underneath. */
+[hidden]{display:none!important}
+
+/* ---------------------------------------------------------------------- lab
+ * A screen rather than a panel: the graphs the console has no room for. It covers the stage
+ * completely, so the 3D view underneath keeps rendering but is not competing for attention. */
+#lab{position:fixed;inset:0;z-index:40;overflow:auto;
+ background:radial-gradient(1200px 700px at 22% -10%, #101a2c 0%, #070c15 55%, #04070d 100%)}
+.labtop{display:flex;align-items:flex-start;gap:20px;padding:26px 30px 14px;
+ max-width:1500px;margin:0 auto}
+.labtop h2{margin:0;font-size:17px;letter-spacing:-.2px;font-weight:600;color:var(--txt)}
+.labsub{margin:6px 0 0;max-width:760px;font-size:11.5px;line-height:1.6;color:var(--dim)}
+.labclose{margin-left:auto;flex:none;width:30px;height:30px;background:var(--glass);
+ border:1px solid var(--line);color:var(--dim);font-size:13px;line-height:1;
+ display:grid;place-items:center}
+.labclose:hover{color:var(--txt);border-color:var(--line2);background:var(--glass2)}
+.labopen{margin-left:8px;border-left:1px solid var(--line)!important;padding-left:12px!important}
+.labtiles{display:flex;flex-wrap:wrap;gap:1px;background:var(--line);border-block:1px solid var(--line);
+ max-width:1500px;margin:12px auto 0}
+.labtile{flex:1 1 130px;background:#070d18;padding:12px 16px}
+.labtile b{display:block;font-size:20px;font-weight:600;letter-spacing:-.5px;color:var(--txt);
+ font-variant-numeric:tabular-nums}
+.labtile span{display:block;margin-top:3px;font-size:8.5px;letter-spacing:.17em;
+ text-transform:uppercase;color:var(--dim2)}
+.labgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;
+ padding:16px 30px 40px;max-width:1500px;margin:0 auto}
+.labpanel{background:rgba(146,178,222,.035);border:1px solid var(--line);
+ border-left:1px solid rgba(255,196,132,.30);padding:14px 16px 16px;min-width:0}
+.labpanel.labwide{grid-column:1 / -1}
+.labpanel h3{margin:0 0 10px;font-size:8.5px;letter-spacing:.17em;text-transform:uppercase;
+ color:var(--dim2);font-weight:600}
+.labhost{position:relative;line-height:0;min-width:0}
+.labcv{display:block;width:100%}
+/* the connectome's own scene — see connectome3d.js */
+.c3dhost{position:relative;background:radial-gradient(60% 70% at 50% 45%,#0b1524,#05090f)}
+.c3d{display:block;width:100%;height:520px;cursor:grab}
+.c3d:active{cursor:grabbing}
+.c3dread{position:absolute;left:16px;top:14px;z-index:2;pointer-events:none;line-height:1.3;
+ font-size:13px;color:var(--txt);letter-spacing:-.1px}
+.c3dhint{position:absolute;left:16px;bottom:12px;z-index:2;pointer-events:none;
+ font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--dim2)}
+/* The lab's enlarged sections, and the key that says what a pixel in one of them is. The
+ * strip beside the stage is 136 px a slice, which is enough to see that a cut changed and not
+ * enough to see what it cut — this is the same render with room to read it. */
+/* The row of small pressed-state buttons: which way to cut, and which way to look at the
+ * fibre plot. Two controls, two class names, one shared rule — a second control borrowing the
+ * first one's bare class is how `.act` on a label ended up inheriting the panel's primary
+ * button width, and a selector counting both is how that gets found late. */
+.sectplanes{display:flex;gap:2px;margin:0 0 12px}
+.sectplane,.fibview{padding:6px 15px;background:transparent;border:1px solid var(--line);
+ color:var(--dim);font:inherit;font-size:9px;letter-spacing:.15em;text-transform:uppercase;
+ cursor:pointer}
+.sectplane:hover,.fibview:hover{color:var(--txt);border-color:var(--line2)}
+.sectplane[aria-pressed="true"],.fibview[aria-pressed="true"]{color:#F0C08A;
+ border-color:rgba(255,196,132,.6);background:rgba(255,196,132,.07)}
+.sectbig{display:flex;gap:10px;flex-wrap:wrap}
+.sectfig{position:relative;flex:1 1 200px;max-width:280px;min-width:150px;padding:0;line-height:0;
+ background:#040810;border:1px solid var(--line);
+ border-left:1px solid rgba(255,196,132,.3);cursor:pointer}
+.sectfig:hover{border-color:var(--line2)}
+.sectfig canvas{display:block;width:100%;height:auto;aspect-ratio:1}
+.sectfig span{position:absolute;left:0;right:0;bottom:0;padding:6px 8px;font-size:11px;
+ line-height:1.3;color:var(--dim);font-variant-numeric:tabular-nums;letter-spacing:.02em;
+ background:linear-gradient(transparent,rgba(4,8,15,.9) 45%);text-align:left}
+.sectfig span i{display:block;font-style:normal;font-variant-numeric:normal;font-size:10px;
+ color:var(--dim2);letter-spacing:0;margin-top:2px}
+/* Which cuts contain the selected structure, and the sentence that says where it is. The
+ * structure itself is what stands out — the section shader lifts its gain and holds the rest
+ * back — so this is only a frame around the thumbnails that have it: a mark on the furniture
+ * rather than one drawn over the picture. */
+.sectfig.hasit{border-color:rgba(255,196,132,.75);
+ box-shadow:0 0 0 1px rgba(255,196,132,.25),0 0 22px rgba(255,196,132,.10)}
+.sectfig.hasit span{color:#F0C08A}
+.sectwhere{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;margin:12px 0 0;
+ padding:9px 12px;background:rgba(146,178,222,.05);border-left:1px solid rgba(255,196,132,.4);
+ font-size:11.5px;line-height:1.55;color:var(--dim);max-width:1000px}
+.sectwhere i{width:8px;height:8px;border-radius:2px;flex:none;align-self:center}
+.sectwhere b{color:var(--txt);font-weight:600}
+.sectwhere em{display:block;flex:1 0 100%;margin-top:5px;font-style:normal;color:var(--dim2);
+ font-size:11px;line-height:1.55}
+.sectwhat{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px 26px;
+ margin:18px 0 0}
+.sectitem b{display:block;font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;
+ color:#F0C08A;font-weight:600;margin-bottom:4px}
+.sectitem span{font-size:11.5px;line-height:1.6;color:var(--dim)}
+/* The body and its chart, side by side inside one panel. Two hosts, so each Panel sizes
+ * itself to half the row and the canvases stay independent. */
+.labpair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.labpair{grid-template-columns:minmax(0,1fr)}}
+/* One structure, twice: alone on the left, in the body on the right. The right figure is
+ * `position:relative` because the ring that marks where the structure sits is a DOM element
+ * over the canvas rather than a mark painted into it — the renders are cached and re-blitted,
+ * so anything drawn onto the pixels would vanish on the next blit or pile up on the one
+ * before. Same rule the section thumbnails learned. */
+/* Hovering a cut names the structure under the pointer. The chip is positioned over the strip
+ * rather than painted into a thumbnail — the renders are cached and re-blitted, so a mark on
+ * the pixels would vanish on the next blit or pile up on the one before. */
+.sectbigwrap{position:relative}
+.sectname{position:absolute;pointer-events:none;z-index:4;white-space:nowrap;
+ padding:2px 7px;font-size:10px;letter-spacing:.02em;font-style:normal;
+ background:rgba(6,11,20,.92);border:1px solid currentColor;
+ box-shadow:0 0 12px rgba(0,0,0,.7)}
+.sectfig.onpart{cursor:pointer}
+.sectfig.onpart canvas{outline:1px solid rgba(255,201,138,.45);outline-offset:-1px}
+/* The tour: a transport, then the ranking as chips. The ranking is the list the reader asked
+ * for in as many words — most-worked first, numbered — and it doubles as the control. */
+.dettour{display:flex;align-items:flex-start;gap:12px;margin:0 0 12px}
+.detctl{display:flex;gap:4px;flex:0 0 auto}
+.detbtn{width:26px;height:24px;background:rgba(146,178,222,.07);border:1px solid var(--line);
+ color:var(--dim);font-size:10px;line-height:1;cursor:pointer;font-family:inherit}
+.detbtn:hover{color:var(--ink);border-color:rgba(146,178,222,.4)}
+.detchips{display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-width:0}
+.detgroup{font-size:8px;letter-spacing:.17em;text-transform:uppercase;color:var(--dim2);
+ margin:0 2px 0 8px}
+.detgroup:first-child{margin-left:0}
+.detchip{display:inline-flex;align-items:baseline;gap:5px;padding:2px 7px;font-family:inherit;
+ background:rgba(146,178,222,.07);border:1px solid var(--line);color:var(--dim);
+ font-size:10px;letter-spacing:.02em;cursor:pointer;white-space:nowrap}
+.detchip i{font-style:normal;color:var(--dim2);font-size:8.5px;font-variant-numeric:tabular-nums}
+.detchip em{font-style:normal;color:var(--dim2);font-size:8.5px;font-variant-numeric:tabular-nums}
+.detchip:hover{color:var(--ink);border-color:rgba(146,178,222,.4)}
+.detchip[aria-current="true"]{color:#0a0f18;background:#F0C08A;border-color:#F0C08A}
+.detchip[aria-current="true"] i,.detchip[aria-current="true"] em{color:rgba(10,15,24,.7)}
+.dethint{margin:0 0 12px;font-size:9px;letter-spacing:.14em;text-transform:uppercase;
+ color:var(--dim2)}
+/* A region the network has no cells for. Dimmer and wrapping, because the sentence explaining
+   why is longer than a name and a count, and it is a statement about the model rather than a
+   reading off it. */
+.c3dread.nocells{color:var(--dim2);max-width:520px;white-space:normal;line-height:1.5;font-size:10px}
+.detpair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.detpair{grid-template-columns:minmax(0,1fr)}}
+.detfig{margin:0}
+.detbox{position:relative;line-height:0}
+.detbox canvas{touch-action:none}
+.detfig figcaption{margin-top:6px;font-size:8.5px;letter-spacing:.17em;text-transform:uppercase;
+ color:var(--dim2)}
+.detring{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;
+ border:1.5px solid currentColor;box-shadow:0 0 10px currentColor,inset 0 0 6px currentColor;
+ pointer-events:none;opacity:.9}
+.detring::after{content:'';position:absolute;inset:10px;border-radius:50%;background:currentColor;
+ opacity:.55}
+.detname{color:var(--ink);font-weight:600;letter-spacing:.02em;text-transform:none;font-size:11px}
+/* "What this exercise works" — four columns of different kinds of statement, each one
+ * carrying the sentence that says what kind it is. The warrant line is not decoration: a
+ * ranked bar chart with no provenance beside it is exactly the object this whole application
+ * is trying not to be. */
+.anal{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:22px 26px}
+.analnone{grid-column:1/-1;margin:0;font-size:12px;line-height:1.6;color:var(--dim);
+ max-width:78ch}
+.analcol{min-width:0}
+.analcol h4{margin:0 0 4px;font-size:8.5px;letter-spacing:.17em;text-transform:uppercase;
+ color:#F0C08A;font-weight:600}
+.analwarrant{margin:0 0 11px;font-size:10px;line-height:1.55;color:var(--dim2);
+ border-left:1px solid rgba(150,185,230,.18);padding-left:9px}
+.analrow{display:grid;grid-template-columns:1fr auto;grid-auto-rows:min-content;gap:2px 8px;
+ width:100%;padding:6px 0;background:none;border:0;border-bottom:1px solid rgba(146,178,222,.07);
+ font:inherit;text-align:left;color:inherit}
+button.analrow{cursor:pointer}
+button.analrow:hover{background:rgba(146,178,222,.06)}
+.analrow.on{background:rgba(255,196,132,.09)}
+.analname{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--txt);
+ line-height:1.4;min-width:0}
+.analname i{width:7px;height:7px;border-radius:50%;flex:none}
+.analtier{flex:none;font-style:normal;font-size:8.5px;font-weight:700;color:#06121c;
+ padding:1px 4px;border-radius:2px}
+.analval{font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+.analbar{grid-column:1/-1;height:4px;background:rgba(150,185,230,.09);display:block}
+.analbar b{display:block;height:100%;background:#FFC98A}
+.analsub{grid-column:1/-1;font-size:10px;line-height:1.5;color:var(--dim2)}
+.analroots{display:flex;flex-wrap:wrap;gap:3px;margin:0 0 11px}
+/* A level chip is a button where a vertebra exists for it and a plain label where none does,
+ * so the two look the same at rest and only the clickable one lights up. Offering a chip that
+ * does nothing would be worse than offering none. */
+.analroots span,.analroots button{padding:2px 6px;background:rgba(146,178,222,.09);
+ border:1px solid var(--line);font:inherit;
+ font-size:9.5px;letter-spacing:.06em;color:var(--dim);font-variant-numeric:tabular-nums}
+.analroots button{cursor:pointer}
+.analroots button:hover{color:var(--ink);border-color:rgba(146,178,222,.4)}
+.analroots button[aria-current="true"]{color:#0a0f18;background:#F0C08A;border-color:#F0C08A}
+.analclaims{grid-column:1/-1;margin:4px 0 0;padding-top:16px;
+ border-top:1px solid var(--line)}
+.analclaims h4{margin:0 0 10px;font-size:8.5px;letter-spacing:.17em;text-transform:uppercase;
+ color:var(--dim2);font-weight:600}
+.analclaim{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin:0 0 11px;
+ align-items:start}
+.analclaim em{font-style:normal;font-size:9px;font-weight:700;color:#06121c;padding:2px 5px;
+ border-radius:2px;line-height:1.2}
+.analclaim p{margin:0;font-size:11.5px;line-height:1.55;color:var(--txt);max-width:88ch}
+.analclaim span{grid-column:2;font-size:10px;line-height:1.4;color:var(--dim2)}
+/* The readout under the fibre plot: what it drew, and how to pick a cell out of it. */
+.fibread{display:flex;align-items:center;gap:7px;flex-wrap:wrap;
+ margin:8px 0 0;font-size:10.5px;letter-spacing:.02em;color:var(--dim2);
+ font-variant-numeric:tabular-nums;min-height:15px}
+.fibread .fibdot{width:8px;height:8px;border-radius:50%;flex:none}
+.fibread .fibhit{color:var(--txt)}
+.fibread .fibhint{color:var(--dim2)}
+.fibreset{margin-left:auto}
+/* The evidence claims table. Not a chart: a chart of five bars told a reader the count of
+ * each tier and nothing about what any claim says, which read as a decorative number. This is
+ * every claim in the library with its effect size, its population, its caveat and its
+ * citation, grouped under the tier that earned it. The strip above is the shape of the whole
+ * distribution and is deliberately thin — worth a glance, not worth a panel. */
+.evsum{display:flex;gap:2px;margin:2px 0 14px;height:46px}
+.evseg{flex:1 1 0;min-width:34px;display:flex;flex-direction:column;justify-content:center;
+ align-items:center;gap:1px;color:#06121c}
+.evseg b{font-size:14px;font-weight:700;letter-spacing:.02em;line-height:1}
+.evseg span{font-size:8.5px;letter-spacing:.09em;text-transform:uppercase;opacity:.72}
+.evtable{display:flex;flex-direction:column}
+.evhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+ margin:16px 0 0;padding:9px 0 8px;border-bottom:1px solid var(--line)}
+.evhead:first-child{margin-top:0}
+.evhead b{flex:0 0 auto;width:20px;height:20px;display:flex;align-items:center;
+ justify-content:center;font-size:11px;font-weight:700;color:#06121c}
+.evhead span{font-size:13px;color:var(--txt);letter-spacing:-.1px}
+.evhead em{font-style:normal;font-size:10.5px;color:var(--dim2)}
+.evrow{padding:13px 0 14px 30px;border-bottom:1px solid rgba(146,178,222,.07)}
+.evclaim{margin:0;font-size:13px;line-height:1.55;color:var(--txt);max-width:78ch}
+.evfacts{display:flex;flex-wrap:wrap;gap:4px 26px;margin:9px 0 0}
+.evfacts div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.evfacts b{font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--dim2);
+ font-weight:600}
+.evfacts span{font-size:11.5px;color:var(--dim);line-height:1.45;max-width:44ch}
+.evcaveat{margin:10px 0 0;font-size:11.5px;line-height:1.6;color:var(--dim);max-width:78ch;
+ border-left:1px solid rgba(226,104,95,.45);padding-left:11px}
+.evcaveat b{display:block;font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;
+ color:rgba(226,104,95,.85);font-weight:600;margin-bottom:3px}
+.evcite{margin:9px 0 0;font-size:10.5px;line-height:1.5;color:var(--dim2);
+ font-variant-numeric:tabular-nums}
+.evstructs{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:9px 0 0}
+.evstructs>b{font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--dim2);
+ font-weight:600;margin-right:2px}
+.evstructs button{display:inline-flex;align-items:center;gap:6px;padding:3px 9px 3px 7px;
+ background:rgba(146,178,222,.06);border:1px solid var(--line);color:var(--dim);
+ font:inherit;font-size:11px;cursor:pointer}
+.evstructs button:hover{background:rgba(146,178,222,.13);color:var(--txt)}
+.evstructs button i{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
+.labnote{margin:10px 0 0;font-size:11px;line-height:1.6;color:var(--dim);
+ border-left:1px solid rgba(255,196,132,.28);padding-left:11px;max-width:820px}
+.labnote b{display:block;color:var(--dim2);font-weight:600;font-size:8.5px;letter-spacing:.15em;
+ text-transform:uppercase;margin-bottom:3px}
+.labnote b:not(:first-child){margin-top:9px}
+@media (max-width:900px){.labgrid{grid-template-columns:minmax(0,1fr)}}
+.labtabs{display:flex;gap:2px;margin:2px 0 0 26px;background:var(--glass);
+ border:1px solid var(--line);align-self:flex-start}
+.labtabs button{padding:7px 16px;background:transparent;border:0;color:var(--dim);
+ font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600}
+.labtabs button:hover{color:var(--txt)}
+.labtabs button[aria-selected="true"]{background:var(--line);color:var(--txt)}
+/* The reading page: a page, not a column. Two things make it readable — a measure that stops
+ * at a sane line length, and a card per entry so the eye can find one thing among thirty. */
+.labref{max-width:1500px;margin:0 auto;padding:20px 30px 48px}
+.refhead h3{margin:0 0 6px;font-size:15px;font-weight:600;color:var(--txt)}
+.refhead p{margin:0 0 22px;max-width:760px;font-size:12px;line-height:1.65;color:var(--dim)}
+.refgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:18px;
+ align-items:start}
+.refsec{background:rgba(146,178,222,.03);border:1px solid var(--line);
+ border-left:1px solid rgba(255,196,132,.28);padding:14px 16px 6px}
+.refsec h4{margin:0 0 12px;font-size:8.5px;letter-spacing:.17em;text-transform:uppercase;
+ color:var(--dim2);font-weight:600}
+.refcard{margin:0 0 14px;padding-bottom:12px;border-bottom:1px solid var(--hair)}
+.refsec .refcard:last-child{border-bottom:0}
+.refcard>b{display:block;font-size:12.5px;font-weight:600;color:var(--txt);margin-bottom:5px}
+.refcard em{display:block;font-style:normal;font-size:8px;letter-spacing:.15em;
+ text-transform:uppercase;color:var(--dim2);font-weight:600;margin:7px 0 2px}
+.refcard p{margin:0;font-size:11.5px;line-height:1.6;color:var(--dim)}
+.refsources{margin:34px 0 16px;font-size:15px;font-weight:600;color:var(--txt)}
+.refline{margin:0 0 7px;font-size:11px;line-height:1.6;color:var(--dim2)}
+
+.pickme{margin:0 0 14px;font-size:12px;color:var(--dim2);letter-spacing:.02em}
+/* Explore's structure list: a palette, not a paragraph. Two columns, so a hundred and ninety
+ * names take half the scroll, and the colour block leads because that is what a reader is
+ * matching against the picture. */
+.swatches{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;
+ background:var(--hair);border:1px solid var(--line);margin-bottom:16px}
+.swatch{display:flex;align-items:center;gap:7px;padding:6px 8px;background:#070d18;
+ border:0;text-align:left;min-width:0}
+.swatch:hover{background:var(--glass2)}
+.swatch[aria-current="true"]{background:rgba(255,196,132,.10)}
+.swatch i{width:9px;height:9px;flex:none;border-radius:2px}
+.swatch span{font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;
+ text-overflow:ellipsis;min-width:0}
+.swatch:hover span,.swatch[aria-current="true"] span{color:var(--txt)}
+#panelBody h3 em{font-style:normal;margin-left:7px;font-size:10px;color:var(--dim2);
+ font-weight:400;letter-spacing:.06em}
+
+/* the region network — see connectome.js */
+.connplot{position:relative;border:1px solid var(--line);
+ border-left:1px solid rgba(255,196,132,.35);background:rgba(8,13,23,.4);line-height:0}
+.conncanvas{display:block}
+.connread{margin:6px 0 8px;font-size:10.5px;color:var(--dim2);
+ font-variant-numeric:tabular-nums;letter-spacing:.02em}
+/* the plot: an instrument reading, so a hairline frame lit on one edge and nothing else.
+ * `.actplot` is what the canvas measures itself against, so it must not have padding. */
+.acthead{margin:12px 0 5px;font-size:8.5px;letter-spacing:.17em;text-transform:uppercase;
+ color:var(--dim2);font-weight:600}
+.actplot{position:relative;border:1px solid var(--line);
+ border-left:1px solid rgba(255,196,132,.42);background:rgba(10,16,26,.35);line-height:0}
+.actcanvas{display:block;cursor:crosshair}
+.actread{display:flex;flex-wrap:wrap;gap:2px 10px;margin-top:6px}
+.ard{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--dim);
+ white-space:nowrap}
+.ard i{width:7px;height:2px;flex:none}
+.ard em{font-style:normal;color:var(--txt);font-variant-numeric:tabular-nums;font-size:10px}
+.blk.small p{font-size:11.5px}
+.numrow{display:flex;gap:14px;flex-wrap:wrap;margin:7px 0 2px}
+.numrow>div{min-width:78px}
+.numrow .n{display:block;font-size:17px;font-weight:600;letter-spacing:-.4px;
+ font-variant-numeric:tabular-nums}
+.numrow .n em{font-style:normal;font-size:10.5px;color:var(--dim2);margin-left:2px}
+.numrow small{color:var(--dim2);font-size:10px;line-height:1.3;display:block}
+
+/* overlay */
+#overlay{position:fixed;inset:0;z-index:20;display:none;place-items:center;
+ background:rgba(4,6,11,.72);backdrop-filter:blur(3px);padding:24px}
+#overlay.on{display:grid}
+.card{background:var(--panel);border:1px solid var(--line2);border-radius:14px;
+ max-width:760px;width:100%;max-height:86vh;overflow:auto}
+.card.narrow{max-width:520px}
+.cbody{padding:22px 26px 20px}
+.cbody h2{margin:0 0 10px;font-size:19px}
+.cnav{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.cnav button{background:var(--glass);border:1px solid var(--line);color:var(--dim);
+ border-radius:4px;padding:8px 15px;font-size:12.5px}
+.cnav button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+
+/* Narrow enough that the disclaimers cannot sit on one line.
+ *
+ * They are the four lines that must not move, and on a phone every one of them was cut off
+ * mid-sentence — "A template body, not", "Group averages, not a prediction about". The cause
+ * was one property: `.disc` is `white-space:nowrap`, so the longest chip set a minimum content
+ * width of 476px for the whole page, the browser widened the layout viewport to fit it, and
+ * everything else — the view bar, the tabs, the language toggle, the structure labels — was
+ * pushed off the right of a 390px screen. Letting the chips wrap their own text removes the
+ * floor and the page is a real 390 again. */
+@media (max-width:640px){
+  #topbar{flex-wrap:wrap;gap:8px 10px;padding:8px 12px}
+  .wm{flex:1 1 auto}
+  .wm b{font-size:15px}
+  #langBtn{flex:none}
+  #bodyPick{margin-left:auto;flex:none}
+  #discBar{order:3;width:100%;margin-left:0;justify-content:flex-start;gap:5px}
+  .disc{white-space:normal;font-size:10.5px;padding:3px 9px;line-height:1.35}
+  /* it stays over the stage, but it may wrap rather than run off the side */
+  #viewbar{left:8px;top:8px;right:8px;flex-wrap:wrap;gap:4px}
+  #viewbar button{padding:4px 8px}
+  #tabs button{font-size:12px;padding:10px 4px}
+  #panelBody{padding:14px 12px 24px}
+}
+
+@media (max-width:1100px){
+ /* Under this width the console cannot float without covering the subject, so it docks to
+    the bottom half and the stage keeps the top. */
+ #panel{right:0;left:0;bottom:0;top:auto;width:auto;height:52vh;border-radius:0;
+  border-left:0;border-right:0;border-bottom:0}
+ #stage{bottom:52vh}
+ #layerbar{left:8px;bottom:8px;min-width:0}
+ /* Stacked, the panel is a couple of hundred pixels tall and the controls strip is a fixed
+    height, so the body was left with sixty of them and clipped its first heading in half.
+    Scroll the panel as one instead, and pin the tabs and the controls to its two edges so
+    neither scrolls out of reach. */
+ #panel{overflow:auto}
+ #panelBody{overflow:visible;flex:none}
+ #tabs{position:sticky;top:0;z-index:3;background:var(--panel)}
+ #controls{position:sticky;bottom:0;max-height:none;overflow:visible;background:#0a0e16}
+ .wm span{display:none}
+}
+</style></head><body>
+<div id="app">
+  <header id="topbar">
+    <div class="wm"><b id="title">Neuro Wellness</b><span id="subtitle"></span></div>
+    <div id="discBar"></div>
+    <span id="bodyPick"></span>
+    <button id="langBtn">한국어</button>
+  </header>
+
+  <div id="stage">
+    <canvas id="view"></canvas>
+    <div id="labels"></div>
+    <div id="viewbar">
+      <b id="viewsLabel">View</b>
+      <button id="vAnt"></button><button id="vPost"></button><button id="vLat"></button>
+      <button id="vSup"></button><button id="vHead"></button><button id="vAll"></button>
+      <button id="labBtn" class="labopen"></button>
+    </div>
+    <div id="layerbar">
+      <b id="layersLabel">Layers</b>
+      <div id="layerList"></div>
+    </div>
+    <!-- The section series. Real sections of the model's own surfaces — see sections.js.
+         Hidden until the brain is on, because there is nothing to cut otherwise. -->
+    <div id="sections" hidden>
+      <div class="secthead"><b id="sectLab">Sections</b><em id="sectPlane"></em></div>
+      <div class="sectwrap">
+        <button class="sectnav prev" id="sectPrev" tabindex="-1" aria-hidden="true">‹</button>
+        <div class="sectrow" id="sectRow"></div>
+        <button class="sectnav next" id="sectNext" tabindex="-1" aria-hidden="true">›</button>
+      </div>
+      <div class="sectlegend" id="sectLegend"></div>
+      <p class="sectnote" id="sectNote"></p>
+    </div>
+    <div id="orient"></div>
+    <div id="loading">Loading anatomy…</div>
+  </div>
+
+  <!-- The lab: the network and the movement off the stage and at full size. See lab.js. -->
+  <div id="lab" hidden></div>
+
+  <aside id="panel">
+    <nav id="tabs">
+      <button id="tabExplore" aria-selected="true"></button>
+      <button id="tabExercise"></button>
+      <button id="tabEvidence"></button>
+      <button id="tabAbout"></button>
+    </nav>
+    <div id="panelBody"></div>
+    <div id="controls">
+      <div class="seg">
+        <button id="mCut"></button>
+        <button id="mRot" aria-pressed="true"></button>
+        <button id="labToggle" class="tgl" aria-pressed="true"></button>
+        <button id="pDesc">↓ Motor</button>
+        <button id="pAsc">↑ Sensory</button>
+        <button id="pInt">◎ Breath</button>
+      </div>
+      <div class="crow"><label id="atlasLab"></label>
+        <input id="atlas" type="range" min="0" max="1" step="0.01" value="0"></div>
+      <div class="crow"><label id="xrayLab"></label>
+        <input id="xray" type="range" min="0" max="1" step="0.01" value="0"></div>
+      <!-- Two ways of drawing the cortex. Like the scan, it means nothing without the brain. -->
+      <div class="crow" id="lookRow" style="display:none"><label id="lookLab"></label>
+        <div class="seg"><button id="lookTissue" aria-pressed="true"></button>
+          <button id="lookAnat"></button><button id="lookNeurons"></button></div></div>
+      <p class="chelp" id="lookHelp" hidden></p>
+      <!-- The scan. It only means anything with the brain on, so the row hides itself. -->
+      <div class="crow" id="scanRow" style="display:none"><label id="scanLab"></label>
+        <div class="scanpick">
+          <!-- Each plane shows the cut it makes, on a head drawn in the view where that cut is
+               a line rather than the whole outline. Words alone did not land: "axial" and
+               "sweep" meant nothing, and a picture of the knife going in does. -->
+          <button id="scanSag" class="planebtn">
+            <svg viewBox="0 0 30 26" aria-hidden="true">
+              <ellipse cx="15" cy="14" rx="9" ry="10.5"/>
+              <path class="nose" d="M15 3.5 l2.6 3.4 h-5.2 z"/>
+              <line class="cut" x1="15" y1="1.5" x2="15" y2="24.5"/>
+            </svg><b></b><i></i></button>
+          <button id="scanCor" class="planebtn">
+            <svg viewBox="0 0 30 26" aria-hidden="true">
+              <ellipse cx="15" cy="14" rx="9" ry="10.5"/>
+              <path class="nose" d="M15 3.5 l2.6 3.4 h-5.2 z"/>
+              <line class="cut" x1="3" y1="14" x2="27" y2="14"/>
+            </svg><b></b><i></i></button>
+          <button id="scanAx" class="planebtn">
+            <svg viewBox="0 0 30 26" aria-hidden="true">
+              <path d="M8 22 v-6 a7.5 8.5 0 0 1 15 -1 q1.6 2 1.6 3.2 l-1.8 .4 v3.4 z"/>
+              <path class="nose" d="M24.8 15.6 l3 1.6 -3 1.6 z"/>
+              <line class="cut" x1="4" y1="15.5" x2="27" y2="15.5"/>
+            </svg><b></b><i></i></button>
+        </div></div>
+      <div class="crow" id="scanOffRow" style="display:none"><label></label>
+        <div class="seg"><button id="scanOff" aria-pressed="true"></button>
+          <button id="scanSweep" class="tgl"></button></div></div>
+      <p class="chelp" id="scanHelp" hidden></p>
+      <div class="crow" id="scanAtRow" style="display:none"><label id="scanAtLab"></label>
+        <input id="scanAt" type="range" min="-1" max="1" step="0.005" value="0"></div>
+      <div class="crow" id="clipRow" style="display:none"><label id="clipLab"></label>
+        <input id="clip" type="range" min="-0.35" max="0.35" step="0.005" value="0.5"></div>
+      <div class="crow"><label id="registerLab"></label>
+        <div class="seg"><button id="regPlain"></button><button id="regClinical"></button>
+          <button id="regBoth" aria-pressed="true"></button></div></div>
+      <div class="crow"><label id="instrLab"></label>
+        <button id="instrToggle" class="tgl" aria-pressed="true">on</button>
+        <button id="reset" class="tgl"></button></div>
+      <div id="pathPanel"></div>
+    </div>
+  </aside>
+</div>
+<div id="overlay"></div>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
+<script type="module" src="./src/main.js"></script>
+<!-- The session layer. With no ?session= in the URL this does nothing at all and
+     the application is exactly what it was; with one, the body shows a person.
+     This line and one getter added to `gfx` in src/main.js are the whole patch
+     against upstream -- see web/VENDOR.md. -->
+<script type="module" src="./src/session/boot.js"></script>
+</body></html>

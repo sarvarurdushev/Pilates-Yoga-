@@ -1,0 +1,41 @@
+{
+  "name": "neuro-wellness",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "npx http-server . -p 8080 -c-1",
+    "test": "node --test test/frame.test.mjs test/palette.test.mjs test/content.test.mjs test/library.test.mjs test/skin.test.mjs test/rig.test.mjs test/bind.test.mjs test/bodies.test.mjs",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test:render": "node test/render/capture.mjs",
+    "test:render:diff": "node test/render/compare.mjs",
+    "test:smoke": "node test/smoke.mjs",
+    "poses": "node tools/posesheet.mjs .render/poses.html",
+    "poses:check": "node tools/check.mjs",
+    "poses:solve": "node tools/solve.mjs --all",
+    "shots": "node tools/appshots.mjs",
+    "hands": "node tools/hands.mjs",
+    "skinbench": "node tools/skinbench.mjs",
+    "build:body": "python3 scripts/derive_frame.py --write && python3 scripts/build_body.py",
+    "fetch:body": "bash scripts/fetch_bodyparts3d.sh",
+    "build:rig": "python3 scripts/parse_opensim.py",
+    "build:spine": "python3 scripts/build_spine.py",
+    "build:joints": "node tools/fitjoints.mjs --write",
+    "joints": "node tools/fitjoints.mjs",
+    "build:nerves": "python3 scripts/build_nervous.py",
+    "build:shell": "python3 scripts/build_shell.py",
+    "bloomsweep": "node tools/bloomsweep.mjs"
+  },
+  "dependencies": {
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "@gltf-transform/core": "^4.0.0",
+    "@gltf-transform/extensions": "^4.0.0",
+    "@gltf-transform/functions": "^4.0.0",
+    "meshoptimizer": "^0.22.0",
+    "playwright": "^1.56.1",
+    "vite": "^5.4.0"
+  }
+}

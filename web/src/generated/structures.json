@@ -1,0 +1,12972 @@
+{
+ "source": "BodyParts3D 3.0 (20110915), 99% reduction",
+ "attribution": "BodyParts3D, (c) The Database Center for Life Science licensed under CC Attribution-Share Alike 2.1 Japan",
+ "licence": "CC BY-SA 2.1 JP",
+ "idBase": 100,
+ "frame": {
+  "center": [
+   1.7804999999999964,
+   902.3695,
+   152.115
+  ],
+  "scale": 0.0006041461949211242,
+  "heightMm": 1655.2285,
+  "note": "archive mm -> canonical: X=x, Y=z, Z=-y, then (p-center)*scale"
+ },
+ "structures": [
+  {
+   "id": 100,
+   "name": "atlas",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA12519"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2158,
+   "centroid": [
+    -0.00095,
+    0.3489,
+    -0.04362
+   ],
+   "perSide": {
+    "M": [
+     -0.00095,
+     0.3489,
+     -0.04362
+    ]
+   }
+  },
+  {
+   "id": 101,
+   "name": "axis",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA12520"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2370,
+   "centroid": [
+    -0.00054,
+    0.33919,
+    -0.04395
+   ],
+   "perSide": {
+    "M": [
+     -0.00054,
+     0.33919,
+     -0.04395
+    ]
+   }
+  },
+  {
+   "id": 102,
+   "name": "body of sternum",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA7487"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.0002,
+    0.20505,
+    0.02109
+   ],
+   "perSide": {
+    "M": [
+     0.0002,
+     0.20505,
+     0.02109
+    ]
+   }
+  },
+  {
+   "id": 103,
+   "name": "calcaneus",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24497",
+    "FMA24498"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2400,
+   "centroid": [
+    0.00099,
+    -0.52739,
+    -0.05917
+   ],
+   "perSide": {
+    "L": [
+     0.0487,
+     -0.52705,
+     -0.05845
+    ],
+    "R": [
+     -0.05085,
+     -0.52776,
+     -0.05995
+    ]
+   }
+  },
+  {
+   "id": 104,
+   "name": "capitate",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24446",
+    "FMA24447"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 830,
+   "centroid": [
+    -0.00653,
+    -0.0597,
+    -0.0221
+   ],
+   "perSide": {
+    "L": [
+     0.15279,
+     -0.06014,
+     -0.02244
+    ],
+    "R": [
+     -0.15625,
+     -0.05929,
+     -0.02178
+    ]
+   }
+  },
+  {
+   "id": 105,
+   "name": "clavicle",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13322",
+    "FMA13323"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2294,
+   "centroid": [
+    -0.0012,
+    0.27141,
+    -0.03167
+   ],
+   "perSide": {
+    "L": [
+     0.0449,
+     0.27143,
+     -0.03186
+    ],
+    "R": [
+     -0.04754,
+     0.27139,
+     -0.03147
+    ]
+   }
+  },
+  {
+   "id": 106,
+   "name": "cuboid bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24528",
+    "FMA24529"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1794,
+   "centroid": [
+    -0.00387,
+    -0.52798,
+    -0.03692
+   ],
+   "perSide": {
+    "L": [
+     0.05662,
+     -0.52794,
+     -0.03679
+    ],
+    "R": [
+     -0.05983,
+     -0.52802,
+     -0.03704
+    ]
+   }
+  },
+  {
+   "id": 107,
+   "name": "distal phalanx of big toe",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA32650",
+    "FMA32651"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 970,
+   "centroid": [
+    0.00295,
+    -0.54507,
+    0.03825
+   ],
+   "perSide": {
+    "L": [
+     0.04821,
+     -0.54523,
+     0.03822
+    ],
+    "R": [
+     -0.05148,
+     -0.54488,
+     0.03828
+    ]
+   }
+  },
+  {
+   "id": 108,
+   "name": "distal phalanx of fourth toe",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA32656",
+    "FMA32657"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 510,
+   "centroid": [
+    0.00206,
+    -0.54588,
+    0.03096
+   ],
+   "perSide": {
+    "L": [
+     0.07871,
+     -0.54586,
+     0.03098
+    ],
+    "R": [
+     -0.08139,
+     -0.5459,
+     0.03094
+    ]
+   }
+  },
+  {
+   "id": 109,
+   "name": "distal phalanx of index finger",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA23953",
+    "FMA24460"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 538,
+   "centroid": [
+    0.03863,
+    -0.13464,
+    0.01327
+   ],
+   "perSide": {
+    "L": [
+     0.18394,
+     -0.13473,
+     0.01334
+    ],
+    "R": [
+     -0.1868,
+     -0.13452,
+     0.01316
+    ]
+   }
+  },
+  {
+   "id": 110,
+   "name": "distal phalanx of little finger",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA23959",
+    "FMA24463"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 376,
+   "centroid": [
+    0.00396,
+    -0.12631,
+    0.01198
+   ],
+   "perSide": {
+    "L": [
+     0.13301,
+     -0.12635,
+     0.01193
+    ],
+    "R": [
+     -0.13618,
+     -0.12626,
+     0.01203
+    ]
+   }
+  },
+  {
+   "id": 111,
+   "name": "distal phalanx of little toe",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA32658",
+    "FMA32659"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 494,
+   "centroid": [
+    0.01052,
+    -0.54612,
+    0.02062
+   ],
+   "perSide": {
+    "L": [
+     0.08467,
+     -0.54618,
+     0.02059
+    ],
+    "R": [
+     -0.08744,
+     -0.54604,
+     0.02066
+    ]
+   }
+  },
+  {
+   "id": 112,
+   "name": "distal phalanx of middle finger",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA23955",
+    "FMA24461"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 440,
+   "centroid": [
+    0.03284,
+    -0.13988,
+    0.01817
+   ],
+   "perSide": {
+    "L": [
+     0.16558,
+     -0.13973,
+     0.01785
+    ],
+    "R": [
+     -0.16851,
+     -0.1401,
+     0.01865
+    ]
+   }
+  },
+  {
+   "id": 113,
+   "name": "distal phalanx of ring finger",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA23957",
+    "FMA24462"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 304,
+   "centroid": [
+    0.03705,
+    -0.1344,
+    0.01801
+   ],
+   "perSide": {
+    "L": [
+     0.14916,
+     -0.13422,
+     0.01766
+    ],
+    "R": [
+     -0.15237,
+     -0.13471,
+     0.01861
+    ]
+   }
+  },
+  {
+   "id": 114,
+   "name": "distal phalanx of second toe",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA32652",
+    "FMA32653"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 520,
+   "centroid": [
+    0.01278,
+    -0.54553,
+    0.04323
+   ],
+   "perSide": {
+    "L": [
+     0.06171,
+     -0.54546,
+     0.04318
+    ],
+    "R": [
+     -0.06494,
+     -0.54565,
+     0.04332
+    ]
+   }
+  },
+  {
+   "id": 115,
+   "name": "distal phalanx of third toe",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA32654",
+    "FMA32655"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 520,
+   "centroid": [
+    -0.0013,
+    -0.54581,
+    0.03953
+   ],
+   "perSide": {
+    "L": [
+     0.07102,
+     -0.54587,
+     0.0394
+    ],
+    "R": [
+     -0.07361,
+     -0.54576,
+     0.03966
+    ]
+   }
+  },
+  {
+   "id": 116,
+   "name": "distal phalanx of thumb",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA23951",
+    "FMA24459"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 480,
+   "centroid": [
+    0.02269,
+    -0.09738,
+    0.0064
+   ],
+   "perSide": {
+    "L": [
+     0.1906,
+     -0.09799,
+     0.00683
+    ],
+    "R": [
+     -0.19274,
+     -0.09659,
+     0.00584
+    ]
+   }
+  },
+  {
+   "id": 117,
+   "name": "eighth rib",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA8283",
+    "FMA8310"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    -0.00289,
+    0.16222,
+    -0.0535
+   ],
+   "perSide": {
+    "L": [
+     0.04614,
+     0.1629,
+     -0.05364
+    ],
+    "R": [
+     -0.05183,
+     0.16155,
+     -0.05336
+    ]
+   }
+  },
+  {
+   "id": 118,
+   "name": "eighth thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA9991"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1422,
+   "centroid": [
+    -0.00148,
+    0.18553,
+    -0.07469
+   ],
+   "perSide": {
+    "M": [
+     -0.00148,
+     0.18553,
+     -0.07469
+    ]
+   }
+  },
+  {
+   "id": 119,
+   "name": "eleventh rib",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA8531",
+    "FMA8532"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00292,
+    0.10869,
+    -0.05896
+   ],
+   "perSide": {
+    "L": [
+     0.03859,
+     0.10961,
+     -0.05887
+    ],
+    "R": [
+     -0.04443,
+     0.10778,
+     -0.05906
+    ]
+   }
+  },
+  {
+   "id": 120,
+   "name": "eleventh thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA10059"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1658,
+   "centroid": [
+    -0.0014,
+    0.13316,
+    -0.06462
+   ],
+   "perSide": {
+    "M": [
+     -0.0014,
+     0.13316,
+     -0.06462
+    ]
+   }
+  },
+  {
+   "id": 121,
+   "name": "ethmoid",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA52740"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00166,
+    0.37535,
+    0.00011
+   ],
+   "perSide": {
+    "M": [
+     -0.00166,
+     0.37535,
+     0.00011
+    ]
+   }
+  },
+  {
+   "id": 122,
+   "name": "eyeball",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA12513"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.0053,
+    0.37748,
+    0.00407
+   ],
+   "perSide": {
+    "M": [
+     -0.0053,
+     0.37748,
+     0.00407
+    ]
+   }
+  },
+  {
+   "id": 123,
+   "name": "femur",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24474",
+    "FMA24475"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.00085,
+    -0.15692,
+    -0.04417
+   ],
+   "perSide": {
+    "L": [
+     0.05438,
+     -0.15274,
+     -0.04386
+    ],
+    "R": [
+     -0.05268,
+     -0.16109,
+     -0.04447
+    ]
+   }
+  },
+  {
+   "id": 124,
+   "name": "fibula",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24480",
+    "FMA24481"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1900,
+   "centroid": [
+    0.00045,
+    -0.41731,
+    -0.05955
+   ],
+   "perSide": {
+    "L": [
+     0.06351,
+     -0.41403,
+     -0.0594
+    ],
+    "R": [
+     -0.06614,
+     -0.42077,
+     -0.05971
+    ]
+   }
+  },
+  {
+   "id": 125,
+   "name": "fifth cervical vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA12523"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2102,
+   "centroid": [
+    -0.0019,
+    0.31234,
+    -0.04506
+   ],
+   "perSide": {
+    "M": [
+     -0.0019,
+     0.31234,
+     -0.04506
+    ]
+   }
+  },
+  {
+   "id": 126,
+   "name": "fifth costal cartilage",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA8070",
+    "FMA8112"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2098,
+   "centroid": [
+    -0.00244,
+    0.18319,
+    0.02651
+   ],
+   "perSide": {
+    "L": [
+     0.02712,
+     0.18332,
+     0.02653
+    ],
+    "R": [
+     -0.03021,
+     0.18306,
+     0.02649
+    ]
+   }
+  },
+  {
+   "id": 127,
+   "name": "fifth lumbar vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13076"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00015,
+    0.02402,
+    -0.05278
+   ],
+   "perSide": {
+    "M": [
+     -0.00015,
+     0.02402,
+     -0.05278
+    ]
+   }
+  },
+  {
+   "id": 128,
+   "name": "fifth metacarpal bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24472",
+    "FMA24473"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 884,
+   "centroid": [
+    0.00016,
+    -0.08219,
+    -0.01383
+   ],
+   "perSide": {
+    "L": [
+     0.1403,
+     -0.08357,
+     -0.01373
+    ],
+    "R": [
+     -0.1438,
+     -0.08078,
+     -0.01393
+    ]
+   }
+  },
+  {
+   "id": 129,
+   "name": "fifth metatarsal bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24515",
+    "FMA24516"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1536,
+   "centroid": [
+    0.00407,
+    -0.53886,
+    -0.01831
+   ],
+   "perSide": {
+    "L": [
+     0.07088,
+     -0.53891,
+     -0.01802
+    ],
+    "R": [
+     -0.0736,
+     -0.53881,
+     -0.01865
+    ]
+   }
+  },
+  {
+   "id": 130,
+   "name": "fifth rib",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA8066",
+    "FMA8093"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    -0.00303,
+    0.21905,
+    -0.04636
+   ],
+   "perSide": {
+    "L": [
+     0.04361,
+     0.22009,
+     -0.04758
+    ],
+    "R": [
+     -0.04975,
+     0.21801,
+     -0.04513
+    ]
+   }
+  },
+  {
+   "id": 131,
+   "name": "fifth thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA9922"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2082,
+   "centroid": [
+    -0.00133,
+    0.23749,
+    -0.07436
+   ],
+   "perSide": {
+    "M": [
+     -0.00133,
+     0.23749,
+     -0.07436
+    ]
+   }
+  },
+  {
+   "id": 132,
+   "name": "first costal cartilage",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA7875",
+    "FMA8005"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1008,
+   "centroid": [
+    -0.00241,
+    0.25963,
+    -0.01088
+   ],
+   "perSide": {
+    "L": [
+     0.02064,
+     0.2593,
+     -0.01035
+    ],
+    "R": [
+     -0.02261,
+     0.25993,
+     -0.01134
+    ]
+   }
+  },
+  {
+   "id": 133,
+   "name": "first lumbar vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13072"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00066,
+    0.09401,
+    -0.05477
+   ],
+   "perSide": {
+    "M": [
+     -0.00066,
+     0.09401,
+     -0.05477
+    ]
+   }
+  },
+  {
+   "id": 134,
+   "name": "first metacarpal bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24464",
+    "FMA24465"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1070,
+   "centroid": [
+    -0.00931,
+    -0.07029,
+    -0.00904
+   ],
+   "perSide": {
+    "L": [
+     0.17555,
+     -0.06941,
+     -0.00926
+    ],
+    "R": [
+     -0.17905,
+     -0.07109,
+     -0.00883
+    ]
+   }
+  },
+  {
+   "id": 135,
+   "name": "first metatarsal bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24507",
+    "FMA24508"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2020,
+   "centroid": [
+    1e-05,
+    -0.53371,
+    -0.001
+   ],
+   "perSide": {
+    "L": [
+     0.04296,
+     -0.53415,
+     -0.00022
+    ],
+    "R": [
+     -0.04591,
+     -0.53324,
+     -0.00184
+    ]
+   }
+  },
+  {
+   "id": 136,
+   "name": "first rib",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA7857",
+    "FMA7987"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00219,
+    0.27924,
+    -0.03698
+   ],
+   "perSide": {
+    "L": [
+     0.02273,
+     0.27958,
+     -0.03746
+    ],
+    "R": [
+     -0.02712,
+     0.27891,
+     -0.03651
+    ]
+   }
+  },
+  {
+   "id": 137,
+   "name": "first thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA9165"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1706,
+   "centroid": [
+    -0.00188,
+    0.28839,
+    -0.05434
+   ],
+   "perSide": {
+    "M": [
+     -0.00188,
+     0.28839,
+     -0.05434
+    ]
+   }
+  },
+  {
+   "id": 138,
+   "name": "fourth cervical vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA12522"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1740,
+   "centroid": [
+    -0.00171,
+    0.32099,
+    -0.04365
+   ],
+   "perSide": {
+    "M": [
+     -0.00171,
+     0.32099,
+     -0.04365
+    ]
+   }
+  },
+  {
+   "id": 139,
+   "name": "fourth costal cartilage",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA7976",
+    "FMA8167"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1496,
+   "centroid": [
+    -0.00359,
+    0.20171,
+    0.02057
+   ],
+   "perSide": {
+    "L": [
+     0.02167,
+     0.20207,
+     0.02068
+    ],
+    "R": [
+     -0.02622,
+     0.20139,
+     0.02048
+    ]
+   }
+  },
+  {
+   "id": 140,
+   "name": "fourth lumbar vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13075"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.00031,
+    0.04103,
+    -0.04974
+   ],
+   "perSide": {
+    "M": [
+     0.00031,
+     0.04103,
+     -0.04974
+    ]
+   }
+  },
+  {
+   "id": 141,
+   "name": "fourth metacarpal bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24470",
+    "FMA24471"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1006,
+   "centroid": [
+    -0.0107,
+    -0.0827,
+    -0.01713
+   ],
+   "perSide": {
+    "L": [
+     0.14865,
+     -0.08441,
+     -0.01676
+    ],
+    "R": [
+     -0.15168,
+     -0.08118,
+     -0.01746
+    ]
+   }
+  },
+  {
+   "id": 142,
+   "name": "fourth metatarsal bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24513",
+    "FMA24514"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1280,
+   "centroid": [
+    0.00403,
+    -0.5348,
+    -0.01293
+   ],
+   "perSide": {
+    "L": [
+     0.0652,
+     -0.53533,
+     -0.01148
+    ],
+    "R": [
+     -0.06699,
+     -0.53419,
+     -0.01461
+    ]
+   }
+  },
+  {
+   "id": 143,
+   "name": "fourth rib",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA7957",
+    "FMA8148"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00023,
+    0.23636,
+    -0.04241
+   ],
+   "perSide": {
+    "L": [
+     0.04343,
+     0.23537,
+     -0.04148
+    ],
+    "R": [
+     -0.0439,
+     0.23735,
+     -0.04334
+    ]
+   }
+  },
+  {
+   "id": 144,
+   "name": "fourth thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA9248"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1892,
+   "centroid": [
+    -0.00213,
+    0.25211,
+    -0.07147
+   ],
+   "perSide": {
+    "M": [
+     -0.00213,
+     0.25211,
+     -0.07147
+    ]
+   }
+  },
+  {
+   "id": 145,
+   "name": "frontal bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA52734"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.0026,
+    0.40358,
+    -0.00466
+   ],
+   "perSide": {
+    "M": [
+     0.0026,
+     0.40358,
+     -0.00466
+    ]
+   }
+  },
+  {
+   "id": 146,
+   "name": "hamate",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24448",
+    "FMA24449"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 974,
+   "centroid": [
+    -0.01213,
+    -0.06199,
+    -0.02067
+   ],
+   "perSide": {
+    "L": [
+     0.14662,
+     -0.06178,
+     -0.02052
+    ],
+    "R": [
+     -0.14975,
+     -0.06216,
+     -0.02081
+    ]
+   }
+  },
+  {
+   "id": 147,
+   "name": "hip bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA16586",
+    "FMA16587"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00075,
+    -0.02826,
+    -0.04045
+   ],
+   "perSide": {
+    "L": [
+     0.03852,
+     -0.02783,
+     -0.04056
+    ],
+    "R": [
+     -0.04002,
+     -0.02869,
+     -0.04033
+    ]
+   }
+  },
+  {
+   "id": 148,
+   "name": "humerus",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA23130",
+    "FMA23131"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -2e-05,
+    0.17208,
+    -0.05026
+   ],
+   "perSide": {
+    "L": [
+     0.1149,
+     0.16833,
+     -0.05075
+    ],
+    "R": [
+     -0.11493,
+     0.17582,
+     -0.04978
+    ]
+   }
+  },
+  {
+   "id": 149,
+   "name": "hyoid bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA52749"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1166,
+   "centroid": [
+    -0.00205,
+    0.32561,
+    -0.01847
+   ],
+   "perSide": {
+    "M": [
+     -0.00205,
+     0.32561,
+     -0.01847
+    ]
+   }
+  },
+  {
+   "id": 150,
+   "name": "inferior nasal concha",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA54737",
+    "FMA54738"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1058,
+   "centroid": [
+    -0.00149,
+    0.36143,
+    0.0029
+   ],
+   "perSide": {
+    "L": [
+     0.00326,
+     0.36156,
+     0.00378
+    ],
+    "R": [
+     -0.00708,
+     0.36127,
+     0.00186
+    ]
+   }
+  },
+  {
+   "id": 151,
+   "name": "intermediate cuneiform bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24523",
+    "FMA24524"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 972,
+   "centroid": [
+    0.00277,
+    -0.51914,
+    -0.02635
+   ],
+   "perSide": {
+    "L": [
+     0.04868,
+     -0.51928,
+     -0.0264
+    ],
+    "R": [
+     -0.0522,
+     -0.51897,
+     -0.02628
+    ]
+   }
+  },
+  {
+   "id": 152,
+   "name": "interosseous membrane of forearm",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA23707",
+    "FMA23708"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    -0.00189,
+    0.00073,
+    -0.03615
+   ],
+   "perSide": {
+    "L": [
+     0.14353,
+     -0.00063,
+     -0.03583
+    ],
+    "R": [
+     -0.14547,
+     0.00207,
+     -0.03645
+    ]
+   }
+  },
+  {
+   "id": 153,
+   "name": "interosseous membrane of leg",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA35192",
+    "FMA35193"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    -0.00089,
+    -0.40543,
+    -0.05255
+   ],
+   "perSide": {
+    "L": [
+     0.05666,
+     -0.40541,
+     -0.05283
+    ],
+    "R": [
+     -0.05871,
+     -0.40546,
+     -0.05227
+    ]
+   }
+  },
+  {
+   "id": 154,
+   "name": "intervertebral disk of axis",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA25058"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 674,
+   "centroid": [
+    -0.00187,
+    0.33524,
+    -0.03866
+   ],
+   "perSide": {
+    "M": [
+     -0.00187,
+     0.33524,
+     -0.03866
+    ]
+   }
+  },
+  {
+   "id": 155,
+   "name": "intervertebral disk of eighth thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13505"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2286,
+   "centroid": [
+    -0.00268,
+    0.18033,
+    -0.05961
+   ],
+   "perSide": {
+    "M": [
+     -0.00268,
+     0.18033,
+     -0.05961
+    ]
+   }
+  },
+  {
+   "id": 156,
+   "name": "intervertebral disk of eleventh thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13508"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.00013,
+    0.12802,
+    -0.04651
+   ],
+   "perSide": {
+    "M": [
+     0.00013,
+     0.12802,
+     -0.04651
+    ]
+   }
+  },
+  {
+   "id": 157,
+   "name": "intervertebral disk of fifth cervical vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13898"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 770,
+   "centroid": [
+    -0.00264,
+    0.30722,
+    -0.03866
+   ],
+   "perSide": {
+    "M": [
+     -0.00264,
+     0.30722,
+     -0.03866
+    ]
+   }
+  },
+  {
+   "id": 158,
+   "name": "intervertebral disk of fifth lumbar vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA16037"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.00055,
+    0.00969,
+    -0.04288
+   ],
+   "perSide": {
+    "M": [
+     0.00055,
+     0.00969,
+     -0.04288
+    ]
+   }
+  },
+  {
+   "id": 159,
+   "name": "intervertebral disk of fifth thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13502"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1644,
+   "centroid": [
+    -0.00204,
+    0.22796,
+    -0.06374
+   ],
+   "perSide": {
+    "M": [
+     -0.00204,
+     0.22796,
+     -0.06374
+    ]
+   }
+  },
+  {
+   "id": 160,
+   "name": "intervertebral disk of first lumbar vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA16033"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.00033,
+    0.08995,
+    -0.03654
+   ],
+   "perSide": {
+    "M": [
+     0.00033,
+     0.08995,
+     -0.03654
+    ]
+   }
+  },
+  {
+   "id": 161,
+   "name": "intervertebral disk of first thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA10458"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 958,
+   "centroid": [
+    -0.00313,
+    0.28075,
+    -0.04906
+   ],
+   "perSide": {
+    "M": [
+     -0.00313,
+     0.28075,
+     -0.04906
+    ]
+   }
+  },
+  {
+   "id": 162,
+   "name": "intervertebral disk of fourth cervical vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13897"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 786,
+   "centroid": [
+    -0.00163,
+    0.31668,
+    -0.03757
+   ],
+   "perSide": {
+    "M": [
+     -0.00163,
+     0.31668,
+     -0.03757
+    ]
+   }
+  },
+  {
+   "id": 163,
+   "name": "intervertebral disk of fourth lumbar vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA16036"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.00097,
+    0.03021,
+    -0.03682
+   ],
+   "perSide": {
+    "M": [
+     0.00097,
+     0.03021,
+     -0.03682
+    ]
+   }
+  },
+  {
+   "id": 164,
+   "name": "intervertebral disk of fourth thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13501"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1412,
+   "centroid": [
+    -0.00252,
+    0.2433,
+    -0.06251
+   ],
+   "perSide": {
+    "M": [
+     -0.00252,
+     0.2433,
+     -0.06251
+    ]
+   }
+  },
+  {
+   "id": 165,
+   "name": "intervertebral disk of ninth thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13506"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1122,
+   "centroid": [
+    -0.00244,
+    0.16291,
+    -0.05499
+   ],
+   "perSide": {
+    "M": [
+     -0.00244,
+     0.16291,
+     -0.05499
+    ]
+   }
+  },
+  {
+   "id": 166,
+   "name": "intervertebral disk of second lumbar vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA16034"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00031,
+    0.07092,
+    -0.03364
+   ],
+   "perSide": {
+    "M": [
+     -0.00031,
+     0.07092,
+     -0.03364
+    ]
+   }
+  },
+  {
+   "id": 167,
+   "name": "intervertebral disk of second thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13495"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1112,
+   "centroid": [
+    -0.00254,
+    0.26906,
+    -0.05353
+   ],
+   "perSide": {
+    "M": [
+     -0.00254,
+     0.26906,
+     -0.05353
+    ]
+   }
+  },
+  {
+   "id": 168,
+   "name": "intervertebral disk of seventh cervical vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13900"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 876,
+   "centroid": [
+    -0.0038,
+    0.29053,
+    -0.04516
+   ],
+   "perSide": {
+    "M": [
+     -0.0038,
+     0.29053,
+     -0.04516
+    ]
+   }
+  },
+  {
+   "id": 169,
+   "name": "intervertebral disk of seventh thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13504"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2326,
+   "centroid": [
+    -0.00232,
+    0.19597,
+    -0.06203
+   ],
+   "perSide": {
+    "M": [
+     -0.00232,
+     0.19597,
+     -0.06203
+    ]
+   }
+  },
+  {
+   "id": 170,
+   "name": "intervertebral disk of sixth cervical vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13899"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 724,
+   "centroid": [
+    -0.00216,
+    0.29908,
+    -0.04214
+   ],
+   "perSide": {
+    "M": [
+     -0.00216,
+     0.29908,
+     -0.04214
+    ]
+   }
+  },
+  {
+   "id": 171,
+   "name": "intervertebral disk of sixth thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13503"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2028,
+   "centroid": [
+    -0.00249,
+    0.21264,
+    -0.06466
+   ],
+   "perSide": {
+    "M": [
+     -0.00249,
+     0.21264,
+     -0.06466
+    ]
+   }
+  },
+  {
+   "id": 172,
+   "name": "intervertebral disk of tenth thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13507"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.0013,
+    0.14591,
+    -0.0517
+   ],
+   "perSide": {
+    "M": [
+     -0.0013,
+     0.14591,
+     -0.0517
+    ]
+   }
+  },
+  {
+   "id": 173,
+   "name": "intervertebral disk of third cervical vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13896"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 674,
+   "centroid": [
+    -0.00131,
+    0.32618,
+    -0.03855
+   ],
+   "perSide": {
+    "M": [
+     -0.00131,
+     0.32618,
+     -0.03855
+    ]
+   }
+  },
+  {
+   "id": 174,
+   "name": "intervertebral disk of third lumbar vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA16035"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.00068,
+    0.05011,
+    -0.03276
+   ],
+   "perSide": {
+    "M": [
+     0.00068,
+     0.05011,
+     -0.03276
+    ]
+   }
+  },
+  {
+   "id": 175,
+   "name": "intervertebral disk of third thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13500"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1158,
+   "centroid": [
+    -0.0022,
+    0.25678,
+    -0.0584
+   ],
+   "perSide": {
+    "M": [
+     -0.0022,
+     0.25678,
+     -0.0584
+    ]
+   }
+  },
+  {
+   "id": 176,
+   "name": "intervertebral disk of twelfth thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13509"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.00056,
+    0.10906,
+    -0.04199
+   ],
+   "perSide": {
+    "M": [
+     0.00056,
+     0.10906,
+     -0.04199
+    ]
+   }
+  },
+  {
+   "id": 177,
+   "name": "lateral cuneiform bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24525",
+    "FMA24526"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1306,
+   "centroid": [
+    0.00174,
+    -0.5229,
+    -0.02909
+   ],
+   "perSide": {
+    "L": [
+     0.05437,
+     -0.52277,
+     -0.02882
+    ],
+    "R": [
+     -0.05717,
+     -0.52304,
+     -0.0294
+    ]
+   }
+  },
+  {
+   "id": 178,
+   "name": "long plantar ligament",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA44249",
+    "FMA44250"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.0018,
+    -0.53479,
+    -0.03811
+   ],
+   "perSide": {
+    "L": [
+     0.04909,
+     -0.53494,
+     -0.03797
+    ],
+    "R": [
+     -0.05067,
+     -0.53463,
+     -0.03824
+    ]
+   }
+  },
+  {
+   "id": 179,
+   "name": "lunate",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24437",
+    "FMA24438"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 646,
+   "centroid": [
+    -0.00523,
+    -0.05398,
+    -0.02237
+   ],
+   "perSide": {
+    "L": [
+     0.147,
+     -0.05411,
+     -0.0218
+    ],
+    "R": [
+     -0.1493,
+     -0.05385,
+     -0.02292
+    ]
+   }
+  },
+  {
+   "id": 180,
+   "name": "mandible",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA52748"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2148,
+   "centroid": [
+    -0.00138,
+    0.34636,
+    -0.00733
+   ],
+   "perSide": {
+    "M": [
+     -0.00138,
+     0.34636,
+     -0.00733
+    ]
+   }
+  },
+  {
+   "id": 181,
+   "name": "manubrium",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA7486"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00044,
+    0.25244,
+    -0.00036
+   ],
+   "perSide": {
+    "M": [
+     -0.00044,
+     0.25244,
+     -0.00036
+    ]
+   }
+  },
+  {
+   "id": 182,
+   "name": "maxilla",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA53649",
+    "FMA53650"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    -0.00058,
+    0.35882,
+    0.00519
+   ],
+   "perSide": {
+    "L": [
+     0.01014,
+     0.35796,
+     0.00465
+    ],
+    "R": [
+     -0.01136,
+     0.35969,
+     0.00573
+    ]
+   }
+  },
+  {
+   "id": 183,
+   "name": "medial cuneiform bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24521",
+    "FMA24522"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1832,
+   "centroid": [
+    0.00027,
+    -0.52285,
+    -0.02277
+   ],
+   "perSide": {
+    "L": [
+     0.04216,
+     -0.5228,
+     -0.02256
+    ],
+    "R": [
+     -0.04523,
+     -0.52291,
+     -0.023
+    ]
+   }
+  },
+  {
+   "id": 184,
+   "name": "middle phalanx of fourth toe",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA32646",
+    "FMA32647"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 762,
+   "centroid": [
+    0.00479,
+    -0.54493,
+    0.02506
+   ],
+   "perSide": {
+    "L": [
+     0.07673,
+     -0.54479,
+     0.02498
+    ],
+    "R": [
+     -0.07974,
+     -0.5451,
+     0.02514
+    ]
+   }
+  },
+  {
+   "id": 185,
+   "name": "middle phalanx of index finger",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA23938",
+    "FMA24455"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 534,
+   "centroid": [
+    0.02435,
+    -0.12768,
+    0.00411
+   ],
+   "perSide": {
+    "L": [
+     0.18073,
+     -0.12735,
+     0.00368
+    ],
+    "R": [
+     -0.1846,
+     -0.12812,
+     0.00468
+    ]
+   }
+  },
+  {
+   "id": 186,
+   "name": "middle phalanx of little finger",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA23944",
+    "FMA24458"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 454,
+   "centroid": [
+    0.01428,
+    -0.11777,
+    0.00499
+   ],
+   "perSide": {
+    "L": [
+     0.1337,
+     -0.118,
+     0.00519
+    ],
+    "R": [
+     -0.13674,
+     -0.11747,
+     0.00473
+    ]
+   }
+  },
+  {
+   "id": 187,
+   "name": "middle phalanx of little toe",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA230986",
+    "FMA230988"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 390,
+   "centroid": [
+    0.02372,
+    -0.54596,
+    0.01589
+   ],
+   "perSide": {
+    "L": [
+     0.08325,
+     -0.54607,
+     0.01598
+    ],
+    "R": [
+     -0.08598,
+     -0.54576,
+     0.01572
+    ]
+   }
+  },
+  {
+   "id": 188,
+   "name": "middle phalanx of middle finger",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA23940",
+    "FMA24456"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 678,
+   "centroid": [
+    0.02042,
+    -0.13101,
+    0.00848
+   ],
+   "perSide": {
+    "L": [
+     0.16428,
+     -0.13192,
+     0.00906
+    ],
+    "R": [
+     -0.16689,
+     -0.12981,
+     0.00773
+    ]
+   }
+  },
+  {
+   "id": 189,
+   "name": "middle phalanx of ring finger",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA23942",
+    "FMA24457"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 698,
+   "centroid": [
+    -0.00524,
+    -0.12734,
+    0.00816
+   ],
+   "perSide": {
+    "L": [
+     0.14873,
+     -0.12707,
+     0.00797
+    ],
+    "R": [
+     -0.15156,
+     -0.1276,
+     0.00833
+    ]
+   }
+  },
+  {
+   "id": 190,
+   "name": "middle phalanx of second toe",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA32642",
+    "FMA32643"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 594,
+   "centroid": [
+    0.00517,
+    -0.54421,
+    0.0362
+   ],
+   "perSide": {
+    "L": [
+     0.06025,
+     -0.54419,
+     0.0357
+    ],
+    "R": [
+     -0.06347,
+     -0.54423,
+     0.03682
+    ]
+   }
+  },
+  {
+   "id": 191,
+   "name": "middle phalanx of third toe",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA32644",
+    "FMA32645"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 560,
+   "centroid": [
+    -0.00443,
+    -0.54478,
+    0.03279
+   ],
+   "perSide": {
+    "L": [
+     0.06891,
+     -0.54491,
+     0.03305
+    ],
+    "R": [
+     -0.07183,
+     -0.54466,
+     0.03256
+    ]
+   }
+  },
+  {
+   "id": 192,
+   "name": "nasal bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA53647",
+    "FMA53648"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 732,
+   "centroid": [
+    -0.00163,
+    0.37755,
+    0.01875
+   ],
+   "perSide": {
+    "L": [
+     -0.0002,
+     0.37754,
+     0.01875
+    ],
+    "R": [
+     -0.00378,
+     0.37758,
+     0.01874
+    ]
+   }
+  },
+  {
+   "id": 193,
+   "name": "navicular bone of foot",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24500",
+    "FMA24501"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1416,
+   "centroid": [
+    -0.00259,
+    -0.51634,
+    -0.03524
+   ],
+   "perSide": {
+    "L": [
+     0.04343,
+     -0.51704,
+     -0.03576
+    ],
+    "R": [
+     -0.04759,
+     -0.51566,
+     -0.03473
+    ]
+   }
+  },
+  {
+   "id": 194,
+   "name": "ninth rib",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA8364",
+    "FMA8391"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    -0.00468,
+    0.14715,
+    -0.06089
+   ],
+   "perSide": {
+    "L": [
+     0.04205,
+     0.14918,
+     -0.06089
+    ],
+    "R": [
+     -0.05149,
+     0.14511,
+     -0.06088
+    ]
+   }
+  },
+  {
+   "id": 195,
+   "name": "ninth thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA10014"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2444,
+   "centroid": [
+    -0.0019,
+    0.16911,
+    -0.07179
+   ],
+   "perSide": {
+    "M": [
+     -0.0019,
+     0.16911,
+     -0.07179
+    ]
+   }
+  },
+  {
+   "id": 196,
+   "name": "occipital bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA52735"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.00031,
+    0.38033,
+    -0.06669
+   ],
+   "perSide": {
+    "M": [
+     0.00031,
+     0.38033,
+     -0.06669
+    ]
+   }
+  },
+  {
+   "id": 197,
+   "name": "palatine bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA53655",
+    "FMA53656"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00176,
+    0.36018,
+    -0.00782
+   ],
+   "perSide": {
+    "L": [
+     0.00535,
+     0.35988,
+     -0.00851
+    ],
+    "R": [
+     -0.00886,
+     0.36049,
+     -0.00713
+    ]
+   }
+  },
+  {
+   "id": 198,
+   "name": "parietal bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA52788",
+    "FMA52789"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    0.00072,
+    0.41885,
+    -0.05204
+   ],
+   "perSide": {
+    "L": [
+     0.01614,
+     0.41657,
+     -0.05058
+    ],
+    "R": [
+     -0.01469,
+     0.42112,
+     -0.0535
+    ]
+   }
+  },
+  {
+   "id": 199,
+   "name": "patella",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24486",
+    "FMA24487"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 552,
+   "centroid": [
+    -0.00047,
+    -0.29273,
+    -0.02826
+   ],
+   "perSide": {
+    "L": [
+     0.04876,
+     -0.29199,
+     -0.0281
+    ],
+    "R": [
+     -0.05334,
+     -0.29351,
+     -0.02842
+    ]
+   }
+  },
+  {
+   "id": 200,
+   "name": "pisiform",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24441",
+    "FMA24442"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 400,
+   "centroid": [
+    0.00523,
+    -0.05868,
+    -0.01378
+   ],
+   "perSide": {
+    "L": [
+     0.14078,
+     -0.05844,
+     -0.01414
+    ],
+    "R": [
+     -0.1443,
+     -0.05895,
+     -0.01338
+    ]
+   }
+  },
+  {
+   "id": 201,
+   "name": "proximal phalanx of big toe",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA43253",
+    "FMA43254"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 892,
+   "centroid": [
+    0.0012,
+    -0.54241,
+    0.02401
+   ],
+   "perSide": {
+    "L": [
+     0.04496,
+     -0.5423,
+     0.02312
+    ],
+    "R": [
+     -0.04793,
+     -0.54253,
+     0.02502
+    ]
+   }
+  },
+  {
+   "id": 202,
+   "name": "proximal phalanx of fourth toe",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA32638",
+    "FMA32639"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 884,
+   "centroid": [
+    -0.00079,
+    -0.5436,
+    0.01407
+   ],
+   "perSide": {
+    "L": [
+     0.0732,
+     -0.54367,
+     0.01397
+    ],
+    "R": [
+     -0.07613,
+     -0.54352,
+     0.01417
+    ]
+   }
+  },
+  {
+   "id": 203,
+   "name": "proximal phalanx of index finger",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24451",
+    "FMA71915"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 722,
+   "centroid": [
+    -0.00818,
+    -0.11323,
+    -0.00567
+   ],
+   "perSide": {
+    "L": [
+     0.17509,
+     -0.11313,
+     -0.00565
+    ],
+    "R": [
+     -0.17884,
+     -0.11331,
+     -0.0057
+    ]
+   }
+  },
+  {
+   "id": 204,
+   "name": "proximal phalanx of little finger",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24454",
+    "FMA66791"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 568,
+   "centroid": [
+    -0.01545,
+    -0.1045,
+    -0.00373
+   ],
+   "perSide": {
+    "L": [
+     0.1368,
+     -0.10499,
+     -0.00359
+    ],
+    "R": [
+     -0.13897,
+     -0.10411,
+     -0.00384
+    ]
+   }
+  },
+  {
+   "id": 205,
+   "name": "proximal phalanx of little toe",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA32640",
+    "FMA32641"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 770,
+   "centroid": [
+    -0.00576,
+    -0.54513,
+    0.00813
+   ],
+   "perSide": {
+    "L": [
+     0.08085,
+     -0.54507,
+     0.00848
+    ],
+    "R": [
+     -0.0835,
+     -0.54519,
+     0.00782
+    ]
+   }
+  },
+  {
+   "id": 206,
+   "name": "proximal phalanx of middle finger",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24452",
+    "FMA71908"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 800,
+   "centroid": [
+    0.00149,
+    -0.11364,
+    -0.00302
+   ],
+   "perSide": {
+    "L": [
+     0.16101,
+     -0.11355,
+     -0.00311
+    ],
+    "R": [
+     -0.16449,
+     -0.11372,
+     -0.00293
+    ]
+   }
+  },
+  {
+   "id": 207,
+   "name": "proximal phalanx of ring finger",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24453",
+    "FMA71916"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 686,
+   "centroid": [
+    0.0068,
+    -0.11066,
+    -0.00353
+   ],
+   "perSide": {
+    "L": [
+     0.14852,
+     -0.11029,
+     -0.00363
+    ],
+    "R": [
+     -0.15133,
+     -0.11107,
+     -0.00341
+    ]
+   }
+  },
+  {
+   "id": 208,
+   "name": "proximal phalanx of second toe",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA32634",
+    "FMA32635"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 866,
+   "centroid": [
+    0.00085,
+    -0.54192,
+    0.02338
+   ],
+   "perSide": {
+    "L": [
+     0.05651,
+     -0.54158,
+     0.02213
+    ],
+    "R": [
+     -0.05986,
+     -0.54228,
+     0.02473
+    ]
+   }
+  },
+  {
+   "id": 209,
+   "name": "proximal phalanx of third toe",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA32636",
+    "FMA32637"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 854,
+   "centroid": [
+    -0.00091,
+    -0.54322,
+    0.01965
+   ],
+   "perSide": {
+    "L": [
+     0.06559,
+     -0.5432,
+     0.01965
+    ],
+    "R": [
+     -0.06898,
+     -0.54323,
+     0.01965
+    ]
+   }
+  },
+  {
+   "id": 210,
+   "name": "proximal phalanx of thumb",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24450",
+    "FMA65470"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 618,
+   "centroid": [
+    0.01924,
+    -0.08478,
+    -0.00101
+   ],
+   "perSide": {
+    "L": [
+     0.18529,
+     -0.08408,
+     -0.001
+    ],
+    "R": [
+     -0.18833,
+     -0.08564,
+     -0.00102
+    ]
+   }
+  },
+  {
+   "id": 211,
+   "name": "radius",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA23464",
+    "FMA23465"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1220,
+   "centroid": [
+    -0.00714,
+    0.01255,
+    -0.03648
+   ],
+   "perSide": {
+    "L": [
+     0.14775,
+     0.01361,
+     -0.03692
+    ],
+    "R": [
+     -0.15131,
+     0.01157,
+     -0.03607
+    ]
+   }
+  },
+  {
+   "id": 212,
+   "name": "sacrum",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA16202"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.00331,
+    -0.01394,
+    -0.06666
+   ],
+   "perSide": {
+    "M": [
+     0.00331,
+     -0.01394,
+     -0.06666
+    ]
+   }
+  },
+  {
+   "id": 213,
+   "name": "scaphoid",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24435",
+    "FMA24436"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 634,
+   "centroid": [
+    -0.00464,
+    -0.05289,
+    -0.0227
+   ],
+   "perSide": {
+    "L": [
+     0.15634,
+     -0.05327,
+     -0.02317
+    ],
+    "R": [
+     -0.16068,
+     -0.05253,
+     -0.02224
+    ]
+   }
+  },
+  {
+   "id": 214,
+   "name": "scapula",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13395",
+    "FMA13396"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    -0.00252,
+    0.24875,
+    -0.06719
+   ],
+   "perSide": {
+    "L": [
+     0.06885,
+     0.24835,
+     -0.06772
+    ],
+    "R": [
+     -0.074,
+     0.24914,
+     -0.06666
+    ]
+   }
+  },
+  {
+   "id": 215,
+   "name": "second costal cartilage",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA7886",
+    "FMA8031"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1094,
+   "centroid": [
+    -0.0018,
+    0.23692,
+    0.00852
+   ],
+   "perSide": {
+    "L": [
+     0.01506,
+     0.23691,
+     0.00828
+    ],
+    "R": [
+     -0.01743,
+     0.23693,
+     0.00875
+    ]
+   }
+  },
+  {
+   "id": 216,
+   "name": "second lumbar vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13073"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2388,
+   "centroid": [
+    -0.00199,
+    0.07649,
+    -0.05121
+   ],
+   "perSide": {
+    "M": [
+     -0.00199,
+     0.07649,
+     -0.05121
+    ]
+   }
+  },
+  {
+   "id": 217,
+   "name": "second metacarpal bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24466",
+    "FMA24467"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1418,
+   "centroid": [
+    0.01337,
+    -0.08215,
+    -0.01547
+   ],
+   "perSide": {
+    "L": [
+     0.16512,
+     -0.08062,
+     -0.01596
+    ],
+    "R": [
+     -0.16882,
+     -0.08398,
+     -0.01487
+    ]
+   }
+  },
+  {
+   "id": 218,
+   "name": "second metatarsal bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24509",
+    "FMA24510"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1380,
+   "centroid": [
+    0.00167,
+    -0.5289,
+    -0.00787
+   ],
+   "perSide": {
+    "L": [
+     0.05341,
+     -0.5298,
+     -0.00664
+    ],
+    "R": [
+     -0.05641,
+     -0.5279,
+     -0.00925
+    ]
+   }
+  },
+  {
+   "id": 219,
+   "name": "second rib",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA7882",
+    "FMA8012"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.0021,
+    0.2683,
+    -0.03812
+   ],
+   "perSide": {
+    "L": [
+     0.03089,
+     0.26995,
+     -0.03994
+    ],
+    "R": [
+     -0.03509,
+     0.26666,
+     -0.0363
+    ]
+   }
+  },
+  {
+   "id": 220,
+   "name": "second thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA9187"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1790,
+   "centroid": [
+    -0.0015,
+    0.27928,
+    -0.05963
+   ],
+   "perSide": {
+    "M": [
+     -0.0015,
+     0.27928,
+     -0.05963
+    ]
+   }
+  },
+  {
+   "id": 221,
+   "name": "sesamoid bone of foot",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA45097",
+    "FMA45098"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 496,
+   "centroid": [
+    -0.00019,
+    -0.5444,
+    0.00864
+   ],
+   "perSide": {
+    "L": [
+     0.04335,
+     -0.54444,
+     0.00877
+    ],
+    "R": [
+     -0.04726,
+     -0.54437,
+     0.00851
+    ]
+   }
+  },
+  {
+   "id": 222,
+   "name": "seventh cervical vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA12525"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1914,
+   "centroid": [
+    -0.00262,
+    0.29614,
+    -0.05065
+   ],
+   "perSide": {
+    "M": [
+     -0.00262,
+     0.29614,
+     -0.05065
+    ]
+   }
+  },
+  {
+   "id": 223,
+   "name": "seventh costal cartilage",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA8248",
+    "FMA8275"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.00088,
+    0.15151,
+    0.02629
+   ],
+   "perSide": {
+    "L": [
+     0.03251,
+     0.14963,
+     0.02578
+    ],
+    "R": [
+     -0.03005,
+     0.15334,
+     0.02679
+    ]
+   }
+  },
+  {
+   "id": 224,
+   "name": "seventh rib",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA8229",
+    "FMA8256"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00596,
+    0.18166,
+    -0.05227
+   ],
+   "perSide": {
+    "L": [
+     0.04511,
+     0.18592,
+     -0.05778
+    ],
+    "R": [
+     -0.05704,
+     0.1774,
+     -0.04677
+    ]
+   }
+  },
+  {
+   "id": 225,
+   "name": "seventh thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA9968"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2300,
+   "centroid": [
+    -0.00246,
+    0.20337,
+    -0.0766
+   ],
+   "perSide": {
+    "M": [
+     -0.00246,
+     0.20337,
+     -0.0766
+    ]
+   }
+  },
+  {
+   "id": 226,
+   "name": "sixth cervical vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA12524"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2210,
+   "centroid": [
+    -0.00099,
+    0.30373,
+    -0.04618
+   ],
+   "perSide": {
+    "M": [
+     -0.00099,
+     0.30373,
+     -0.04618
+    ]
+   }
+  },
+  {
+   "id": 227,
+   "name": "sixth costal cartilage",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA8194",
+    "FMA8221"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00032,
+    0.16537,
+    0.02774
+   ],
+   "perSide": {
+    "L": [
+     0.03264,
+     0.16456,
+     0.02764
+    ],
+    "R": [
+     -0.03328,
+     0.16618,
+     0.02783
+    ]
+   }
+  },
+  {
+   "id": 228,
+   "name": "sixth rib",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA8175",
+    "FMA8202"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00429,
+    0.20188,
+    -0.05209
+   ],
+   "perSide": {
+    "L": [
+     0.04647,
+     0.20323,
+     -0.05294
+    ],
+    "R": [
+     -0.05505,
+     0.20052,
+     -0.05125
+    ]
+   }
+  },
+  {
+   "id": 229,
+   "name": "sixth thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA9945"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1588,
+   "centroid": [
+    -0.00155,
+    0.22106,
+    -0.07542
+   ],
+   "perSide": {
+    "M": [
+     -0.00155,
+     0.22106,
+     -0.07542
+    ]
+   }
+  },
+  {
+   "id": 230,
+   "name": "sphenoid bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA52736"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00063,
+    0.37624,
+    -0.01693
+   ],
+   "perSide": {
+    "M": [
+     -0.00063,
+     0.37624,
+     -0.01693
+    ]
+   }
+  },
+  {
+   "id": 231,
+   "name": "talus",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24482",
+    "FMA24483"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00113,
+    -0.51444,
+    -0.0525
+   ],
+   "perSide": {
+    "L": [
+     0.04384,
+     -0.51407,
+     -0.05186
+    ],
+    "R": [
+     -0.04609,
+     -0.51481,
+     -0.05314
+    ]
+   }
+  },
+  {
+   "id": 232,
+   "name": "temporal bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA52738",
+    "FMA52739"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00094,
+    0.37044,
+    -0.03642
+   ],
+   "perSide": {
+    "L": [
+     0.02505,
+     0.37068,
+     -0.03595
+    ],
+    "R": [
+     -0.02696,
+     0.37021,
+     -0.0369
+    ]
+   }
+  },
+  {
+   "id": 233,
+   "name": "tenth rib",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA8445",
+    "FMA8472"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00531,
+    0.13079,
+    -0.06176
+   ],
+   "perSide": {
+    "L": [
+     0.03724,
+     0.134,
+     -0.0617
+    ],
+    "R": [
+     -0.04785,
+     0.12759,
+     -0.06182
+    ]
+   }
+  },
+  {
+   "id": 234,
+   "name": "tenth thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA10037"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00165,
+    0.15059,
+    -0.06805
+   ],
+   "perSide": {
+    "M": [
+     -0.00165,
+     0.15059,
+     -0.06805
+    ]
+   }
+  },
+  {
+   "id": 235,
+   "name": "third cervical vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA12521"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1978,
+   "centroid": [
+    -0.0028,
+    0.32947,
+    -0.04357
+   ],
+   "perSide": {
+    "M": [
+     -0.0028,
+     0.32947,
+     -0.04357
+    ]
+   }
+  },
+  {
+   "id": 236,
+   "name": "third costal cartilage",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA7913",
+    "FMA8058"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1146,
+   "centroid": [
+    -0.00247,
+    0.21924,
+    0.01419
+   ],
+   "perSide": {
+    "L": [
+     0.01693,
+     0.21924,
+     0.01409
+    ],
+    "R": [
+     -0.0199,
+     0.21924,
+     0.01428
+    ]
+   }
+  },
+  {
+   "id": 237,
+   "name": "third lumbar vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA13074"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.00175,
+    0.05924,
+    -0.05094
+   ],
+   "perSide": {
+    "M": [
+     0.00175,
+     0.05924,
+     -0.05094
+    ]
+   }
+  },
+  {
+   "id": 238,
+   "name": "third metacarpal bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24468",
+    "FMA24469"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1232,
+   "centroid": [
+    0.00227,
+    -0.08267,
+    -0.0177
+   ],
+   "perSide": {
+    "L": [
+     0.15684,
+     -0.08395,
+     -0.01756
+    ],
+    "R": [
+     -0.15945,
+     -0.08133,
+     -0.01785
+    ]
+   }
+  },
+  {
+   "id": 239,
+   "name": "third metatarsal bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24511",
+    "FMA24512"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1312,
+   "centroid": [
+    0.00301,
+    -0.53248,
+    -0.00725
+   ],
+   "perSide": {
+    "L": [
+     0.06007,
+     -0.53179,
+     -0.00848
+    ],
+    "R": [
+     -0.0634,
+     -0.53328,
+     -0.0058
+    ]
+   }
+  },
+  {
+   "id": 240,
+   "name": "third rib",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA7909",
+    "FMA8039"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    -0.00447,
+    0.25619,
+    -0.04542
+   ],
+   "perSide": {
+    "L": [
+     0.03119,
+     0.25733,
+     -0.04618
+    ],
+    "R": [
+     -0.04018,
+     0.25504,
+     -0.04465
+    ]
+   }
+  },
+  {
+   "id": 241,
+   "name": "third thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA9209"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2030,
+   "centroid": [
+    -0.00165,
+    0.26591,
+    -0.06671
+   ],
+   "perSide": {
+    "M": [
+     -0.00165,
+     0.26591,
+     -0.06671
+    ]
+   }
+  },
+  {
+   "id": 242,
+   "name": "tibia",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24477",
+    "FMA24478"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00334,
+    -0.38374,
+    -0.05379
+   ],
+   "perSide": {
+    "L": [
+     0.04192,
+     -0.38645,
+     -0.05438
+    ],
+    "R": [
+     -0.04861,
+     -0.38103,
+     -0.05319
+    ]
+   }
+  },
+  {
+   "id": 243,
+   "name": "trapezium",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24443",
+    "FMA24444"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 790,
+   "centroid": [
+    -0.01742,
+    -0.05814,
+    -0.01687
+   ],
+   "perSide": {
+    "L": [
+     0.16336,
+     -0.05894,
+     -0.01719
+    ],
+    "R": [
+     -0.166,
+     -0.05748,
+     -0.0166
+    ]
+   }
+  },
+  {
+   "id": 244,
+   "name": "trapezoid",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA23725",
+    "FMA24445"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 758,
+   "centroid": [
+    0.0067,
+    -0.0621,
+    -0.02132
+   ],
+   "perSide": {
+    "L": [
+     0.15992,
+     -0.06203,
+     -0.02133
+    ],
+    "R": [
+     -0.16251,
+     -0.06218,
+     -0.02131
+    ]
+   }
+  },
+  {
+   "id": 245,
+   "name": "triquetral",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA24439",
+    "FMA24440"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 474,
+   "centroid": [
+    0.03825,
+    -0.05879,
+    -0.02046
+   ],
+   "perSide": {
+    "L": [
+     0.14193,
+     -0.05897,
+     -0.0203
+    ],
+    "R": [
+     -0.14529,
+     -0.05846,
+     -0.02076
+    ]
+   }
+  },
+  {
+   "id": 246,
+   "name": "twelfth rib",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA8533",
+    "FMA8534"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1924,
+   "centroid": [
+    -0.01118,
+    0.09456,
+    -0.0594
+   ],
+   "perSide": {
+    "L": [
+     0.02939,
+     0.09449,
+     -0.05763
+    ],
+    "R": [
+     -0.03311,
+     0.0946,
+     -0.06036
+    ]
+   }
+  },
+  {
+   "id": 247,
+   "name": "twelfth thoracic vertebra",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA10081"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 2300,
+   "centroid": [
+    -0.00192,
+    0.11544,
+    -0.05865
+   ],
+   "perSide": {
+    "M": [
+     -0.00192,
+     0.11544,
+     -0.05865
+    ]
+   }
+  },
+  {
+   "id": 248,
+   "name": "ulna",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA23467",
+    "FMA23468"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1574,
+   "centroid": [
+    0.00238,
+    0.04374,
+    -0.04604
+   ],
+   "perSide": {
+    "L": [
+     0.13203,
+     0.0402,
+     -0.04525
+    ],
+    "R": [
+     -0.13365,
+     0.04746,
+     -0.04686
+    ]
+   }
+  },
+  {
+   "id": 249,
+   "name": "vomer",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA9710"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 800,
+   "centroid": [
+    -0.00217,
+    0.36565,
+    -0.00621
+   ],
+   "perSide": {
+    "M": [
+     -0.00217,
+     0.36565,
+     -0.00621
+    ]
+   }
+  },
+  {
+   "id": 250,
+   "name": "xiphoid process",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA7488"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 914,
+   "centroid": [
+    -0.00148,
+    0.16954,
+    0.02804
+   ],
+   "perSide": {
+    "M": [
+     -0.00148,
+     0.16954,
+     0.02804
+    ]
+   }
+  },
+  {
+   "id": 251,
+   "name": "zygomatic bone",
+   "layer": "skeleton",
+   "system": "skeletal",
+   "fma": [
+    "FMA52892",
+    "FMA52893"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00121,
+    0.3693,
+    -0.00086
+   ],
+   "perSide": {
+    "L": [
+     0.02537,
+     0.36877,
+     -0.00109
+    ],
+    "R": [
+     -0.0278,
+     0.36982,
+     -0.00064
+    ]
+   }
+  },
+  {
+   "id": 252,
+   "name": "adductor longus",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA22456",
+    "FMA22457"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.00083,
+    -0.13945,
+    -0.0209
+   ],
+   "perSide": {
+    "L": [
+     0.03472,
+     -0.14355,
+     -0.02218
+    ],
+    "R": [
+     -0.03318,
+     -0.13534,
+     -0.01962
+    ]
+   }
+  },
+  {
+   "id": 253,
+   "name": "biceps brachii",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA37684",
+    "FMA37685",
+    "FMA37686",
+    "FMA37687"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    -0.00104,
+    0.17836,
+    -0.03961
+   ],
+   "perSide": {
+    "L": [
+     0.11238,
+     0.17843,
+     -0.03944
+    ],
+    "R": [
+     -0.11519,
+     0.17829,
+     -0.03979
+    ]
+   }
+  },
+  {
+   "id": 254,
+   "name": "biceps femoris",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA45888",
+    "FMA45889",
+    "FMA45891",
+    "FMA45892"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    -0.00027,
+    -0.20499,
+    -0.05827
+   ],
+   "perSide": {
+    "L": [
+     0.05624,
+     -0.20696,
+     -0.05828
+    ],
+    "R": [
+     -0.05804,
+     -0.20297,
+     -0.05826
+    ]
+   }
+  },
+  {
+   "id": 255,
+   "name": "brachioradialis",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA38486",
+    "FMA38487"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    -0.00269,
+    0.06711,
+    -0.04121
+   ],
+   "perSide": {
+    "L": [
+     0.14722,
+     0.07065,
+     -0.04156
+    ],
+    "R": [
+     -0.15188,
+     0.06359,
+     -0.04085
+    ]
+   }
+  },
+  {
+   "id": 256,
+   "name": "deltoid",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA34680",
+    "FMA34681",
+    "FMA34682",
+    "FMA34683",
+    "FMA34684",
+    "FMA34685"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.00148,
+    0.24297,
+    -0.05773
+   ],
+   "perSide": {
+    "L": [
+     0.10696,
+     0.24197,
+     -0.05697
+    ],
+    "R": [
+     -0.10399,
+     0.24398,
+     -0.0585
+    ]
+   }
+  },
+  {
+   "id": 257,
+   "name": "extensor carpi radialis longus",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA38495",
+    "FMA38496"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00213,
+    0.05221,
+    -0.04819
+   ],
+   "perSide": {
+    "L": [
+     0.15162,
+     0.053,
+     -0.04842
+    ],
+    "R": [
+     -0.15491,
+     0.05143,
+     -0.04795
+    ]
+   }
+  },
+  {
+   "id": 258,
+   "name": "extensor digitorum",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA38501",
+    "FMA38502"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00051,
+    -0.05076,
+    -0.02861
+   ],
+   "perSide": {
+    "L": [
+     0.15243,
+     -0.05168,
+     -0.02817
+    ],
+    "R": [
+     -0.15369,
+     -0.04983,
+     -0.02906
+    ]
+   }
+  },
+  {
+   "id": 259,
+   "name": "external oblique",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA13336",
+    "FMA13337"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2496,
+   "centroid": [
+    0.00502,
+    0.07126,
+    0.00948
+   ],
+   "perSide": {
+    "L": [
+     0.04335,
+     0.07435,
+     0.00543
+    ],
+    "R": [
+     -0.0329,
+     0.0682,
+     0.01349
+    ]
+   }
+  },
+  {
+   "id": 260,
+   "name": "flexor carpi radialis",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA38460",
+    "FMA38461"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00149,
+    0.02607,
+    -0.0277
+   ],
+   "perSide": {
+    "L": [
+     0.13386,
+     0.02497,
+     -0.02742
+    ],
+    "R": [
+     -0.13598,
+     0.02717,
+     -0.02799
+    ]
+   }
+  },
+  {
+   "id": 261,
+   "name": "flexor carpi ulnaris",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA38617",
+    "FMA38618",
+    "FMA38619",
+    "FMA38620"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    -0.00089,
+    0.02194,
+    -0.03997
+   ],
+   "perSide": {
+    "L": [
+     0.12316,
+     0.0247,
+     -0.04057
+    ],
+    "R": [
+     -0.12695,
+     0.01913,
+     -0.03936
+    ]
+   }
+  },
+  {
+   "id": 262,
+   "name": "gastrocnemius",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA45957",
+    "FMA45958",
+    "FMA45960",
+    "FMA45961"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    -0.00146,
+    -0.33091,
+    -0.07098
+   ],
+   "perSide": {
+    "L": [
+     0.04526,
+     -0.33039,
+     -0.07102
+    ],
+    "R": [
+     -0.04826,
+     -0.33143,
+     -0.07094
+    ]
+   }
+  },
+  {
+   "id": 263,
+   "name": "gluteus maximus",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA22328",
+    "FMA22329"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    0.00385,
+    -0.05549,
+    -0.07097
+   ],
+   "perSide": {
+    "L": [
+     0.05006,
+     -0.05925,
+     -0.06904
+    ],
+    "R": [
+     -0.04229,
+     -0.05173,
+     -0.07289
+    ]
+   }
+  },
+  {
+   "id": 264,
+   "name": "gracilis",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA43883",
+    "FMA43884"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00142,
+    -0.17272,
+    -0.03429
+   ],
+   "perSide": {
+    "L": [
+     0.01317,
+     -0.17334,
+     -0.0345
+    ],
+    "R": [
+     -0.01622,
+     -0.17209,
+     -0.03407
+    ]
+   }
+  },
+  {
+   "id": 265,
+   "name": "infraspinatus muscle",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA32547",
+    "FMA32548"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.00294,
+    0.24037,
+    -0.08011
+   ],
+   "perSide": {
+    "L": [
+     0.07758,
+     0.2427,
+     -0.07765
+    ],
+    "R": [
+     -0.07169,
+     0.23804,
+     -0.08256
+    ]
+   }
+  },
+  {
+   "id": 266,
+   "name": "latissimus dorsi",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA13358",
+    "FMA13359"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.00155,
+    0.12813,
+    -0.07371
+   ],
+   "perSide": {
+    "L": [
+     0.05057,
+     0.12562,
+     -0.07287
+    ],
+    "R": [
+     -0.0481,
+     0.13067,
+     -0.07455
+    ]
+   }
+  },
+  {
+   "id": 267,
+   "name": "masseter",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA49001",
+    "FMA49002",
+    "FMA49004",
+    "FMA49005"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    -0.00086,
+    0.35205,
+    -0.01399
+   ],
+   "perSide": {
+    "L": [
+     0.02817,
+     0.35297,
+     -0.01415
+    ],
+    "R": [
+     -0.03022,
+     0.35113,
+     -0.01383
+    ]
+   }
+  },
+  {
+   "id": 268,
+   "name": "pectoralis major",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA34690",
+    "FMA34691",
+    "FMA45874",
+    "FMA45875",
+    "FMA79979",
+    "FMA79980"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.00232,
+    0.21591,
+    0.00442
+   ],
+   "perSide": {
+    "L": [
+     0.05807,
+     0.21632,
+     0.00235
+    ],
+    "R": [
+     -0.0517,
+     0.21552,
+     0.00642
+    ]
+   }
+  },
+  {
+   "id": 269,
+   "name": "rectus abdominis",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA13377",
+    "FMA13378"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.00076,
+    0.09268,
+    0.02399
+   ],
+   "perSide": {
+    "L": [
+     0.02382,
+     0.09563,
+     0.02426
+    ],
+    "R": [
+     -0.02233,
+     0.08973,
+     0.02371
+    ]
+   }
+  },
+  {
+   "id": 270,
+   "name": "rectus femoris",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA38928",
+    "FMA38929"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2496,
+   "centroid": [
+    0.00095,
+    -0.1746,
+    -0.01899
+   ],
+   "perSide": {
+    "L": [
+     0.06106,
+     -0.16114,
+     -0.01865
+    ],
+    "R": [
+     -0.05916,
+     -0.18805,
+     -0.01934
+    ]
+   }
+  },
+  {
+   "id": 271,
+   "name": "sartorius",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA22354",
+    "FMA22355"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.0022,
+    -0.15366,
+    -0.01862
+   ],
+   "perSide": {
+    "L": [
+     0.03747,
+     -0.16332,
+     -0.01946
+    ],
+    "R": [
+     -0.04295,
+     -0.14373,
+     -0.01776
+    ]
+   }
+  },
+  {
+   "id": 272,
+   "name": "semitendinosus",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA22358",
+    "FMA22359"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00113,
+    -0.1927,
+    -0.06296
+   ],
+   "perSide": {
+    "L": [
+     0.02855,
+     -0.19388,
+     -0.06275
+    ],
+    "R": [
+     -0.03091,
+     -0.19152,
+     -0.06317
+    ]
+   }
+  },
+  {
+   "id": 273,
+   "name": "serratus anterior",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA13398",
+    "FMA13399"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    0.00091,
+    0.21064,
+    -0.05219
+   ],
+   "perSide": {
+    "L": [
+     0.06755,
+     0.20713,
+     -0.05156
+    ],
+    "R": [
+     -0.06562,
+     0.21414,
+     -0.05282
+    ]
+   }
+  },
+  {
+   "id": 274,
+   "name": "soleus",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA22558",
+    "FMA22559"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    -0.00063,
+    -0.38018,
+    -0.06589
+   ],
+   "perSide": {
+    "L": [
+     0.05035,
+     -0.37924,
+     -0.06576
+    ],
+    "R": [
+     -0.05218,
+     -0.38112,
+     -0.06603
+    ]
+   }
+  },
+  {
+   "id": 275,
+   "name": "sternocleidomastoid",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA13408",
+    "FMA13409"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    -0.00069,
+    0.30012,
+    -0.02022
+   ],
+   "perSide": {
+    "L": [
+     0.01871,
+     0.30094,
+     -0.02062
+    ],
+    "R": [
+     -0.02053,
+     0.29929,
+     -0.01981
+    ]
+   }
+  },
+  {
+   "id": 276,
+   "name": "temporalis",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA49007",
+    "FMA49008"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00071,
+    0.3892,
+    -0.02288
+   ],
+   "perSide": {
+    "L": [
+     0.0348,
+     0.3918,
+     -0.02603
+    ],
+    "R": [
+     -0.03513,
+     0.38668,
+     -0.01983
+    ]
+   }
+  },
+  {
+   "id": 277,
+   "name": "tensor fasciae latae",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA22425",
+    "FMA22426"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    -0.00042,
+    -0.03436,
+    -0.01591
+   ],
+   "perSide": {
+    "L": [
+     0.07711,
+     -0.03758,
+     -0.01655
+    ],
+    "R": [
+     -0.07794,
+     -0.03114,
+     -0.01527
+    ]
+   }
+  },
+  {
+   "id": 278,
+   "name": "teres major",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA32551",
+    "FMA32552"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.00035,
+    0.21548,
+    -0.06649
+   ],
+   "perSide": {
+    "L": [
+     0.08511,
+     0.2167,
+     -0.06449
+    ],
+    "R": [
+     -0.08442,
+     0.21425,
+     -0.06849
+    ]
+   }
+  },
+  {
+   "id": 279,
+   "name": "tibialis anterior",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA22544",
+    "FMA22545"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    -0.00271,
+    -0.4244,
+    -0.03761
+   ],
+   "perSide": {
+    "L": [
+     0.04981,
+     -0.43268,
+     -0.03731
+    ],
+    "R": [
+     -0.05572,
+     -0.41603,
+     -0.03791
+    ]
+   }
+  },
+  {
+   "id": 280,
+   "name": "trapezius",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA33581",
+    "FMA33583",
+    "FMA33584",
+    "FMA33585",
+    "FMA33586",
+    "FMA33587"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    -0.00012,
+    0.26768,
+    -0.08038
+   ],
+   "perSide": {
+    "L": [
+     0.02331,
+     0.26822,
+     -0.07953
+    ],
+    "R": [
+     -0.02189,
+     0.26718,
+     -0.08118
+    ]
+   }
+  },
+  {
+   "id": 281,
+   "name": "triceps brachii",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA37695",
+    "FMA37696",
+    "FMA37697",
+    "FMA37698",
+    "FMA37699",
+    "FMA37700"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    0.00021,
+    0.16279,
+    -0.06591
+   ],
+   "perSide": {
+    "L": [
+     0.11392,
+     0.16,
+     -0.06609
+    ],
+    "R": [
+     -0.11297,
+     0.16558,
+     -0.06573
+    ]
+   }
+  },
+  {
+   "id": 282,
+   "name": "vastus lateralis",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA38930",
+    "FMA38931"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2500,
+   "centroid": [
+    0.0005,
+    -0.20183,
+    -0.03011
+   ],
+   "perSide": {
+    "L": [
+     0.07381,
+     -0.19242,
+     -0.03008
+    ],
+    "R": [
+     -0.07223,
+     -0.21118,
+     -0.03013
+    ]
+   }
+  },
+  {
+   "id": 283,
+   "name": "vastus medialis",
+   "layer": "muscles_superficial",
+   "system": "muscular",
+   "fma": [
+    "FMA38932",
+    "FMA38933"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2498,
+   "centroid": [
+    -0.00082,
+    -0.21138,
+    -0.02339
+   ],
+   "perSide": {
+    "L": [
+     0.04056,
+     -0.21075,
+     -0.02367
+    ],
+    "R": [
+     -0.04228,
+     -0.21202,
+     -0.0231
+    ]
+   }
+  },
+  {
+   "id": 284,
+   "name": "abductor digiti minimi of foot",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA37463",
+    "FMA37464"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00135,
+    -0.54205,
+    -0.04083
+   ],
+   "perSide": {
+    "L": [
+     0.06192,
+     -0.54213,
+     -0.03753
+    ],
+    "R": [
+     -0.06113,
+     -0.54196,
+     -0.04423
+    ]
+   }
+  },
+  {
+   "id": 285,
+   "name": "abductor digiti minimi of hand",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA37396",
+    "FMA37397"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00104,
+    -0.08201,
+    -0.00822
+   ],
+   "perSide": {
+    "L": [
+     0.13656,
+     -0.0809,
+     -0.00815
+    ],
+    "R": [
+     -0.13885,
+     -0.08316,
+     -0.00829
+    ]
+   }
+  },
+  {
+   "id": 286,
+   "name": "abductor hallucis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA37459",
+    "FMA37460"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.0016,
+    -0.53678,
+    -0.02049
+   ],
+   "perSide": {
+    "L": [
+     0.0352,
+     -0.53693,
+     -0.0208
+    ],
+    "R": [
+     -0.03743,
+     -0.53663,
+     -0.02018
+    ]
+   }
+  },
+  {
+   "id": 287,
+   "name": "abductor pollicis brevis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA37386",
+    "FMA37387"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00187,
+    -0.05923,
+    -0.00969
+   ],
+   "perSide": {
+    "L": [
+     0.16706,
+     -0.0595,
+     -0.00964
+    ],
+    "R": [
+     -0.16933,
+     -0.05896,
+     -0.00973
+    ]
+   }
+  },
+  {
+   "id": 288,
+   "name": "abductor pollicis longus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA38516",
+    "FMA38517"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00221,
+    0.0004,
+    -0.04024
+   ],
+   "perSide": {
+    "L": [
+     0.14843,
+     0.00146,
+     -0.04048
+    ],
+    "R": [
+     -0.15219,
+     -0.00066,
+     -0.04
+    ]
+   }
+  },
+  {
+   "id": 289,
+   "name": "adductor brevis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22452",
+    "FMA22454"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00136,
+    -0.11404,
+    -0.02718
+   ],
+   "perSide": {
+    "L": [
+     0.04359,
+     -0.11717,
+     -0.02848
+    ],
+    "R": [
+     -0.04105,
+     -0.1109,
+     -0.02587
+    ]
+   }
+  },
+  {
+   "id": 290,
+   "name": "adductor hallucis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46018",
+    "FMA46019",
+    "FMA46020",
+    "FMA46021"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    -0.00175,
+    -0.53716,
+    -0.00949
+   ],
+   "perSide": {
+    "L": [
+     0.05477,
+     -0.53666,
+     -0.01108
+    ],
+    "R": [
+     -0.05711,
+     -0.53764,
+     -0.00793
+    ]
+   }
+  },
+  {
+   "id": 291,
+   "name": "adductor magnus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22459",
+    "FMA22460"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    0.00354,
+    -0.16909,
+    -0.04222
+   ],
+   "perSide": {
+    "L": [
+     0.04072,
+     -0.16702,
+     -0.04243
+    ],
+    "R": [
+     -0.03398,
+     -0.17118,
+     -0.042
+    ]
+   }
+  },
+  {
+   "id": 292,
+   "name": "adductor minimus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA43886",
+    "FMA43887"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00114,
+    -0.10914,
+    -0.03447
+   ],
+   "perSide": {
+    "L": [
+     0.05028,
+     -0.1114,
+     -0.03545
+    ],
+    "R": [
+     -0.04821,
+     -0.10687,
+     -0.03349
+    ]
+   }
+  },
+  {
+   "id": 293,
+   "name": "adductor pollicis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46121",
+    "FMA46122",
+    "FMA46123",
+    "FMA46124"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    -0.00351,
+    -0.07708,
+    -0.01347
+   ],
+   "perSide": {
+    "L": [
+     0.16653,
+     -0.07731,
+     -0.01327
+    ],
+    "R": [
+     -0.16778,
+     -0.07686,
+     -0.01367
+    ]
+   }
+  },
+  {
+   "id": 294,
+   "name": "anconeus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA37705",
+    "FMA37706"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00115,
+    0.07509,
+    -0.06392
+   ],
+   "perSide": {
+    "L": [
+     0.13162,
+     0.07564,
+     -0.06392
+    ],
+    "R": [
+     -0.13332,
+     0.07454,
+     -0.06392
+    ]
+   }
+  },
+  {
+   "id": 295,
+   "name": "aponeurosis of epicranius",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46768"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00619,
+    0.42098,
+    -0.05376
+   ],
+   "perSide": {
+    "M": [
+     0.00619,
+     0.42098,
+     -0.05376
+    ]
+   }
+  },
+  {
+   "id": 296,
+   "name": "brachialis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA37668",
+    "FMA37669"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    -0.00069,
+    0.12867,
+    -0.04856
+   ],
+   "perSide": {
+    "L": [
+     0.12545,
+     0.12917,
+     -0.0488
+    ],
+    "R": [
+     -0.12571,
+     0.12818,
+     -0.04832
+    ]
+   }
+  },
+  {
+   "id": 297,
+   "name": "buccinator",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46835",
+    "FMA46836"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00136,
+    0.34495,
+    0.00082
+   ],
+   "perSide": {
+    "L": [
+     0.01708,
+     0.34512,
+     0.0005
+    ],
+    "R": [
+     -0.01979,
+     0.34479,
+     0.00114
+    ]
+   }
+  },
+  {
+   "id": 298,
+   "name": "calcaneal tendon",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA258847",
+    "FMA264844"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    0.00086,
+    -0.45642,
+    -0.07793
+   ],
+   "perSide": {
+    "L": [
+     0.04526,
+     -0.46058,
+     -0.07868
+    ],
+    "R": [
+     -0.04665,
+     -0.45196,
+     -0.07712
+    ]
+   }
+  },
+  {
+   "id": 299,
+   "name": "cervical rotator",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA81752",
+    "FMA81753"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00063,
+    0.319,
+    -0.05318
+   ],
+   "perSide": {
+    "L": [
+     0.00812,
+     0.31837,
+     -0.05275
+    ],
+    "R": [
+     -0.00945,
+     0.31964,
+     -0.05362
+    ]
+   }
+  },
+  {
+   "id": 300,
+   "name": "coccygeus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46443",
+    "FMA46444"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00016,
+    -0.04707,
+    -0.07259
+   ],
+   "perSide": {
+    "L": [
+     0.01287,
+     -0.04669,
+     -0.07195
+    ],
+    "R": [
+     -0.01319,
+     -0.04745,
+     -0.07324
+    ]
+   }
+  },
+  {
+   "id": 301,
+   "name": "coracobrachialis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA37665",
+    "FMA37666"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00038,
+    0.21845,
+    -0.04378
+   ],
+   "perSide": {
+    "L": [
+     0.097,
+     0.2122,
+     -0.04487
+    ],
+    "R": [
+     -0.09497,
+     0.22462,
+     -0.0427
+    ]
+   }
+  },
+  {
+   "id": 302,
+   "name": "corrugator supercilii",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46796",
+    "FMA46797"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00112,
+    0.3907,
+    0.01404
+   ],
+   "perSide": {
+    "L": [
+     0.01186,
+     0.39089,
+     0.01408
+    ],
+    "R": [
+     -0.01447,
+     0.39051,
+     0.01399
+    ]
+   }
+  },
+  {
+   "id": 303,
+   "name": "depressor anguli oris",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46829",
+    "FMA46830"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00096,
+    0.32936,
+    0.00506
+   ],
+   "perSide": {
+    "L": [
+     0.01328,
+     0.33052,
+     0.00497
+    ],
+    "R": [
+     -0.01492,
+     0.32823,
+     0.00516
+    ]
+   }
+  },
+  {
+   "id": 304,
+   "name": "depressor labii inferioris",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46817",
+    "FMA46818"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    -0.00279,
+    0.33256,
+    0.00984
+   ],
+   "perSide": {
+    "L": [
+     0.01001,
+     0.33341,
+     0.01037
+    ],
+    "R": [
+     -0.01296,
+     0.33189,
+     0.00941
+    ]
+   }
+  },
+  {
+   "id": 305,
+   "name": "depressor septi nasi",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA55608",
+    "FMA55609"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00104,
+    0.35254,
+    0.0181
+   ],
+   "perSide": {
+    "L": [
+     0.00258,
+     0.35252,
+     0.01793
+    ],
+    "R": [
+     -0.0046,
+     0.35255,
+     0.01826
+    ]
+   }
+  },
+  {
+   "id": 306,
+   "name": "diaphragm",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA13295"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.0053,
+    0.12392,
+    -0.02831
+   ],
+   "perSide": {
+    "M": [
+     -0.0053,
+     0.12392,
+     -0.02831
+    ]
+   }
+  },
+  {
+   "id": 307,
+   "name": "digastric",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46304",
+    "FMA46305",
+    "FMA46306",
+    "FMA46307"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00274,
+    0.34445,
+    -0.02793
+   ],
+   "perSide": {
+    "L": [
+     0.01758,
+     0.34333,
+     -0.02656
+    ],
+    "R": [
+     -0.02198,
+     0.34551,
+     -0.02923
+    ]
+   }
+  },
+  {
+   "id": 308,
+   "name": "extensor carpi radialis brevis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA38498",
+    "FMA38499"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00186,
+    0.03699,
+    -0.0494
+   ],
+   "perSide": {
+    "L": [
+     0.1499,
+     0.03733,
+     -0.0495
+    ],
+    "R": [
+     -0.15295,
+     0.03664,
+     -0.0493
+    ]
+   }
+  },
+  {
+   "id": 309,
+   "name": "extensor digiti minimi",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA38504",
+    "FMA38505"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    -0.00218,
+    0.00777,
+    -0.04435
+   ],
+   "perSide": {
+    "L": [
+     0.14095,
+     0.00616,
+     -0.04373
+    ],
+    "R": [
+     -0.14405,
+     0.00936,
+     -0.04497
+    ]
+   }
+  },
+  {
+   "id": 310,
+   "name": "extensor digitorum brevis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA51142",
+    "FMA51143"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00146,
+    -0.52535,
+    -0.01458
+   ],
+   "perSide": {
+    "L": [
+     0.06002,
+     -0.52501,
+     -0.01475
+    ],
+    "R": [
+     -0.06294,
+     -0.52569,
+     -0.01441
+    ]
+   }
+  },
+  {
+   "id": 311,
+   "name": "extensor digitorum longus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22548",
+    "FMA22549"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00187,
+    -0.46033,
+    -0.02011
+   ],
+   "perSide": {
+    "L": [
+     0.06266,
+     -0.45943,
+     -0.02189
+    ],
+    "R": [
+     -0.06613,
+     -0.46122,
+     -0.01833
+    ]
+   }
+  },
+  {
+   "id": 312,
+   "name": "extensor hallucis brevis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA51144",
+    "FMA51145"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00064,
+    -0.52298,
+    -0.01409
+   ],
+   "perSide": {
+    "L": [
+     0.04824,
+     -0.52253,
+     -0.01655
+    ],
+    "R": [
+     -0.04974,
+     -0.52344,
+     -0.01162
+    ]
+   }
+  },
+  {
+   "id": 313,
+   "name": "extensor hallucis longus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22546",
+    "FMA22547"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00157,
+    -0.45799,
+    -0.04001
+   ],
+   "perSide": {
+    "L": [
+     0.05271,
+     -0.45872,
+     -0.03926
+    ],
+    "R": [
+     -0.05585,
+     -0.45725,
+     -0.04075
+    ]
+   }
+  },
+  {
+   "id": 314,
+   "name": "extensor indicis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA38525",
+    "FMA38526"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    0.0013,
+    -0.05634,
+    -0.02471
+   ],
+   "perSide": {
+    "L": [
+     0.15719,
+     -0.06523,
+     -0.02222
+    ],
+    "R": [
+     -0.15323,
+     -0.04753,
+     -0.02717
+    ]
+   }
+  },
+  {
+   "id": 315,
+   "name": "extensor pollicis brevis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA38519",
+    "FMA38520"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00161,
+    -0.03612,
+    -0.02903
+   ],
+   "perSide": {
+    "L": [
+     0.16181,
+     -0.04056,
+     -0.02696
+    ],
+    "R": [
+     -0.15929,
+     -0.03166,
+     -0.03111
+    ]
+   }
+  },
+  {
+   "id": 316,
+   "name": "extensor pollicis longus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA38522",
+    "FMA38523"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00064,
+    -0.03439,
+    -0.02768
+   ],
+   "perSide": {
+    "L": [
+     0.15809,
+     -0.03808,
+     -0.02614
+    ],
+    "R": [
+     -0.1568,
+     -0.0307,
+     -0.02922
+    ]
+   }
+  },
+  {
+   "id": 317,
+   "name": "external anal sphincter",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA21930"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 802,
+   "centroid": [
+    -0.00168,
+    -0.07939,
+    -0.06528
+   ],
+   "perSide": {
+    "M": [
+     -0.00168,
+     -0.07939,
+     -0.06528
+    ]
+   }
+  },
+  {
+   "id": 318,
+   "name": "external intercostal muscle",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA9756"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 900,
+   "centroid": [
+    0.00673,
+    0.18788,
+    -0.04655
+   ],
+   "perSide": {
+    "M": [
+     0.00673,
+     0.18788,
+     -0.04655
+    ]
+   }
+  },
+  {
+   "id": 319,
+   "name": "fibularis brevis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22554",
+    "FMA22555"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00516,
+    -0.46233,
+    -0.06061
+   ],
+   "perSide": {
+    "L": [
+     0.0607,
+     -0.46552,
+     -0.06075
+    ],
+    "R": [
+     -0.06376,
+     -0.4595,
+     -0.06049
+    ]
+   }
+  },
+  {
+   "id": 320,
+   "name": "fibularis longus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22552",
+    "FMA22553"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00217,
+    -0.42726,
+    -0.05316
+   ],
+   "perSide": {
+    "L": [
+     0.0631,
+     -0.43144,
+     -0.05337
+    ],
+    "R": [
+     -0.06637,
+     -0.42314,
+     -0.05296
+    ]
+   }
+  },
+  {
+   "id": 321,
+   "name": "fibularis tertius",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22550",
+    "FMA22551"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    0.00112,
+    -0.50894,
+    -0.03898
+   ],
+   "perSide": {
+    "L": [
+     0.06148,
+     -0.51054,
+     -0.03821
+    ],
+    "R": [
+     -0.06359,
+     -0.50721,
+     -0.03981
+    ]
+   }
+  },
+  {
+   "id": 322,
+   "name": "first lumbrical of foot",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA37717",
+    "FMA37718"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    0.00041,
+    -0.53885,
+    -0.01331
+   ],
+   "perSide": {
+    "L": [
+     0.04525,
+     -0.53903,
+     -0.01216
+    ],
+    "R": [
+     -0.04786,
+     -0.53866,
+     -0.01454
+    ]
+   }
+  },
+  {
+   "id": 323,
+   "name": "first plantar interosseous of foot",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA37745",
+    "FMA37746"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00118,
+    -0.53537,
+    0.00037
+   ],
+   "perSide": {
+    "L": [
+     0.05643,
+     -0.5354,
+     0.00033
+    ],
+    "R": [
+     -0.0593,
+     -0.53533,
+     0.0004
+    ]
+   }
+  },
+  {
+   "id": 324,
+   "name": "flexor accessorius",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA37465",
+    "FMA37466"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    -0.00044,
+    -0.53833,
+    -0.04511
+   ],
+   "perSide": {
+    "L": [
+     0.04949,
+     -0.53858,
+     -0.04367
+    ],
+    "R": [
+     -0.05036,
+     -0.53809,
+     -0.04655
+    ]
+   }
+  },
+  {
+   "id": 325,
+   "name": "flexor digiti minimi brevis of foot",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA37471",
+    "FMA37472"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00025,
+    -0.54329,
+    -0.01551
+   ],
+   "perSide": {
+    "L": [
+     0.07113,
+     -0.54394,
+     -0.01263
+    ],
+    "R": [
+     -0.07163,
+     -0.54263,
+     -0.0184
+    ]
+   }
+  },
+  {
+   "id": 326,
+   "name": "flexor digiti minimi brevis of hand",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA37398",
+    "FMA37399"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.0026,
+    -0.08065,
+    -0.00863
+   ],
+   "perSide": {
+    "L": [
+     0.1398,
+     -0.07874,
+     -0.00904
+    ],
+    "R": [
+     -0.14193,
+     -0.08252,
+     -0.00823
+    ]
+   }
+  },
+  {
+   "id": 327,
+   "name": "flexor digitorum brevis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA37461",
+    "FMA37462"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00012,
+    -0.54523,
+    -0.00492
+   ],
+   "perSide": {
+    "L": [
+     0.05906,
+     -0.54534,
+     -0.00426
+    ],
+    "R": [
+     -0.05908,
+     -0.54512,
+     -0.00558
+    ]
+   }
+  },
+  {
+   "id": 328,
+   "name": "flexor digitorum longus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA65016",
+    "FMA65017"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00318,
+    -0.48826,
+    -0.03801
+   ],
+   "perSide": {
+    "L": [
+     0.04542,
+     -0.48814,
+     -0.03822
+    ],
+    "R": [
+     -0.04995,
+     -0.48838,
+     -0.0378
+    ]
+   }
+  },
+  {
+   "id": 329,
+   "name": "flexor digitorum profundus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA38479",
+    "FMA38480"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00082,
+    -0.05077,
+    -0.01687
+   ],
+   "perSide": {
+    "L": [
+     0.1491,
+     -0.05516,
+     -0.01555
+    ],
+    "R": [
+     -0.14945,
+     -0.04642,
+     -0.01818
+    ]
+   }
+  },
+  {
+   "id": 330,
+   "name": "flexor digitorum superficialis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA38638",
+    "FMA38639",
+    "FMA38640",
+    "FMA38641"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.0046,
+    -0.01683,
+    -0.02287
+   ],
+   "perSide": {
+    "L": [
+     0.1369,
+     -0.00605,
+     -0.0255
+    ],
+    "R": [
+     -0.1461,
+     -0.02761,
+     -0.02025
+    ]
+   }
+  },
+  {
+   "id": 331,
+   "name": "flexor hallucis brevis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA45971",
+    "FMA45972",
+    "FMA45973",
+    "FMA45974"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00046,
+    -0.53651,
+    -0.00857
+   ],
+   "perSide": {
+    "L": [
+     0.03977,
+     -0.53712,
+     -0.00715
+    ],
+    "R": [
+     -0.04183,
+     -0.53589,
+     -0.01002
+    ]
+   }
+  },
+  {
+   "id": 332,
+   "name": "flexor hallucis longus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA65014",
+    "FMA65015"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00256,
+    -0.47766,
+    -0.04301
+   ],
+   "perSide": {
+    "L": [
+     0.04714,
+     -0.48024,
+     -0.0431
+    ],
+    "R": [
+     -0.05161,
+     -0.4751,
+     -0.04293
+    ]
+   }
+  },
+  {
+   "id": 333,
+   "name": "flexor pollicis brevis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46110",
+    "FMA46111",
+    "FMA65198",
+    "FMA65199"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.01207,
+    -0.06464,
+    -0.00993
+   ],
+   "perSide": {
+    "L": [
+     0.1647,
+     -0.06506,
+     -0.0093
+    ],
+    "R": [
+     -0.16536,
+     -0.06428,
+     -0.01048
+    ]
+   }
+  },
+  {
+   "id": 334,
+   "name": "flexor pollicis longus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA38482",
+    "FMA38484"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.0024,
+    -0.02097,
+    -0.02592
+   ],
+   "perSide": {
+    "L": [
+     0.15898,
+     -0.02385,
+     -0.0253
+    ],
+    "R": [
+     -0.15911,
+     -0.01801,
+     -0.02655
+    ]
+   }
+  },
+  {
+   "id": 335,
+   "name": "flexor retinaculum of wrist",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA40120",
+    "FMA40121"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.0005,
+    -0.05744,
+    -0.01206
+   ],
+   "perSide": {
+    "L": [
+     0.15429,
+     -0.05717,
+     -0.01217
+    ],
+    "R": [
+     -0.15399,
+     -0.05772,
+     -0.01194
+    ]
+   }
+  },
+  {
+   "id": 336,
+   "name": "fourth lumbrical of foot",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA37483",
+    "FMA37484"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00119,
+    -0.54249,
+    -0.01273
+   ],
+   "perSide": {
+    "L": [
+     0.06339,
+     -0.54271,
+     -0.01165
+    ],
+    "R": [
+     -0.06494,
+     -0.54226,
+     -0.01381
+    ]
+   }
+  },
+  {
+   "id": 337,
+   "name": "frontalis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46759",
+    "FMA46760"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00032,
+    0.40503,
+    0.01049
+   ],
+   "perSide": {
+    "L": [
+     0.01697,
+     0.40587,
+     0.00965
+    ],
+    "R": [
+     -0.01806,
+     0.40416,
+     0.01136
+    ]
+   }
+  },
+  {
+   "id": 338,
+   "name": "gemellus inferior",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22336",
+    "FMA22337"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00015,
+    -0.05984,
+    -0.05952
+   ],
+   "perSide": {
+    "L": [
+     0.04673,
+     -0.05977,
+     -0.0587
+    ],
+    "R": [
+     -0.04723,
+     -0.05992,
+     -0.06034
+    ]
+   }
+  },
+  {
+   "id": 339,
+   "name": "gemellus superior",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22334",
+    "FMA22335"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    0.00067,
+    -0.04933,
+    -0.05565
+   ],
+   "perSide": {
+    "L": [
+     0.04764,
+     -0.0505,
+     -0.05395
+    ],
+    "R": [
+     -0.04228,
+     -0.04827,
+     -0.05721
+    ]
+   }
+  },
+  {
+   "id": 340,
+   "name": "geniohyoid",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46326",
+    "FMA46327"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00117,
+    0.32801,
+    -0.0083
+   ],
+   "perSide": {
+    "L": [
+     0.00206,
+     0.32801,
+     -0.00856
+    ],
+    "R": [
+     -0.00442,
+     0.32801,
+     -0.00804
+    ]
+   }
+  },
+  {
+   "id": 341,
+   "name": "gluteus medius",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22330",
+    "FMA22331"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    0.00252,
+    -0.0139,
+    -0.04936
+   ],
+   "perSide": {
+    "L": [
+     0.07007,
+     -0.01725,
+     -0.04778
+    ],
+    "R": [
+     -0.06623,
+     -0.01049,
+     -0.05096
+    ]
+   }
+  },
+  {
+   "id": 342,
+   "name": "gluteus minimus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22332",
+    "FMA22333"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00029,
+    -0.02578,
+    -0.0412
+   ],
+   "perSide": {
+    "L": [
+     0.06984,
+     -0.02715,
+     -0.04069
+    ],
+    "R": [
+     -0.06895,
+     -0.02442,
+     -0.04171
+    ]
+   }
+  },
+  {
+   "id": 343,
+   "name": "iliacus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22322",
+    "FMA22323"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    0.00114,
+    -0.0208,
+    -0.02687
+   ],
+   "perSide": {
+    "L": [
+     0.05131,
+     -0.0199,
+     -0.0263
+    ],
+    "R": [
+     -0.04991,
+     -0.02171,
+     -0.02744
+    ]
+   }
+  },
+  {
+   "id": 344,
+   "name": "iliococcygeus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA45858",
+    "FMA45859"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    6e-05,
+    -0.05876,
+    -0.05886
+   ],
+   "perSide": {
+    "L": [
+     0.01697,
+     -0.05736,
+     -0.05769
+    ],
+    "R": [
+     -0.01669,
+     -0.06015,
+     -0.06003
+    ]
+   }
+  },
+  {
+   "id": 345,
+   "name": "iliocostalis cervicis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22744",
+    "FMA22745"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    0.00065,
+    0.27282,
+    -0.06625
+   ],
+   "perSide": {
+    "L": [
+     0.03175,
+     0.26665,
+     -0.0697
+    ],
+    "R": [
+     -0.03046,
+     0.27899,
+     -0.06281
+    ]
+   }
+  },
+  {
+   "id": 346,
+   "name": "iliocostalis lumborum",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22740",
+    "FMA22741"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 892,
+   "centroid": [
+    -0.00346,
+    0.06654,
+    -0.07678
+   ],
+   "perSide": {
+    "L": [
+     0.02826,
+     0.06192,
+     -0.07711
+    ],
+    "R": [
+     -0.03504,
+     0.07114,
+     -0.07645
+    ]
+   }
+  },
+  {
+   "id": 347,
+   "name": "iliocostalis thoracis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22742",
+    "FMA22743"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00318,
+    0.19132,
+    -0.08103
+   ],
+   "perSide": {
+    "L": [
+     0.03741,
+     0.18891,
+     -0.0803
+    ],
+    "R": [
+     -0.04342,
+     0.19371,
+     -0.08176
+    ]
+   }
+  },
+  {
+   "id": 348,
+   "name": "iliotibial tract",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA58776",
+    "FMA58777"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    0.00011,
+    -0.11369,
+    -0.03888
+   ],
+   "perSide": {
+    "L": [
+     0.08063,
+     -0.10301,
+     -0.03919
+    ],
+    "R": [
+     -0.07971,
+     -0.12428,
+     -0.03857
+    ]
+   }
+  },
+  {
+   "id": 349,
+   "name": "inguinal ligament",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA21964",
+    "FMA21965"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00064,
+    -0.02388,
+    -0.0013
+   ],
+   "perSide": {
+    "L": [
+     0.04927,
+     -0.02187,
+     -0.0014
+    ],
+    "R": [
+     -0.04801,
+     -0.02579,
+     -0.0012
+    ]
+   }
+  },
+  {
+   "id": 350,
+   "name": "innermost intercostal muscle",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA9758"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.01504,
+    0.17728,
+    -0.03684
+   ],
+   "perSide": {
+    "M": [
+     0.01504,
+     0.17728,
+     -0.03684
+    ]
+   }
+  },
+  {
+   "id": 351,
+   "name": "intermediate tendon",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA258850",
+    "FMA264840"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00187,
+    0.32593,
+    -0.01243
+   ],
+   "perSide": {
+    "L": [
+     0.00613,
+     0.32592,
+     -0.01228
+    ],
+    "R": [
+     -0.00947,
+     0.32594,
+     -0.01257
+    ]
+   }
+  },
+  {
+   "id": 352,
+   "name": "internal intercostal muscle",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA9757"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 900,
+   "centroid": [
+    0.0059,
+    0.17208,
+    -0.0315
+   ],
+   "perSide": {
+    "M": [
+     0.0059,
+     0.17208,
+     -0.0315
+    ]
+   }
+  },
+  {
+   "id": 353,
+   "name": "internal oblique",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA13892",
+    "FMA13893"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    0.00675,
+    0.05976,
+    0.00744
+   ],
+   "perSide": {
+    "L": [
+     0.03963,
+     0.05881,
+     0.00438
+    ],
+    "R": [
+     -0.02628,
+     0.06071,
+     0.01051
+    ]
+   }
+  },
+  {
+   "id": 354,
+   "name": "lateral pterygoid",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA49022",
+    "FMA49023",
+    "FMA49024",
+    "FMA49025"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00065,
+    0.36609,
+    -0.02076
+   ],
+   "perSide": {
+    "L": [
+     0.01791,
+     0.36707,
+     -0.0212
+    ],
+    "R": [
+     -0.02024,
+     0.36505,
+     -0.02029
+    ]
+   }
+  },
+  {
+   "id": 355,
+   "name": "levator anguli oris",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46823",
+    "FMA46824"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    -0.00163,
+    0.35745,
+    0.01137
+   ],
+   "perSide": {
+    "L": [
+     0.01153,
+     0.357,
+     0.01108
+    ],
+    "R": [
+     -0.01371,
+     0.35786,
+     0.01164
+    ]
+   }
+  },
+  {
+   "id": 356,
+   "name": "levator labii superioris",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46806",
+    "FMA46807"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00073,
+    0.3632,
+    0.01196
+   ],
+   "perSide": {
+    "L": [
+     0.0127,
+     0.36343,
+     0.0115
+    ],
+    "R": [
+     -0.01416,
+     0.36298,
+     0.01242
+    ]
+   }
+  },
+  {
+   "id": 357,
+   "name": "levator labii superioris alaeque nasi",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46803",
+    "FMA46804"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 674,
+   "centroid": [
+    -0.00172,
+    0.36699,
+    0.01434
+   ],
+   "perSide": {
+    "L": [
+     0.00657,
+     0.36667,
+     0.01442
+    ],
+    "R": [
+     -0.00949,
+     0.36729,
+     0.01426
+    ]
+   }
+  },
+  {
+   "id": 358,
+   "name": "levator scapulae",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA32540",
+    "FMA32541"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.0002,
+    0.29869,
+    -0.0607
+   ],
+   "perSide": {
+    "L": [
+     0.03024,
+     0.29224,
+     -0.06435
+    ],
+    "R": [
+     -0.02845,
+     0.30485,
+     -0.05722
+    ]
+   }
+  },
+  {
+   "id": 359,
+   "name": "linea alba",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA11336"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 676,
+   "centroid": [
+    -0.00088,
+    0.0796,
+    0.0206
+   ],
+   "perSide": {
+    "M": [
+     -0.00088,
+     0.0796,
+     0.0206
+    ]
+   }
+  },
+  {
+   "id": 360,
+   "name": "longissimus capitis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22754",
+    "FMA22756"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    -0.00098,
+    0.31669,
+    -0.05156
+   ],
+   "perSide": {
+    "L": [
+     0.01826,
+     0.31769,
+     -0.05167
+    ],
+    "R": [
+     -0.02049,
+     0.31568,
+     -0.05144
+    ]
+   }
+  },
+  {
+   "id": 361,
+   "name": "longissimus cervicis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22757",
+    "FMA22758"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00184,
+    0.29216,
+    -0.05794
+   ],
+   "perSide": {
+    "L": [
+     0.01759,
+     0.2918,
+     -0.05846
+    ],
+    "R": [
+     -0.02015,
+     0.2925,
+     -0.05745
+    ]
+   }
+  },
+  {
+   "id": 362,
+   "name": "longissimus thoracis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22751",
+    "FMA22753"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00056,
+    0.1448,
+    -0.07554
+   ],
+   "perSide": {
+    "L": [
+     0.01928,
+     0.15048,
+     -0.07546
+    ],
+    "R": [
+     -0.01889,
+     0.13889,
+     -0.07562
+    ]
+   }
+  },
+  {
+   "id": 363,
+   "name": "longus capitis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46309",
+    "FMA46310"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00061,
+    0.33138,
+    -0.03379
+   ],
+   "perSide": {
+    "L": [
+     0.00988,
+     0.32864,
+     -0.03426
+    ],
+    "R": [
+     -0.01111,
+     0.33411,
+     -0.03331
+    ]
+   }
+  },
+  {
+   "id": 364,
+   "name": "longus colli",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46283",
+    "FMA46284",
+    "FMA46285",
+    "FMA46286",
+    "FMA46287",
+    "FMA46288"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00143,
+    0.30938,
+    -0.03705
+   ],
+   "perSide": {
+    "L": [
+     0.00466,
+     0.30892,
+     -0.03714
+    ],
+    "R": [
+     -0.00755,
+     0.30984,
+     -0.03695
+    ]
+   }
+  },
+  {
+   "id": 365,
+   "name": "lumbar rotator",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA23089",
+    "FMA23090"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    0.00013,
+    0.07141,
+    -0.05862
+   ],
+   "perSide": {
+    "L": [
+     0.01263,
+     0.07164,
+     -0.05825
+    ],
+    "R": [
+     -0.01241,
+     0.07117,
+     -0.059
+    ]
+   }
+  },
+  {
+   "id": 366,
+   "name": "medial pterygoid",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA49012",
+    "FMA49013"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00103,
+    0.35218,
+    -0.01831
+   ],
+   "perSide": {
+    "L": [
+     0.01585,
+     0.35144,
+     -0.01853
+    ],
+    "R": [
+     -0.01791,
+     0.35293,
+     -0.01808
+    ]
+   }
+  },
+  {
+   "id": 367,
+   "name": "mentalis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46826",
+    "FMA46827"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 820,
+   "centroid": [
+    -0.00117,
+    0.3268,
+    0.01352
+   ],
+   "perSide": {
+    "L": [
+     0.00266,
+     0.32666,
+     0.01354
+    ],
+    "R": [
+     -0.00573,
+     0.32696,
+     0.0135
+    ]
+   }
+  },
+  {
+   "id": 368,
+   "name": "multifidus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22878",
+    "FMA22879"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    -4e-05,
+    0.16725,
+    -0.07256
+   ],
+   "perSide": {
+    "L": [
+     0.00852,
+     0.16677,
+     -0.0726
+    ],
+    "R": [
+     -0.00848,
+     0.16773,
+     -0.07253
+    ]
+   }
+  },
+  {
+   "id": 369,
+   "name": "mylohyoid",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46321",
+    "FMA46322"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00041,
+    0.32791,
+    -0.00454
+   ],
+   "perSide": {
+    "L": [
+     0.00419,
+     0.32825,
+     -0.00459
+    ],
+    "R": [
+     -0.00499,
+     0.32757,
+     -0.0045
+    ]
+   }
+  },
+  {
+   "id": 370,
+   "name": "nasalis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA55606",
+    "FMA55607"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00095,
+    0.37235,
+    0.01895
+   ],
+   "perSide": {
+    "L": [
+     0.004,
+     0.37161,
+     0.01828
+    ],
+    "R": [
+     -0.00593,
+     0.3731,
+     0.01962
+    ]
+   }
+  },
+  {
+   "id": 371,
+   "name": "obliquus capitis inferior",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA32536",
+    "FMA32537"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00056,
+    0.3403,
+    -0.05216
+   ],
+   "perSide": {
+    "L": [
+     0.01254,
+     0.34086,
+     -0.05145
+    ],
+    "R": [
+     -0.01365,
+     0.33975,
+     -0.05287
+    ]
+   }
+  },
+  {
+   "id": 372,
+   "name": "obliquus capitis superior",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA32534",
+    "FMA32535"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.001,
+    0.35705,
+    -0.05733
+   ],
+   "perSide": {
+    "L": [
+     0.02119,
+     0.35669,
+     -0.05633
+    ],
+    "R": [
+     -0.02319,
+     0.35741,
+     -0.05834
+    ]
+   }
+  },
+  {
+   "id": 373,
+   "name": "obturator externus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22326",
+    "FMA22327"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    0.00203,
+    -0.06671,
+    -0.03868
+   ],
+   "perSide": {
+    "L": [
+     0.03979,
+     -0.06627,
+     -0.04048
+    ],
+    "R": [
+     -0.03477,
+     -0.06714,
+     -0.03692
+    ]
+   }
+  },
+  {
+   "id": 374,
+   "name": "obturator internus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22324",
+    "FMA22325"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -8e-05,
+    -0.05669,
+    -0.04305
+   ],
+   "perSide": {
+    "L": [
+     0.02935,
+     -0.05603,
+     -0.04325
+    ],
+    "R": [
+     -0.02888,
+     -0.05734,
+     -0.04285
+    ]
+   }
+  },
+  {
+   "id": 375,
+   "name": "occipitalis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46761",
+    "FMA46762"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00023,
+    0.38363,
+    -0.08294
+   ],
+   "perSide": {
+    "L": [
+     0.02316,
+     0.38441,
+     -0.08202
+    ],
+    "R": [
+     -0.0229,
+     0.38285,
+     -0.08386
+    ]
+   }
+  },
+  {
+   "id": 376,
+   "name": "omohyoid",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA13348",
+    "FMA13349"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00125,
+    0.28713,
+    -0.03737
+   ],
+   "perSide": {
+    "L": [
+     0.03504,
+     0.28432,
+     -0.03985
+    ],
+    "R": [
+     -0.03254,
+     0.28994,
+     -0.03489
+    ]
+   }
+  },
+  {
+   "id": 377,
+   "name": "opponens digiti minimi of foot",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA86034",
+    "FMA86035"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00104,
+    -0.54048,
+    -0.02399
+   ],
+   "perSide": {
+    "L": [
+     0.06824,
+     -0.54078,
+     -0.02255
+    ],
+    "R": [
+     -0.06972,
+     -0.54018,
+     -0.02541
+    ]
+   }
+  },
+  {
+   "id": 378,
+   "name": "opponens digiti minimi of hand",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA37400",
+    "FMA37401"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00264,
+    -0.07911,
+    -0.01189
+   ],
+   "perSide": {
+    "L": [
+     0.14048,
+     -0.07724,
+     -0.01197
+    ],
+    "R": [
+     -0.14209,
+     -0.08092,
+     -0.01182
+    ]
+   }
+  },
+  {
+   "id": 379,
+   "name": "opponens pollicis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA37390",
+    "FMA37391"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00576,
+    -0.06124,
+    -0.01017
+   ],
+   "perSide": {
+    "L": [
+     0.16905,
+     -0.0617,
+     -0.00992
+    ],
+    "R": [
+     -0.16974,
+     -0.06081,
+     -0.0104
+    ]
+   }
+  },
+  {
+   "id": 380,
+   "name": "orbicularis oculi",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46782",
+    "FMA46783",
+    "FMA46785",
+    "FMA46786"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00014,
+    0.37852,
+    0.0093
+   ],
+   "perSide": {
+    "L": [
+     0.01871,
+     0.37807,
+     0.00879
+    ],
+    "R": [
+     -0.01909,
+     0.37897,
+     0.00982
+    ]
+   }
+  },
+  {
+   "id": 381,
+   "name": "orbicularis oris",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46841"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00021,
+    0.34317,
+    0.01571
+   ],
+   "perSide": {
+    "M": [
+     0.00021,
+     0.34317,
+     0.01571
+    ]
+   }
+  },
+  {
+   "id": 382,
+   "name": "palmaris longus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA38463",
+    "FMA38464"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    0.00297,
+    -0.03927,
+    -0.01584
+   ],
+   "perSide": {
+    "L": [
+     0.14657,
+     -0.0476,
+     -0.01415
+    ],
+    "R": [
+     -0.14257,
+     -0.03082,
+     -0.01756
+    ]
+   }
+  },
+  {
+   "id": 383,
+   "name": "pectineus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22450",
+    "FMA22451"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00302,
+    -0.07618,
+    -0.01455
+   ],
+   "perSide": {
+    "L": [
+     0.03681,
+     -0.08319,
+     -0.01787
+    ],
+    "R": [
+     -0.0299,
+     -0.06936,
+     -0.01131
+    ]
+   }
+  },
+  {
+   "id": 384,
+   "name": "pectoralis minor",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA13375",
+    "FMA13376"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    -0.00076,
+    0.22667,
+    -0.01024
+   ],
+   "perSide": {
+    "L": [
+     0.06395,
+     0.22847,
+     -0.01217
+    ],
+    "R": [
+     -0.06327,
+     0.22493,
+     -0.00838
+    ]
+   }
+  },
+  {
+   "id": 385,
+   "name": "piriformis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22340",
+    "FMA22341"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    0.0017,
+    -0.03353,
+    -0.05909
+   ],
+   "perSide": {
+    "L": [
+     0.04215,
+     -0.03491,
+     -0.05724
+    ],
+    "R": [
+     -0.03822,
+     -0.03216,
+     -0.06091
+    ]
+   }
+  },
+  {
+   "id": 386,
+   "name": "plantaris",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22560",
+    "FMA22561"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00076,
+    -0.3641,
+    -0.06832
+   ],
+   "perSide": {
+    "L": [
+     0.04401,
+     -0.35908,
+     -0.06819
+    ],
+    "R": [
+     -0.04534,
+     -0.36909,
+     -0.06844
+    ]
+   }
+  },
+  {
+   "id": 387,
+   "name": "platysma",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA45739",
+    "FMA45740"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00083,
+    0.30068,
+    -0.01725
+   ],
+   "perSide": {
+    "L": [
+     0.02398,
+     0.3001,
+     -0.0185
+    ],
+    "R": [
+     -0.02213,
+     0.30125,
+     -0.01601
+    ]
+   }
+  },
+  {
+   "id": 388,
+   "name": "popliteus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22591",
+    "FMA22592"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00034,
+    -0.31971,
+    -0.06093
+   ],
+   "perSide": {
+    "L": [
+     0.05069,
+     -0.31548,
+     -0.06184
+    ],
+    "R": [
+     -0.04852,
+     -0.32381,
+     -0.06005
+    ]
+   }
+  },
+  {
+   "id": 389,
+   "name": "procerus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA55610",
+    "FMA55611"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00112,
+    0.39098,
+    0.01769
+   ],
+   "perSide": {
+    "L": [
+     0.00413,
+     0.39099,
+     0.01758
+    ],
+    "R": [
+     -0.00637,
+     0.39097,
+     0.01781
+    ]
+   }
+  },
+  {
+   "id": 390,
+   "name": "pronator quadratus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA38454",
+    "FMA38455"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 894,
+   "centroid": [
+    -0.0079,
+    -0.02625,
+    -0.02609
+   ],
+   "perSide": {
+    "L": [
+     0.14728,
+     -0.02796,
+     -0.02551
+    ],
+    "R": [
+     -0.14724,
+     -0.02471,
+     -0.0266
+    ]
+   }
+  },
+  {
+   "id": 391,
+   "name": "pronator teres",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA38560",
+    "FMA38561",
+    "FMA38562",
+    "FMA38563"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    -0.00339,
+    0.05429,
+    -0.03955
+   ],
+   "perSide": {
+    "L": [
+     0.13982,
+     0.0563,
+     -0.03959
+    ],
+    "R": [
+     -0.14476,
+     0.0523,
+     -0.03951
+    ]
+   }
+  },
+  {
+   "id": 392,
+   "name": "psoas major",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22342",
+    "FMA22343"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    0.00032,
+    0.03197,
+    -0.0368
+   ],
+   "perSide": {
+    "L": [
+     0.02829,
+     0.01656,
+     -0.03633
+    ],
+    "R": [
+     -0.024,
+     0.04538,
+     -0.03721
+    ]
+   }
+  },
+  {
+   "id": 393,
+   "name": "pubococcygeus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA45854",
+    "FMA45855"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00078,
+    -0.06408,
+    -0.05357
+   ],
+   "perSide": {
+    "L": [
+     0.0083,
+     -0.06415,
+     -0.05286
+    ],
+    "R": [
+     -0.01015,
+     -0.06401,
+     -0.05431
+    ]
+   }
+  },
+  {
+   "id": 394,
+   "name": "puborectalis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA45856",
+    "FMA45857"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00045,
+    -0.06901,
+    -0.04162
+   ],
+   "perSide": {
+    "L": [
+     0.00879,
+     -0.06875,
+     -0.04257
+    ],
+    "R": [
+     -0.01009,
+     -0.06928,
+     -0.04063
+    ]
+   }
+  },
+  {
+   "id": 395,
+   "name": "pyramidalis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22346",
+    "FMA22347"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00061,
+    -0.04036,
+    0.00253
+   ],
+   "perSide": {
+    "L": [
+     0.00782,
+     -0.04172,
+     0.0021
+    ],
+    "R": [
+     -0.00884,
+     -0.03904,
+     0.00296
+    ]
+   }
+  },
+  {
+   "id": 396,
+   "name": "quadratus femoris",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22338",
+    "FMA22339"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00053,
+    -0.07633,
+    -0.0524
+   ],
+   "perSide": {
+    "L": [
+     0.05428,
+     -0.0761,
+     -0.05255
+    ],
+    "R": [
+     -0.0537,
+     -0.07657,
+     -0.05224
+    ]
+   }
+  },
+  {
+   "id": 397,
+   "name": "quadratus lumborum",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22348",
+    "FMA22349"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00027,
+    0.06026,
+    -0.06391
+   ],
+   "perSide": {
+    "L": [
+     0.02243,
+     0.05762,
+     -0.06411
+    ],
+    "R": [
+     -0.02278,
+     0.06287,
+     -0.06371
+    ]
+   }
+  },
+  {
+   "id": 398,
+   "name": "rectus capitis anterior",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46313",
+    "FMA46314"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00083,
+    0.35669,
+    -0.03428
+   ],
+   "perSide": {
+    "L": [
+     0.00754,
+     0.35639,
+     -0.0344
+    ],
+    "R": [
+     -0.00889,
+     0.35698,
+     -0.03416
+    ]
+   }
+  },
+  {
+   "id": 399,
+   "name": "rectus capitis lateralis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46317",
+    "FMA46318"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00127,
+    0.35406,
+    -0.0416
+   ],
+   "perSide": {
+    "L": [
+     0.01997,
+     0.35403,
+     -0.04172
+    ],
+    "R": [
+     -0.02251,
+     0.3541,
+     -0.04147
+    ]
+   }
+  },
+  {
+   "id": 400,
+   "name": "rectus capitis posterior major",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA32530",
+    "FMA32531"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00047,
+    0.34934,
+    -0.06195
+   ],
+   "perSide": {
+    "L": [
+     0.0112,
+     0.35057,
+     -0.06193
+    ],
+    "R": [
+     -0.01215,
+     0.34811,
+     -0.06198
+    ]
+   }
+  },
+  {
+   "id": 401,
+   "name": "rectus capitis posterior minor",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA32532",
+    "FMA32533"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.0005,
+    0.35538,
+    -0.06642
+   ],
+   "perSide": {
+    "L": [
+     0.0057,
+     0.35587,
+     -0.06677
+    ],
+    "R": [
+     -0.00681,
+     0.35489,
+     -0.06606
+    ]
+   }
+  },
+  {
+   "id": 402,
+   "name": "rhomboid major",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA13381",
+    "FMA13382"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    0.00296,
+    0.24394,
+    -0.09119
+   ],
+   "perSide": {
+    "L": [
+     0.02048,
+     0.23729,
+     -0.09216
+    ],
+    "R": [
+     -0.01448,
+     0.25057,
+     -0.09022
+    ]
+   }
+  },
+  {
+   "id": 403,
+   "name": "rhomboid minor",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA13383",
+    "FMA13384"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 894,
+   "centroid": [
+    -0.00032,
+    0.27403,
+    -0.08464
+   ],
+   "perSide": {
+    "L": [
+     0.01654,
+     0.27285,
+     -0.08497
+    ],
+    "R": [
+     -0.01674,
+     0.27517,
+     -0.08432
+    ]
+   }
+  },
+  {
+   "id": 404,
+   "name": "risorius",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46839",
+    "FMA46840"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00215,
+    0.34148,
+    -0.00355
+   ],
+   "perSide": {
+    "L": [
+     0.02343,
+     0.34206,
+     -0.00392
+    ],
+    "R": [
+     -0.02546,
+     0.34096,
+     -0.00322
+    ]
+   }
+  },
+  {
+   "id": 405,
+   "name": "scalenus anterior",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA13392",
+    "FMA13393"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00069,
+    0.30015,
+    -0.03401
+   ],
+   "perSide": {
+    "L": [
+     0.01758,
+     0.29946,
+     -0.03375
+    ],
+    "R": [
+     -0.01985,
+     0.30086,
+     -0.03427
+    ]
+   }
+  },
+  {
+   "id": 406,
+   "name": "scalenus medius",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA13390",
+    "FMA13391"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00042,
+    0.30435,
+    -0.04
+   ],
+   "perSide": {
+    "L": [
+     0.01998,
+     0.30216,
+     -0.03963
+    ],
+    "R": [
+     -0.0211,
+     0.30657,
+     -0.04036
+    ]
+   }
+  },
+  {
+   "id": 407,
+   "name": "scalenus posterior",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA13388",
+    "FMA13389"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    0.00016,
+    0.29409,
+    -0.04701
+   ],
+   "perSide": {
+    "L": [
+     0.02654,
+     0.29263,
+     -0.04763
+    ],
+    "R": [
+     -0.0268,
+     0.29558,
+     -0.04638
+    ]
+   }
+  },
+  {
+   "id": 408,
+   "name": "second lumbrical of foot",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA37719",
+    "FMA37720"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00156,
+    -0.54161,
+    -0.0062
+   ],
+   "perSide": {
+    "L": [
+     0.05195,
+     -0.54176,
+     -0.00555
+    ],
+    "R": [
+     -0.05436,
+     -0.54146,
+     -0.00684
+    ]
+   }
+  },
+  {
+   "id": 409,
+   "name": "second plantar interosseous of foot",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA37743",
+    "FMA37744"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00174,
+    -0.53646,
+    -0.00405
+   ],
+   "perSide": {
+    "L": [
+     0.0624,
+     -0.5367,
+     -0.00341
+    ],
+    "R": [
+     -0.06478,
+     -0.53622,
+     -0.00469
+    ]
+   }
+  },
+  {
+   "id": 410,
+   "name": "semimembranosus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22448",
+    "FMA22449"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00152,
+    -0.20935,
+    -0.05853
+   ],
+   "perSide": {
+    "L": [
+     0.02579,
+     -0.21043,
+     -0.0583
+    ],
+    "R": [
+     -0.02835,
+     -0.20828,
+     -0.05876
+    ]
+   }
+  },
+  {
+   "id": 411,
+   "name": "semispinalis capitis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22876",
+    "FMA22877"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00054,
+    0.33762,
+    -0.06197
+   ],
+   "perSide": {
+    "L": [
+     0.01371,
+     0.33593,
+     -0.06116
+    ],
+    "R": [
+     -0.01518,
+     0.33934,
+     -0.0628
+    ]
+   }
+  },
+  {
+   "id": 412,
+   "name": "semispinalis cervicis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22874",
+    "FMA22875"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00069,
+    0.29018,
+    -0.06638
+   ],
+   "perSide": {
+    "L": [
+     0.00995,
+     0.28843,
+     -0.06664
+    ],
+    "R": [
+     -0.01119,
+     0.29191,
+     -0.06613
+    ]
+   }
+  },
+  {
+   "id": 413,
+   "name": "semispinalis thoracis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22872",
+    "FMA22873"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    -0.00013,
+    0.21126,
+    -0.08358
+   ],
+   "perSide": {
+    "L": [
+     0.0084,
+     0.20731,
+     -0.08391
+    ],
+    "R": [
+     -0.00871,
+     0.21523,
+     -0.08325
+    ]
+   }
+  },
+  {
+   "id": 414,
+   "name": "serratus posterior inferior",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA13405",
+    "FMA13406"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    0.0035,
+    0.09516,
+    -0.07712
+   ],
+   "perSide": {
+    "L": [
+     0.03179,
+     0.09976,
+     -0.07713
+    ],
+    "R": [
+     -0.02381,
+     0.09073,
+     -0.07711
+    ]
+   }
+  },
+  {
+   "id": 415,
+   "name": "serratus posterior superior",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA13403",
+    "FMA13404"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00286,
+    0.27012,
+    -0.07559
+   ],
+   "perSide": {
+    "L": [
+     0.03062,
+     0.26719,
+     -0.07469
+    ],
+    "R": [
+     -0.02478,
+     0.27304,
+     -0.07648
+    ]
+   }
+  },
+  {
+   "id": 416,
+   "name": "spinalis cervicis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22781",
+    "FMA22782"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00157,
+    0.30143,
+    -0.06913
+   ],
+   "perSide": {
+    "L": [
+     0.00075,
+     0.30149,
+     -0.06911
+    ],
+    "R": [
+     -0.00392,
+     0.30136,
+     -0.06914
+    ]
+   }
+  },
+  {
+   "id": 417,
+   "name": "spinalis thoracis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22779",
+    "FMA22780"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    -0.0012,
+    0.17315,
+    -0.08391
+   ],
+   "perSide": {
+    "L": [
+     0.00177,
+     0.16974,
+     -0.08365
+    ],
+    "R": [
+     -0.0042,
+     0.17661,
+     -0.08418
+    ]
+   }
+  },
+  {
+   "id": 418,
+   "name": "splenius capitis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22728",
+    "FMA22729"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00046,
+    0.30966,
+    -0.06753
+   ],
+   "perSide": {
+    "L": [
+     0.01279,
+     0.31444,
+     -0.06505
+    ],
+    "R": [
+     -0.01234,
+     0.30538,
+     -0.06975
+    ]
+   }
+  },
+  {
+   "id": 419,
+   "name": "splenius cervicis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22726",
+    "FMA22727"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    0.00067,
+    0.25572,
+    -0.08077
+   ],
+   "perSide": {
+    "L": [
+     0.01068,
+     0.26049,
+     -0.07872
+    ],
+    "R": [
+     -0.00948,
+     0.25089,
+     -0.08286
+    ]
+   }
+  },
+  {
+   "id": 420,
+   "name": "sternohyoid",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA13346",
+    "FMA13347"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00096,
+    0.29062,
+    -0.01687
+   ],
+   "perSide": {
+    "L": [
+     0.00648,
+     0.29143,
+     -0.0168
+    ],
+    "R": [
+     -0.00844,
+     0.28981,
+     -0.01695
+    ]
+   }
+  },
+  {
+   "id": 421,
+   "name": "sternothyroid",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA13350",
+    "FMA13351"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00114,
+    0.27669,
+    -0.01948
+   ],
+   "perSide": {
+    "L": [
+     0.00706,
+     0.27743,
+     -0.01976
+    ],
+    "R": [
+     -0.009,
+     0.27599,
+     -0.01922
+    ]
+   }
+  },
+  {
+   "id": 422,
+   "name": "stylohyoid",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA45826",
+    "FMA45827"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00303,
+    0.33856,
+    -0.02291
+   ],
+   "perSide": {
+    "L": [
+     0.01171,
+     0.33521,
+     -0.02056
+    ],
+    "R": [
+     -0.01798,
+     0.34195,
+     -0.02529
+    ]
+   }
+  },
+  {
+   "id": 423,
+   "name": "subclavius",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA13411",
+    "FMA13412"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00119,
+    0.26377,
+    -0.01675
+   ],
+   "perSide": {
+    "L": [
+     0.03606,
+     0.26458,
+     -0.0189
+    ],
+    "R": [
+     -0.03368,
+     0.26296,
+     -0.01461
+    ]
+   }
+  },
+  {
+   "id": 424,
+   "name": "subscapularis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA13414",
+    "FMA13415"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00093,
+    0.23901,
+    -0.06711
+   ],
+   "perSide": {
+    "L": [
+     0.06737,
+     0.24068,
+     -0.06317
+    ],
+    "R": [
+     -0.06238,
+     0.23741,
+     -0.07087
+    ]
+   }
+  },
+  {
+   "id": 425,
+   "name": "supinator",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA38513",
+    "FMA38514"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00248,
+    0.05885,
+    -0.04832
+   ],
+   "perSide": {
+    "L": [
+     0.14416,
+     0.06008,
+     -0.04866
+    ],
+    "R": [
+     -0.14657,
+     0.05764,
+     -0.04798
+    ]
+   }
+  },
+  {
+   "id": 426,
+   "name": "supraspinatus",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA32544",
+    "FMA32545"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    0.00087,
+    0.26453,
+    -0.06059
+   ],
+   "perSide": {
+    "L": [
+     0.08591,
+     0.26474,
+     -0.05944
+    ],
+    "R": [
+     -0.08418,
+     0.26432,
+     -0.06174
+    ]
+   }
+  },
+  {
+   "id": 427,
+   "name": "temporoparietalis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46763",
+    "FMA46764"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.0034,
+    0.40117,
+    -0.04689
+   ],
+   "perSide": {
+    "L": [
+     0.03809,
+     0.40147,
+     -0.04437
+    ],
+    "R": [
+     -0.03761,
+     0.40092,
+     -0.04896
+    ]
+   }
+  },
+  {
+   "id": 428,
+   "name": "tendinous arch of levator ani",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46442"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.0028,
+    -0.05855,
+    -0.03821
+   ],
+   "perSide": {
+    "M": [
+     -0.0028,
+     -0.05855,
+     -0.03821
+    ]
+   }
+  },
+  {
+   "id": 429,
+   "name": "teres minor",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA32553",
+    "FMA32554"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.0001,
+    0.23437,
+    -0.07041
+   ],
+   "perSide": {
+    "L": [
+     0.08815,
+     0.23512,
+     -0.06985
+    ],
+    "R": [
+     -0.08834,
+     0.23362,
+     -0.07097
+    ]
+   }
+  },
+  {
+   "id": 430,
+   "name": "third lumbrical of foot",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA37485",
+    "FMA37486"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    0.00051,
+    -0.54157,
+    -0.01094
+   ],
+   "perSide": {
+    "L": [
+     0.05704,
+     -0.54182,
+     -0.00983
+    ],
+    "R": [
+     -0.05912,
+     -0.5413,
+     -0.0121
+    ]
+   }
+  },
+  {
+   "id": 431,
+   "name": "third plantar interosseous of foot",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA37741",
+    "FMA37742"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00035,
+    -0.53977,
+    -0.00963
+   ],
+   "perSide": {
+    "L": [
+     0.06902,
+     -0.54008,
+     -0.00823
+    ],
+    "R": [
+     -0.07033,
+     -0.53945,
+     -0.01103
+    ]
+   }
+  },
+  {
+   "id": 432,
+   "name": "thoracic rotator",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA23083"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 900,
+   "centroid": [
+    -0.00331,
+    0.21412,
+    -0.07498
+   ],
+   "perSide": {
+    "M": [
+     -0.00331,
+     0.21412,
+     -0.07498
+    ]
+   }
+  },
+  {
+   "id": 433,
+   "name": "thyrohyoid",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA13352",
+    "FMA13353"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.0014,
+    0.31518,
+    -0.02173
+   ],
+   "perSide": {
+    "L": [
+     0.00744,
+     0.31637,
+     -0.02189
+    ],
+    "R": [
+     -0.00946,
+     0.31409,
+     -0.02158
+    ]
+   }
+  },
+  {
+   "id": 434,
+   "name": "tibialis posterior",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA65018",
+    "FMA65019"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00413,
+    -0.47186,
+    -0.04352
+   ],
+   "perSide": {
+    "L": [
+     0.04212,
+     -0.46696,
+     -0.04585
+    ],
+    "R": [
+     -0.04656,
+     -0.47636,
+     -0.04138
+    ]
+   }
+  },
+  {
+   "id": 435,
+   "name": "transversus abdominis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA22344",
+    "FMA22345"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00468,
+    0.07847,
+    -0.01509
+   ],
+   "perSide": {
+    "L": [
+     0.05131,
+     0.08415,
+     -0.01751
+    ],
+    "R": [
+     -0.04278,
+     0.07269,
+     -0.01262
+    ]
+   }
+  },
+  {
+   "id": 436,
+   "name": "transversus thoracis",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA9761",
+    "FMA9762"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 896,
+   "centroid": [
+    0.00088,
+    0.19565,
+    0.01765
+   ],
+   "perSide": {
+    "L": [
+     0.02097,
+     0.19571,
+     0.01723
+    ],
+    "R": [
+     -0.01813,
+     0.19559,
+     0.01805
+    ]
+   }
+  },
+  {
+   "id": 437,
+   "name": "vastus intermedius",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA38934",
+    "FMA38935"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    0.00033,
+    -0.20562,
+    -0.02542
+   ],
+   "perSide": {
+    "L": [
+     0.06092,
+     -0.20356,
+     -0.02529
+    ],
+    "R": [
+     -0.0608,
+     -0.20769,
+     -0.02555
+    ]
+   }
+  },
+  {
+   "id": 438,
+   "name": "zygomaticus major",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46812",
+    "FMA46813"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 898,
+   "centroid": [
+    -0.00247,
+    0.3561,
+    0.00371
+   ],
+   "perSide": {
+    "L": [
+     0.02313,
+     0.35626,
+     0.00363
+    ],
+    "R": [
+     -0.02571,
+     0.35596,
+     0.00378
+    ]
+   }
+  },
+  {
+   "id": 439,
+   "name": "zygomaticus minor",
+   "layer": "muscles_deep",
+   "system": "muscular",
+   "fma": [
+    "FMA46814",
+    "FMA46815"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 900,
+   "centroid": [
+    0.00021,
+    0.36051,
+    0.01102
+   ],
+   "perSide": {
+    "L": [
+     0.0172,
+     0.36167,
+     0.01003
+    ],
+    "R": [
+     -0.01662,
+     0.35936,
+     0.012
+    ]
+   }
+  },
+  {
+   "id": 440,
+   "name": "adrenal gland",
+   "layer": "organs",
+   "system": "endocrine",
+   "fma": [
+    "FMA15629",
+    "FMA15630"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1198,
+   "centroid": [
+    -0.0032,
+    0.12139,
+    -0.04993
+   ],
+   "perSide": {
+    "L": [
+     0.01872,
+     0.12379,
+     -0.04764
+    ],
+    "R": [
+     -0.0252,
+     0.11898,
+     -0.05223
+    ]
+   }
+  },
+  {
+   "id": 441,
+   "name": "anterior papillary muscle of ventricle",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA7260"
+   ],
+   "sides": [
+    "R"
+   ],
+   "tris": 1200,
+   "centroid": [
+    0.0175,
+    0.18362,
+    0.00609
+   ],
+   "perSide": {
+    "R": [
+     0.0175,
+     0.18362,
+     0.00609
+    ]
+   }
+  },
+  {
+   "id": 442,
+   "name": "appendix",
+   "layer": "organs",
+   "system": "alimentary",
+   "fma": [
+    "FMA14542"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 332,
+   "centroid": [
+    -0.03572,
+    -0.00176,
+    -0.01305
+   ],
+   "perSide": {
+    "M": [
+     -0.03572,
+     -0.00176,
+     -0.01305
+    ]
+   }
+  },
+  {
+   "id": 443,
+   "name": "arch of aorta",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA3768"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 656,
+   "centroid": [
+    0.00739,
+    0.25012,
+    -0.03347
+   ],
+   "perSide": {
+    "M": [
+     0.00739,
+     0.25012,
+     -0.03347
+    ]
+   }
+  },
+  {
+   "id": 444,
+   "name": "ascending aorta",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA3736"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 430,
+   "centroid": [
+    0.00344,
+    0.22838,
+    -0.01613
+   ],
+   "perSide": {
+    "M": [
+     0.00344,
+     0.22838,
+     -0.01613
+    ]
+   }
+  },
+  {
+   "id": 445,
+   "name": "brachiocephalic vein",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA4751",
+    "FMA4761"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 712,
+   "centroid": [
+    -0.00642,
+    0.26051,
+    -0.01969
+   ],
+   "perSide": {
+    "L": [
+     -0.00073,
+     0.25917,
+     -0.01952
+    ],
+    "R": [
+     -0.01421,
+     0.26234,
+     -0.01992
+    ]
+   }
+  },
+  {
+   "id": 446,
+   "name": "bronchus",
+   "layer": "organs",
+   "system": "respiratory",
+   "fma": [
+    "FMA7409"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1200,
+   "centroid": [
+    0.01464,
+    0.20103,
+    -0.04246
+   ],
+   "perSide": {
+    "M": [
+     0.01464,
+     0.20103,
+     -0.04246
+    ]
+   }
+  },
+  {
+   "id": 447,
+   "name": "celiac artery",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA50737"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 220,
+   "centroid": [
+    0.00118,
+    0.1077,
+    -0.01669
+   ],
+   "perSide": {
+    "M": [
+     0.00118,
+     0.1077,
+     -0.01669
+    ]
+   }
+  },
+  {
+   "id": 448,
+   "name": "circumflex branch of coronary artery",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA3895"
+   ],
+   "sides": [
+    "L"
+   ],
+   "tris": 1200,
+   "centroid": [
+    0.03817,
+    0.19147,
+    -0.02702
+   ],
+   "perSide": {
+    "L": [
+     0.03817,
+     0.19147,
+     -0.02702
+    ]
+   }
+  },
+  {
+   "id": 449,
+   "name": "common carotid artery",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA3941",
+    "FMA4058"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 770,
+   "centroid": [
+    -0.00593,
+    0.27664,
+    -0.0257
+   ],
+   "perSide": {
+    "L": [
+     0.00929,
+     0.27357,
+     -0.02897
+    ],
+    "R": [
+     -0.01032,
+     0.27753,
+     -0.02476
+    ]
+   }
+  },
+  {
+   "id": 450,
+   "name": "common hepatic artery",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA14771"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 228,
+   "centroid": [
+    -0.00323,
+    0.11341,
+    -0.00958
+   ],
+   "perSide": {
+    "M": [
+     -0.00323,
+     0.11341,
+     -0.00958
+    ]
+   }
+  },
+  {
+   "id": 451,
+   "name": "common iliac artery",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA14765",
+    "FMA14766"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 338,
+   "centroid": [
+    0.00013,
+    0.03044,
+    -0.0187
+   ],
+   "perSide": {
+    "L": [
+     0.00698,
+     0.03106,
+     -0.01897
+    ],
+    "R": [
+     -0.00605,
+     0.02989,
+     -0.01846
+    ]
+   }
+  },
+  {
+   "id": 452,
+   "name": "common iliac vein",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA21387",
+    "FMA21388"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 388,
+   "centroid": [
+    -0.00594,
+    0.03095,
+    -0.02216
+   ],
+   "perSide": {
+    "L": [
+     -0.0018,
+     0.02935,
+     -0.02312
+    ],
+    "R": [
+     -0.0106,
+     0.03276,
+     -0.02108
+    ]
+   }
+  },
+  {
+   "id": 453,
+   "name": "coronary sinus",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA4706"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 384,
+   "centroid": [
+    0.00714,
+    0.19083,
+    -0.03163
+   ],
+   "perSide": {
+    "M": [
+     0.00714,
+     0.19083,
+     -0.03163
+    ]
+   }
+  },
+  {
+   "id": 454,
+   "name": "descending aorta",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA3784"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1200,
+   "centroid": [
+    0.00629,
+    0.14393,
+    -0.03688
+   ],
+   "perSide": {
+    "M": [
+     0.00629,
+     0.14393,
+     -0.03688
+    ]
+   }
+  },
+  {
+   "id": 455,
+   "name": "duodenum",
+   "layer": "organs",
+   "system": "alimentary",
+   "fma": [
+    "FMA7206"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1200,
+   "centroid": [
+    -0.00219,
+    0.08833,
+    -0.0096
+   ],
+   "perSide": {
+    "M": [
+     -0.00219,
+     0.08833,
+     -0.0096
+    ]
+   }
+  },
+  {
+   "id": 456,
+   "name": "esophagus",
+   "layer": "organs",
+   "system": "alimentary",
+   "fma": [
+    "FMA7131"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 528,
+   "centroid": [
+    -0.00016,
+    0.2214,
+    -0.03912
+   ],
+   "perSide": {
+    "M": [
+     -0.00016,
+     0.2214,
+     -0.03912
+    ]
+   }
+  },
+  {
+   "id": 457,
+   "name": "external iliac artery",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA18806",
+    "FMA18807"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 558,
+   "centroid": [
+    -0.00288,
+    -0.02008,
+    -0.01759
+   ],
+   "perSide": {
+    "L": [
+     0.02607,
+     -0.02049,
+     -0.02006
+    ],
+    "R": [
+     -0.02747,
+     -0.01973,
+     -0.01549
+    ]
+   }
+  },
+  {
+   "id": 458,
+   "name": "external iliac vein",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA18885",
+    "FMA18886"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 572,
+   "centroid": [
+    -0.00068,
+    -0.0238,
+    -0.02387
+   ],
+   "perSide": {
+    "L": [
+     0.01927,
+     -0.02348,
+     -0.02566
+    ],
+    "R": [
+     -0.02264,
+     -0.02415,
+     -0.02189
+    ]
+   }
+  },
+  {
+   "id": 459,
+   "name": "free taenia",
+   "layer": "organs",
+   "system": "alimentary",
+   "fma": [
+    "FMA76893"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1198,
+   "centroid": [
+    0.0075,
+    0.04171,
+    -0.01563
+   ],
+   "perSide": {
+    "M": [
+     0.0075,
+     0.04171,
+     -0.01563
+    ]
+   }
+  },
+  {
+   "id": 460,
+   "name": "gallbladder",
+   "layer": "organs",
+   "system": "alimentary",
+   "fma": [
+    "FMA7202"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1198,
+   "centroid": [
+    -0.034,
+    0.10471,
+    0.00142
+   ],
+   "perSide": {
+    "M": [
+     -0.034,
+     0.10471,
+     0.00142
+    ]
+   }
+  },
+  {
+   "id": 461,
+   "name": "gastric artery",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA14768"
+   ],
+   "sides": [
+    "L"
+   ],
+   "tris": 58,
+   "centroid": [
+    0.00284,
+    0.1103,
+    -0.00937
+   ],
+   "perSide": {
+    "L": [
+     0.00284,
+     0.1103,
+     -0.00937
+    ]
+   }
+  },
+  {
+   "id": 462,
+   "name": "great cardiac vein",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA4707"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1200,
+   "centroid": [
+    0.03457,
+    0.19495,
+    -0.00072
+   ],
+   "perSide": {
+    "M": [
+     0.03457,
+     0.19495,
+     -0.00072
+    ]
+   }
+  },
+  {
+   "id": 463,
+   "name": "ileum",
+   "layer": "organs",
+   "system": "alimentary",
+   "fma": [
+    "FMA7208"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1198,
+   "centroid": [
+    -0.00438,
+    -0.00802,
+    -0.0053
+   ],
+   "perSide": {
+    "M": [
+     -0.00438,
+     -0.00802,
+     -0.0053
+    ]
+   }
+  },
+  {
+   "id": 464,
+   "name": "inferior mesenteric artery",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA14750"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 232,
+   "centroid": [
+    0.00385,
+    0.04935,
+    -0.00963
+   ],
+   "perSide": {
+    "M": [
+     0.00385,
+     0.04935,
+     -0.00963
+    ]
+   }
+  },
+  {
+   "id": 465,
+   "name": "inferior vena cava",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA10951"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1200,
+   "centroid": [
+    -0.00803,
+    0.09548,
+    -0.01963
+   ],
+   "perSide": {
+    "M": [
+     -0.00803,
+     0.09548,
+     -0.01963
+    ]
+   }
+  },
+  {
+   "id": 466,
+   "name": "internal iliac artery",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA18809",
+    "FMA18810"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 612,
+   "centroid": [
+    0.0019,
+    -0.00765,
+    -0.04199
+   ],
+   "perSide": {
+    "L": [
+     0.01497,
+     -0.00839,
+     -0.04466
+    ],
+    "R": [
+     -0.01668,
+     -0.00658,
+     -0.03821
+    ]
+   }
+  },
+  {
+   "id": 467,
+   "name": "internal iliac vein",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA18887",
+    "FMA18888"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 424,
+   "centroid": [
+    -0.00329,
+    -0.00482,
+    -0.04606
+   ],
+   "perSide": {
+    "L": [
+     0.01127,
+     -0.00485,
+     -0.04637
+    ],
+    "R": [
+     -0.01732,
+     -0.00479,
+     -0.04577
+    ]
+   }
+  },
+  {
+   "id": 468,
+   "name": "internal jugular vein",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA4754",
+    "FMA4762"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 412,
+   "centroid": [
+    -0.00261,
+    0.28254,
+    -0.02109
+   ],
+   "perSide": {
+    "L": [
+     0.01371,
+     0.28301,
+     -0.02121
+    ],
+    "R": [
+     -0.01688,
+     0.28213,
+     -0.02099
+    ]
+   }
+  },
+  {
+   "id": 469,
+   "name": "jejunum",
+   "layer": "organs",
+   "system": "alimentary",
+   "fma": [
+    "FMA7207"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1200,
+   "centroid": [
+    0.00892,
+    0.04968,
+    -0.00108
+   ],
+   "perSide": {
+    "M": [
+     0.00892,
+     0.04968,
+     -0.00108
+    ]
+   }
+  },
+  {
+   "id": 470,
+   "name": "kidney",
+   "layer": "organs",
+   "system": "urinary",
+   "fma": [
+    "FMA7204",
+    "FMA7205"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1196,
+   "centroid": [
+    -0.00284,
+    0.09467,
+    -0.0465
+   ],
+   "perSide": {
+    "L": [
+     0.03231,
+     0.09985,
+     -0.04632
+    ],
+    "R": [
+     -0.03799,
+     0.08948,
+     -0.04668
+    ]
+   }
+  },
+  {
+   "id": 471,
+   "name": "liver",
+   "layer": "organs",
+   "system": "alimentary",
+   "fma": [
+    "FMA7197"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1200,
+   "centroid": [
+    -0.01434,
+    0.13963,
+    -0.01124
+   ],
+   "perSide": {
+    "M": [
+     -0.01434,
+     0.13963,
+     -0.01124
+    ]
+   }
+  },
+  {
+   "id": 472,
+   "name": "lower lobe of lung",
+   "layer": "organs",
+   "system": "respiratory",
+   "fma": [
+    "FMA7337",
+    "FMA7371"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1200,
+   "centroid": [
+    0.00811,
+    0.17576,
+    -0.04127
+   ],
+   "perSide": {
+    "L": [
+     0.04619,
+     0.17412,
+     -0.03268
+    ],
+    "R": [
+     -0.02985,
+     0.17739,
+     -0.04985
+    ]
+   }
+  },
+  {
+   "id": 473,
+   "name": "marginal branch of coronary artery",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA3818"
+   ],
+   "sides": [
+    "R"
+   ],
+   "tris": 1200,
+   "centroid": [
+    0.0094,
+    0.19276,
+    0.00716
+   ],
+   "perSide": {
+    "R": [
+     0.0094,
+     0.19276,
+     0.00716
+    ]
+   }
+  },
+  {
+   "id": 474,
+   "name": "mesocolic taenia",
+   "layer": "organs",
+   "system": "alimentary",
+   "fma": [
+    "FMA76891"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1200,
+   "centroid": [
+    0.00158,
+    0.05713,
+    -0.02178
+   ],
+   "perSide": {
+    "M": [
+     0.00158,
+     0.05713,
+     -0.02178
+    ]
+   }
+  },
+  {
+   "id": 475,
+   "name": "middle cardiac vein",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA4713"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1200,
+   "centroid": [
+    0.02388,
+    0.17338,
+    -0.00877
+   ],
+   "perSide": {
+    "M": [
+     0.02388,
+     0.17338,
+     -0.00877
+    ]
+   }
+  },
+  {
+   "id": 476,
+   "name": "middle lobe of lung",
+   "layer": "organs",
+   "system": "respiratory",
+   "fma": [
+    "FMA7383"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1198,
+   "centroid": [
+    -0.03506,
+    0.19107,
+    -0.00889
+   ],
+   "perSide": {
+    "M": [
+     -0.03506,
+     0.19107,
+     -0.00889
+    ]
+   }
+  },
+  {
+   "id": 477,
+   "name": "mitral valve",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA7235"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1200,
+   "centroid": [
+    0.02295,
+    0.19339,
+    -0.02891
+   ],
+   "perSide": {
+    "M": [
+     0.02295,
+     0.19339,
+     -0.02891
+    ]
+   }
+  },
+  {
+   "id": 478,
+   "name": "omental taenia",
+   "layer": "organs",
+   "system": "alimentary",
+   "fma": [
+    "FMA76892"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1198,
+   "centroid": [
+    0.00589,
+    0.05668,
+    -0.0203
+   ],
+   "perSide": {
+    "M": [
+     0.00589,
+     0.05668,
+     -0.0203
+    ]
+   }
+  },
+  {
+   "id": 479,
+   "name": "pancreatic duct",
+   "layer": "organs",
+   "system": "alimentary",
+   "fma": [
+    "FMA10419"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1200,
+   "centroid": [
+    0.00367,
+    0.10093,
+    -0.01489
+   ],
+   "perSide": {
+    "M": [
+     0.00367,
+     0.10093,
+     -0.01489
+    ]
+   }
+  },
+  {
+   "id": 480,
+   "name": "pineal body",
+   "layer": "organs",
+   "system": "endocrine",
+   "fma": [
+    "FMA62033"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 580,
+   "centroid": [
+    -0.00148,
+    0.39211,
+    -0.04643
+   ],
+   "perSide": {
+    "M": [
+     -0.00148,
+     0.39211,
+     -0.04643
+    ]
+   }
+  },
+  {
+   "id": 481,
+   "name": "pituitary gland",
+   "layer": "organs",
+   "system": "endocrine",
+   "fma": [
+    "FMA13889"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1164,
+   "centroid": [
+    -0.00143,
+    0.38309,
+    -0.02309
+   ],
+   "perSide": {
+    "M": [
+     -0.00143,
+     0.38309,
+     -0.02309
+    ]
+   }
+  },
+  {
+   "id": 482,
+   "name": "posterior papillary muscle of ventricle",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA7261",
+    "FMA7266"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1200,
+   "centroid": [
+    0.02451,
+    0.1822,
+    -0.01029
+   ],
+   "perSide": {
+    "L": [
+     0.03678,
+     0.18745,
+     -0.01612
+    ],
+    "R": [
+     0.01225,
+     0.17694,
+     -0.00446
+    ]
+   }
+  },
+  {
+   "id": 483,
+   "name": "posterolateral branch of coronary artery",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA76994"
+   ],
+   "sides": [
+    "R"
+   ],
+   "tris": 1200,
+   "centroid": [
+    0.03264,
+    0.17551,
+    -0.02246
+   ],
+   "perSide": {
+    "R": [
+     0.03264,
+     0.17551,
+     -0.02246
+    ]
+   }
+  },
+  {
+   "id": 484,
+   "name": "pulmonary artery",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA66326"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1198,
+   "centroid": [
+    0.01395,
+    0.20986,
+    -0.04408
+   ],
+   "perSide": {
+    "M": [
+     0.01395,
+     0.20986,
+     -0.04408
+    ]
+   }
+  },
+  {
+   "id": 485,
+   "name": "pulmonary valve",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA7246"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1198,
+   "centroid": [
+    0.01498,
+    0.2186,
+    -0.00437
+   ],
+   "perSide": {
+    "M": [
+     0.01498,
+     0.2186,
+     -0.00437
+    ]
+   }
+  },
+  {
+   "id": 486,
+   "name": "pulmonary vein",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA66643"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1200,
+   "centroid": [
+    0.00769,
+    0.21037,
+    -0.03908
+   ],
+   "perSide": {
+    "M": [
+     0.00769,
+     0.21037,
+     -0.03908
+    ]
+   }
+  },
+  {
+   "id": 487,
+   "name": "rectum",
+   "layer": "organs",
+   "system": "alimentary",
+   "fma": [
+    "FMA14544"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1200,
+   "centroid": [
+    0.0003,
+    -0.04438,
+    -0.06132
+   ],
+   "perSide": {
+    "M": [
+     0.0003,
+     -0.04438,
+     -0.06132
+    ]
+   }
+  },
+  {
+   "id": 488,
+   "name": "renal artery",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA14752",
+    "FMA14753"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 618,
+   "centroid": [
+    -0.00289,
+    0.09387,
+    -0.03333
+   ],
+   "perSide": {
+    "L": [
+     0.01922,
+     0.09653,
+     -0.03288
+    ],
+    "R": [
+     -0.01945,
+     0.09188,
+     -0.03367
+    ]
+   }
+  },
+  {
+   "id": 489,
+   "name": "renal vein",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA14335",
+    "FMA14336"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 474,
+   "centroid": [
+    -0.01254,
+    0.09031,
+    -0.02965
+   ],
+   "perSide": {
+    "L": [
+     0.01189,
+     0.0921,
+     -0.02702
+    ],
+    "R": [
+     -0.02561,
+     0.08935,
+     -0.03106
+    ]
+   }
+  },
+  {
+   "id": 490,
+   "name": "septal papillary muscle of ventricle",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA7262"
+   ],
+   "sides": [
+    "R"
+   ],
+   "tris": 844,
+   "centroid": [
+    0.01153,
+    0.20157,
+    -0.01031
+   ],
+   "perSide": {
+    "R": [
+     0.01153,
+     0.20157,
+     -0.01031
+    ]
+   }
+  },
+  {
+   "id": 491,
+   "name": "splenic artery",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA14773"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1200,
+   "centroid": [
+    0.0373,
+    0.11917,
+    -0.03322
+   ],
+   "perSide": {
+    "M": [
+     0.0373,
+     0.11917,
+     -0.03322
+    ]
+   }
+  },
+  {
+   "id": 492,
+   "name": "splenic vein",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA14331"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 796,
+   "centroid": [
+    0.03095,
+    0.11366,
+    -0.02822
+   ],
+   "perSide": {
+    "M": [
+     0.03095,
+     0.11366,
+     -0.02822
+    ]
+   }
+  },
+  {
+   "id": 493,
+   "name": "stem of coronary artery",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA4685"
+   ],
+   "sides": [
+    "L"
+   ],
+   "tris": 154,
+   "centroid": [
+    0.01589,
+    0.22071,
+    -0.01915
+   ],
+   "perSide": {
+    "L": [
+     0.01589,
+     0.22071,
+     -0.01915
+    ]
+   }
+  },
+  {
+   "id": 494,
+   "name": "stomach",
+   "layer": "organs",
+   "system": "alimentary",
+   "fma": [
+    "FMA7148"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1200,
+   "centroid": [
+    0.02525,
+    0.13306,
+    -0.00912
+   ],
+   "perSide": {
+    "M": [
+     0.02525,
+     0.13306,
+     -0.00912
+    ]
+   }
+  },
+  {
+   "id": 495,
+   "name": "subclavian artery",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA3953",
+    "FMA4694"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1088,
+   "centroid": [
+    0.00375,
+    0.27114,
+    -0.03102
+   ],
+   "perSide": {
+    "L": [
+     0.03089,
+     0.27107,
+     -0.03223
+    ],
+    "R": [
+     -0.02958,
+     0.27122,
+     -0.02953
+    ]
+   }
+  },
+  {
+   "id": 496,
+   "name": "subclavian vein",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA4755",
+    "FMA4763"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 440,
+   "centroid": [
+    0.00097,
+    0.27187,
+    -0.02281
+   ],
+   "perSide": {
+    "L": [
+     0.02628,
+     0.2721,
+     -0.02337
+    ],
+    "R": [
+     -0.02876,
+     0.27159,
+     -0.02215
+    ]
+   }
+  },
+  {
+   "id": 497,
+   "name": "superior mesenteric artery",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA14749"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 70,
+   "centroid": [
+    0.00275,
+    0.09546,
+    -0.01515
+   ],
+   "perSide": {
+    "M": [
+     0.00275,
+     0.09546,
+     -0.01515
+    ]
+   }
+  },
+  {
+   "id": 498,
+   "name": "superior mesenteric vein",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA14332"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 100,
+   "centroid": [
+    -0.00228,
+    0.09355,
+    -0.00983
+   ],
+   "perSide": {
+    "M": [
+     -0.00228,
+     0.09355,
+     -0.00983
+    ]
+   }
+  },
+  {
+   "id": 499,
+   "name": "superior vena cava",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA4720"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 308,
+   "centroid": [
+    -0.01072,
+    0.24018,
+    -0.02238
+   ],
+   "perSide": {
+    "M": [
+     -0.01072,
+     0.24018,
+     -0.02238
+    ]
+   }
+  },
+  {
+   "id": 500,
+   "name": "testis",
+   "layer": "organs",
+   "system": "endocrine",
+   "fma": [
+    "FMA7211",
+    "FMA7212"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 422,
+   "centroid": [
+    -0.00207,
+    -0.11904,
+    -9e-05
+   ],
+   "perSide": {
+    "L": [
+     0.00947,
+     -0.11908,
+     -0.00017
+    ],
+    "R": [
+     -0.01351,
+     -0.11901,
+     -1e-05
+    ]
+   }
+  },
+  {
+   "id": 501,
+   "name": "thyroid cartilage",
+   "layer": "organs",
+   "system": "respiratory",
+   "fma": [
+    "FMA55099"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1200,
+   "centroid": [
+    -0.0004,
+    0.31205,
+    -0.02609
+   ],
+   "perSide": {
+    "M": [
+     -0.0004,
+     0.31205,
+     -0.02609
+    ]
+   }
+  },
+  {
+   "id": 502,
+   "name": "trachea",
+   "layer": "organs",
+   "system": "respiratory",
+   "fma": [
+    "FMA7394"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1200,
+   "centroid": [
+    -0.00064,
+    0.27862,
+    -0.03101
+   ],
+   "perSide": {
+    "M": [
+     -0.00064,
+     0.27862,
+     -0.03101
+    ]
+   }
+  },
+  {
+   "id": 503,
+   "name": "tricuspid valve",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA7234"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1200,
+   "centroid": [
+    0.00053,
+    0.19367,
+    -0.01328
+   ],
+   "perSide": {
+    "M": [
+     0.00053,
+     0.19367,
+     -0.01328
+    ]
+   }
+  },
+  {
+   "id": 504,
+   "name": "trunk of coronary artery",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA3802"
+   ],
+   "sides": [
+    "R"
+   ],
+   "tris": 1200,
+   "centroid": [
+    -0.00146,
+    0.19925,
+    -0.0089
+   ],
+   "perSide": {
+    "R": [
+     -0.00146,
+     0.19925,
+     -0.0089
+    ]
+   }
+  },
+  {
+   "id": 505,
+   "name": "upper lobe of lung",
+   "layer": "organs",
+   "system": "respiratory",
+   "fma": [
+    "FMA7333",
+    "FMA7370"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1200,
+   "centroid": [
+    0.00602,
+    0.22871,
+    -0.02701
+   ],
+   "perSide": {
+    "L": [
+     0.03304,
+     0.22139,
+     -0.02398
+    ],
+    "R": [
+     -0.021,
+     0.23603,
+     -0.03004
+    ]
+   }
+  },
+  {
+   "id": 506,
+   "name": "ureter",
+   "layer": "organs",
+   "system": "urinary",
+   "fma": [
+    "FMA15571",
+    "FMA15572"
+   ],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1198,
+   "centroid": [
+    -0.00225,
+    0.0648,
+    -0.0446
+   ],
+   "perSide": {
+    "L": [
+     0.02634,
+     0.0676,
+     -0.04498
+    ],
+    "R": [
+     -0.03075,
+     0.06201,
+     -0.04421
+    ]
+   }
+  },
+  {
+   "id": 507,
+   "name": "urethra",
+   "layer": "organs",
+   "system": "urinary",
+   "fma": [
+    "FMA19667"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 652,
+   "centroid": [
+    -0.00138,
+    -0.08034,
+    -0.02006
+   ],
+   "perSide": {
+    "M": [
+     -0.00138,
+     -0.08034,
+     -0.02006
+    ]
+   }
+  },
+  {
+   "id": 508,
+   "name": "urinary bladder",
+   "layer": "organs",
+   "system": "urinary",
+   "fma": [
+    "FMA15900"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 206,
+   "centroid": [
+    -0.00122,
+    -0.05145,
+    -0.03494
+   ],
+   "perSide": {
+    "M": [
+     -0.00122,
+     -0.05145,
+     -0.03494
+    ]
+   }
+  },
+  {
+   "id": 509,
+   "name": "wall of heart",
+   "layer": "organs",
+   "system": "cardiovascular",
+   "fma": [
+    "FMA7274"
+   ],
+   "sides": [
+    "M"
+   ],
+   "tris": 1198,
+   "centroid": [
+    0.006,
+    0.20223,
+    -0.02029
+   ],
+   "perSide": {
+    "M": [
+     0.006,
+     0.20223,
+     -0.02029
+    ]
+   }
+  },
+  {
+   "id": 510,
+   "name": "axillary nerve",
+   "layer": "nervous",
+   "system": "nervous",
+   "fma": [],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 192,
+   "centroid": [
+    -0.00038,
+    0.24435,
+    -0.04886
+   ],
+   "perSide": {
+    "L": [
+     0.09364,
+     0.24427,
+     -0.04639
+    ],
+    "R": [
+     -0.0944,
+     0.24444,
+     -0.05134
+    ]
+   },
+   "source": "z-anatomy"
+  },
+  {
+   "id": 511,
+   "name": "brachial plexus",
+   "layer": "nervous",
+   "system": "nervous",
+   "fma": [],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 312,
+   "centroid": [
+    -0.00048,
+    0.27296,
+    -0.04409
+   ],
+   "perSide": {
+    "L": [
+     0.05168,
+     0.27291,
+     -0.04272
+    ],
+    "R": [
+     -0.05264,
+     0.273,
+     -0.04546
+    ]
+   },
+   "source": "z-anatomy"
+  },
+  {
+   "id": 512,
+   "name": "common fibular nerve",
+   "layer": "nervous",
+   "system": "nervous",
+   "fma": [],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1920,
+   "centroid": [
+    -0.00197,
+    -0.47261,
+    -0.01361
+   ],
+   "perSide": {
+    "L": [
+     0.05695,
+     -0.47266,
+     -0.01206
+    ],
+    "R": [
+     -0.06089,
+     -0.47255,
+     -0.01517
+    ]
+   },
+   "source": "z-anatomy"
+  },
+  {
+   "id": 513,
+   "name": "cranial nerves",
+   "layer": "nervous",
+   "system": "nervous",
+   "fma": [],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 5199,
+   "centroid": [
+    -0.00102,
+    0.36752,
+    -0.01777
+   ],
+   "perSide": {
+    "L": [
+     0.01176,
+     0.36752,
+     -0.01745
+    ],
+    "R": [
+     -0.01379,
+     0.36753,
+     -0.01809
+    ]
+   },
+   "source": "z-anatomy"
+  },
+  {
+   "id": 514,
+   "name": "femoral nerve",
+   "layer": "nervous",
+   "system": "nervous",
+   "fma": [],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1104,
+   "centroid": [
+    -0.00111,
+    -0.19499,
+    -0.03689
+   ],
+   "perSide": {
+    "L": [
+     0.03161,
+     -0.19502,
+     -0.03603
+    ],
+    "R": [
+     -0.03382,
+     -0.19496,
+     -0.03774
+    ]
+   },
+   "source": "z-anatomy"
+  },
+  {
+   "id": 515,
+   "name": "intercostal nerves",
+   "layer": "nervous",
+   "system": "nervous",
+   "fma": [],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 4296,
+   "centroid": [
+    -0.00089,
+    0.17179,
+    -0.03179
+   ],
+   "perSide": {
+    "L": [
+     0.0436,
+     0.17174,
+     -0.03061
+    ],
+    "R": [
+     -0.04539,
+     0.17183,
+     -0.03296
+    ]
+   },
+   "source": "z-anatomy"
+  },
+  {
+   "id": 516,
+   "name": "long thoracic nerve",
+   "layer": "nervous",
+   "system": "nervous",
+   "fma": [],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 336,
+   "centroid": [
+    -0.00044,
+    0.23866,
+    -0.04675
+   ],
+   "perSide": {
+    "L": [
+     0.05405,
+     0.23861,
+     -0.04531
+    ],
+    "R": [
+     -0.05493,
+     0.23871,
+     -0.04818
+    ]
+   },
+   "source": "z-anatomy"
+  },
+  {
+   "id": 517,
+   "name": "lumbar plexus",
+   "layer": "nervous",
+   "system": "nervous",
+   "fma": [],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 576,
+   "centroid": [
+    -0.00126,
+    0.00562,
+    -0.02369
+   ],
+   "perSide": {
+    "L": [
+     0.0237,
+     0.0056,
+     -0.02303
+    ],
+    "R": [
+     -0.02622,
+     0.00565,
+     -0.02435
+    ]
+   },
+   "source": "z-anatomy"
+  },
+  {
+   "id": 518,
+   "name": "median nerve",
+   "layer": "nervous",
+   "system": "nervous",
+   "fma": [],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1776,
+   "centroid": [
+    -0.00162,
+    -0.04491,
+    -0.01203
+   ],
+   "perSide": {
+    "L": [
+     0.15195,
+     -0.04505,
+     -0.00798
+    ],
+    "R": [
+     -0.15519,
+     -0.04477,
+     -0.01607
+    ]
+   },
+   "source": "z-anatomy"
+  },
+  {
+   "id": 519,
+   "name": "musculocutaneous nerve",
+   "layer": "nervous",
+   "system": "nervous",
+   "fma": [],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 120,
+   "centroid": [
+    -0.00062,
+    0.14859,
+    -0.04301
+   ],
+   "perSide": {
+    "L": [
+     0.11988,
+     0.14848,
+     -0.03984
+    ],
+    "R": [
+     -0.12112,
+     0.1487,
+     -0.04618
+    ]
+   },
+   "source": "z-anatomy"
+  },
+  {
+   "id": 520,
+   "name": "obturator nerve",
+   "layer": "nervous",
+   "system": "nervous",
+   "fma": [],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 528,
+   "centroid": [
+    -0.00107,
+    -0.03993,
+    -0.03263
+   ],
+   "perSide": {
+    "L": [
+     0.02477,
+     -0.03996,
+     -0.03195
+    ],
+    "R": [
+     -0.02691,
+     -0.03991,
+     -0.03331
+    ]
+   },
+   "source": "z-anatomy"
+  },
+  {
+   "id": 521,
+   "name": "radial nerve",
+   "layer": "nervous",
+   "system": "nervous",
+   "fma": [],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2064,
+   "centroid": [
+    -0.00133,
+    -0.02953,
+    -0.02207
+   ],
+   "perSide": {
+    "L": [
+     0.1574,
+     -0.02975,
+     -0.0179
+    ],
+    "R": [
+     -0.16006,
+     -0.02932,
+     -0.02625
+    ]
+   },
+   "source": "z-anatomy"
+  },
+  {
+   "id": 522,
+   "name": "sacral plexus",
+   "layer": "nervous",
+   "system": "nervous",
+   "fma": [],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 600,
+   "centroid": [
+    -0.00038,
+    -0.02646,
+    -0.05815
+   ],
+   "perSide": {
+    "L": [
+     0.02362,
+     -0.02648,
+     -0.05752
+    ],
+    "R": [
+     -0.02439,
+     -0.02644,
+     -0.05879
+    ]
+   },
+   "source": "z-anatomy"
+  },
+  {
+   "id": 523,
+   "name": "sciatic nerve",
+   "layer": "nervous",
+   "system": "nervous",
+   "fma": [],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 408,
+   "centroid": [
+    -0.00045,
+    -0.05468,
+    -0.05651
+   ],
+   "perSide": {
+    "L": [
+     0.02696,
+     -0.05471,
+     -0.05579
+    ],
+    "R": [
+     -0.02787,
+     -0.05466,
+     -0.05724
+    ]
+   },
+   "source": "z-anatomy"
+  },
+  {
+   "id": 524,
+   "name": "spinal cord",
+   "layer": "nervous",
+   "system": "nervous",
+   "fma": [],
+   "sides": [
+    "M"
+   ],
+   "tris": 396,
+   "centroid": [
+    -0.00479,
+    0.06543,
+    -0.06095
+   ],
+   "perSide": {
+    "M": [
+     -0.00479,
+     0.06543,
+     -0.06095
+    ]
+   },
+   "source": "z-anatomy"
+  },
+  {
+   "id": 525,
+   "name": "spinal nerve roots",
+   "layer": "nervous",
+   "system": "nervous",
+   "fma": [],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1896,
+   "centroid": [
+    -0.00023,
+    0.20155,
+    -0.05625
+   ],
+   "perSide": {
+    "L": [
+     0.00963,
+     0.20129,
+     -0.056
+    ],
+    "R": [
+     -0.01008,
+     0.2018,
+     -0.0565
+    ]
+   },
+   "source": "z-anatomy"
+  },
+  {
+   "id": 526,
+   "name": "sympathetic trunk",
+   "layer": "nervous",
+   "system": "nervous",
+   "fma": [],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2040,
+   "centroid": [
+    -0.00011,
+    0.2273,
+    -0.05955
+   ],
+   "perSide": {
+    "L": [
+     0.00947,
+     0.22729,
+     -0.0593
+    ],
+    "R": [
+     -0.00969,
+     0.22731,
+     -0.05981
+    ]
+   },
+   "source": "z-anatomy"
+  },
+  {
+   "id": 527,
+   "name": "tibial nerve",
+   "layer": "nervous",
+   "system": "nervous",
+   "fma": [],
+   "sides": [
+    "L",
+    "M",
+    "R"
+   ],
+   "tris": 1824,
+   "centroid": [
+    -0.01785,
+    -0.53082,
+    -0.00241
+   ],
+   "perSide": {
+    "L": [
+     0.05609,
+     -0.5266,
+     0.00094
+    ],
+    "M": [
+     -0.04745,
+     -0.5408,
+     -0.0065
+    ],
+    "R": [
+     -0.0622,
+     -0.52505,
+     -0.00166
+    ]
+   },
+   "source": "z-anatomy"
+  },
+  {
+   "id": 528,
+   "name": "ulnar nerve",
+   "layer": "nervous",
+   "system": "nervous",
+   "fma": [],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 1752,
+   "centroid": [
+    -0.00161,
+    -0.06014,
+    -0.01223
+   ],
+   "perSide": {
+    "L": [
+     0.13506,
+     -0.0603,
+     -0.00864
+    ],
+    "R": [
+     -0.13829,
+     -0.05998,
+     -0.01583
+    ]
+   },
+   "source": "z-anatomy"
+  },
+  {
+   "id": 529,
+   "name": "vagus nerve",
+   "layer": "nervous",
+   "system": "nervous",
+   "fma": [],
+   "sides": [
+    "L",
+    "R"
+   ],
+   "tris": 2496,
+   "centroid": [
+    0.01017,
+    0.26337,
+    -0.03236
+   ],
+   "perSide": {
+    "L": [
+     0.00907,
+     0.33182,
+     -0.0347
+    ],
+    "R": [
+     0.01127,
+     0.19491,
+     -0.03001
+    ]
+   },
+   "source": "z-anatomy"
+  }
+ ],
+ "sources": {
+  "nervous": {
+   "attribution": "Z-Anatomy by Gauthier Kervyn and Marcin Zielinski, licensed CC BY-SA 4.0, derived from BodyParts3D (CC BY-SA 2.1 JP)",
+   "licence": "CC BY-SA 4.0",
+   "registration": {
+    "bones": [
+     "clavicle",
+     "femur",
+     "hip bone",
+     "humerus",
+     "sacrum",
+     "scapula",
+     "talus",
+     "tibia"
+    ],
+    "residual_mm": 7.12
+   }
+  }
+ }
+}
