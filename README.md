@@ -1042,6 +1042,52 @@ The Coach button works the same way, for the same reason: always drawn, and on a
 copy with no database behind it, it says so instead of offering a form whose
 save would fail.
 
+### A clip recorded here joins a history
+
+The form asks **who this is** before it asks anything else, and that is the
+field that matters. Every clip analysed through the browser is written into the
+studio's own record under that name, so the second recording of a person comes
+back with the first one under it: a line, a noise floor, a verdict. Type a
+different name and you have started a second student, which is why the people
+already on record are offered as a list — the way this goes wrong is a typo, and
+the way to stop a typo is to make picking easier than typing. `Anna Smith` and
+`anna smith` are the same record.
+
+This was not true at first, and the bug was invisible in exactly the way this
+project is meant to catch. Uploads were analysed in a throwaway database that
+was deleted with the job, so every clip was measured correctly and then
+forgotten. Nothing failed, nothing was wrong on screen, and the history charts,
+the noise floor and the coach's sheet were simply unreachable from the browser —
+which by then was where all the recording happened.
+
+Height and weight are still optional; the name is not, where the server keeps a
+record. The form says which of the two it is.
+
+### Deploying it where somebody else can press Record
+
+`render.yaml` is a one-service blueprint: push the branch, point Render at the
+repository, open the URL, press Record. It carries a persistent disk, because
+without one the platform replaces the filesystem on every deploy and the studio
+would forget every student each time you push. The pose model lives on that disk
+too, so it is fetched once rather than once per deploy.
+
+It used to be two services — a Python studio and a free static viewer — and that
+split was right in theory and wrong in practice: Render creates both, you open
+whichever URL you happen to click, and half the time that is the one where the
+Record button has nothing behind it.
+
+**Two things to know before you use it for anything real.** Analysing in a data
+centre means video of people leaves the building, which is the one thing this
+design otherwise avoids — the clip is still deleted the moment the job ends, but
+it travelled. And the service has no login: set `PILATES_PASSCODE` in the Render
+dashboard and the upload and note endpoints ask for it once per browser window.
+Leave it unset and the URL is the only secret there is.
+
+Sizing, measured rather than guessed: one analysis peaks at **363 MB** of
+resident memory and runs about five times slower than real time on four cores.
+Render's free tier is 0.1 CPU and spins down after fifteen minutes of quiet,
+which would kill a job mid-analysis; Starter fits and stays awake.
+
 ### Click any structure
 
 The right-hand column is that part's dashboard: the structure rendered from the

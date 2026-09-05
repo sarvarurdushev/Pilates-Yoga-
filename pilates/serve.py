@@ -19,9 +19,17 @@ the analysis takes.
 
 **Bound to localhost by default, and that is a decision.** This server accepts a
 video and runs a pipeline over it. On a studio machine that is exactly right; on
-an open interface it is an upload endpoint with no authentication in front of it.
+an open interface it is an upload endpoint that a stranger can point at.
 ``--host 0.0.0.0`` opens it deliberately, which is what a hosted deployment
 needs, and what a studio serving the room needs a proxy in front of.
+
+**``$PILATES_PASSCODE`` is the smallest honest answer to that.** Set it and the
+two endpoints that change something -- an upload and a note -- want it in a
+header; leave it unset and the server is open, which is the right default on a
+machine on the studio's own network. It is a shared word, not a login: there are
+no accounts here and inventing some would be a worse lie than a word everybody
+in the room knows. Reading the page, the anatomy and any loaded session is never
+gated, because none of that changes anything.
 
 **A hosted deployment is a real trade, not a free upgrade.** Running the
 analysis in a data centre means video of people leaves the building, which is
@@ -41,6 +49,10 @@ from urllib.parse import parse_qs, urlparse
 
 from .analysis_jobs import MAX_UPLOAD_BYTES, Jobs
 from .observations import KINDS
+
+#: The header a browser sends the passcode in. Not a cookie: there is no session
+#: to keep and nothing to log out of.
+PASSCODE_HEADER = "X-Passcode"
 
 #: The application root, inside this repository.
 WEB = Path(__file__).resolve().parent.parent / "web"
@@ -62,6 +74,25 @@ class Handler(SimpleHTTPRequestHandler):
     #: single exported bundle has none, and then a coach cannot write into it --
     #: which is right: there is nothing to write into.
     db: str = ""
+    #: A shared passcode for the two endpoints that change something, from
+    #: ``$PILATES_PASSCODE``. Empty means the server is open, which is the right
+    #: default on a studio machine on its own network and the wrong one on a
+    #: public URL -- so a hosted deployment sets it.
+    #:
+    #: Deliberately not a login. There are no accounts here and inventing some
+    #: would be a worse lie than a shared word everybody in the studio knows:
+    #: this stops a stranger who found the URL from uploading video to it, and
+    #: claims nothing more than that.
+    passcode: str = ""
+
+    def _allowed(self) -> bool:
+        """Whether this request may change something."""
+        import hmac
+
+        if not self.passcode:
+            return True
+        given = self.headers.get(PASSCODE_HEADER, "")
+        return hmac.compare_digest(given, self.passcode)
 
     def _store(self):
         """A short-lived store for one request.
@@ -103,9 +134,17 @@ class Handler(SimpleHTTPRequestHandler):
             self._json({"analyse": self.jobs is not None,
                         "max_upload_bytes": MAX_UPLOAD_BYTES,
                         "session": self.bundle is not None,
+                        # Whether a clip analysed here joins a history or is
+                        # measured once and forgotten. The record form says
+                        # which, because it changes what the numbers mean.
+                        "remembers": bool(self.db and self.jobs is not None),
                         # Coach mode is offered only where a note has somewhere
                         # to go. Reading a session from a file is a viewer.
                         "coach": bool(self.db),
+                        # Whether the page has to ask for a passcode before it
+                        # can upload or write. Saying so is not a leak: the
+                        # 401 would say it anyway, one round trip later.
+                        "passcode": bool(self.passcode),
                         "kinds": KINDS if self.db else {}})
             return
         if route.path == "/sheet" and self.db:
@@ -136,6 +175,10 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if route.path != "/analyse" or self.jobs is None:
             self._json({"error": "not here"}, 404)
+            return
+        if not self._allowed():
+            self._json({"error": "this server asks for a passcode before it "
+                                 "takes a video"}, 401)
             return
 
         length = int(self.headers.get("Content-Length") or 0)
@@ -170,6 +213,10 @@ class Handler(SimpleHTTPRequestHandler):
         if not self.db:
             self._json({"error": "this is a viewer; there is no record to "
                                  "write into"}, 404)
+            return
+        if not self._allowed():
+            self._json({"error": "this server asks for a passcode before it "
+                                 "keeps a note"}, 401)
             return
         length = int(self.headers.get("Content-Length") or 0)
         if not 0 < length < 64 * 1024:
@@ -223,8 +270,12 @@ def serve(bundle: dict | None, root: Path = WEB, port: int = 8000,
     if port == 8000 and os.environ.get("PORT"):
         port = int(os.environ["PORT"])
     handler = partial(Handler, directory=str(root))
+    Handler.passcode = os.environ.get("PILATES_PASSCODE", "").strip()
     Handler.bundle = bundle
-    Handler.jobs = Jobs() if analyse else None
+    # The record goes to the jobs runner too, so an uploaded clip is measured
+    # into the studio's history rather than into a scratch file that is deleted
+    # with the job. Without one it still analyses; it just cannot remember.
+    Handler.jobs = Jobs(db=db) if analyse else None
     Handler.db = db
     server = ThreadingHTTPServer((host, port), handler)
     url = f"http://{host}:{server.server_address[1]}/index.html"

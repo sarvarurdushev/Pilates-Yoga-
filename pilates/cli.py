@@ -1633,9 +1633,21 @@ def cmd_web(args: argparse.Namespace) -> int:
 
     # The coach can only write where there is a record to write into. Serving a
     # single exported bundle is a viewer, and says so.
+    #
+    # With analysis on, the record is *created* rather than merely found. That
+    # server is going to be recording people, and a clip measured into a
+    # database that was never made is a clip measured into nothing -- which is
+    # exactly what a fresh deployment on a hosting platform is: an empty disk
+    # and nobody to run `pilates enrol` on it first. With --no-analyse there is
+    # nothing to write, so an absent file stays absent and it serves as a viewer.
     from pathlib import Path as _P
 
-    record = args.db if _P(args.db).exists() else ""
+    if args.no_analyse:
+        record = args.db if _P(args.db).exists() else ""
+    else:
+        _P(args.db).parent.mkdir(parents=True, exist_ok=True)
+        Store.open(args.db).close()
+        record = args.db
     url = run(bundle, port=args.port, analyse=not args.no_analyse,
               host=args.host, db=record)
     print(f"the body -> {url}")
@@ -2385,8 +2397,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="serve the viewer only, with no upload endpoint")
     wb.add_argument("--host", default="127.0.0.1",
                     help="0.0.0.0 to accept connections from the network. This "
-                         "server takes video uploads and has no authentication "
-                         "of its own; open it only behind something that does")
+                         "server takes video uploads; set $PILATES_PASSCODE, or "
+                         "put something that authenticates in front of it, "
+                         "before opening it to one you do not control")
     wb.set_defaults(func=cmd_web)
 
     dm = sub.add_parser("demo",

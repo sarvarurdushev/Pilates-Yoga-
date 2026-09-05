@@ -18,6 +18,16 @@ is the most sensitive thing this system ever touches, and the whole design is
 built on not keeping it: the measurements and the pose stream survive, the
 footage does not. The temporary file is removed when the job finishes, whether
 it succeeded or not.
+
+**The measurements go into the studio's own record, not a scratch file.** The
+first version analysed every upload in a throwaway database and returned the
+bundle: each clip was measured correctly and then forgotten, so the second
+recording of the same person knew nothing about the first. That makes the
+history charts, the noise floor and the coach's sheet unreachable from the
+browser -- which is where all the recording now happens. Given a database, this
+writes into it and every clip becomes another point on the line. Given none, it
+still falls back to a scratch file, because a viewer serving one exported bundle
+has nowhere to write and should still be able to measure a clip.
 """
 from __future__ import annotations
 
@@ -40,6 +50,19 @@ MAX_UPLOAD_BYTES = 512 * 1024 * 1024
 KEEP_LINES = 12
 
 QUEUED, RUNNING, DONE, FAILED = "queued", "running", "done", "failed"
+
+
+def slug(name: str | None) -> str:
+    """A username out of whatever somebody typed into the box.
+
+    The browser asks for a name in the words a person uses -- "Anna Smith" --
+    and the record is keyed on a username. Lower-cased, spaces to underscores,
+    everything else dropped: two people typing the same name land on the same
+    record, which is the whole point, and one typing a stray comma does not
+    become a second person.
+    """
+    kept = "".join(c if c.isalnum() else "_" for c in (name or "").strip().lower())
+    return "_".join(part for part in kept.split("_") if part)[:40]
 
 
 @dataclass
@@ -73,12 +96,17 @@ class Jobs:
     and the studio wondering whether it has hung.
     """
 
-    def __init__(self, root: Path | None = None):
+    def __init__(self, root: Path | None = None, db: str = ""):
         self.jobs: dict[str, Job] = {}
         self.lock = threading.Lock()
         self.root = root or Path(tempfile.gettempdir()) / "pilates-uploads"
         self.root.mkdir(parents=True, exist_ok=True)
         self.busy = threading.Lock()
+        #: The studio's record. Every clip analysed here is written into it, so
+        #: a person recorded twice has a history rather than two unrelated
+        #: readings. Empty means there is no record and each clip is measured
+        #: on its own.
+        self.db = db
 
     def get(self, job_id: str) -> Job | None:
         return self.jobs.get(job_id)
@@ -117,12 +145,18 @@ class Jobs:
                 shutil.rmtree(work, ignore_errors=True)
 
     def _analyse(self, job: Job, video: Path, work: Path, options: dict) -> None:
-        db = work / "session.db"
-        person = options.get("user") or "you"
-        session = options.get("session") or f"clip-{job.id[:6]}"
+        db = Path(self.db) if self.db else work / "session.db"
+        person = slug(options.get("user")) or "you"
+        # Unique per job, always. A repeated session key does not fail -- it
+        # appends to the session already there, so two uploads a minute apart
+        # under a clock-shaped key silently become one class with twice the
+        # measurements in it.
+        session = f"{options.get('session') or 'clip'}-{job.id[:6]}"
 
-        self._step(job, ["enrol", person, "--name", options.get("name") or person,
-                         "--db", str(db)])
+        # The display name is what they typed; the username is the slug of it.
+        # "Anna Smith" reads back as Anna Smith and is keyed on anna_smith.
+        display = (options.get("name") or options.get("user") or person).strip()
+        self._step(job, ["enrol", person, "--name", display, "--db", str(db)])
 
         capture = ["capture", str(video), "--session", session, "--user", person,
                    "--by", "self", "--db", str(db)]
@@ -134,6 +168,11 @@ class Jobs:
         self._step(job, capture)
 
         out = work / "bundle.json"
+        # A bundle is one class -- that is what it means. What makes the second
+        # upload worth more than the first is not in this argument list: the
+        # history block inside the bundle is collected across every session in
+        # the database, so pointing the pipeline at the studio's own record
+        # instead of a scratch file is the whole of the change.
         self._step(job, ["bundle", person, "--session", session, "--db", str(db),
                          "--out", str(out), "--no-poses"])
         if out.exists():

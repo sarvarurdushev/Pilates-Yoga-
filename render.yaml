@@ -1,77 +1,81 @@
-# Render blueprint. Two services, and the difference between them matters.
+# Render blueprint. One service, and it can record.
 #
-#   pilates-yoga-studio   the whole thing: the 3D body, the lab, and the Record
-#                         button, because Python is running behind it
-#   pilates-yoga-viewer   the anatomy application and a sample session, static,
-#                         no analysis, free
+# It used to be two -- a Python "studio" and a free static "viewer" -- and that
+# was a mistake in practice rather than in theory. Render creates both, you open
+# whichever URL you happen to click, and half the time that is the static one,
+# where the Record button has nothing behind it. The person deploying this wants
+# to press Record on the internet and have it measure them. So: one service,
+# Python, and every URL it hands out can do that.
 #
-# **The static site cannot record, and now says so instead of saying nothing.**
-# The page asks `/capabilities` before it offers to analyse anything; on a static
-# host that request 404s. It used to draw no Record button at all in that case,
-# on the reasoning that a button which offers to analyse a clip and then cannot
-# is worse than no button. That reasoning is wrong in practice: the first thing
-# anybody looks for here is where to record, and a blank header answers by
-# implying the camera half was never built. So the viewer draws the button too,
-# greyed, and pressing it says which half is missing and how to start it. If you
-# are looking for where to *actually* record, it is the **studio** service below,
-# or `python -m pilates web` on your own machine.
+# **Hosting the analysis is a real trade, and deploying this is accepting it.**
+# The clip is deleted the moment the job ends -- that part is unchanged and it is
+# enforced in `analysis_jobs.py` -- but it does travel to a data centre first.
+# Running `python -m pilates web` on the studio's own machine is the honest
+# default and the one this project is designed around. This blueprint exists
+# because a thing you cannot show to anybody is a thing nobody uses.
 #
-# **Hosting the analysis is a real trade.** It means video of people leaves the
-# building, which is the one thing this design otherwise avoids: the clip is
-# deleted the moment the job ends, but it still travelled. Running it locally is
-# the honest default. This service exists so the thing can be shown to somebody
-# who has not installed it.
+#   1. Push this branch.
+#   2. Render -> New -> Blueprint -> pick this repository.
+#   3. Wait for the build, open the URL, press Record.
+#
+# There is no login in front of it (see PILATES_PASSCODE below). Until you add
+# one, treat the URL as the secret and do not put a real class through it.
 services:
-  # ----------------------------------------------------------------- studio
-  # Python, so the camera and the upload work. The pose model is about ninety
-  # megabytes and is fetched on the first analysis, not at build time -- a build
-  # that downloads it would time out and a service that pre-warms it would pay
-  # for the download on every deploy.
   - type: web
-    name: pilates-yoga-studio
+    name: pilates-yoga
     runtime: python
-    plan: starter          # free tier sleeps and has too little memory for onnxruntime
+    # Free is 512 MB and 0.1 CPU, and spins down after fifteen minutes of quiet
+    # -- which would kill a job mid-analysis. Measured on a four-core laptop one
+    # analysis peaks at 363 MB and runs about five times slower than real time,
+    # so a twenty-second clip is a minute and a half there and several minutes
+    # on half a core. Starter fits and does not sleep. Standard is worth it if
+    # you are putting whole classes through.
+    plan: starter
     buildCommand: pip install -r requirements.txt
     # --host 0.0.0.0 because the platform's router is a different machine, and
-    # $PORT is honoured by the server itself. There is no authentication in
-    # front of this: put Render's own access control on it before it holds
-    # anybody's real class.
-    startCommand: python -m pilates web --host 0.0.0.0
+    # $PORT is honoured by the server itself. --db on the disk below, so the
+    # record is the same one after a deploy.
+    startCommand: python -m pilates web --host 0.0.0.0 --db /var/data/studio.db
     healthCheckPath: /capabilities
+    # Without this the studio is amnesiac: Render replaces the filesystem on
+    # every deploy, so the measurements, the people and the coach's notes would
+    # last until the next push. It also holds the pose model, which is ninety
+    # megabytes and would otherwise be re-downloaded on the first analysis after
+    # each deploy.
+    disk:
+      name: studio
+      mountPath: /var/data
+      sizeGB: 2
     envVars:
-      # Where rtmlib caches the pose model. Render's disk is ephemeral, so this
-      # is re-fetched after a deploy; that is one download, not one per request.
+      # Where rtmlib caches the pose model. On the disk, so it is fetched once
+      # ever rather than once per deploy.
       - key: XDG_CACHE_HOME
-        value: /opt/render/project/.cache
+        value: /var/data/cache
       - key: PYTHONUNBUFFERED
         value: "1"
+      # Optional. Set it in the Render dashboard and the upload and note
+      # endpoints ask for it once; leave it unset and the service is open to
+      # anybody with the URL, which is fine for showing it to somebody and not
+      # fine for a real studio.
+      - key: PILATES_PASSCODE
+        sync: false
 
-  # ----------------------------------------------------------------- viewer
-  # Everything the application needs is committed, so there is no build step.
-  - type: web
-    name: pilates-yoga-viewer
-    runtime: static
-    staticPublishPath: ./web
-    buildCommand: ""
-    headers:
-      # Twenty-five megabytes of anatomy that changes only when the model is
-      # rebuilt. Without this every visit re-downloads the body.
-      - path: /models/*
-        name: Cache-Control
-        value: public, max-age=604800
-      - path: /vendor/*
-        name: Cache-Control
-        value: public, max-age=604800
-      # The sample session is regenerated whenever the bundle format changes,
-      # and a stale one would be validated against a newer viewer and refused.
-      - path: /demo/*
-        name: Cache-Control
-        value: public, max-age=300
-
-# There is deliberately no `routes:` block on the static site, and this is the
-# one thing not to "fix" later. Render evaluates rewrites *before* it looks for
-# a file, so the usual single-page-app catch-all -- /* to /index.html -- would
-# return the HTML page for src/main.js and for every GLB, and the application
-# would not start. It has no client-side routing: it is one page that fetches
-# its assets by path. Inherited from the anatomy project's own blueprint, which
-# learned it the hard way; see web/render.yaml.
+# A note on what is deliberately absent.
+#
+# There is no `routes:` block and no static service. Render evaluates rewrites
+# *before* it looks for a file, so the usual single-page-app catch-all -- /* to
+# /index.html -- would return the HTML page for src/main.js and for every GLB,
+# and the application would not start. It has no client-side routing: it is one
+# page that fetches its assets by path. Inherited from the anatomy project's own
+# blueprint, which learned it the hard way; see web/render.yaml.
+#
+# If you do want a free, static, analysis-free copy as well -- for a public
+# link that cannot upload anything -- add a second service:
+#
+#   - type: web
+#     name: pilates-yoga-viewer
+#     runtime: static
+#     staticPublishPath: ./web
+#     buildCommand: ""
+#
+# The Record button still appears there and explains that it is a viewer.

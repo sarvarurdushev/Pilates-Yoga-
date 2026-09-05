@@ -27,6 +27,8 @@
  * list sorted by date puts a March contraindication six screens below a note
  * about a warm-up.
  */
+import { passcode } from './record.js';
+
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g,
   (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -111,6 +113,9 @@ const ORDER = ['cue', 'modification', 'assessment', 'contraindication',
 
 let state = {
   on: false, user: '', by: '', sheet: null, kinds: {}, session: '',
+  // What the server said it can do, kept so a save knows whether to send a
+  // passcode with it.
+  capable: null,
 };
 
 export function coaching() { return state.on; }
@@ -254,10 +259,17 @@ export function wireWriter(root, onSaved) {
     said.className = '';
     said.textContent = 'Saving…';
     try {
-      const response = await fetch('note', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      let response;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const word = passcode(state.capable, attempt > 0);
+        response = await fetch('note', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json',
+                     ...(word ? { 'X-Passcode': word } : {}) },
+          body: JSON.stringify(payload),
+        });
+        if (response.status !== 401) break;
+      }
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || response.statusText);
       state.sheet = body.sheet;
@@ -350,6 +362,7 @@ export async function mount(session, nw, onChange, known) {
   })();
   if (!capable?.coach) return offline(session);
 
+  state.capable = capable;
   state.kinds = capable.kinds ?? {};
   state.user = session.person.username;
   state.session = session.key ?? '';

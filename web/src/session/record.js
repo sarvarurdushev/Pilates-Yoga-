@@ -72,6 +72,7 @@ const CSS = `
 #ss-rec .drop:hover{border-color:var(--acc);color:var(--txt)}
 #ss-rec .drop b{display:block;color:var(--txt);font-weight:500;margin-bottom:4px}
 #ss-rec .about{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 8px}
+#ss-rec #ss-who{margin:0 0 8px}
 #ss-rec label{display:block;font-size:10px;letter-spacing:.12em;
   text-transform:uppercase;color:var(--dim2);margin:0 0 4px}
 #ss-rec input{width:100%;padding:8px 10px;border-radius:3px;font:inherit;
@@ -107,6 +108,31 @@ const CSS = `
 #ss-rec .stillhere b{color:var(--txt);font-weight:500}
 `;
 
+/**
+ * The passcode this server asks for, if it asks for one.
+ *
+ * Held for the window and no longer. It is a shared word, not a login: it stops
+ * a stranger who found the URL from uploading video to somebody's studio, and
+ * claims nothing more than that. Where the server is open -- a machine on the
+ * studio's own network, which is the design -- nothing is asked and nothing is
+ * stored.
+ */
+export function passcode(can, renew = false) {
+  if (!can?.passcode) return '';
+  let held = '';
+  try { held = sessionStorage.getItem('ss-pass') || ''; } catch { /* private */ }
+  if (held && !renew) return held;
+  const typed = (window.prompt(renew
+    ? 'That passcode was not accepted. Try again:'
+    : 'This studio asks for a passcode before it takes a video or keeps a note.'
+    ) || '').trim();
+  try {
+    if (typed) sessionStorage.setItem('ss-pass', typed);
+    else sessionStorage.removeItem('ss-pass');
+  } catch { /* private */ }
+  return typed;
+}
+
 /** Ask the server what it can do before offering it. */
 export async function capabilities() {
   try {
@@ -116,7 +142,34 @@ export async function capabilities() {
   } catch { return null; }
 }
 
-const FORM = `
+/**
+ * Who this is, and what they weigh.
+ *
+ * The name is not bookkeeping. Every clip analysed here is written into the
+ * studio's record under it, so it is the difference between a reading and a
+ * line: record the same name twice and the second clip comes back with the
+ * first one under it, a noise floor, and a verdict. Type a different name and
+ * you have started a second person.
+ *
+ * The people already on record are offered as a list, because the way this goes
+ * wrong is a typo -- "Anna" and "anna smith" as two students -- and the way to
+ * stop that is to make picking easier than typing. Names are matched loosely
+ * enough that case and spacing do not fork a record.
+ */
+const form = (remembers, people) => `
+  <label for="ss-who">Who is this?</label>
+  <input id="ss-who" list="ss-people" autocomplete="off"
+    placeholder="${people.length ? esc(people[0].display_name
+                                       || people[0].username) : 'Your name'}">
+  <datalist id="ss-people">${people.map((p) =>
+    `<option value="${esc(p.display_name || p.username)}"></option>`).join('')}
+  </datalist>
+  <p class="why">${remembers
+    ? 'Recorded under this name, and added to everything already on record for '
+      + 'it. Use the same name every time and the measurements become a line '
+      + 'you can read; use a new one and you have started a new student.'
+    : 'This server keeps no record, so this clip is measured on its own and '
+      + 'the name is only a label on the result.'}</p>
   <div class="about">
     <div><label>Height</label><input id="ss-h" inputmode="decimal"
       placeholder="1.68 m"></div>
@@ -126,6 +179,15 @@ const FORM = `
   <p class="why">Both are needed for the effort numbers — a joint moment in
     newton-metres is a mass on a lever, so without them every angle is still
     measured and no load is. Leave them blank and you get the angles.</p>`;
+
+/** The people already on record here, so a name can be picked rather than typed. */
+async function enrolled() {
+  try {
+    const response = await fetch('people');
+    if (!response.ok) return [];
+    return (await response.json()).people ?? [];
+  } catch { return []; }
+}
 
 /**
  * Put the Record button where the eye already is.
@@ -213,15 +275,20 @@ python -m pilates web --db studio.db</pre></li>
   return host;
 }
 
-function dialog(nw, install, can) {
+async function dialog(nw, install, can) {
   if (!can?.analyse) return explain(can);
+  const remembers = !!can.remembers;
+  const people = remembers ? await enrolled() : [];
   const host = document.createElement('div');
   host.id = 'ss-rec';
   host.innerHTML = `<div class="box">
     <h2>Analyse a video</h2>
     <p class="sub">The clip is uploaded, measured, and deleted. What is kept is
       the measurements and a pose stream of about a megabyte an hour — never the
-      video.</p>
+      video.${remembers
+        ? ' They are written into this studio\u2019s record, so the same person '
+          + 'recorded again builds a history.'
+        : ' This server keeps no record between clips.'}</p>
     <div class="tabs" role="tablist">
       <button type="button" data-tab="file" aria-selected="true">Choose a file</button>
       <button type="button" data-tab="camera" aria-selected="false">Use my camera</button>
@@ -240,7 +307,7 @@ function dialog(nw, install, can) {
         <span class="spacer"></span><span class="dim" data-cam="clock"></span>
       </div>
     </div>
-    ${FORM}
+    ${form(remembers, people)}
     <div class="go">
       <button type="button" class="primary" data-go disabled>Analyse</button>
       <button type="button" data-close>Close</button>
@@ -253,6 +320,8 @@ function dialog(nw, install, can) {
   document.body.appendChild(host);
 
   const $ = (sel) => host.querySelector(sel);
+  const who = $('#ss-who');
+  try { who.value = localStorage.getItem('ss-who') || ''; } catch { /* private */ }
   const log = $('.log');
   const goButton = $('[data-go]');
   const chosen = $('[data-chosen]');
@@ -342,20 +411,42 @@ function dialog(nw, install, can) {
     if (!clip) return;
     goButton.disabled = true;
     say('Uploading…');
+    const name = who.value.trim();
+    if (remembers && !name) {
+      say('Who is this? The clip is written into the record under a name, and '
+        + 'without one every student on this machine becomes the same person.',
+          true);
+      goButton.disabled = false;
+      who.focus();
+      return;
+    }
+    try { if (name) localStorage.setItem('ss-who', name); } catch { /* private */ }
+
     const params = new URLSearchParams();
     const height = $('#ss-h').value.replace(/[^\d.]/g, '');
     const mass = $('#ss-m').value.replace(/[^\d.]/g, '');
     if (height) params.set('height', height);
     if (mass) params.set('mass', mass);
+    if (name) { params.set('user', name); params.set('name', name); }
     params.set('session', `clip-${new Date().toISOString().slice(0, 16).replace(/[:T-]/g, '')}`);
     params.set('date', new Date().toISOString().slice(0, 10));
 
     let job;
     try {
-      const response = await fetch(`analyse?${params}`, {
-        method: 'POST', body: clip,
-        headers: { 'X-Filename': clipName, 'Content-Type': 'application/octet-stream' },
-      });
+      // Two attempts at most, and the second only to re-ask for a passcode that
+      // was wrong. A clip is not re-uploaded for any other reason: it is the
+      // largest thing this page ever sends.
+      let response;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const word = passcode(can, attempt > 0);
+        response = await fetch(`analyse?${params}`, {
+          method: 'POST', body: clip,
+          headers: { 'X-Filename': clipName,
+                     'Content-Type': 'application/octet-stream',
+                     ...(word ? { 'X-Passcode': word } : {}) },
+        });
+        if (response.status !== 401) break;
+      }
       job = await response.json();
       if (!response.ok) throw new Error(job.error || response.statusText);
     } catch (error) {

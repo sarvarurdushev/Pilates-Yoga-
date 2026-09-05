@@ -217,3 +217,194 @@ class TestTheCoachWritesFromTheBody:
                         "text": "hello"}).encode(),
             {"Content-Type": "application/json"})
         assert status == 404 and "viewer" in payload["error"]
+
+
+class TestARecordingJoinsAHistory:
+    """The bug this class exists to stop coming back.
+
+    Uploads were analysed in a throwaway database that was deleted with the job,
+    so every clip was measured correctly and then forgotten. Nothing failed and
+    nothing looked wrong: the history charts, the noise floor and the coach's
+    sheet were simply unreachable from the browser, which by then was where all
+    the recording happened.
+    """
+
+    def test_the_jobs_runner_is_given_the_studio_s_record(self, tmp_path):
+        from pilates.store import Store
+
+        db = tmp_path / "studio.db"
+        Store.open(db).close()
+        server, _ = serve(None, root=WEB, port=0, analyse=True, db=str(db))
+        try:
+            from pilates.serve import Handler
+
+            assert Handler.jobs is not None and Handler.jobs.db == str(db)
+        finally:
+            server.server_close()
+
+    def test_the_page_is_told_whether_it_will_be_remembered(self, tmp_path):
+        """It changes what the numbers mean, so the form says which it is."""
+        from pilates.store import Store
+
+        db = tmp_path / "studio.db"
+        Store.open(db).close()
+        server, url = serve(None, root=WEB, port=0, analyse=True, db=str(db))
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            _, payload = get(f"{url.split('/index.html')[0]}/capabilities")
+            assert payload["remembers"] is True
+        finally:
+            server.shutdown()
+
+    def test_a_viewer_says_it_will_not_remember(self, running):
+        base, _ = running
+        _, payload = get(f"{base}/capabilities")
+        assert payload["analyse"] is True and payload["remembers"] is False
+
+    def test_the_pipeline_is_pointed_at_that_record(self, tmp_path, monkeypatch):
+        """Not at a scratch file beside the clip. Checked on the arguments
+        rather than by running a two-minute analysis."""
+        from pilates.analysis_jobs import Job, Jobs
+
+        db = tmp_path / "studio.db"
+        jobs = Jobs(root=tmp_path / "uploads", db=str(db))
+        seen = []
+        monkeypatch.setattr(Jobs, "_step", lambda self, job, args: seen.append(args))
+        jobs._analyse(Job(id="abcdef123456", name="clip.mp4"),
+                      tmp_path / "clip.mp4", tmp_path / "work",
+                      {"user": "Anna Smith"})
+        for args in seen:
+            assert str(db) in args, args
+
+    def test_a_typed_name_becomes_one_username_and_one_display_name(
+            self, tmp_path, monkeypatch):
+        from pilates.analysis_jobs import Job, Jobs
+
+        jobs = Jobs(root=tmp_path / "uploads", db=str(tmp_path / "s.db"))
+        seen = []
+        monkeypatch.setattr(Jobs, "_step", lambda self, job, args: seen.append(args))
+        jobs._analyse(Job(id="abcdef123456", name="clip.mp4"),
+                      tmp_path / "clip.mp4", tmp_path / "work",
+                      {"user": "Anna Smith", "name": "Anna Smith"})
+        enrol = seen[0]
+        assert enrol[:2] == ["enrol", "anna_smith"]
+        assert "Anna Smith" in enrol
+        assert all("anna_smith" in args for args in seen)
+
+    def test_every_job_gets_its_own_session_key(self, tmp_path, monkeypatch):
+        """A repeated key does not fail -- it appends to the session already
+        there, so two uploads a minute apart under a clock-shaped key silently
+        become one class with twice the measurements in it."""
+        from pilates.analysis_jobs import Job, Jobs
+
+        jobs = Jobs(root=tmp_path / "uploads", db=str(tmp_path / "s.db"))
+        keys = []
+        monkeypatch.setattr(Jobs, "_step",
+                            lambda self, job, args: keys.append(args))
+        for job_id in ("aaaaaaaaaaaa", "bbbbbbbbbbbb"):
+            jobs._analyse(Job(id=job_id, name="c.mp4"), tmp_path / "c.mp4",
+                          tmp_path / "work", {"session": "clip-202609050930"})
+        sessions = {args[args.index("--session") + 1]
+                    for args in keys if "--session" in args}
+        assert len(sessions) == 2
+
+
+class TestTheSlug:
+    """A name typed into a box, and the record it keys."""
+
+    @pytest.mark.parametrize("typed, expected", [
+        ("Anna Smith", "anna_smith"),
+        ("  ANNA   smith ", "anna_smith"),
+        ("anna_smith", "anna_smith"),
+        ("Anna-Smith", "anna_smith"),
+        ("x@y!!z", "x_y_z"),
+        ("--evil", "evil"),
+        ("", ""),
+        (None, ""),
+    ])
+    def test_it_reads_the_same_record(self, typed, expected):
+        from pilates.analysis_jobs import slug
+
+        assert slug(typed) == expected
+
+    def test_it_cannot_grow_without_bound(self):
+        from pilates.analysis_jobs import slug
+
+        assert len(slug("a" * 500)) <= 40
+
+
+class TestThePasscode:
+    """A shared word in front of the two endpoints that change something.
+
+    Not a login, and it does not pretend to be one. What it stops is a stranger
+    who found a hosted URL uploading video to somebody's studio.
+    """
+
+    @pytest.fixture
+    def guarded(self, tmp_path, monkeypatch):
+        from pilates.demo import fill
+        from pilates.store import Store
+
+        monkeypatch.setenv("PILATES_PASSCODE", "open sesame")
+        db = tmp_path / "studio.db"
+        with Store.open(db) as store:
+            fill(store, session="s1", date="2026-03-03")
+        server, url = serve(None, root=WEB, port=0, analyse=True, db=str(db))
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        yield url.split("/index.html")[0]
+        server.shutdown()
+
+    def note(self, base, headers=None):
+        return post(f"{base}/note",
+                    json.dumps({"username": "anna", "kind": "note", "by": "Sam",
+                                "text": "hello"}).encode(),
+                    {"Content-Type": "application/json", **(headers or {})})
+
+    def test_the_page_is_told_to_ask(self, guarded):
+        """The 401 would say it anyway, one round trip later."""
+        _, payload = get(f"{guarded}/capabilities")
+        assert payload["passcode"] is True
+
+    def test_an_upload_without_one_is_refused(self, guarded):
+        status, payload = post(f"{guarded}/analyse", b"x" * 32)
+        assert status == 401 and "passcode" in payload["error"]
+
+    def test_a_wrong_one_is_refused(self, guarded):
+        status, _ = post(f"{guarded}/analyse", b"x" * 32,
+                         {"X-Passcode": "not it"})
+        assert status == 401
+
+    def test_a_note_without_one_is_refused(self, guarded):
+        status, _ = self.note(guarded)
+        assert status == 401
+
+    def test_the_right_one_is_let_through(self, guarded):
+        status, _ = self.note(guarded, {"X-Passcode": "open sesame"})
+        assert status == 201
+
+    def test_reading_is_never_gated(self, guarded):
+        """Nothing about looking at an anatomy model changes anything, and a
+        passcode in front of the page would be security theatre over a body."""
+        status, payload = get(f"{guarded}/capabilities")
+        assert status == 200
+        with urllib.request.urlopen(f"{guarded}/index.html", timeout=10) as page:
+            assert page.status == 200
+        assert get(f"{guarded}/sheet?user=anna")[0] == 200
+
+    def test_an_unset_passcode_leaves_the_server_open(self, tmp_path, monkeypatch):
+        """The right default on a studio machine on its own network."""
+        from pilates.demo import fill
+        from pilates.store import Store
+
+        monkeypatch.delenv("PILATES_PASSCODE", raising=False)
+        db = tmp_path / "studio.db"
+        with Store.open(db) as store:
+            fill(store, session="s1", date="2026-03-03")
+        server, url = serve(None, root=WEB, port=0, analyse=True, db=str(db))
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        base = url.split("/index.html")[0]
+        try:
+            assert get(f"{base}/capabilities")[1]["passcode"] is False
+            assert self.note(base)[0] == 201
+        finally:
+            server.shutdown()
