@@ -5,12 +5,16 @@
 #   pilates-yoga-viewer   the anatomy application and a sample session, static,
 #                         no analysis, free
 #
-# **The static site cannot record and does not pretend to.** The page asks
-# `/capabilities` before it draws a Record button; on a static host that request
-# 404s and no button appears. That is deliberate -- a button that offers to
-# analyse a clip and then cannot is worse than no button -- but it does mean the
-# free deployment is a viewer. If you are looking for where to start recording,
-# it is the *studio* service, or `python -m pilates web` on your own machine.
+# **The static site cannot record, and now says so instead of saying nothing.**
+# The page asks `/capabilities` before it offers to analyse anything; on a static
+# host that request 404s. It used to draw no Record button at all in that case,
+# on the reasoning that a button which offers to analyse a clip and then cannot
+# is worse than no button. That reasoning is wrong in practice: the first thing
+# anybody looks for here is where to record, and a blank header answers by
+# implying the camera half was never built. So the viewer draws the button too,
+# greyed, and pressing it says which half is missing and how to start it. If you
+# are looking for where to *actually* record, it is the **studio** service below,
+# or `python -m pilates web` on your own machine.
 #
 # **Hosting the analysis is a real trade.** It means video of people leaves the
 # building, which is the one thing this design otherwise avoids: the clip is
