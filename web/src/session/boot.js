@@ -2,9 +2,11 @@
  * Attach one person's recorded class to the anatomy application.
  *
  * Loaded by a single script tag at the end of `index.html`. With no session in
- * the URL it does nothing at all and the application is exactly what it was --
- * which is the point: the anatomy explorer has to keep working on its own, for
- * somebody who has never been in front of a camera.
+ * the URL it adds one thing and changes nothing else: a Record button in the
+ * header, because the way somebody gets a session is by recording one and that
+ * question has to have a visible answer on the empty page. The anatomy explorer
+ * underneath keeps working exactly as it did, for somebody who has never been
+ * in front of a camera.
  *
  *     index.html?session=anna_s1.json
  *
@@ -236,15 +238,15 @@ export async function install(bundle) {
     openLab: () => document.getElementById('labBtn')?.click(),
   });
 
-  /* The coach's half. Offered only where there is a record to write into: a
-   * viewer showing an exported bundle has none, and a note with nowhere to go
-   * is worse than no note. */
+  /* The coach's half. Drawn everywhere; writable only where there is a record
+   * to write into. A viewer showing an exported bundle has none, and there the
+   * button says that instead of offering a form that cannot save. */
   const coach = await mountCoach(session, nw, () => {
     // Re-render the panel so the form appears and disappears with the mode.
     for (const el of document.querySelectorAll('.ss-panel, .ss-said, .ss-write')) {
       el.remove();
     }
-  });
+  }, served);
 
   // For the render harness and for anybody poking at it in a console.
   globalThis.__session = { session, lit, coach };
@@ -254,15 +256,31 @@ export async function install(bundle) {
   return session;
 }
 
+/**
+ * What the server behind this page can do, or null where there is no server.
+ *
+ * Read once at boot and kept, because the recorder and the coach both need it
+ * and `install` runs again after every analysis. It is deliberately allowed to
+ * be null: that is the static copy of the site, and both buttons have something
+ * to say in that case rather than nothing.
+ */
+let served = null;
+
 async function boot() {
-  /* The recorder is offered first and independently of any session: "where do I
-   * start recording" must have an answer on an empty page, which is the page
-   * somebody sees before they have ever recorded anything. */
-  const can = await capabilities();
-  if (can?.analyse) mountRecorder(nw, install);
+  /* The recorder is mounted first, before any session and whatever the server
+   * turns out to be: "where do I start recording" must have an answer on an
+   * empty page, which is the page somebody sees before they have ever recorded
+   * anything -- and on a page with no pipeline behind it, which is the page
+   * most people will see first. Hiding the button there answered the question
+   * with silence. */
+  served = await capabilities();
+  mountRecorder(nw, install, served);
 
   const url = new URLSearchParams(location.search).get('session');
-  if (!url) { if (!can?.analyse) offerDemo(); return; }
+  /* No session named. The demo chip is offered whatever the server is: a studio
+   * that has been installed but has never recorded anything is an empty page
+   * too, and "see one first" is a fair thing to put next to "record one". */
+  if (!url) { offerDemo(); return; }
   let bundle;
   try {
     const response = await fetch(url);

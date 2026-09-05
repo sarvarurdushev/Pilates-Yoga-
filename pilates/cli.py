@@ -1640,8 +1640,11 @@ def cmd_web(args: argparse.Namespace) -> int:
               host=args.host, db=record)
     print(f"the body -> {url}")
     if not args.no_analyse:
-        print("  the Record button is live: point a camera at yourself, or drop "
-              "in a clip, and this runs the pipeline over it")
+        print("  the Record button in the header is live: point a camera at "
+              "yourself, or drop in a clip, and this runs the pipeline over it")
+    else:
+        print("  viewer only: the Record button is still there and says how to "
+              "turn analysis on, but this server will not take a clip")
     if bundle is None:
         print("  no session: this is the anatomy application on its own, which "
               "is how it is meant to work without one")

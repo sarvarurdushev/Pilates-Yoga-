@@ -70,8 +70,10 @@ class TestCapabilities:
         assert status == 200 and payload["analyse"] is True
 
     def test_a_viewer_only_server_says_so(self, tmp_path):
-        """The page asks before it draws a record button. Served statically the
-        request fails outright; served without analysis it answers honestly."""
+        """The page asks before it offers to analyse anything. Served
+        statically the request fails outright; served without analysis it
+        answers honestly, and either way the button says so rather than
+        vanishing."""
         server, url = serve(None, root=WEB, port=0, analyse=False)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         base = url.split("/index.html")[0]

@@ -41,6 +41,9 @@ const CSS = `
   cursor:pointer;letter-spacing:.02em}
 #ss-coach-bar button[aria-pressed=true]{border-color:var(--gold);
   color:var(--txt);background:rgba(233,180,92,.14)}
+#ss-coach-bar.ss-off em{color:var(--dim2)}
+#ss-coach-bar.ss-off button{background:rgba(8,14,24,.6);color:var(--dim2)}
+#ss-coach-bar.ss-off button:hover{color:var(--txt);border-color:var(--line2)}
 #ss-coach-bar em{font-style:normal;font-size:9.5px;letter-spacing:.12em;
   text-transform:uppercase;color:var(--gold);margin-right:6px}
 
@@ -68,6 +71,7 @@ const CSS = `
 #ss-sheet .item .meta{display:block;color:var(--dim2);font-size:10px;margin-top:2px}
 #ss-sheet .none{font-size:11.5px;color:var(--dim2);font-style:italic;margin:0}
 #ss-sheet .due{color:var(--gold)}
+#ss-sheet .item.wide{margin-bottom:10px;line-height:1.65}
 
 /* Writing one. In the panel, under whatever structure is selected, because the
    structure is the subject and clicking away to a form loses it. */
@@ -285,19 +289,66 @@ export function wireWriter(root, onSaved) {
 /* ------------------------------------------------------------------- mount */
 
 /**
- * Offer coach mode, when there is a record to write into.
+ * The coach button on a copy of the site that cannot keep notes.
  *
- * A viewer showing an exported bundle has none, and then the button never
- * appears: a note with nowhere to go is worse than no note.
+ * It says which half is missing and stops there, rather than showing a form
+ * whose save button would fail. Same rule as the recorder: visible, honest,
+ * and it names the command that turns it on.
  */
-export async function mount(session, nw, onChange) {
-  const capable = await (async () => {
+function offline(session) {
+  const style = document.createElement('style');
+  style.textContent = CSS;
+  document.head.appendChild(style);
+
+  const bar = document.createElement('div');
+  bar.id = 'ss-coach-bar';
+  bar.className = 'ss-off';
+  bar.innerHTML = `<button type="button" aria-pressed="false" data-toggle>
+    <em>Coach</em><span>Notes — how to turn them on</span></button>`;
+  document.body.appendChild(bar);
+
+  const host = document.createElement('div');
+  host.id = 'ss-sheet';
+  host.hidden = true;
+  host.innerHTML = `<h3>Coach notes need the studio running</h3>
+    <p class="item wide">A note is written into this person's record, and this copy
+      of the site has no record behind it — it is showing a session that was
+      exported to a file.</p>
+    <p class="item wide">Run <b>python -m pilates web --db studio.db</b> on the
+      studio's own machine and open it there. Then coach mode writes
+      contraindications, cues, modifications, springs and goals onto the
+      structure you are looking at, and reads them back before the next class.</p>
+    <p class="item wide">Everything already on the body stays readable here; it is
+      only writing that needs somewhere to write.</p>`;
+  document.body.appendChild(host);
+
+  bar.querySelector('[data-toggle]').addEventListener('click', () => {
+    host.hidden = !host.hidden;
+    bar.querySelector('[data-toggle]')
+       .setAttribute('aria-pressed', String(!host.hidden));
+  });
+  return null;
+}
+
+
+/**
+ * Offer coach mode.
+ *
+ * The button is drawn on every copy of the site, the same as Record and for the
+ * same reason: a feature that is invisible where it does not work is a feature
+ * nobody knows exists. Where there is a record to write into it opens the sheet
+ * and the writing form. Where there is not -- a viewer showing an exported
+ * bundle, which has no database behind it -- it opens one paragraph saying so.
+ * Notes are still never *offered* into nowhere: nothing writable is drawn.
+ */
+export async function mount(session, nw, onChange, known) {
+  const capable = known !== undefined ? known : await (async () => {
     try {
       const response = await fetch('capabilities');
       return response.ok ? await response.json() : null;
     } catch { return null; }
   })();
-  if (!capable?.coach) return null;
+  if (!capable?.coach) return offline(session);
 
   state.kinds = capable.kinds ?? {};
   state.user = session.person.username;

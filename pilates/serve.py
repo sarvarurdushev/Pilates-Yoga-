@@ -95,9 +95,11 @@ class Handler(SimpleHTTPRequestHandler):
             self._json(self.bundle)
             return
         if route.path == "/capabilities":
-            # The page asks before it offers a record button. On a static host
-            # this 404s, the button never appears, and the site is honest about
-            # being a viewer rather than pretending it can analyse anything.
+            # The page asks before it dresses the Record button as the thing
+            # to press. It is drawn either way -- a hidden button answers
+            # "where do I record" with silence -- but on a static host this
+            # 404s and the button explains how to start the other half instead
+            # of offering an analysis nothing can run.
             self._json({"analyse": self.jobs is not None,
                         "max_upload_bytes": MAX_UPLOAD_BYTES,
                         "session": self.bundle is not None,

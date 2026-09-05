@@ -6,11 +6,15 @@
  * at yourself, or hand over a clip you already have, and watch the same
  * `pilates capture` a studio would type run over it.
  *
- * **The button only appears when there is something behind it.** The page asks
- * `/capabilities` first. Served as a static site -- on Render, from a folder,
- * from a memory stick -- that request fails, no button is drawn, and the site is
- * honestly a viewer rather than one that offers to analyse a clip and then
- * cannot. Served by `pilates web --analyse`, the button is there.
+ * **The button is always there, and says so when it cannot work.** It used to be
+ * drawn only when `/capabilities` answered, so that a static copy of the site
+ * never offered an analysis it could not run. That was honest and it was wrong:
+ * the first question anybody asks this project is *where do I record*, and a
+ * page that answers by showing nothing reads as a page where the camera half
+ * does not exist. So the button is in the header on every copy of the site. On
+ * one that can analyse, it opens the recorder. On one that cannot -- a static
+ * host, a folder, a memory stick -- it opens a page that says which half of the
+ * project is missing and the one command that starts it.
  *
  * **Height and weight are asked for, and asked for once, in plain terms.** They
  * are not vanity fields: a joint moment in newton-metres is a mass and a lever
@@ -26,14 +30,26 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g,
   (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 const CSS = `
-/* Beside the coach button, clear of the layers panel on the left. */
-#ss-rec-open{position:fixed;left:308px;bottom:70px;z-index:60;display:flex;gap:9px;
-  align-items:center;padding:10px 15px;border-radius:4px;cursor:pointer;
-  background:rgba(90,169,230,.13);border:1px solid rgba(90,169,230,.45);
-  color:var(--txt);font-size:12.5px;letter-spacing:.02em}
-#ss-rec-open:hover{background:rgba(90,169,230,.2)}
-#ss-rec-open em{font-style:normal;color:var(--acc);font-size:9.5px;
-  letter-spacing:.12em;text-transform:uppercase}
+/* In the header, immediately after the title, before the disclaimer chips --
+   which keep their own corner and do not move. A corner button over the 3D
+   scene was findable only by somebody already looking for it. */
+#ss-rec-open{flex:none;align-self:flex-start;display:inline-flex;gap:9px;
+  align-items:center;padding:7px 15px 7px 12px;border-radius:4px;cursor:pointer;
+  font:inherit;font-size:11.5px;font-weight:600;letter-spacing:.11em;
+  text-transform:uppercase;white-space:nowrap;
+  background:var(--acc);border:1px solid var(--acc);color:#04121f}
+#ss-rec-open:hover{filter:brightness(1.12)}
+#ss-rec-open i{width:9px;height:9px;border-radius:50%;background:#d0452f;
+  box-shadow:0 0 0 3px rgba(208,69,47,.25)}
+/* Nothing behind it: still there, still says what it is for, but not dressed as
+   the thing you are meant to press next. */
+#ss-rec-open.ss-off{background:var(--glass);border-color:var(--line2);
+  color:var(--dim);font-weight:500}
+#ss-rec-open.ss-off:hover{color:var(--txt);border-color:var(--acc)}
+#ss-rec-open.ss-off i{background:var(--dim2);box-shadow:none}
+/* If the application's header is not there to sit in, it falls back to the
+   corner rather than to nowhere. */
+#ss-rec-open.ss-loose{position:fixed;left:308px;bottom:70px;z-index:60}
 #ss-rec{position:fixed;inset:0;z-index:120;display:flex;align-items:center;
   justify-content:center;background:rgba(2,5,10,.78);backdrop-filter:blur(3px)}
 #ss-rec .box{width:min(560px,92vw);max-height:88vh;overflow:auto;border-radius:6px;
@@ -77,6 +93,18 @@ const CSS = `
 #ss-rec .bad{color:var(--gold)}
 #ss-rec .privacy{margin:14px 0 0;font-size:11px;color:var(--dim2);line-height:1.6;
   border-left:2px solid var(--line2);padding-left:11px}
+#ss-rec p.body{margin:0 0 13px;font-size:12.5px;color:var(--dim);line-height:1.7}
+#ss-rec p.body b{color:var(--txt);font-weight:500}
+#ss-rec ol{margin:0 0 14px;padding-left:19px;font-size:12.5px;color:var(--dim);
+  line-height:1.75}
+#ss-rec ol li{margin:0 0 7px}
+#ss-rec pre{margin:7px 0;padding:11px 13px;border-radius:3px;background:#05070d;
+  border:1px solid var(--line);color:var(--acc);font-size:11.5px;line-height:1.7;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow:auto}
+#ss-rec .stillhere{margin:16px 0 0;padding:12px 14px;border-radius:3px;
+  background:rgba(90,169,230,.06);border:1px solid var(--line);
+  font-size:11.5px;color:var(--dim2);line-height:1.7}
+#ss-rec .stillhere b{color:var(--txt);font-weight:500}
 `;
 
 /** Ask the server what it can do before offering it. */
@@ -99,21 +127,94 @@ const FORM = `
     newton-metres is a mass on a lever, so without them every angle is still
     measured and no load is. Leave them blank and you get the angles.</p>`;
 
-export function mount(nw, install) {
+/**
+ * Put the Record button where the eye already is.
+ *
+ * `can` is whatever `/capabilities` answered, or null where it answered nothing.
+ * Either way a button is drawn: what changes is its treatment and what it opens.
+ */
+export function mount(nw, install, can) {
   const style = document.createElement('style');
   style.textContent = CSS;
   document.head.appendChild(style);
 
+  const live = !!can?.analyse;
   const open = document.createElement('button');
   open.id = 'ss-rec-open';
   open.type = 'button';
-  open.innerHTML = '<em>Record</em><span>Analyse a video of yourself</span>';
-  open.addEventListener('click', () => dialog(nw, install));
-  document.body.appendChild(open);
+  open.title = live ? 'Record or upload a video and measure it'
+                    : 'This copy cannot analyse video — press to see how to turn it on';
+  open.innerHTML = `<i></i><span>Record${live ? '' : ' — how to turn it on'}</span>`;
+  if (!live) open.classList.add('ss-off');
+  open.addEventListener('click', () => dialog(nw, install, can));
+
+  /* Into the header, after the title and before the four disclaimer lines,
+   * which keep their corner. Anywhere else and it is a button somebody has to
+   * go looking for -- which is the failure this is fixing. */
+  const bar = document.getElementById('topbar');
+  const chips = document.getElementById('discBar');
+  if (bar && chips) bar.insertBefore(open, chips);
+  else if (bar) bar.appendChild(open);
+  else { open.classList.add('ss-loose'); document.body.appendChild(open); }
   return open;
 }
 
-function dialog(nw, install) {
+/**
+ * What to say when the button cannot do the thing it names.
+ *
+ * Not an apology and not a dead end: the measurement half of this project is a
+ * Python pipeline, this page is the viewing half, and the two are separable on
+ * purpose -- video of a class should not have to leave the building for the
+ * anatomy to be readable. So this says which half is running, why they are
+ * split, and the one command that starts the other one.
+ */
+function explain(can) {
+  const host = document.createElement('div');
+  host.id = 'ss-rec';
+  const served = can != null;
+  host.innerHTML = `<div class="box">
+    <h2>Recording needs the other half of this project</h2>
+    <p class="sub">You are looking at the viewer. The camera, the pose tracking
+      and the measurement are a Python pipeline that has to be running behind
+      this page, and on this copy it is not.</p>
+    <p class="body">${served
+      ? 'This server is serving the site but was started without the analysis '
+        + 'endpoint, so there is nowhere to send a clip.'
+      : 'This is a static copy of the site — a folder, a memory stick, or a '
+        + 'static host. There is no server behind it to send a clip to.'}</p>
+    <p class="body"><b>To record and measure, run the studio yourself:</b></p>
+    <ol>
+      <li>Get the project onto the machine with the camera on it, then:
+        <pre>pip install -e .
+python -m pilates web --db studio.db</pre></li>
+      <li>Open <b>http://localhost:8000</b>. This same page loads, and the
+        Record button up there turns blue.</li>
+      <li>Point the camera at the class, or hand it a clip you already have.
+        The video is measured and then deleted; what is kept is the numbers and
+        a pose stream of about a megabyte an hour.</li>
+    </ol>
+    <p class="body"><b>Why it is split like this.</b> Analysing in a data centre
+      means video of real people leaves the building — the one thing this design
+      is otherwise built to avoid. Running it on the studio's own machine is the
+      honest default, so the hosted copy is a viewer and says so rather than
+      quietly uploading bodies to somebody else's computer.</p>
+    <div class="stillhere"><b>Everything else on this page is real.</b> The body,
+      the measurements on it, the charts and the history all came out of that
+      same pipeline — they were computed on a machine like the one above and
+      exported to a file. This page is what you get afterwards.</div>
+    <div class="go" style="margin-top:16px">
+      <button type="button" class="primary" data-close>Got it</button>
+    </div>
+  </div>`;
+  document.body.appendChild(host);
+  const shut = () => host.remove();
+  host.querySelector('[data-close]').addEventListener('click', shut);
+  host.addEventListener('click', (e) => { if (e.target === host) shut(); });
+  return host;
+}
+
+function dialog(nw, install, can) {
+  if (!can?.analyse) return explain(can);
   const host = document.createElement('div');
   host.id = 'ss-rec';
   host.innerHTML = `<div class="box">

@@ -1009,11 +1009,11 @@ with three things added and nothing forked.
 
 ### Where you start recording
 
-The Record button, bottom left. Point a camera at yourself in the browser or
-drop in a clip you already have; it runs the same `pilates capture` a studio
-would type, shows the pipeline's own output while it works, and loads the result
-onto the body **without a page reload** — so the camera angle and the layers you
-turned on survive it.
+**The Record button, in the header, on every page.** Point a camera at yourself
+in the browser or drop in a clip you already have; it runs the same
+`pilates capture` a studio would type, shows the pipeline's own output while it
+works, and loads the result onto the body **without a page reload** — so the
+camera angle and the layers you turned on survive it.
 
 Height and weight are asked for once, in the words that say why: a joint moment
 is a mass on a lever, so without them every angle is still measured and no load
@@ -1023,10 +1023,24 @@ is.
 succeeded or not. What survives is the measurements and the pose stream — about
 a megabyte an hour, instead of gigabytes of video of somebody's body.
 
-The button only exists when something is behind it: the page asks
-`/capabilities` first, so a static deployment draws no button rather than
-offering to analyse a clip and then failing. `--no-analyse` serves the viewer
-alone.
+**The button is drawn whether or not anything is behind it, and that is a
+correction.** It used to be drawn only when `/capabilities` answered, so that a
+static copy of the site never offered an analysis it could not run. That was
+honest and it was wrong. The first question anybody asks this project is *where
+do I record*, and a page that answers by showing nothing reads as a page where
+the camera half was never built — which is what happened, repeatedly, to the
+person it was built for.
+
+So the button is always in the header. Where the pipeline is behind it, it is
+blue and it opens the recorder. Where it is not — a static host, a folder, a
+memory stick, or `--no-analyse` — it is grey, it says *how to turn it on*, and
+it opens a page naming the one command that starts the other half
+(`python -m pilates web --db studio.db`) and why the two are separable at all:
+analysing in a data centre means video of real people leaves the building.
+
+The Coach button works the same way, for the same reason: always drawn, and on a
+copy with no database behind it, it says so instead of offering a form whose
+save would fail.
 
 ### Click any structure
 
