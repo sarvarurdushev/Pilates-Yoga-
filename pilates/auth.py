@@ -193,11 +193,21 @@ def viewer_for(store, token: str) -> Viewer | None:
             if m.state == ACTIVE]
     if not held:
         return None
-    store.db.execute("UPDATE auth_sessions SET last_seen = ? WHERE token_hash = ?",
-                     (now(), row["token_hash"]))
-    store.db.commit()
+    # Only when it has gone stale. This runs on every single request, and a
+    # write per request is write contention per request -- for a field nothing
+    # reads more precisely than "roughly when were they last here".
+    if (row["last_seen"] or "") < _a_minute_ago():
+        store.db.execute(
+            "UPDATE auth_sessions SET last_seen = ? WHERE token_hash = ?",
+            (now(), row["token_hash"]))
+        store.db.commit()
     return Viewer(username=row["username"], studio=row["studio"],
                   role=row["role"], state=ACTIVE)
+
+
+def _a_minute_ago() -> str:
+    return (datetime.now(timezone.utc)
+            - timedelta(minutes=1)).isoformat(timespec="seconds")
 
 
 def switch(store, token: str, studio: str, role: str) -> Viewer:

@@ -374,6 +374,8 @@ class Handler(SimpleHTTPRequestHandler):
             store, self._viewer(store), body),
         "/admin/invite": lambda self, store, body: api.make_invitation(
             store, self._viewer(store), body),
+        "/admin/seed": lambda self, store, body: api.seed_studio(
+            store, self._viewer(store), body),
     }
 
     def do_POST(self):  # noqa: N802

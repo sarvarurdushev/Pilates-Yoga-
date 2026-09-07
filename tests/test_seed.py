@@ -164,3 +164,98 @@ class TestTheClasses:
             bundle = build(store, "kim_minji_example_com", newest["key"],
                            include_poses=False)
             assert max(h["sessions"] for h in bundle["history"].values()) == 12
+
+
+class TestSeedingIntoAStudioThatAlreadyExists:
+    """The case somebody actually hit: they set their own studio up through
+    the page, then seeded, and the fictional people landed in three studios
+    they were not a member of. From where they were sitting the fixture had
+    simply not worked."""
+
+    @pytest.fixture
+    def mine(self, monkeypatch):
+        from pilates.accounts import Account, Studio
+        from pilates.onboarding import grant
+
+        monkeypatch.setattr("pilates.passwords.N", 2 ** 14)
+        with Store.memory() as store:
+            store.add_studio(Studio(key="songdo", name="Songdo Pilates",
+                                    city="Incheon", country="KR"))
+            owner = Account(email="me@real.test", display_name="The Owner")
+            store.create_account(owner, password="a decently long password")
+            for role in (ADMIN, COACH, STUDENT):
+                grant(store, owner.username, "songdo", role, by="setup")
+            yield store
+
+    def test_everybody_lands_in_the_named_studio(self, mine):
+        seed.sow(mine, classes=False, into="songdo")
+        for account in mine.accounts():
+            if not account.email.endswith(seed.DOMAIN):
+                continue
+            held = mine.memberships(username=account.username)
+            assert held and {m.studio for m in held} == {"songdo"}
+
+    def test_no_new_studios_are_invented(self, mine):
+        seed.sow(mine, classes=False, into="songdo")
+        assert [s["key"] for s in mine.studios()] == ["songdo"]
+
+    def test_nobody_seeded_becomes_an_admin_of_it(self, mine):
+        """A fixture poured into somewhere real must not hand a fictional
+        person the ability to read every health record in the building."""
+        seed.sow(mine, classes=False, into="songdo")
+        admins = {m.username for m in
+                  mine.memberships(studio="songdo", role=ADMIN)}
+        assert not any(u.endswith("_test") is False and "example_com" in u
+                       for u in admins)
+        assert admins == {"me_real_test"}
+
+    def test_the_person_who_was_an_admin_is_still_two_roles(self, mine):
+        """The switcher still has something to demonstrate."""
+        seed.sow(mine, classes=False, into="songdo")
+        held = {m.role for m in
+                mine.memberships(username="seo_jiwoo_example_com")}
+        assert held == {COACH, STUDENT}
+
+    def test_the_assignments_are_at_that_studio_too(self, mine):
+        seed.sow(mine, classes=False, into="songdo")
+        assignments = mine.assignments()
+        assert assignments
+        assert all(a.studio == "songdo" for a in assignments)
+
+    def test_a_coach_can_still_see_their_roster(self, mine):
+        """The whole point: from the coach's chair the fixture has to work."""
+        from pilates.accounts import Viewer
+        from pilates.api import roster
+
+        seed.sow(mine, classes=False, into="songdo")
+        found = roster(mine, Viewer(username="park_minseok_example_com",
+                                    studio="songdo", role=COACH))
+        assert {s["display_name"] for s in found["students"]} == {
+            "Kim Min-ji", "Lee Joon-ho", "Choi Seo-yeon"}
+
+    def test_a_studio_that_does_not_exist_is_refused(self, mine):
+        with pytest.raises(ValueError, match="no studio called"):
+            seed.sow(mine, classes=False, into="nowhere")
+
+    def test_the_owner_is_untouched(self, mine):
+        before = {m.role for m in mine.memberships(username="me_real_test")}
+        seed.sow(mine, classes=False, into="songdo")
+        after = {m.role for m in mine.memberships(username="me_real_test")}
+        assert before == after == {ADMIN, COACH, STUDENT}
+
+
+class TestOneHashForSixteenPeople:
+    def test_they_share_it(self, sown):
+        """Right for real accounts, pointless here: they share a password that
+        is printed on the screen, so there is nothing a per-account salt
+        protects -- and it takes seeding from sixteen scrypt runs to one, which
+        on the smallest hosting tier is a click rather than a timeout."""
+        hashes = {row["password_hash"] for row in
+                  sown.db.execute("SELECT password_hash FROM accounts")}
+        assert len(hashes) == 1
+
+    def test_and_it_still_verifies(self, sown):
+        from pilates import auth
+
+        assert auth.sign_in(sown, "kim.minji@example.com", seed.PASSWORD)
+        assert auth.sign_in(sown, "park.minseok@example.com", seed.PASSWORD)

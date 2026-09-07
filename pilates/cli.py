@@ -2249,14 +2249,31 @@ def cmd_seed(args) -> int:
     with Store.open(args.db) as store:
         has_accounts = store.db.execute(
             "SELECT COUNT(*) AS n FROM accounts").fetchone()["n"]
-        if has_accounts and not args.force:
+        # An existing studio named on purpose is consent: somebody who typed
+        # --studio knows the database has people in it, which is why they are
+        # pointing at one of their own. Without it, a database with accounts is
+        # refused, because a fixture that can be poured into a working studio
+        # by accident is one that will be.
+        if has_accounts and not args.studio and not args.force:
             what = ("seeded people" if already_seeded(store)
                     else f"{has_accounts} account(s)")
-            print(f"{args.db} already has {what}. Point --db at a new file, or "
-                  "pass --force to add these on top.", file=sys.stderr)
+            print(f"{args.db} already has {what}.\n"
+                  f"  To put the fixture in a studio you already have:\n"
+                  f"    pilates seed --db {args.db} --studio <key>\n"
+                  f"  `pilates studio --list --db {args.db}` shows the keys.\n"
+                  f"  Or point --db at a new file, or pass --force.",
+                  file=sys.stderr)
             return 1
-        made = sow(store, password=args.password or PASSWORD,
-                   classes=not args.no_classes)
+        if already_seeded(store) and not args.force:
+            print(f"{args.db} has already been seeded. Pass --force to add "
+                  "them again.", file=sys.stderr)
+            return 1
+        try:
+            made = sow(store, password=args.password or PASSWORD,
+                       classes=not args.no_classes, into=args.studio or "")
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
         print(f"Seeded {args.db}: {len(made['people'])} people, "
               f"{len(made['studios'])} studios, {made['assignments']} "
               f"coach-student assignments, {made['sessions']} recorded "
@@ -2666,6 +2683,9 @@ def main(argv: list[str] | None = None) -> int:
                         help="fill a database with a studio of fictional "
                              "people, for testing the whole thing end to end")
     sd.add_argument("--db", default="studio.db")
+    sd.add_argument("--studio",
+                    help="put them all in a studio you already have, instead "
+                         "of making three. Nobody seeded becomes an admin of it")
     sd.add_argument("--password", help="one password for all of them")
     sd.add_argument("--no-classes", action="store_true",
                     help="skip the measurements; much faster, no charts")

@@ -76,6 +76,8 @@ const CSS = `
   border-radius:3px;font:inherit;font-size:13px;background:var(--glass);
   border:1px solid var(--line);color:var(--txt)}
 #ss-admin .ss-invite input{flex:1}
+#ss-admin .ss-fill{flex:1;font-size:11.5px;color:var(--dim2);line-height:1.55;
+  align-self:center}
 /* Flex arithmetic that has to be spelled out. Without flex:none on the
    controls, a long email in the middle column is squeezed to one character
    wide and prints itself vertically -- which is exactly what happened. */
@@ -218,6 +220,14 @@ async function dialog(me) {
         <select data-invite-studio>${options}</select>
         <button type="button" class="ss-act" data-invite>Invite</button>
       </div>
+      <!-- The fixture, reachable from a hosted deployment where there is no
+           terminal to run a command in. -->
+      <div class="ss-invite">
+        <span class="ss-fill">Nobody here yet? Add sixteen people who do not
+          exist — coaches, students, consent in every state and twelve weeks of
+          measurements — so there is something to click.</span>
+        <button type="button" class="ss-act" data-seed>Add demo people</button>
+      </div>
       ${people.map((person) => {
         const roles = (person.memberships ?? [])
           .filter((m) => m.state === 'active')
@@ -267,6 +277,19 @@ async function dialog(me) {
         } catch (error) { tell(error.message, true); }
       });
     }
+    rows.querySelector('[data-seed]')?.addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      tell('Making them…');
+      try {
+        const out = await post('admin/seed', {});
+        tell(out.message);
+        drawPeople();
+      } catch (error) {
+        tell(error.message, true);
+        button.disabled = false;
+      }
+    });
     rows.querySelector('[data-invite]')?.addEventListener('click', async () => {
       const email = rows.querySelector('[data-invite-email]').value.trim();
       const role = rows.querySelector('[data-invite-role]').value;

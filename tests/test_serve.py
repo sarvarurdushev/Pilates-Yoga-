@@ -557,3 +557,82 @@ class TestGettingBackToARecording:
         behind a button is worse than no button."""
         base, _ = running
         assert fetch(f"{base}/recordings")[0] == 404
+
+
+class TestOneSlowWriteDoesNotLockOutEverybodyElse:
+    """The bug that pressing one button in the admin console exposed.
+
+    The server opens a SQLite connection per request, because connections are
+    not shareable across threads. Under the rollback journal that means one
+    writer blocks every reader on the file, so a write of any length -- filling
+    a studio with fixture data, a capture saving a long session -- made every
+    other request in flight fail with "database is locked". The page broke
+    around the button that was working.
+    """
+
+    def test_the_file_is_opened_in_wal_mode(self, tmp_path):
+        from pilates.store import Store
+
+        with Store.open(tmp_path / "studio.db") as store:
+            assert store.db.execute(
+                "PRAGMA journal_mode").fetchone()[0].lower() == "wal"
+
+    def test_a_writer_waits_rather_than_failing_at_once(self, tmp_path):
+        from pilates.store import Store
+
+        with Store.open(tmp_path / "studio.db") as store:
+            assert store.db.execute("PRAGMA busy_timeout").fetchone()[0] >= 10000
+
+    def test_durability_is_not_the_thing_traded_away(self, tmp_path):
+        """NORMAL is the usual WAL pairing and is faster. What it trades is the
+        last few transactions on power loss, which here is a coach's note about
+        somebody's knee."""
+        from pilates.store import Store
+
+        with Store.open(tmp_path / "studio.db") as store:
+            assert store.db.execute("PRAGMA synchronous").fetchone()[0] == 2
+
+    def test_reads_keep_working_while_a_long_write_is_in_flight(self, tmp_path):
+        """The actual failure, reproduced: a second connection reading the file
+        while the first holds a write transaction open."""
+        import sqlite3
+
+        from pilates.demo import fill
+        from pilates.store import Store
+
+        db = tmp_path / "studio.db"
+        with Store.open(db) as writer:
+            fill(writer, session="s1", date="2026-03-03")
+            writer.db.execute("BEGIN IMMEDIATE")
+            writer.db.execute("INSERT INTO audit (at, action) VALUES ('x', 'y')")
+            try:
+                with Store.open(db) as reader:
+                    assert reader.people()          # would raise before WAL
+                    assert reader.recordings() is not None
+            finally:
+                writer.db.execute("ROLLBACK")
+
+    def test_the_session_row_is_not_written_on_every_request(self, tmp_path):
+        """A write per request is write contention per request, for a field
+        nothing reads more precisely than "roughly when were they last here"."""
+        from pilates import auth, passwords
+        from pilates.accounts import Account, Studio
+        from pilates.onboarding import grant
+        from pilates.store import Store
+
+        passwords.N = 2 ** 14
+        db = tmp_path / "studio.db"
+        with Store.open(db) as store:
+            store.add_studio(Studio(key="here", name="Here"))
+            account = Account(email="a@b.co", display_name="A")
+            store.create_account(account, password="a decently long password")
+            grant(store, account.username, "here", "student", by="test")
+            session = auth.sign_in(store, "a@b.co", "a decently long password")
+
+            first = store.db.execute(
+                "SELECT last_seen FROM auth_sessions").fetchone()["last_seen"]
+            for _ in range(5):
+                assert auth.viewer_for(store, session.token) is not None
+            again = store.db.execute(
+                "SELECT last_seen FROM auth_sessions").fetchone()["last_seen"]
+            assert first == again

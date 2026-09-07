@@ -683,3 +683,72 @@ class TestGettingBackInOverHttp:
     def test_signed_out_cannot_ask_for_somebody_else_s_codes(self, studio):
         base, _, _ = studio
         assert Client(base).post("/me/recovery-codes")[0] == 401
+
+
+class TestSeedingFromTheAdminConsole:
+    """Here as well as in the terminal because the deployments most in need of
+    it are hosted ones, where there is no terminal to run a command in."""
+
+    def _admin(self, base):
+        client = Client(base)
+        client.sign_in("boss@b.co")
+        client.post("/auth/switch", {"studio": "gangnam", "role": ADMIN})
+        return client
+
+    def test_an_admin_can_fill_their_own_studio(self, studio):
+        base, _, _ = studio
+        admin = self._admin(base)
+        status, payload = admin.post("/admin/seed", {"no_classes": True})
+        assert status == 200 and payload["people"] == 16
+        assert payload["studio"] == "gangnam"
+        names = {p["display_name"] for p in admin.get("/admin/people")[1]["people"]}
+        assert "Kim Min-ji" in names and "Park Min-seok" in names
+
+    def test_they_land_in_the_studio_the_admin_is_acting_in(self, studio):
+        base, _, db = studio
+        self._admin(base).post("/admin/seed", {"no_classes": True})
+        with Store.open(db) as store:
+            held = store.memberships(username="kim_minji_example_com")
+            assert {m.studio for m in held} == {"gangnam"}
+
+    def test_nobody_seeded_becomes_an_admin(self, studio):
+        base, names, db = studio
+        self._admin(base).post("/admin/seed", {"no_classes": True})
+        with Store.open(db) as store:
+            admins = {m.username for m in
+                      store.memberships(studio="gangnam", role=ADMIN)}
+        assert admins == {names["boss"]}
+
+    def test_a_coach_cannot_do_it(self, studio):
+        base, _, _ = studio
+        coach = Client(base)
+        coach.sign_in("coach@b.co")
+        assert coach.post("/admin/seed", {"no_classes": True})[0] == 403
+
+    def test_a_student_cannot_do_it(self, studio):
+        base, _, _ = studio
+        ann = Client(base)
+        ann.sign_in("ann@b.co")
+        assert ann.post("/admin/seed", {"no_classes": True})[0] == 403
+
+    def test_signed_out_cannot_do_it(self, studio):
+        base, _, _ = studio
+        assert Client(base).post("/admin/seed", {})[0] == 401
+
+    def test_twice_is_refused_unless_asked_for(self, studio):
+        base, _, _ = studio
+        admin = self._admin(base)
+        admin.post("/admin/seed", {"no_classes": True})
+        status, payload = admin.post("/admin/seed", {"no_classes": True})
+        assert status == 409 and "already" in payload["error"]
+
+    def test_the_coach_roster_works_straight_afterwards(self, studio):
+        """The thing that was broken: the fixture existed and the coach could
+        not see it."""
+        base, _, _ = studio
+        self._admin(base).post("/admin/seed", {"no_classes": True})
+        park = Client(base)
+        park.sign_in("park.minseok@example.com", "seoul-pilates-2026")
+        found = park.get("/roster")[1]["students"]
+        assert {s["display_name"] for s in found} == {
+            "Kim Min-ji", "Lee Joon-ho", "Choi Seo-yeon"}

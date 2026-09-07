@@ -360,9 +360,36 @@ making it look fake:
 - every person carries a marker in their record, and every session carries the
   same synthetic block the demo bundle does.
 
-And it **refuses a database that already has accounts on it**. A fixture that
-can be poured into a working studio is one that will be, and afterwards there is
-no way to tell a seeded student from a real one.
+And it **refuses a database that already has accounts on it** unless you name a
+studio of your own with `--studio`, or press the button in the admin console.
+A fixture that can be poured into a working studio *by accident* is one that
+will be; naming the studio is the consent that makes it deliberate. Where it is
+poured into somewhere real, **nobody it creates becomes an admin of it** — an
+admin role becomes a coach role, because a fictional person must not end up able
+to read every health record in the building.
+
+### The bug the button found
+
+Pressing it the first time broke the page around it: `database is locked`. The
+server opens a SQLite connection per request, because connections are not
+shareable across threads, and under the rollback journal one writer blocks every
+reader on the file. So a write of any length — filling a studio with fixtures, a
+capture saving a long session — made every other request in flight fail.
+
+Three changes, and they matter well beyond the fixture:
+
+- **WAL journalling.** Readers no longer block the writer and the writer no
+  longer blocks readers, so only writer-against-writer contends, and those are
+  milliseconds long.
+- **A twenty-second busy timeout.** When two writers do meet, wait rather than
+  fail. The default five seconds is less than a capture takes to save.
+- **The session row is no longer written on every request.** `last_seen` was a
+  write per request — write contention per request — for a field nothing reads
+  more precisely than *roughly when were they last here*.
+
+`synchronous` stays at `FULL`. `NORMAL` is the usual WAL pairing and is faster,
+and what it trades away is the last few transactions on power loss — which here
+is a coach's note about somebody's knee.
 
 ## What this deliberately does not do yet
 

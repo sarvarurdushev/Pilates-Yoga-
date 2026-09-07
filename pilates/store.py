@@ -420,6 +420,35 @@ class Store:
         self.db = connection
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA foreign_keys = ON")
+
+        # -- concurrency, learned the hard way ---------------------------
+        #
+        # The server opens a connection per request, because SQLite
+        # connections are not shareable across threads. Under the rollback
+        # journal that means one writer blocks every reader on the file, and a
+        # write that takes a second -- filling a studio with fixture data,
+        # a capture subprocess saving a session -- makes every other request in
+        # flight fail with "database is locked". Which is exactly what
+        # happened: pressing one button in the admin console broke the page
+        # around it.
+        #
+        # WAL is the fix and the reason it is the fix is worth writing down:
+        # readers no longer block on the writer and the writer no longer blocks
+        # readers, so only writer-against-writer contends -- and those are all
+        # milliseconds long.
+        try:
+            self.db.execute("PRAGMA journal_mode = WAL")
+        except sqlite3.DatabaseError:
+            # A read-only file or an exotic filesystem. The rest still works.
+            pass
+        # And when two writers do meet, wait rather than fail. The default is
+        # five seconds, which a capture writing a long session can exceed.
+        self.db.execute("PRAGMA busy_timeout = 20000")
+        # Left at FULL deliberately. NORMAL is the usual WAL pairing and is
+        # faster, and what it trades away is the last few transactions on power
+        # loss -- which here is a coach's note about somebody's knee.
+        self.db.execute("PRAGMA synchronous = FULL")
+
         self.db.executescript(SCHEMA)
         self._migrate()
         self.db.commit()

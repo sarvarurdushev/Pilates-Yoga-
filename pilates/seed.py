@@ -210,6 +210,25 @@ NOTES = (
 )
 
 
+def _roles_for(person: Person, into: str) -> tuple:
+    """Where this person's roles land, and what they are allowed to be.
+
+    Seeding into an existing studio collapses every membership onto it and
+    demotes admin to coach: a fixture poured into somewhere real must not make
+    a fictional person able to read every health record in the building.
+    Duplicates are dropped, since somebody who was admin *and* coach at Gangnam
+    is just a coach once both land in the same place.
+    """
+    if not into:
+        return person.roles
+    kept = []
+    for _, role in person.roles:
+        role = COACH if role == ADMIN else role
+        if (into, role) not in kept:
+            kept.append((into, role))
+    return tuple(kept)
+
+
 def _answers(flags) -> dict:
     from .accounts import PARQ
 
@@ -221,25 +240,53 @@ def already_seeded(store) -> bool:
         "SELECT 1 FROM accounts WHERE email LIKE ?", (f"%@{DOMAIN}",)).fetchone())
 
 
-def sow(store, password: str = PASSWORD, classes: bool = True) -> dict:
+def sow(store, password: str = PASSWORD, classes: bool = True,
+        into: str = "") -> dict:
     """Build the whole studio. Returns what was made, for printing.
 
     Ordered the way it has to be: studios, then people, then roles, then the
     assignments that depend on both people existing, then the notes that depend
     on the assignment being live -- which is the same order a real studio fills
     up in, and the reason the fixture is worth having.
+
+    ``into`` puts everybody in a studio that already exists instead of making
+    the three. That is the case somebody actually hits: they set their own
+    studio up through the page, then seeded, and the fictional people landed in
+    three studios they were not a member of -- so from where they were sitting
+    the fixture had simply not worked.
+
+    **Nobody seeded becomes an admin of a studio they did not create.** Seeding
+    into somewhere real should not hand a fictional person the ability to read
+    every health record in it, so an admin role becomes a coach role. The
+    switcher still has something to demonstrate: the owner of those two roles
+    holds both.
     """
     made = {"studios": [], "people": [], "assignments": 0, "notes": 0,
-            "sessions": 0}
+            "sessions": 0, "into": into}
 
-    for studio in STUDIOS:
-        store.add_studio(studio)
-        made["studios"].append(studio)
+    if into:
+        if store.studio(into) is None:
+            raise ValueError(f"there is no studio called {into!r} here. "
+                             "`pilates studio --list` shows the ones there are")
+        made["studios"].append(store.studio(into))
+    else:
+        for studio in STUDIOS:
+            store.add_studio(studio)
+            made["studios"].append(studio)
+
+    # One hash for all sixteen. Hashing separately is right for real accounts
+    # and pointless here: they share a password that is printed on the screen,
+    # so there is nothing a per-account salt protects. It also takes the cost of
+    # seeding from sixteen scrypt runs to one, which on the smallest hosting
+    # tier is the difference between a click and a timeout.
+    from .passwords import hash_password
+
+    shared = hash_password(password)
 
     for person in PEOPLE:
         account = Account(email=person.email, display_name=person.name,
-                          phone=person.phone)
-        username = store.create_account(account, password=password)
+                          phone=person.phone, password_hash=shared)
+        username = store.create_account(account)
         store.db.execute("UPDATE people SET notes = ? WHERE username = ?",
                          (MARKER, username))
         store.put_profile(Profile(username=username, born=person.born,
@@ -256,7 +303,7 @@ def sow(store, password: str = PASSWORD, classes: bool = True) -> dict:
                 medications="", pregnant=person.pregnant,
                 cleared_by_physician=person.cleared,
                 completed_on=str(date.today() - timedelta(days=30))))
-        for studio_key, role in person.roles:
+        for studio_key, role in _roles_for(person, into):
             store.put_membership(Membership(
                 username=username, studio=studio_key, role=role,
                 state=person.state, decided_by="seed",
@@ -267,12 +314,12 @@ def sow(store, password: str = PASSWORD, classes: bool = True) -> dict:
 
     for coach_handle, (accepted, asked) in ROSTERS.items():
         coach = handles[coach_handle]
+        person = next(p for p in PEOPLE if p.handle == coach_handle)
         # The studio they coach at, found by the role rather than by position:
         # Yoon coaches at Gangnam and is a student at Hongdae, and taking the
         # first membership would have put her students at the wrong place.
-        studio = next(studio_key
-                      for person in PEOPLE if person.handle == coach_handle
-                      for studio_key, role in person.roles if role == COACH)
+        studio = next(studio_key for studio_key, role
+                      in _roles_for(person, into) if role == COACH)
         for student_handle in accepted:
             store.put_assignment(Assignment(
                 coach=coach, student=handles[student_handle], studio=studio,
@@ -323,16 +370,25 @@ def _record_classes(store, people) -> int:
 
 
 def summary(made: dict, password: str = PASSWORD) -> str:
-    """What to hand somebody who now has to sign in as thirteen people."""
+    """What to hand somebody who now has to sign in as sixteen people."""
+    into = made.get("into") or ""
     lines = ["", "Studios", "-------"]
     for studio in made["studios"]:
-        lines.append(f"  {studio.key:<10} {studio.name} — {studio.city}")
+        key = studio["key"] if isinstance(studio, dict) else studio.key
+        name = studio["name"] if isinstance(studio, dict) else studio.name
+        city = studio["city"] if isinstance(studio, dict) else studio.city
+        lines.append(f"  {key:<10} {name}" + (f" — {city}" if city else ""))
+    if into:
+        lines.append("")
+        lines.append(f"  Everybody was put into {into}, and nobody seeded was "
+                     "made an admin of it.")
 
     lines += ["", f"Everybody's password is:  {password}",
               f"Every address is at @{DOMAIN}, which reaches nobody.", "",
               "People", "------"]
     for person, _ in made["people"]:
-        roles = ", ".join(f"{role}@{studio}" for studio, role in person.roles)
+        roles = ", ".join(f"{role}@{studio}"
+                          for studio, role in _roles_for(person, into))
         note = []
         if person.state == PENDING:
             note.append("waiting for approval")
@@ -343,17 +399,18 @@ def summary(made: dict, password: str = PASSWORD) -> str:
         lines.append(f"  {person.email:<34} {person.name:<16} {roles}"
                      + (f"   ({'; '.join(note)})" if note else ""))
 
+    where = into or "gangnam"
     lines += ["", "Try this", "--------",
-              "  1. Sign in as seo.jiwoo@example.com — admin, coach and student",
-              "     at Gangnam. Switch role in the header and watch the room",
-              "     change.",
-              "  2. As admin, open Studio: Kang Tae-yang is waiting to be made",
-              "     a coach.",
+              f"  1. As your own admin, open Studio → People. All of them are",
+              f"     there, at {where}.",
+              "  2. Studio → Waiting: Kang Tae-yang has asked to be a coach.",
               "  3. Sign in as park.minseok@example.com — three students, and",
               "     Choi Seo-yeon is red because nobody has screened her.",
               "  4. Sign in as oh.seah@example.com — Yoon Chae-won has asked to",
               "     coach her, and the consent prompt is waiting.",
               "  5. Sign in as kim.minji@example.com — twelve weeks of",
               "     measurements, a knee flag and an overdue goal.",
+              "  6. Sign in as seo.jiwoo@example.com — two roles at once; the",
+              "     switcher in the header changes the room.",
               ""]
     return "\n".join(lines)

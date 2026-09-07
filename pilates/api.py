@@ -396,6 +396,40 @@ def give_role(store, viewer: Viewer | None, payload: dict) -> dict:
     return membership.to_dict()
 
 
+def seed_studio(store, viewer: Viewer | None, payload: dict) -> dict:
+    """Fill this studio with people who do not exist, from the admin console.
+
+    Here as well as in the terminal because the deployments most in need of it
+    are the hosted ones, where there is no terminal to run a command in. Scoped
+    to the studio the admin is acting in, and nobody it creates becomes an admin
+    of it: a fixture poured into somewhere real must not hand a fictional person
+    the ability to read every health record in the building.
+    """
+    from .seed import PASSWORD, already_seeded, sow
+
+    admin = _need_admin(viewer)
+    if already_seeded(store) and not payload.get("again"):
+        raise Refused("this database already has the demonstration people on "
+                      "it. Look in People, or pass again:true to add them "
+                      "a second time", 409)
+    made = sow(store, password=PASSWORD, into=admin.studio,
+               classes=not payload.get("no_classes"))
+    store.record_audit(actor=admin.username, action="seed:sown",
+                       studio=admin.studio,
+                       detail=f"{len(made['people'])} fictional people")
+    return {
+        "people": len(made["people"]),
+        "assignments": made["assignments"],
+        "sessions": made["sessions"],
+        "notes": made["notes"],
+        "studio": admin.studio,
+        "password": PASSWORD,
+        "message": f"{len(made['people'])} people who do not exist are now at "
+                   f"{admin.studio}. They all sign in with “{PASSWORD}”. "
+                   "Nobody seeded is an admin.",
+    }
+
+
 def make_invitation(store, viewer: Viewer | None, payload: dict) -> dict:
     """The preferred way to create staff: role scoped in the same act."""
     admin = _need_admin(viewer)

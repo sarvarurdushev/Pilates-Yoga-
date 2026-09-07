@@ -1241,8 +1241,22 @@ pilates seed --db seoul.db      # three studios, sixteen people, twelve weeks
 pilates web --db seoul.db       # then sign in as any of them
 ```
 
-That builds a Seoul and Busan studio group with every state somebody needs to
-click through: one person who is admin, coach *and* student at Gangnam; a coach
+**If you already set your own studio up**, point the fixture at it instead —
+otherwise the fictional people land in three studios you are not a member of,
+and from where you are sitting the fixture has simply not worked:
+
+```bash
+pilates seed --db seoul.db --studio songdo
+```
+
+Or, on a hosted deployment where there is no terminal: sign in as your admin,
+open **Studio → People**, and press **Add demo people**. Same fixture, same
+studio, one click. Nobody it creates becomes an admin — a fixture poured into
+somewhere real must not hand a fictional person the ability to read every
+health record in the building.
+
+The default builds a Seoul and Busan studio group with every state somebody
+needs to click through: one person who is admin, coach *and* student at Gangnam; a coach
 who teaches there and trains at Hongdae; a coach waiting to be approved, so the
 admin inbox is not empty; a student nobody has screened, so the roster has its
 red row; an assignment still waiting on the student, so the consent prompt
