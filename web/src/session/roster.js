@@ -127,7 +127,7 @@ export function mount(me, open) {
 function student(row) {
   const flags = (row.flags ?? []).map((f) => {
     const hot = /not screened|doctor|heart|supervision/i.test(f);
-    return `<i class="${ss-hot ? 'ss-hot' : ''}">${esc(f)}</i>`;
+    return `<i class="${hot ? 'ss-hot' : ''}">${esc(f)}</i>`;
   }).join('');
   const due = (row.goals_due ?? [])
     .map((g) => `<i class="ss-due">goal due: ${esc(g)}</i>`).join('');

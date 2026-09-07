@@ -90,7 +90,7 @@ DEFAULT_SCOPES = (SEE_MEASUREMENTS, SEE_FLAGS, SEE_CONTACT)
 # -- validation --------------------------------------------------------------
 
 EMAIL = re.compile(r"^[^@\s]+@[^@\s.]+(\.[^@\s.]+)+$")
-#: E.164. Stored normalised so that "+998 90 123 45 67" and "+998901234567" are
+#: E.164. Stored normalised so that "+82 10 1234 5678" and "+821012345678" are
 #: one person rather than two -- which is the whole reason the studio asked for a
 #: phone number in the first place.
 PHONE = re.compile(r"^\+[1-9]\d{6,14}$")
@@ -110,7 +110,7 @@ def normalise_phone(text: str) -> str:
     """Everything that is not a digit goes, and a leading ``+`` is kept.
 
     A number with no country code is refused rather than assumed: assuming is
-    how a studio in Tashkent ends up with a Uzbek number filed as American.
+    how a studio in Gangnam ends up with a Korean number filed as American.
     """
     raw = (text or "").strip()
     if not raw:
@@ -122,7 +122,7 @@ def normalise_phone(text: str) -> str:
         pass
     elif kept:
         raise ValueError("a phone number needs its country code, like "
-                         "+998901234567")
+                         "+821012345678")
     return f"+{kept}"
 
 

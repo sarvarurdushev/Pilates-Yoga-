@@ -10,7 +10,7 @@ wrong::
 
     PILATES_SMTP_URL=smtps://studio%40gmail.com:app-password@smtp.gmail.com:465
     PILATES_SMTP_URL=smtp+starttls://user:pass@smtp.example.com:587
-    PILATES_MAIL_FROM="Tashkent Pilates <studio@gmail.com>"   # optional
+    PILATES_MAIL_FROM="Gangnam Pilates <studio@gmail.com>"   # optional
 
 ``smtps://`` is TLS from the first byte (port 465); ``smtp+starttls://`` upgrades
 a plain connection (port 587). Plain ``smtp://`` is allowed and refused for

@@ -1233,13 +1233,44 @@ rather than a sentence in a policy.
 
 ### Getting started
 
+The fastest way to see all of it working is to fill a database with people who
+do not exist:
+
 ```bash
-pilates studio tashkent --name "Tashkent Pilates" --city Tashkent --country UZ
-pilates account you@example.com --name "Your Name" --phone "+998901234567" \
-    --role admin --role coach --role student --studio tashkent
-pilates roles                       # what people have asked to be
-pilates roles --approve someone@tashkent:coach --by you
+pilates seed --db seoul.db      # three studios, sixteen people, twelve weeks
+pilates web --db seoul.db       # then sign in as any of them
 ```
+
+That builds a Seoul and Busan studio group with every state somebody needs to
+click through: one person who is admin, coach *and* student at Gangnam; a coach
+who teaches there and trains at Hongdae; a coach waiting to be approved, so the
+admin inbox is not empty; a student nobody has screened, so the roster has its
+red row; an assignment still waiting on the student, so the consent prompt
+appears the moment you sign in as her; and a twelve-week history with a knee
+flag and an overdue goal. Everybody's password is printed, along with a short
+list of what to try in what order.
+
+Nothing in that fixture can reach a real person. Every address is at
+`example.com`, which is reserved and unroutable, so a deployment with a mail
+server configured cannot email a stranger by accident; every number is in the
+`010-0000-xxxx` block Korean carriers do not issue; and every person carries a
+marker in their record saying they were seeded. `pilates seed` refuses a
+database that already has accounts on it, because a fixture that can be poured
+into a working studio is one that will be.
+
+To build a real studio instead:
+
+```bash
+pilates studio gangnam --name "Gangnam Pilates" --city Seoul --country KR \
+    --timezone Asia/Seoul
+pilates account you@example.com --name "Your Name" --phone "+821012345678" \
+    --role admin --role coach --role student --studio gangnam
+pilates roles                       # what people have asked to be
+pilates roles --approve someone@gangnam:coach --by you
+pilates reset someone@example.com   # a link they use to choose a new password
+```
+
+Or open the page on an empty database and it offers the same thing as a form.
 
 Passwords are scrypt at the current OWASP cost (`n=2**17, r=8, p=1`), which is
 about 400 ms and 128 MB per attempt — deliberately expensive, serialised so a

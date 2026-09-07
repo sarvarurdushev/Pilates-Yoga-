@@ -22,13 +22,13 @@ def db(monkeypatch):
     monkeypatch.setattr("pilates.passwords.N", 2 ** 14)
     monkeypatch.delenv("PILATES_SMTP_URL", raising=False)
     with Store.memory() as store:
-        store.add_studio(Studio(key="tashkent", name="Tashkent Pilates"))
+        store.add_studio(Studio(key="gangnam", name="Gangnam Pilates"))
         account = Account(email="ann@b.co", display_name="Ann")
         store.create_account(account, password=PASSWORD)
-        grant(store, account.username, "tashkent", STUDENT, by="test")
+        grant(store, account.username, "gangnam", STUDENT, by="test")
         boss = Account(email="boss@b.co", display_name="The Owner")
         store.create_account(boss, password=PASSWORD)
-        grant(store, boss.username, "tashkent", ADMIN, by="test")
+        grant(store, boss.username, "gangnam", ADMIN, by="test")
         store.ann = account.username
         store.boss = boss.username
         yield store

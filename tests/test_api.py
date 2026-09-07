@@ -62,20 +62,20 @@ def studio(tmp_path, monkeypatch):
     monkeypatch.setattr("pilates.passwords.N", 2 ** 14)
     db = tmp_path / "studio.db"
     with Store.open(db) as store:
-        store.add_studio(Studio(key="tashkent", name="Tashkent Pilates"))
-        store.add_studio(Studio(key="samarkand", name="Samarkand Yoga"))
+        store.add_studio(Studio(key="gangnam", name="Gangnam Pilates"))
+        store.add_studio(Studio(key="hongdae", name="Hongdae Movement Lab"))
         boss = Account(email="boss@b.co", display_name="The Owner")
         store.create_account(boss, password=PASSWORD)
         for role in (ADMIN, COACH, STUDENT):
-            grant(store, boss.username, "tashkent", role, by="bootstrap")
+            grant(store, boss.username, "gangnam", role, by="bootstrap")
         coach = Account(email="coach@b.co", display_name="A Coach")
         store.create_account(coach, password=PASSWORD)
-        grant(store, coach.username, "tashkent", COACH, by=boss.username)
+        grant(store, coach.username, "gangnam", COACH, by=boss.username)
         other = Account(email="other@b.co", display_name="Another Coach")
         store.create_account(other, password=PASSWORD)
-        grant(store, other.username, "tashkent", COACH, by=boss.username)
+        grant(store, other.username, "gangnam", COACH, by=boss.username)
         for email, name in (("ann@b.co", "Ann"), ("ben@b.co", "Ben")):
-            sign_up(store, email, name, PASSWORD, "tashkent", wants=STUDENT)
+            sign_up(store, email, name, PASSWORD, "gangnam", wants=STUDENT)
         names = {"boss": boss.username, "coach": coach.username,
                  "other": other.username,
                  "ann": store.account_by_email("ann@b.co").username,
@@ -93,7 +93,7 @@ class TestSigningInOverHttp:
         base, _, _ = studio
         status, payload = Client(base).get("/auth/me")
         assert status == 200 and payload["signed_in"] is False
-        assert {s["key"] for s in payload["studios"]} == {"tashkent", "samarkand"}
+        assert {s["key"] for s in payload["studios"]} == {"gangnam", "hongdae"}
 
     def test_the_signup_form_is_never_offered_admin(self, studio):
         base, _, _ = studio
@@ -137,7 +137,7 @@ class TestSwitchingRoleOverHttp:
         client = Client(base)
         client.sign_in("boss@b.co")
         assert client.get("/auth/me")[1]["can"]["administer"] is False
-        client.post("/auth/switch", {"studio": "tashkent", "role": ADMIN})
+        client.post("/auth/switch", {"studio": "gangnam", "role": ADMIN})
         assert client.get("/auth/me")[1]["can"]["administer"] is True
 
     def test_a_student_cannot_switch_to_admin(self, studio):
@@ -145,7 +145,7 @@ class TestSwitchingRoleOverHttp:
         client = Client(base)
         client.sign_in("ann@b.co")
         status, _ = client.post("/auth/switch",
-                                {"studio": "tashkent", "role": ADMIN})
+                                {"studio": "gangnam", "role": ADMIN})
         assert status == 403
         assert client.get("/auth/me")[1]["can"]["administer"] is False
 
@@ -295,7 +295,7 @@ class TestWhatAnAdminCanReach:
         base, names, db = studio
         client = Client(base)
         client.sign_in("boss@b.co")
-        client.post("/auth/switch", {"studio": "tashkent", "role": ADMIN})
+        client.post("/auth/switch", {"studio": "gangnam", "role": ADMIN})
         return client, names, db
 
     def test_everybody_including_the_full_screening(self, boss):
@@ -315,7 +315,7 @@ class TestWhatAnAdminCanReach:
         base, _, _ = studio
         Client(base).post("/auth/signup",
                           {"email": "new@b.co", "display_name": "A New Coach",
-                           "password": PASSWORD, "studio": "tashkent",
+                           "password": PASSWORD, "studio": "gangnam",
                            "wants": COACH})
         client, _, _ = boss
         waiting = client.get("/admin/pending")[1]["pending"]
@@ -325,7 +325,7 @@ class TestWhatAnAdminCanReach:
         base, _, _ = studio
         Client(base).post("/auth/signup",
                           {"email": "new@b.co", "display_name": "A New Coach",
-                           "password": PASSWORD, "studio": "tashkent",
+                           "password": PASSWORD, "studio": "gangnam",
                            "wants": COACH})
         client, _, _ = boss
         username = client.get("/admin/pending")[1]["pending"][0]["username"]
@@ -481,8 +481,8 @@ class TestSigningUpOverHttp:
         client = Client(base)
         status, payload = client.post("/auth/signup", {
             "email": "new@b.co", "display_name": "A New Student",
-            "password": PASSWORD, "studio": "tashkent", "wants": STUDENT,
-            "phone": "+998901234500", "born": "1998-04-12",
+            "password": PASSWORD, "studio": "gangnam", "wants": STUDENT,
+            "phone": "+821012345600", "born": "1998-04-12",
             "height_m": 1.76, "mass_kg": 72})
         assert status == 201 and payload["waiting"] is False
         assert client.sign_in("new@b.co")[0] == 200
@@ -492,7 +492,7 @@ class TestSigningUpOverHttp:
         client = Client(base)
         status, payload = client.post("/auth/signup", {
             "email": "newcoach@b.co", "display_name": "A New Coach",
-            "password": PASSWORD, "studio": "tashkent", "wants": COACH})
+            "password": PASSWORD, "studio": "gangnam", "wants": COACH})
         assert status == 201 and payload["waiting"] is True
         assert client.sign_in("newcoach@b.co")[0] == 401
 
@@ -500,14 +500,14 @@ class TestSigningUpOverHttp:
         base, _, _ = studio
         status, payload = Client(base).post("/auth/signup", {
             "email": "sneaky@b.co", "display_name": "Sneaky",
-            "password": PASSWORD, "studio": "tashkent", "wants": ADMIN})
+            "password": PASSWORD, "studio": "gangnam", "wants": ADMIN})
         assert status == 400 and "never requested" in payload["error"]
 
     def test_a_short_password_is_refused(self, studio):
         base, _, _ = studio
         status, payload = Client(base).post("/auth/signup", {
             "email": "weak@b.co", "display_name": "Weak", "password": "1234",
-            "studio": "tashkent", "wants": STUDENT})
+            "studio": "gangnam", "wants": STUDENT})
         assert status == 400 and "characters" in payload["error"]
 
     def test_the_profile_and_screening_round_trip(self, studio):
@@ -515,7 +515,7 @@ class TestSigningUpOverHttp:
         client = Client(base)
         client.post("/auth/signup", {
             "email": "new@b.co", "display_name": "A New Student",
-            "password": PASSWORD, "studio": "tashkent", "wants": STUDENT})
+            "password": PASSWORD, "studio": "gangnam", "wants": STUDENT})
         client.sign_in("new@b.co")
         client.post("/me/profile", {"born": "1998-04-12", "height_m": 1.76,
                                     "mass_kg": 72})
@@ -598,7 +598,7 @@ class TestGettingBackInOverHttp:
         client = Client(base)
         _, welcome = client.post("/auth/signup", {
             "email": "new@b.co", "display_name": "New", "password": PASSWORD,
-            "studio": "tashkent", "wants": STUDENT})
+            "studio": "gangnam", "wants": STUDENT})
         assert len(welcome["recovery_codes"]) == 8
         assert "not this computer" in welcome["recovery_note"]
 
@@ -607,7 +607,7 @@ class TestGettingBackInOverHttp:
         client = Client(base)
         _, welcome = client.post("/auth/signup", {
             "email": "new@b.co", "display_name": "New", "password": PASSWORD,
-            "studio": "tashkent", "wants": STUDENT})
+            "studio": "gangnam", "wants": STUDENT})
         code = welcome["recovery_codes"][0]
         status, _ = Client(base).post("/auth/recover", {
             "email": "new@b.co", "code": code, "password": "a whole new one now"})
@@ -627,7 +627,7 @@ class TestGettingBackInOverHttp:
         base, names, _ = studio
         boss = Client(base)
         boss.sign_in("boss@b.co")
-        boss.post("/auth/switch", {"studio": "tashkent", "role": ADMIN})
+        boss.post("/auth/switch", {"studio": "gangnam", "role": ADMIN})
         status, payload = boss.post("/admin/reset", {"username": names["ann"]})
         assert status == 200 and "reset=" in payload["link"]
         token = payload["link"].split("reset=")[1]
@@ -652,7 +652,7 @@ class TestGettingBackInOverHttp:
 
         boss = Client(base)
         boss.sign_in("boss@b.co")
-        boss.post("/auth/switch", {"studio": "tashkent", "role": ADMIN})
+        boss.post("/auth/switch", {"studio": "gangnam", "role": ADMIN})
         token = boss.post("/admin/reset",
                           {"username": names["ann"]})[1]["link"].split("reset=")[1]
         Client(base).post("/auth/reset", {"token": token,
@@ -672,7 +672,7 @@ class TestGettingBackInOverHttp:
         client = Client(base)
         _, welcome = client.post("/auth/signup", {
             "email": "new@b.co", "display_name": "New", "password": PASSWORD,
-            "studio": "tashkent", "wants": STUDENT})
+            "studio": "gangnam", "wants": STUDENT})
         old = welcome["recovery_codes"][0]
         client.sign_in("new@b.co")
         fresh = client.post("/me/recovery-codes")[1]["codes"]

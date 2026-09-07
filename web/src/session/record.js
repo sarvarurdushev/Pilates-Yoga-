@@ -84,7 +84,7 @@ const CSS = `
 #ss-rec .go button{padding:10px 18px;border-radius:3px;font-size:13px;
   border:1px solid var(--line2);background:var(--glass);color:var(--txt);
   cursor:pointer}
-#ss-rec .go button.primary{background:var(--acc);border-color:var(--acc);color:#04121f}
+#ss-rec .go button.ss-primary{background:var(--acc);border-color:var(--acc);color:#04121f}
 #ss-rec .go button[disabled]{opacity:.45;cursor:default}
 #ss-rec .go .spacer{margin-left:auto}
 #ss-rec .log{margin:14px 0 0;padding:11px 13px;border-radius:3px;
@@ -266,7 +266,7 @@ python -m pilates web --db studio.db</pre></li>
       same pipeline — they were computed on a machine like the one above and
       exported to a file. This page is what you get afterwards.</div>
     <div class="go" style="margin-top:16px">
-      <button type="button" class="primary" data-close>Got it</button>
+      <button type="button" class="ss-primary" data-close>Got it</button>
     </div>
   </div>`;
   document.body.appendChild(host);
@@ -310,7 +310,7 @@ async function dialog(nw, install, can) {
     </div>
     ${form(remembers, people)}
     <div class="go">
-      <button type="button" class="primary" data-go disabled>Analyse</button>
+      <button type="button" class="ss-primary" data-go disabled>Analyse</button>
       <button type="button" data-close>Close</button>
       <span class="spacer"></span><span data-chosen class="why"></span>
     </div>

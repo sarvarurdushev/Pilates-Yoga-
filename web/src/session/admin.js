@@ -51,8 +51,10 @@ const CSS = `
 #ss-admin .ss-row .ss-tag{font-size:10px;letter-spacing:.1em;text-transform:uppercase;
   padding:2px 7px;border-radius:3px;border:1px solid var(--line2);
   color:var(--dim)}
-#ss-admin .ss-row .ss-tag.admin{border-color:rgba(226,104,95,.5);color:#e2685f}
-#ss-admin .ss-row .ss-tag.coach{border-color:rgba(233,180,92,.5);color:var(--gold)}
+#ss-admin .ss-row .ss-tag.ss-role-admin{border-color:rgba(226,104,95,.5);
+  color:#e2685f}
+#ss-admin .ss-row .ss-tag.ss-role-coach{border-color:rgba(233,180,92,.5);
+  color:var(--gold)}
 #ss-admin button.ss-act{padding:5px 11px;border-radius:3px;font:inherit;
   font-size:11.5px;cursor:pointer;border:1px solid var(--line2);
   background:var(--glass);color:var(--txt);white-space:nowrap}
@@ -77,9 +79,9 @@ const CSS = `
 /* Flex arithmetic that has to be spelled out. Without flex:none on the
    controls, a long email in the middle column is squeezed to one character
    wide and prints itself vertically -- which is exactly what happened. */
-#ss-admin .ss-row .ss-main,#ss-admin .who .ss-main{flex:1 1 auto;min-width:200px;overflow:hidden}
-#ss-admin .ss-row .ss-meta,#ss-admin .who .ss-meta{overflow-wrap:anywhere}
-#ss-admin .ss-row .ss-tag,#ss-admin .ss-row button,#ss-admin .who button,#ss-admin .who .ss-n{flex:none}
+#ss-admin .ss-row .ss-main{flex:1 1 auto;min-width:200px;overflow:hidden}
+#ss-admin .ss-row .ss-meta{overflow-wrap:anywhere}
+#ss-admin .ss-row .ss-tag,#ss-admin .ss-row button{flex:none}
 
 `;
 
@@ -169,7 +171,7 @@ async function dialog(me) {
           <span class="ss-meta">${esc(row.email)}${
             row.phone ? ` · ${esc(row.phone)}` : ''} · asked ${esc(row.since)}</span>
         </span>
-        <span class="ss-tag ${esc(ss-row.role)}">wants ${esc(row.role)}</span>
+        <span class="ss-tag ss-role-${esc(row.role)}">wants ${esc(row.role)}</span>
         <button type="button" class="ss-act" data-yes="${esc(row.username)}"
           data-role="${esc(row.role)}">Approve</button>
         <button type="button" class="ss-act ss-warn" data-no="${esc(row.username)}"
@@ -219,7 +221,7 @@ async function dialog(me) {
       ${people.map((person) => {
         const roles = (person.memberships ?? [])
           .filter((m) => m.state === 'active')
-          .map((m) => `<span class="ss-tag ${esc(m.role)}">${esc(m.role)}</span>`)
+          .map((m) => `<span class="ss-tag ss-role-${esc(m.role)}">${esc(m.role)}</span>`)
           .join(' ');
         const facts = [person.age && `${person.age}`, person.phone,
                        (person.screening?.flags ?? []).join(', ')]

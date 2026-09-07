@@ -27,7 +27,7 @@ class TestAnAccountRefuses:
             Account(email="a@b.co", display_name="   ")
 
     def test_a_phone_number_with_no_country_code(self):
-        """Assuming one is how a studio in Tashkent files a Uzbek number as
+        """Assuming one is how a studio in Gangnam files a Uzbek number as
         American."""
         with pytest.raises(ValueError, match="country code"):
             Account(email="a@b.co", display_name="A", phone="901234567")
@@ -48,11 +48,11 @@ class TestOnePersonOneKey:
         assert (normalise_email("  A@B.CO ") == normalise_email("a@b.co"))
 
     def test_a_phone_number_is_stored_one_way(self):
-        assert (normalise_phone("+998 90 123 45 67")
-                == normalise_phone("+998901234567") == "+998901234567")
+        assert (normalise_phone("+82 10 1234 5678")
+                == normalise_phone("+821012345678") == "+821012345678")
 
     def test_a_double_zero_prefix_is_the_same_number(self):
-        assert normalise_phone("00998901234567") == "+998901234567"
+        assert normalise_phone("00821012345678") == "+821012345678"
 
 
 class TestAgeIsComputed:
@@ -78,8 +78,8 @@ class TestTheRoleIsOnTheMembership:
     @pytest.fixture
     def db(self):
         with Store.memory() as store:
-            store.add_studio(Studio(key="tashkent", name="Tashkent Pilates"))
-            store.add_studio(Studio(key="samarkand", name="Samarkand Yoga"))
+            store.add_studio(Studio(key="gangnam", name="Gangnam Pilates"))
+            store.add_studio(Studio(key="hongdae", name="Hongdae Movement Lab"))
             yield store
 
     def test_one_account_can_hold_three_roles(self, db):
@@ -87,7 +87,7 @@ class TestTheRoleIsOnTheMembership:
         db.create_account(account, password="a good long password")
         for role in (ADMIN, COACH, STUDENT):
             db.put_membership(Membership(username=account.username,
-                                         studio="tashkent", role=role,
+                                         studio="gangnam", role=role,
                                          state=ACTIVE))
         held = db.memberships(username=account.username)
         assert {m.role for m in held} == {ADMIN, COACH, STUDENT}
@@ -96,25 +96,25 @@ class TestTheRoleIsOnTheMembership:
         account = Account(email="a@b.co", display_name="Sarvar")
         db.create_account(account, password="a good long password")
         db.put_membership(Membership(username=account.username,
-                                     studio="tashkent", role=COACH,
+                                     studio="gangnam", role=COACH,
                                      state=ACTIVE))
         db.put_membership(Membership(username=account.username,
-                                     studio="samarkand", role=STUDENT,
+                                     studio="hongdae", role=STUDENT,
                                      state=ACTIVE))
         assert len(db.memberships(username=account.username, role=COACH)) == 1
         assert db.memberships(username=account.username,
-                              studio="samarkand")[0].role == STUDENT
+                              studio="hongdae")[0].role == STUDENT
 
     def test_only_an_active_membership_does_anything(self, db):
         for state in (PENDING, "suspended", "left"):
-            assert not Membership(username="x", studio="tashkent", role=COACH,
+            assert not Membership(username="x", studio="gangnam", role=COACH,
                                   state=state).usable
-        assert Membership(username="x", studio="tashkent", role=COACH,
+        assert Membership(username="x", studio="gangnam", role=COACH,
                           state=ACTIVE).usable
 
     def test_an_invented_role_is_refused(self, db):
         with pytest.raises(ValueError, match="not one of"):
-            Membership(username="x", studio="tashkent", role="supervisor")
+            Membership(username="x", studio="gangnam", role="supervisor")
 
     def test_the_account_row_itself_carries_no_role(self, db):
         """If it ever does, the whole design has been undone."""
@@ -171,11 +171,11 @@ class TestWhoSeesWhat:
     @pytest.fixture
     def people(self):
         student = Account(email="student@b.co", display_name="A Student",
-                          phone="+998901234568")
+                          phone="+821012345679")
         profile = Profile(username=student.username, born="1998-04-12",
                           height_m=1.76, mass_kg=72,
                           emergency_name="Next of kin",
-                          emergency_phone="+998901234569")
+                          emergency_phone="+821012345670")
         screening = Screening(
             username=student.username,
             answers={key: (key == "joint") for key in PARQ},
@@ -185,12 +185,12 @@ class TestWhoSeesWhat:
         return student, profile, screening
 
     def _assignment(self, coach, student, **kwargs):
-        return Assignment(coach=coach, student=student, studio="tashkent",
+        return Assignment(coach=coach, student=student, studio="gangnam",
                           state=ACTIVE, **kwargs)
 
     def test_a_coach_sees_flags_and_never_the_record(self, people):
         student, profile, screening = people
-        coach = Viewer(username="coach", studio="tashkent", role=COACH)
+        coach = Viewer(username="coach", studio="gangnam", role=COACH)
         seen = visible_person(student, profile, screening, coach,
                               self._assignment("coach", student.username))
         assert seen["seen_as"] == "coach"
@@ -203,7 +203,7 @@ class TestWhoSeesWhat:
         """Height and weight are not vanity fields: a joint moment is a mass on
         a lever."""
         student, profile, screening = people
-        coach = Viewer(username="coach", studio="tashkent", role=COACH)
+        coach = Viewer(username="coach", studio="gangnam", role=COACH)
         seen = visible_person(student, profile, screening, coach,
                               self._assignment("coach", student.username))
         assert seen["height_m"] == 1.76 and seen["mass_kg"] == 72
@@ -211,7 +211,7 @@ class TestWhoSeesWhat:
 
     def test_an_admin_sees_everything(self, people):
         student, profile, screening = people
-        admin = Viewer(username="boss", studio="tashkent", role=ADMIN)
+        admin = Viewer(username="boss", studio="gangnam", role=ADMIN)
         seen = visible_person(student, profile, screening, admin)
         assert seen["born"] == "1998-04-12"
         assert seen["screening"]["medications"] == "ibuprofen"
@@ -220,7 +220,7 @@ class TestWhoSeesWhat:
         student, profile, screening = people
         seen = visible_person(student, profile, screening,
                               Viewer(username=student.username,
-                                     studio="tashkent", role=STUDENT))
+                                     studio="gangnam", role=STUDENT))
         assert seen["seen_as"] == "self"
         assert seen["screening"]["conditions"]
 
@@ -228,13 +228,13 @@ class TestWhoSeesWhat:
         """Being in the same building is not permission. This is the line the
         whole privacy design comes down to."""
         student, profile, screening = people
-        stranger = Viewer(username="other_coach", studio="tashkent", role=COACH)
+        stranger = Viewer(username="other_coach", studio="gangnam", role=COACH)
         seen = visible_person(student, profile, screening, stranger, None)
         assert set(seen) == {"username", "display_name"}
 
     def test_contact_is_withheld_when_it_was_not_consented_to(self, people):
         student, profile, screening = people
-        coach = Viewer(username="coach", studio="tashkent", role=COACH)
+        coach = Viewer(username="coach", studio="gangnam", role=COACH)
         narrow = self._assignment("coach", student.username,
                                   scopes=(SEE_MEASUREMENTS, SEE_FLAGS))
         seen = visible_person(student, profile, screening, coach, narrow)
@@ -243,7 +243,7 @@ class TestWhoSeesWhat:
 
     def test_flags_are_withheld_when_they_were_not_consented_to(self, people):
         student, profile, screening = people
-        coach = Viewer(username="coach", studio="tashkent", role=COACH)
+        coach = Viewer(username="coach", studio="gangnam", role=COACH)
         narrow = self._assignment("coach", student.username,
                                   scopes=(SEE_MEASUREMENTS, SEE_CONTACT))
         seen = visible_person(student, profile, screening, coach, narrow)
@@ -252,18 +252,18 @@ class TestWhoSeesWhat:
 
 class TestReadingAndWritingMeasurements:
     def _coach(self, name="coach"):
-        return Viewer(username=name, studio="tashkent", role=COACH)
+        return Viewer(username=name, studio="gangnam", role=COACH)
 
     def _live(self, coach="coach", student="student", **kwargs):
-        return Assignment(coach=coach, student=student, studio="tashkent",
+        return Assignment(coach=coach, student=student, studio="gangnam",
                           state=ACTIVE, **kwargs)
 
     def test_everybody_reads_their_own(self):
-        me = Viewer(username="me", studio="tashkent", role=STUDENT)
+        me = Viewer(username="me", studio="gangnam", role=STUDENT)
         assert may_read_measurements(me, "me", None)
 
     def test_a_student_cannot_read_another_student(self):
-        me = Viewer(username="me", studio="tashkent", role=STUDENT)
+        me = Viewer(username="me", studio="gangnam", role=STUDENT)
         assert not may_read_measurements(me, "somebody_else", None)
 
     def test_a_coach_reads_an_assigned_student(self):
@@ -274,13 +274,13 @@ class TestReadingAndWritingMeasurements:
         assert not may_read_measurements(self._coach(), "student", other)
 
     def test_an_ended_assignment_stops_reading(self):
-        ended = Assignment(coach="coach", student="student", studio="tashkent",
+        ended = Assignment(coach="coach", student="student", studio="gangnam",
                            state=LEFT, until=today())
         assert not may_read_measurements(self._coach(), "student", ended)
 
     def test_a_pending_request_grants_nothing(self):
         """A coach asking is not a student agreeing."""
-        asked = Assignment(coach="coach", student="student", studio="tashkent",
+        asked = Assignment(coach="coach", student="student", studio="gangnam",
                            state=PENDING)
         assert not may_read_measurements(self._coach(), "student", asked)
 
@@ -289,14 +289,14 @@ class TestReadingAndWritingMeasurements:
         assert not may_read_measurements(self._coach(), "student", narrow)
 
     def test_an_admin_reads_anybody(self):
-        boss = Viewer(username="boss", studio="tashkent", role=ADMIN)
+        boss = Viewer(username="boss", studio="gangnam", role=ADMIN)
         assert may_read_measurements(boss, "anyone", None)
 
     def test_a_student_cannot_write_observations_even_about_themselves(self):
         """An observation's whole authority is that a coach said it, on a date.
         A student's own account of how it felt is a subjective note, which the
         coach records."""
-        me = Viewer(username="me", studio="tashkent", role=STUDENT)
+        me = Viewer(username="me", studio="gangnam", role=STUDENT)
         assert not may_write_about(me, "me", None)
 
     def test_a_coach_writes_only_about_their_own_students(self):
@@ -308,7 +308,7 @@ class TestReadingAndWritingMeasurements:
 class TestAssignments:
     def test_a_coach_cannot_be_assigned_to_themselves(self):
         with pytest.raises(ValueError, match="themselves"):
-            Assignment(coach="same", student="same", studio="tashkent")
+            Assignment(coach="same", student="same", studio="gangnam")
 
     def test_an_invented_consent_scope_is_refused(self):
         with pytest.raises(ValueError, match="not consent scopes"):

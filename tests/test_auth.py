@@ -25,11 +25,11 @@ def db(monkeypatch):
     # make this file take a minute.
     monkeypatch.setattr("pilates.passwords.N", 2 ** 14)
     with Store.memory() as store:
-        store.add_studio(Studio(key="tashkent", name="Tashkent Pilates"))
+        store.add_studio(Studio(key="gangnam", name="Gangnam Pilates"))
         yield store
 
 
-def make(db, email, name="A Person", password=PASSWORD, roles=(), studio="tashkent"):
+def make(db, email, name="A Person", password=PASSWORD, roles=(), studio="gangnam"):
     account = Account(email=email, display_name=name)
     db.create_account(account, password=password)
     for role in roles:
@@ -80,7 +80,7 @@ class TestSigningIn:
     def test_an_account_with_no_approved_role_cannot_get_in(self, db):
         account = make(db, "a@b.co")
         db.put_membership(Membership(username=account.username,
-                                     studio="tashkent", role=COACH,
+                                     studio="gangnam", role=COACH,
                                      state=PENDING))
         with pytest.raises(ValueError, match="waiting"):
             auth.sign_in(db, "a@b.co", PASSWORD)
@@ -155,7 +155,7 @@ class TestSessions:
         account = make(db, "a@b.co", roles=(COACH,))
         session = auth.sign_in(db, "a@b.co", PASSWORD)
         assert auth.viewer_for(db, session.token) is not None
-        db.decide_membership(account.username, "tashkent", COACH, "suspended",
+        db.decide_membership(account.username, "gangnam", COACH, "suspended",
                              by="boss")
         assert auth.viewer_for(db, session.token) is None
 
@@ -177,28 +177,28 @@ class TestSwitchingRole:
     def test_to_one_you_hold(self, db):
         make(db, "a@b.co", roles=(ADMIN, STUDENT))
         session = auth.sign_in(db, "a@b.co", PASSWORD)
-        assert auth.switch(db, session.token, "tashkent", ADMIN).role == ADMIN
+        assert auth.switch(db, session.token, "gangnam", ADMIN).role == ADMIN
 
     def test_never_to_one_you_do_not(self, db):
         """The difference between a role switcher and a privilege escalation."""
         make(db, "a@b.co", roles=(STUDENT,))
         session = auth.sign_in(db, "a@b.co", PASSWORD)
         with pytest.raises(ValueError, match="do not hold"):
-            auth.switch(db, session.token, "tashkent", ADMIN)
+            auth.switch(db, session.token, "gangnam", ADMIN)
 
     def test_not_at_all_when_signed_out(self, db):
         with pytest.raises(ValueError, match="not signed in"):
-            auth.switch(db, "nope", "tashkent", ADMIN)
+            auth.switch(db, "nope", "gangnam", ADMIN)
 
 
 class TestSigningUp:
     def test_a_student_is_approved_on_the_spot(self, db):
-        welcome = sign_up(db, "s@b.co", "A Student", PASSWORD, "tashkent",
+        welcome = sign_up(db, "s@b.co", "A Student", PASSWORD, "gangnam",
                           wants=STUDENT)
         assert welcome.state == ACTIVE and not welcome.waiting
 
     def test_a_coach_waits(self, db):
-        welcome = sign_up(db, "c@b.co", "A Coach", PASSWORD, "tashkent",
+        welcome = sign_up(db, "c@b.co", "A Coach", PASSWORD, "gangnam",
                           wants=COACH)
         assert welcome.state == PENDING and welcome.waiting
         assert "own record and nobody else's" in welcome.message
@@ -207,44 +207,44 @@ class TestSigningUp:
         """A role dropdown that offers admin is one somebody will choose admin
         from."""
         with pytest.raises(ValueError, match="never requested"):
-            sign_up(db, "x@b.co", "X", PASSWORD, "tashkent", wants=ADMIN)
+            sign_up(db, "x@b.co", "X", PASSWORD, "gangnam", wants=ADMIN)
 
     def test_an_invented_role_is_refused_too(self, db):
         with pytest.raises(ValueError):
-            sign_up(db, "x@b.co", "X", PASSWORD, "tashkent", wants="owner")
+            sign_up(db, "x@b.co", "X", PASSWORD, "gangnam", wants="owner")
 
     def test_a_studio_that_does_not_exist_is_refused_not_created(self, db):
         """A signup form that can invent studios fills the database with typos
         of the same gym."""
         with pytest.raises(ValueError, match="no studio"):
             sign_up(db, "x@b.co", "X", PASSWORD, "nowhere")
-        assert [s["key"] for s in db.studios()] == ["tashkent"]
+        assert [s["key"] for s in db.studios()] == ["gangnam"]
 
     def test_a_pending_coach_can_sign_in_to_nothing(self, db):
-        sign_up(db, "c@b.co", "A Coach", PASSWORD, "tashkent", wants=COACH)
+        sign_up(db, "c@b.co", "A Coach", PASSWORD, "gangnam", wants=COACH)
         with pytest.raises(ValueError, match="waiting"):
             auth.sign_in(db, "c@b.co", PASSWORD)
 
     def test_the_admin_sees_the_request(self, db):
-        sign_up(db, "c@b.co", "A Coach", PASSWORD, "tashkent", wants=COACH)
+        sign_up(db, "c@b.co", "A Coach", PASSWORD, "gangnam", wants=COACH)
         waiting = pending(db)
         assert len(waiting) == 1 and waiting[0]["email"] == "c@b.co"
 
     def test_approving_is_what_grants_it(self, db):
-        welcome = sign_up(db, "c@b.co", "A Coach", PASSWORD, "tashkent",
+        welcome = sign_up(db, "c@b.co", "A Coach", PASSWORD, "gangnam",
                           wants=COACH)
-        approve(db, welcome.username, "tashkent", COACH, by="boss")
+        approve(db, welcome.username, "gangnam", COACH, by="boss")
         assert auth.sign_in(db, "c@b.co", PASSWORD).role == COACH
 
     def test_joining_a_second_studio_reuses_the_account(self, db):
-        db.add_studio(Studio(key="samarkand", name="Samarkand Yoga"))
-        first = sign_up(db, "s@b.co", "A Student", PASSWORD, "tashkent")
-        second = sign_up(db, "s@b.co", "A Student", PASSWORD, "samarkand")
+        db.add_studio(Studio(key="hongdae", name="Hongdae Movement Lab"))
+        first = sign_up(db, "s@b.co", "A Student", PASSWORD, "gangnam")
+        second = sign_up(db, "s@b.co", "A Student", PASSWORD, "hongdae")
         assert first.username == second.username
         assert len(db.accounts()) == 1
 
     def test_the_profile_travels_with_the_signup(self, db):
-        welcome = sign_up(db, "s@b.co", "A Student", PASSWORD, "tashkent",
+        welcome = sign_up(db, "s@b.co", "A Student", PASSWORD, "gangnam",
                           profile={"born": "1998-04-12", "height_m": 1.76,
                                    "mass_kg": 72})
         assert db.profile(welcome.username).height_m == 1.76
@@ -252,12 +252,12 @@ class TestSigningUp:
 
 class TestInvitations:
     def test_the_role_is_scoped_in_the_same_act(self, db):
-        token = invite(db, "new@b.co", "tashkent", COACH, by="boss")
+        token = invite(db, "new@b.co", "gangnam", COACH, by="boss")
         welcome = accept(db, token, "A New Coach", PASSWORD)
         assert welcome.role == COACH and welcome.state == ACTIVE
 
     def test_a_used_invitation_cannot_be_used_again(self, db):
-        token = invite(db, "new@b.co", "tashkent", COACH, by="boss")
+        token = invite(db, "new@b.co", "gangnam", COACH, by="boss")
         accept(db, token, "A New Coach", PASSWORD)
         with pytest.raises(ValueError, match="already been used"):
             accept(db, token, "Somebody Else", PASSWORD)
@@ -267,14 +267,14 @@ class TestInvitations:
             accept(db, "made-up", "X", PASSWORD)
 
     def test_an_expired_one_is_refused(self, db):
-        token = invite(db, "new@b.co", "tashkent", COACH, by="boss")
+        token = invite(db, "new@b.co", "gangnam", COACH, by="boss")
         db.db.execute("UPDATE invitations SET expires_at = '2000-01-01T00:00:00+00:00'")
         db.db.commit()
         with pytest.raises(ValueError, match="expired"):
             accept(db, token, "X", PASSWORD)
 
     def test_only_the_hash_is_kept(self, db):
-        token = invite(db, "new@b.co", "tashkent", COACH, by="boss")
+        token = invite(db, "new@b.co", "gangnam", COACH, by="boss")
         rows = list(db.db.execute("SELECT token_hash FROM invitations"))
         assert all(row["token_hash"] != token for row in rows)
 
@@ -287,14 +287,14 @@ class TestTheAuditLog:
 
     def test_granting_a_role_says_who_did_it(self, db):
         account = make(db, "a@b.co")
-        grant(db, account.username, "tashkent", ADMIN, by="the_founder")
+        grant(db, account.username, "gangnam", ADMIN, by="the_founder")
         granted = [e for e in db.audit() if e["action"] == "granted:admin"]
         assert granted and granted[0]["actor"] == "the_founder"
 
     def test_a_person_s_own_log_can_be_read_back(self, db):
         account = make(db, "a@b.co", roles=(STUDENT,))
         db.record_audit(actor="a_coach", action="record:read",
-                        subject=account.username, studio="tashkent")
+                        subject=account.username, studio="gangnam")
         assert db.audit(subject=account.username)[0]["actor"] == "a_coach"
 
 
@@ -302,7 +302,7 @@ class TestErasureStillTakesEverything:
     def test_forgetting_a_person_takes_their_account_and_roles(self, db):
         account = make(db, "a@b.co", roles=(STUDENT, COACH))
         db.put_membership(Membership(username=account.username,
-                                     studio="tashkent", role=STUDENT,
+                                     studio="gangnam", role=STUDENT,
                                      state=ACTIVE))
         db.forget(account.username)
         assert db.account(account.username) is None

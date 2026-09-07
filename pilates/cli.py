@@ -2236,6 +2236,35 @@ def cmd_account(args) -> int:
     return 0
 
 
+def cmd_seed(args) -> int:
+    """Fill a database with a studio full of people who do not exist.
+
+    Refuses a database that already has accounts on it. A fixture that can be
+    poured into a working studio is one that will be, and afterwards there is
+    no way to tell a seeded student from a real one.
+    """
+    from .seed import PASSWORD, already_seeded, sow, summary
+    from .store import Store
+
+    with Store.open(args.db) as store:
+        has_accounts = store.db.execute(
+            "SELECT COUNT(*) AS n FROM accounts").fetchone()["n"]
+        if has_accounts and not args.force:
+            what = ("seeded people" if already_seeded(store)
+                    else f"{has_accounts} account(s)")
+            print(f"{args.db} already has {what}. Point --db at a new file, or "
+                  "pass --force to add these on top.", file=sys.stderr)
+            return 1
+        made = sow(store, password=args.password or PASSWORD,
+                   classes=not args.no_classes)
+        print(f"Seeded {args.db}: {len(made['people'])} people, "
+              f"{len(made['studios'])} studios, {made['assignments']} "
+              f"coach-student assignments, {made['sessions']} recorded "
+              f"classes, {made['notes']} coach notes.")
+        print(summary(made, password=args.password or PASSWORD))
+    return 0
+
+
 def cmd_reset(args) -> int:
     """Issue somebody a way back in, from the terminal.
 
@@ -2622,7 +2651,7 @@ def main(argv: list[str] | None = None) -> int:
                              "admin is made here and nowhere else")
     ac.add_argument("email", nargs="?")
     ac.add_argument("--name", help="what they are called")
-    ac.add_argument("--phone", help="E.164, like +998901234567")
+    ac.add_argument("--phone", help="E.164, like +821012345678")
     ac.add_argument("--password", help="asked for on the terminal if omitted")
     ac.add_argument("--role", action="append",
                     help="admin, coach or student; repeatable")
@@ -2632,6 +2661,17 @@ def main(argv: list[str] | None = None) -> int:
     ac.add_argument("--list", action="store_true")
     ac.add_argument("--db", default="studio.db")
     ac.set_defaults(func=cmd_account)
+
+    sd = sub.add_parser("seed",
+                        help="fill a database with a studio of fictional "
+                             "people, for testing the whole thing end to end")
+    sd.add_argument("--db", default="studio.db")
+    sd.add_argument("--password", help="one password for all of them")
+    sd.add_argument("--no-classes", action="store_true",
+                    help="skip the measurements; much faster, no charts")
+    sd.add_argument("--force", action="store_true",
+                    help="seed even though this database already has accounts")
+    sd.set_defaults(func=cmd_seed)
 
     rs = sub.add_parser("reset",
                         help="issue somebody a link to choose a new password")

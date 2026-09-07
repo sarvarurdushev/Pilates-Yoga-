@@ -40,7 +40,7 @@ const CSS = `
 #ss-recs .row:hover{border-color:var(--acc);background:rgba(90,169,230,.10)}
 #ss-recs .row b{font-weight:500;font-size:13px}
 #ss-recs .row .when{color:var(--dim);font-size:12px}
-#ss-recs .row .n{margin-left:auto;color:var(--dim2);font-size:11px;
+#ss-recs .row .ss-n{margin-left:auto;color:var(--dim2);font-size:11px;
   white-space:nowrap}
 #ss-recs .row.thin{opacity:.55}
 #ss-recs .none{font-size:12.5px;color:var(--dim2);line-height:1.7;margin:0 0 14px}
@@ -126,7 +126,7 @@ async function dialog(install) {
       data-user="${esc(r.username ?? '')}" data-key="${esc(r.key)}">
       <b>${esc(r.display_name || r.username || 'Unattributed')}</b>
       <span class="when">${esc(when(r))}</span>
-      <span class="n">${r.measurements
+      <span class="ss-n">${r.measurements
         ? `${r.measurements} measurements` : 'no measurements'}</span>
     </button>`).join('');
 

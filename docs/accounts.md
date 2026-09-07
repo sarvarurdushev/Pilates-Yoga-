@@ -27,7 +27,7 @@ switcher in the corner, and one body of measurements that the student sees as
 their own and the coach sees as a client's.
 
 It also handles the case that arrives later and would otherwise be a rewrite: a
-coach at the Tashkent studio who takes classes as a student at Samarkand.
+coach at the Gangnam studio who takes classes as a student at Hongdae.
 
 ```
 account ──< membership >── studio
@@ -135,7 +135,7 @@ database full of `170` for height because it was mandatory.
 **At signup (everyone):** name, email, password, phone, studio, role wanted.
 Phone is the disambiguator the studio asked for — two students called Aziz with
 similar emails are one phone call from a mix-up — and it is stored in E.164
-(`+998901234567`) so that formatting never forks a person.
+(`+821012345678`) so that formatting never forks a person.
 
 **Before a first class (students):** date of birth, height, weight, emergency
 contact, and the PAR-Q+ screening. This is the industry-standard pre-exercise
@@ -155,8 +155,8 @@ computed; the coach sees the age, the admin sees the date.
 This is the part the studio said they did not know how to manage, so it is
 spelled out.
 
-**Nothing is global.** Every membership names a studio. A coach at Tashkent
-cannot see Samarkand, and an admin sees both only because admin is scoped to the
+**Nothing is global.** Every membership names a studio. A coach at Gangnam
+cannot see Hongdae, and an admin sees both only because admin is scoped to the
 studios they are admin *of*.
 
 The flow, in the order it happens:
@@ -169,7 +169,7 @@ The flow, in the order it happens:
 4. **The coach adds a student** from that directory. That creates an
    *assignment request*.
 5. **The student accepts** — one tap, and it is also the consent: *"Sam may see
-   my measurements and screening flags at Tashkent Pilates."* An admin can
+   my measurements and screening flags at Gangnam Pilates."* An admin can
    assign directly, and the student is told rather than asked.
 6. **From then on** that student is on the coach's roster, and the coach can
    open the record, read the flags, write cues and goals, and watch the line
@@ -328,6 +328,41 @@ Three rules hold across all three paths:
 Email verification works the same way where mail is configured: a one-time link,
 a separate token namespace from resets, and a `verified_at` that stays empty and
 means nothing where there is no mail server.
+
+## Testing it with people who do not exist
+
+`pilates seed` fills a database with a studio group in Seoul and Busan, because
+a permission system cannot be judged with one account in it. A coach with no
+students never shows the roster; a roster with nobody unscreened never shows the
+red row; an inbox with nothing waiting never shows what approving looks like.
+
+What it deliberately contains, one per thing somebody has to be able to see:
+
+| Person | Shows |
+|---|---|
+| Seo Ji-woo | admin, coach **and** student at one studio, plus admin at a second |
+| Yoon Chae-won | coaches at Gangnam, trains as a student at Hongdae |
+| Kang Tae-yang | asked to coach and is still waiting — the admin's inbox |
+| Choi Seo-yeon | never screened — the red row at the top of the roster |
+| Han Do-yun | a yes on the questionnaire with no doctor behind it |
+| Jung Ha-eun | pregnant, with the contraindication written by her coach |
+| Kim Min-ji | twelve weeks of measurements, a knee flag, an overdue goal |
+| Oh Se-ah | asked by a coach and has not answered — the consent prompt |
+
+Three things keep it from being mistaken for real data, and none of them is
+making it look fake:
+
+- every address is at **`example.com`**, reserved by RFC 2606 and unroutable, so
+  a deployment with `$PILATES_SMTP_URL` set cannot send a verification email to
+  a real person because a fixture invented their address;
+- every number is in the **`010-0000-xxxx`** block, which Korean carriers do not
+  issue, so nothing here dials a stranger;
+- every person carries a marker in their record, and every session carries the
+  same synthetic block the demo bundle does.
+
+And it **refuses a database that already has accounts on it**. A fixture that
+can be poured into a working studio is one that will be, and afterwards there is
+no way to tell a seeded student from a real one.
 
 ## What this deliberately does not do yet
 

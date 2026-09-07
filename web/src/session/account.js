@@ -234,7 +234,7 @@ export function gate(me) {
 
         ${mode === 'setup' ? `
           <label for="ss-g-sname">Studio name</label>
-          <input id="ss-g-sname" placeholder="Tashkent Pilates">
+          <input id="ss-g-sname" placeholder="Gangnam Pilates">
           <div class="ss-pair">
             <div><label for="ss-g-city">City</label><input id="ss-g-city"></div>
             <div><label for="ss-g-country">Country</label>
@@ -261,7 +261,7 @@ export function gate(me) {
 
         ${mode === 'up' || mode === 'setup' ? `
           <label for="ss-g-phone">Phone</label>
-          <input id="ss-g-phone" placeholder="+998901234567" autocomplete="tel">` : ''}
+          <input id="ss-g-phone" placeholder="+821012345678" autocomplete="tel">` : ''}
 
         ${mode === 'up' ? `
           <label for="ss-g-studio">Studio</label>
