@@ -47,6 +47,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from . import capacity
 from .analysis_jobs import MAX_UPLOAD_BYTES, Jobs
 from .observations import KINDS
 
@@ -145,6 +146,15 @@ class Handler(SimpleHTTPRequestHandler):
                         # can upload or write. Saying so is not a leak: the
                         # 401 would say it anyway, one round trip later.
                         "passcode": bool(self.passcode),
+                        # How much machine this is. The page multiplies it by
+                        # the length of the clip and says how long the wait
+                        # will be, because the difference between a laptop and
+                        # the smallest free hosting tier is a minute and a half
+                        # against an hour and a half -- and finding that out by
+                        # waiting is the worst way to find it out.
+                        "cores": capacity.cores(),
+                        "cpu_seconds_per_video_second":
+                            capacity.CPU_SECONDS_PER_VIDEO_SECOND,
                         "kinds": KINDS if self.db else {}})
             return
         if route.path == "/sheet" and self.db:

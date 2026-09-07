@@ -1065,28 +1065,55 @@ record. The form says which of the two it is.
 
 ### Deploying it where somebody else can press Record
 
-`render.yaml` is a one-service blueprint: push the branch, point Render at the
-repository, open the URL, press Record. It carries a persistent disk, because
-without one the platform replaces the filesystem on every deploy and the studio
-would forget every student each time you push. The pose model lives on that disk
-too, so it is fetched once rather than once per deploy.
+**The cost of an analysis, measured rather than guessed: about 25 CPU-seconds
+per second of video** (RTMO-m, every frame, 495 CPU-seconds over a 20-second
+clip, peak 363 MB resident). That one number decides everything about hosting,
+because it divides by whatever CPU allowance the box turns out to have:
 
-It used to be two services — a Python studio and a free static viewer — and that
-split was right in theory and wrong in practice: Render creates both, you open
-whichever URL you happen to click, and half the time that is the one where the
-Record button has nothing behind it.
+| Machine | 20-second clip | 5 minutes | Card needed |
+|---|---|---|---|
+| Render free — 0.1 CPU, no disk | about 1.4 hours | about 21 hours | no |
+| Render starter — 0.5 CPU | about 17 minutes | about 4 hours | yes |
+| Hugging Face Space, free CPU — 2 vCPU, 16 GB | about 4 minutes | about 1 hour | no |
+| A four-core laptop | about 2 minutes | about 31 minutes | no |
 
-**Two things to know before you use it for anything real.** Analysing in a data
-centre means video of people leaves the building, which is the one thing this
-design otherwise avoids — the clip is still deleted the moment the job ends, but
-it travelled. And the service has no login: set `PILATES_PASSCODE` in the Render
-dashboard and the upload and note endpoints ask for it once per browser window.
-Leave it unset and the URL is the only secret there is.
+So the honest ranking for a free deployment that can actually measure something
+is Hugging Face first and Render second, and the laptop the pipeline was
+designed for beats both.
 
-Sizing, measured rather than guessed: one analysis peaks at **363 MB** of
-resident memory and runs about five times slower than real time on four cores.
-Render's free tier is 0.1 CPU and spins down after fifteen minutes of quiet,
-which would kill a job mid-analysis; Starter fits and stays awake.
+**The page says this to your face before the upload.** The server reads its own
+cgroup quota — a container capped at a tenth of a core on a sixty-four-core host
+has a tenth of a core, and `os.cpu_count` would cheerfully say sixty-four — and
+reports it in `/capabilities`. The record form reads the clip's length out of
+the container header without uploading it, multiplies, and prints *About 1.4
+hours to analyse — this server has 0.1 of a CPU* under the file you just chose.
+Where the browser cannot open the container at all (a Chromium without the
+proprietary codecs cannot decode H.264, so an ordinary phone recording reads as
+zero seconds long) it prints the rate instead: a warning that survives is worth
+more than a precise one that vanishes. The arithmetic exists twice, in
+`pilates/capacity.py` and in `record.js`, and the two are checked against each
+other rather than trusted to agree.
+
+`render.yaml` is a one-service free blueprint — no card, no disk, `plan: free`.
+It was briefly `plan: starter` with a persistent disk, which Render answered
+with a payment form. Free costs two things beyond the speed: the filesystem is
+wiped on every spin-down (fifteen minutes of quiet), so the studio record goes
+with it, and there is no disk to attach to stop that.
+
+`deploy/huggingface/Dockerfile` is the free deployment that can record. Create a
+Space (Docker SDK, blank, CPU basic), add that one file through the web editor,
+and it builds: it clones this repository, installs, bakes the pose model into
+the image so nobody waits ninety megabytes on their first recording, and serves
+on port 7860. Storage there is not persistent either — that is a paid add-on —
+so a hosted copy is somewhere to *show* the thing.
+
+**Hosting the analysis is a real trade, not a free upgrade.** The clip is still
+deleted the moment the job ends, but it travelled to a data centre first, which
+is the one thing this design otherwise avoids. And neither service has a login:
+set `PILATES_PASSCODE` and the upload and note endpoints ask for it once per
+browser window; leave it unset and the URL is the only secret there is. Reading
+the page is never gated — nothing about looking at an anatomy model changes
+anything.
 
 ### Click any structure
 

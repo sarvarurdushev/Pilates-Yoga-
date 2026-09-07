@@ -92,6 +92,7 @@ const CSS = `
   color:var(--dim);line-height:1.65;max-height:190px;overflow:auto;
   font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap}
 #ss-rec .bad{color:var(--gold)}
+#ss-rec .wait{display:inline-block;margin-top:4px;color:var(--gold);font-weight:400}
 #ss-rec .privacy{margin:14px 0 0;font-size:11px;color:var(--dim2);line-height:1.6;
   border-left:2px solid var(--line2);padding-left:11px}
 #ss-rec p.body{margin:0 0 13px;font-size:12.5px;color:var(--dim);line-height:1.7}
@@ -331,10 +332,19 @@ async function dialog(nw, install, can) {
     log.hidden = false;
     log.innerHTML = `<span class="${bad ? 'bad' : ''}">${esc(text)}</span>`;
   };
-  const choose = (blob, name) => {
+  const choose = async (blob, name) => {
     clip = blob; clipName = name;
     chosen.textContent = `${name} · ${(blob.size / 1e6).toFixed(1)} MB`;
     goButton.disabled = false;
+    /* How long this will take, before it is started rather than after. The
+     * same clip is a minute and a half on a laptop and an hour and a half on
+     * the smallest free hosting tier, and the difference is not a fault -- it
+     * is a tenth of a core. Somebody who knows that waits; somebody who does
+     * not decides the thing is broken. */
+    const seconds = await lengthOf(blob);
+    if (seconds) chosen.textContent += ` · ${Math.round(seconds)}s of video`;
+    const wait = waitFor(seconds, can);
+    if (wait) chosen.innerHTML += `<br><b class="wait">${esc(wait)}</b>`;
   };
 
   for (const tab of host.querySelectorAll('.tabs button')) {
@@ -484,6 +494,75 @@ async function dialog(nw, install, can) {
     }
   });
 }
+
+/**
+ * How long the clip is, asked of the browser rather than of the server.
+ *
+ * The file is not uploaded to find this out: a video element will read the
+ * duration out of the container's header and never fetch the rest.
+ *
+ * Returns 0 where the browser will not open the container at all -- which is a
+ * real case and not an edge one: a Chromium built without the proprietary
+ * codecs cannot decode H.264, so an ordinary phone recording reads as zero
+ * seconds long. The caller falls back to a rate rather than losing the warning.
+ */
+function lengthOf(blob) {
+  return new Promise((resolve) => {
+    const probe = document.createElement('video');
+    probe.preload = 'metadata';
+    const url = URL.createObjectURL(blob);
+    const done = (value) => { URL.revokeObjectURL(url); resolve(value); };
+    probe.onloadedmetadata = () => done(
+      Number.isFinite(probe.duration) ? probe.duration : 0);
+    probe.onerror = () => done(0);
+    probe.src = url;
+    // A container the browser will not open should not hold up the form.
+    setTimeout(() => done(0), 4000);
+  });
+}
+
+/** A duration a person can act on, rounded to how sure we are of it. */
+function spell(seconds) {
+  if (seconds < 90) return `${Math.max(Math.round(seconds / 10) * 10, 10)} seconds`;
+  if (seconds < 3600) return `${Math.max(Math.round(seconds / 60), 2)} minutes`;
+  const hours = seconds / 3600;
+  const shown = hours < 10 ? String(+hours.toFixed(1)) : String(Math.round(hours));
+  return `${shown} hour${shown === '1' ? '' : 's'}`;
+}
+
+/**
+ * What to say about the wait, in front of the button rather than after it.
+ *
+ * This is the sentence that stops somebody concluding the project is broken.
+ * Analysis costs about twenty-five CPU-seconds per second of video, so the same
+ * clip is two minutes on a laptop and an hour and a half on a tenth of a core.
+ * Neither is a fault and only one of them is worth waiting for, and there is no
+ * way to tell which you are on by looking at the page.
+ *
+ * Said whatever the machine is, not only on a slow one: "about two minutes" is
+ * information a person wants before they walk away from the screen. Where the
+ * browser could not read the clip's length, the rate is given instead -- a
+ * warning that survives a container the browser will not open is worth more
+ * than a precise one that vanishes.
+ */
+function waitFor(videoSeconds, can) {
+  const cores = Number(can?.cores);
+  const rate = Number(can?.cpu_seconds_per_video_second);
+  if (!cores || !rate) return '';
+  const machine = 'this server has ' + (cores < 1 ? `${cores} of a CPU`
+    : cores === 1 ? '1 core' : `${cores} cores`);
+  if (!videoSeconds) {
+    return `${spell(60 * rate / Math.max(cores, 0.05))} per minute of video — `
+         + `${machine}.`;
+  }
+  return `About ${spell(videoSeconds * rate / Math.max(cores, 0.05))} to `
+       + `analyse — ${machine}.`;
+}
+
+/* The wait arithmetic is also implemented in `pilates/capacity.py`, which is
+ * where the measured rate comes from and where it is tested. Exported so the
+ * two can be checked against each other rather than trusted to agree. */
+export const _internals = { spell, waitFor };
 
 /** The first container this browser will actually record. */
 function pickType() {

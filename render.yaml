@@ -1,81 +1,77 @@
-# Render blueprint. One service, and it can record.
+# Render blueprint. Free, no card, and honest about what free buys.
 #
-# It used to be two -- a Python "studio" and a free static "viewer" -- and that
-# was a mistake in practice rather than in theory. Render creates both, you open
-# whichever URL you happen to click, and half the time that is the static one,
-# where the Record button has nothing behind it. The person deploying this wants
-# to press Record on the internet and have it measure them. So: one service,
-# Python, and every URL it hands out can do that.
-#
-# **Hosting the analysis is a real trade, and deploying this is accepting it.**
-# The clip is deleted the moment the job ends -- that part is unchanged and it is
-# enforced in `analysis_jobs.py` -- but it does travel to a data centre first.
-# Running `python -m pilates web` on the studio's own machine is the honest
-# default and the one this project is designed around. This blueprint exists
-# because a thing you cannot show to anybody is a thing nobody uses.
+# The previous version asked for `plan: starter` and a persistent disk, and
+# Render answered it with a payment form -- which was not the deal. This one
+# needs no card: `plan: free`, no disk, nothing chargeable.
 #
 #   1. Push this branch.
 #   2. Render -> New -> Blueprint -> pick this repository.
-#   3. Wait for the build, open the URL, press Record.
+#   3. Open the URL.
 #
-# There is no login in front of it (see PILATES_PASSCODE below). Until you add
-# one, treat the URL as the secret and do not put a real class through it.
+# **Read this before you press Record on it.** Render's free instance is 0.1 CPU
+# and 512 MB, and it cannot attach a disk. Two consequences, both measured
+# rather than assumed:
+#
+#   * One second of video costs about 25 CPU-seconds to analyse. On a tenth of a
+#     core a twenty-second clip is about an hour and a half, and a real class is
+#     days. The page now says this to your face before the upload rather than
+#     letting you find it out by waiting -- the server reports its own CPU
+#     allowance and the record form multiplies it out.
+#   * Free services have no persistent disk and lose the filesystem every time
+#     they spin down, which is after fifteen minutes of quiet. The studio record
+#     -- people, measurements, history, coach notes -- goes with it.
+#
+# So this deployment is a real, free, public copy of the anatomy application
+# with the sample session on it, and recording works in the sense that the
+# button is wired to a live pipeline, not in the sense that anybody should wait
+# for it. For a free deployment that can actually measure a clip, see
+# `deploy/huggingface/` -- 2 vCPU and 16 GB, also free, also no card. For the
+# real thing, `python -m pilates web` on the studio's own machine: that is the
+# design, and it is the only place the video does not leave the building.
+#
+# If you would rather pay Render than move: `plan: starter` is half a core (a
+# twenty-second clip in about seventeen minutes) and `plan: standard` is one.
+# Add a disk to either and the record survives deploys:
+#
+#     plan: standard
+#     disk:
+#       name: studio
+#       mountPath: /var/data
+#       sizeGB: 2
+#
+# ...and point --db and XDG_CACHE_HOME at /var/data instead of the paths below.
 services:
   - type: web
     name: pilates-yoga
     runtime: python
-    # Free is 512 MB and 0.1 CPU, and spins down after fifteen minutes of quiet
-    # -- which would kill a job mid-analysis. Measured on a four-core laptop one
-    # analysis peaks at 363 MB and runs about five times slower than real time,
-    # so a twenty-second clip is a minute and a half there and several minutes
-    # on half a core. Starter fits and does not sleep. Standard is worth it if
-    # you are putting whole classes through.
-    plan: starter
+    plan: free
     buildCommand: pip install -r requirements.txt
     # --host 0.0.0.0 because the platform's router is a different machine, and
-    # $PORT is honoured by the server itself. --db on the disk below, so the
-    # record is the same one after a deploy.
-    startCommand: python -m pilates web --host 0.0.0.0 --db /var/data/studio.db
+    # $PORT is honoured by the server itself.
+    startCommand: python -m pilates web --host 0.0.0.0 --db /tmp/studio.db
     healthCheckPath: /capabilities
-    # Without this the studio is amnesiac: Render replaces the filesystem on
-    # every deploy, so the measurements, the people and the coach's notes would
-    # last until the next push. It also holds the pose model, which is ninety
-    # megabytes and would otherwise be re-downloaded on the first analysis after
-    # each deploy.
-    disk:
-      name: studio
-      mountPath: /var/data
-      sizeGB: 2
     envVars:
-      # Where rtmlib caches the pose model. On the disk, so it is fetched once
-      # ever rather than once per deploy.
+      # Where rtmlib caches the pose model. Ephemeral here, like everything
+      # else on the free plan, so it is re-fetched after each spin-down.
       - key: XDG_CACHE_HOME
-        value: /var/data/cache
+        value: /tmp/cache
       - key: PYTHONUNBUFFERED
         value: "1"
       # Optional. Set it in the Render dashboard and the upload and note
       # endpoints ask for it once; leave it unset and the service is open to
-      # anybody with the URL, which is fine for showing it to somebody and not
-      # fine for a real studio.
+      # anybody with the URL.
       - key: PILATES_PASSCODE
         sync: false
 
-# A note on what is deliberately absent.
+# There is deliberately no `routes:` block and no second static service.
 #
-# There is no `routes:` block and no static service. Render evaluates rewrites
-# *before* it looks for a file, so the usual single-page-app catch-all -- /* to
-# /index.html -- would return the HTML page for src/main.js and for every GLB,
-# and the application would not start. It has no client-side routing: it is one
-# page that fetches its assets by path. Inherited from the anatomy project's own
-# blueprint, which learned it the hard way; see web/render.yaml.
+# Render evaluates rewrites *before* it looks for a file, so the usual
+# single-page-app catch-all -- /* to /index.html -- would return the HTML page
+# for src/main.js and for every GLB, and the application would not start. It has
+# no client-side routing: it is one page that fetches its assets by path.
+# Inherited from the anatomy project's own blueprint, which learned it the hard
+# way; see web/render.yaml.
 #
-# If you do want a free, static, analysis-free copy as well -- for a public
-# link that cannot upload anything -- add a second service:
-#
-#   - type: web
-#     name: pilates-yoga-viewer
-#     runtime: static
-#     staticPublishPath: ./web
-#     buildCommand: ""
-#
-# The Record button still appears there and explains that it is a viewer.
+# The static viewer that used to be here was removed because two services means
+# two URLs, and half the time the one you open is the one where Record has
+# nothing behind it.
