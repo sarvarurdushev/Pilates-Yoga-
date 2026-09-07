@@ -73,6 +73,10 @@ const CSS = `
   border-radius:3px;border:1px solid var(--line2);color:var(--dim)}
 #ss-roster .ss-who .ss-flags i.ss-hot{border-color:rgba(226,104,95,.55);color:#e2685f}
 #ss-roster .ss-who .ss-flags i.ss-due{border-color:rgba(233,180,92,.55);color:var(--gold)}
+#ss-roster .ss-who .ss-flags i.ss-focus{border-color:rgba(90,169,230,.5);color:var(--acc)}
+#ss-roster .ss-who .ss-flags i.ss-plan{border-color:transparent;color:var(--dim2);
+  padding-left:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#ss-roster .ss-who .ss-flags i.ss-cold{border-style:dashed;color:var(--dim2)}
 #ss-roster .ss-who .ss-n{color:var(--dim2);font-size:11px;white-space:nowrap}
 #ss-roster .ss-add{padding:4px 10px;border-radius:3px;font:inherit;font-size:11px;
   cursor:pointer;border:1px solid var(--line2);background:var(--glass);
@@ -161,13 +165,20 @@ function student(row) {
     .map((g) => `<i class="ss-due">goal due: ${esc(g)}</i>`).join('');
   const facts = [row.age ? `${row.age}` : '', row.height_m ? `${row.height_m} m` : '',
                  row.mass_kg ? `${row.mass_kg} kg` : ''].filter(Boolean).join(' · ');
+  /* What to work on, on the way into the class rather than two clicks inside
+   * it. An evaluation nobody reads before the class changes nothing about the
+   * class, and "never scored" is a thing to see rather than an absence. */
+  const work = row.evaluations
+    ? `<i class="ss-focus">work on ${esc(row.focus || 'the five')}</i>`
+      + (row.plan ? `<i class="ss-plan">${esc(row.plan)}</i>` : '')
+    : '<i class="ss-cold">never scored</i>';
   return `<button type="button" class="ss-who${row.urgent ? ' ss-urgent' : ''}"
       data-open="${esc(row.username)}"
       data-name="${esc((row.display_name || '').toLowerCase())}">
     <span class="ss-main">
       <b>${esc(row.display_name)}</b>
       <span class="ss-meta">${esc(facts || 'no measurements on file')}</span>
-      <span class="ss-flags">${flags}${due}</span>
+      <span class="ss-flags">${flags}${due}${work}</span>
     </span>
     <span class="ss-n">${row.sessions ?? 0} class${row.sessions === 1 ? '' : 'es'}</span>
     <span class="ss-add" role="button" tabindex="0"

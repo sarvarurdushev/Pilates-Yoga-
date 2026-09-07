@@ -221,15 +221,18 @@ def summary(evaluations: list[Evaluation]) -> dict:
     since the first one, and the axis that is furthest behind.
     """
     ordered = sorted(evaluations, key=lambda e: (e.made_on, e.made_at))
-    if not ordered:
-        return {"evaluations": 0, "latest": None, "focus": "", "lines": {}}
     lines = series(ordered)
     scored = [(key, line) for key, line in lines.items() if line["points"]]
     focus = min(scored, key=lambda kv: kv[1]["latest"])[0] if scored else ""
+    # Nobody scored yet is the same shape with nothing in it, not a shorter
+    # dictionary. The first version returned four keys for an empty history and
+    # eight otherwise, and the caller that read the ninth got a KeyError the
+    # first time it met a student nobody had evaluated -- which is every student
+    # in their first week.
     return {
         "evaluations": len(ordered),
-        "latest": ordered[-1].to_dict(),
-        "first_on": ordered[0].made_on,
+        "latest": ordered[-1].to_dict() if ordered else None,
+        "first_on": ordered[0].made_on if ordered else "",
         "focus": focus,
         "focus_label": PRINCIPLES[focus]["label"] if focus else "",
         "lines": lines,

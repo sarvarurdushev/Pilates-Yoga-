@@ -245,6 +245,8 @@ def roster(store, viewer: Viewer | None) -> dict:
     student and a goal past its review date are the two things that should not
     be found by scrolling.
     """
+    from .evaluation import summary
+
     person = _need_coach(viewer)
     if person.can_administer:
         live = [a for a in store.assignments(studio=person.studio) if a.live]
@@ -272,9 +274,20 @@ def roster(store, viewer: Viewer | None) -> dict:
                                 if r.get("username") == assignment.student})
         seen["urgent"] = bool(sheet.urgent) or "not screened yet" in flags
         seen["since"] = assignment.since
+
+        # What the coach is going to work on with this person, on the roster
+        # rather than two clicks inside it. An evaluation nobody sees on the way
+        # into the class is an evaluation that changes nothing about the class.
+        scored = summary(store.evaluations(assignment.student))
+        seen["focus"] = scored["focus_label"]
+        seen["evaluations"] = scored["evaluations"]
+        seen["last_scored"] = (scored["latest"] or {}).get("made_on", "")
+        seen["plan"] = (scored["latest"] or {}).get("plan", "")
         rows.append(seen)
+    # Never scored sorts up with the other things that should not be found by
+    # scrolling: it is the one row where the coach has nothing to go on.
     rows.sort(key=lambda r: (not r["urgent"], not r["goals_due"],
-                             r["display_name"].lower()))
+                             bool(r["evaluations"]), r["display_name"].lower()))
     return {"studio": person.studio, "students": rows,
             "as_admin": person.can_administer}
 

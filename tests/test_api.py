@@ -608,6 +608,43 @@ class TestTheRosterSaysWhatToReadFirst:
         assert order[0] == "Ben"  # never screened
 
 
+    def test_what_to_work_on_is_on_the_roster_not_two_clicks_inside_it(
+            self, studio):
+        """An evaluation nobody reads before the class changes nothing about
+        the class."""
+        base, names, _ = studio
+        coach, _ = self._assign(base, names)
+        coach.post("/evaluate", {
+            "username": names["ann"],
+            "scores": {"breathing": 4, "pelvic": 4, "ribcage": 2,
+                       "scapular": 4, "cervical": 5},
+            "plan": "Wall roll-downs before the mat work"})
+        row = coach.get("/roster")[1]["students"][0]
+        assert row["focus"] == "Rib cage placement"
+        assert row["evaluations"] == 1
+        assert row["plan"] == "Wall roll-downs before the mat work"
+
+    def test_never_scored_is_a_thing_to_see_not_an_absence(self, studio):
+        base, names, _ = studio
+        coach, _ = self._assign(base, names)
+        row = coach.get("/roster")[1]["students"][0]
+        assert row["evaluations"] == 0 and row["focus"] == ""
+
+    def test_somebody_never_scored_sorts_above_somebody_scored(self, studio):
+        """It is the one row where the coach has nothing at all to go on."""
+        base, names, _ = studio
+        coach, ann = self._assign(base, names)
+        ann.post("/me/screening", {"answers": {k: False for k in PARQ}})
+        coach.post("/roster/add", {"student": names["ben"]})
+        ben = Client(base)
+        ben.sign_in("ben@b.co")
+        ben.post("/me/screening", {"answers": {k: False for k in PARQ}})
+        coach.post("/evaluate", {"username": names["ben"],
+                                 "scores": {"breathing": 3}})
+        order = [s["display_name"] for s in coach.get("/roster")[1]["students"]]
+        assert order.index("Ann") < order.index("Ben")
+
+
 class TestGettingBackInOverHttp:
     """Three routes back in, and none of them tell a stranger who trains here."""
 

@@ -328,6 +328,11 @@ The student sees the same panel under **My feedback**, with the scoring form
 replaced by the progress lines. Nothing a coach writes about them is hidden
 from them.
 
+And the result goes back onto the roster: each row carries the axis to work on
+and the plan from the last class, and a student nobody has scored says **never
+scored** and sorts up with the safety flags. An evaluation nobody reads on the
+way into the class changes nothing about the class.
+
 ---
 
 ## Privacy rules, stated once

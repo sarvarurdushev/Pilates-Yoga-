@@ -145,6 +145,13 @@ class TestWhatTheCoachOpensItFor:
     def test_nothing_scored_is_answered_rather_than_crashing(self):
         assert summary([])["evaluations"] == 0
 
+    def test_an_empty_history_is_the_same_shape_with_nothing_in_it(self):
+        """Not a shorter dictionary. A caller that reads a key present only on
+        the populated version breaks on the first student nobody has evaluated,
+        which is every student in their first week."""
+        one = Evaluation(username="ann", by="Coach", scores={"breathing": 4})
+        assert set(summary([])) == set(summary([one]))
+
     def test_the_lines_come_back_oldest_first(self):
         found = summary([
             Evaluation(username="kim", by="P", scores=scored(pelvic=5),
