@@ -207,6 +207,10 @@ export function attachPanel(session, nw, hooks = {}) {
     writing = false;
 
     hooks.onProse?.(carried, id, record);
+    /* The structure is selected; the box to say something about it opens now,
+     * without a toggle and without a second click. A coach looking at a muscle
+     * with no way to write about it was the original complaint. */
+    hooks.onStructure?.(record, id);
     wireWriter(detail);
     wireCharts(detail);
     drawViews(detail, nw);

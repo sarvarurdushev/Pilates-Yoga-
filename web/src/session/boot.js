@@ -35,6 +35,8 @@ import { chip, gate, whoami } from './account.js';
 import { coaches as mountMyCoaches, mount as mountRoster } from './roster.js';
 import { mount as mountAdmin } from './admin.js';
 import { mount as mountEvaluate } from './evaluate.js';
+import { foldable, reset as resetStructure,
+         show as showStructure } from './structure.js';
 
 const BANNER_CSS = `
 #sessbar{position:fixed;left:0;right:0;top:0;z-index:60;display:flex;gap:14px;
@@ -236,11 +238,21 @@ export async function install(bundle) {
   banner(session);
   const lit = await light(session, { registry: reg, palette: nw.gfx.palette });
   attachLab(session, nw);
+  /* The explore dock folds away. It is the widest thing on the screen and a
+   * coach reading a body does not need four tabs of prose in the way of it. */
+  foldable();
+  resetStructure();
   attachPanel(session, nw, {
     onProse: showReading,
     // "Read about this in the lab" has to open the lab, or the button is a
     // promise the interface does not keep.
     openLab: () => document.getElementById('labBtn')?.click(),
+    /* Selecting a structure opens the reading for it, on the axes that
+     * structure actually takes -- recruitment for a muscle, placement for a
+     * bone, a symptom report for a nerve. The server owns which. */
+    onStructure: (record) => showStructure(record, identity,
+                                           session.person.username,
+                                           session.key ?? ''),
   });
 
   /* The coach's half. Drawn everywhere; writable only where there is a record

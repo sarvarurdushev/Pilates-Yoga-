@@ -405,6 +405,106 @@ def evaluate(store, viewer: Viewer | None, payload: dict) -> dict:
             **summary_of(store, who)}
 
 
+def structure_form(store, viewer: Viewer | None, username: str,
+                   structure: str, kind: str, fma: str = "",
+                   side: str = "") -> dict:
+    """The form for one structure, plus everything already written about it.
+
+    The rubric travels with the request rather than living in the page, because
+    which questions a structure takes is a fact about anatomy and belongs on the
+    same side of the wire as the rest of the anatomy.
+    """
+    from .structure_eval import KIND_LABEL, form_for, history
+
+    person = _need(viewer)
+    who = username or person.username
+    guard_subject(store, person, who)
+    account = store.account(who)
+    shape = form_for(kind)
+    return {
+        "student": who,
+        "display_name": account.display_name if account else who,
+        "structure": structure,
+        "kind": kind,
+        "kind_label": KIND_LABEL.get(kind, kind),
+        "fma": fma,
+        "side": side,
+        "may_write": may_write_about(
+            person, who,
+            None if person.is_self(who)
+            else store.assignment_between(person.username, who, person.studio)),
+        **shape,
+        "history": history(store.structure_evals(who, structure)),
+    }
+
+
+def evaluate_structure(store, viewer: Viewer | None, payload: dict) -> dict:
+    """Record a reading of one structure."""
+    from .structure_eval import StructureEval, form_for, history
+
+    person = _need_coach(viewer)
+    who = payload.get("username", "")
+    guard_subject(store, person, who, write=True)
+    account = store.account(person.username)
+    kind = payload.get("kind", "")
+    shape = form_for(kind)
+    if not shape["open"]:
+        raise Refused(shape["why"], 400)
+    try:
+        evaluation = StructureEval(
+            username=who,
+            by=payload.get("by") or (account.display_name if account
+                                     else person.username),
+            structure=payload.get("structure", ""),
+            kind=kind,
+            fma=payload.get("fma", ""),
+            side=payload.get("side", ""),
+            marks=payload.get("marks") or {},
+            fields=payload.get("fields") or {},
+            session=payload.get("session", ""))
+    except ValueError as exc:
+        raise Refused(str(exc), 400) from exc
+    evaluation.id = store.evaluate_structure(evaluation)
+    store.record_audit(
+        actor=person.username, action="evaluated:structure", subject=who,
+        studio=person.studio,
+        detail=f"{evaluation.structure}: "
+               f"{'; '.join(evaluation.findings) or 'nothing flagged'}")
+    return {"evaluation": evaluation.to_dict(),
+            "history": history(store.structure_evals(
+                who, evaluation.structure))}
+
+
+def structures_seen(store, viewer: Viewer | None, username: str = "") -> dict:
+    """Every structure anybody has written about this person, newest first.
+
+    The way back to a note once the panel has been closed. Without it, a reading
+    of the left psoas exists only for as long as the left psoas is on screen,
+    which is the same bug as a recording with nowhere to appear.
+    """
+    person = _need(viewer)
+    who = username or person.username
+    guard_subject(store, person, who)
+    seen: dict[str, dict] = {}
+    for one in store.structure_evals(who):
+        row = seen.setdefault(one.structure, {
+            "structure": one.structure, "kind": one.kind, "fma": one.fma,
+            "count": 0, "last_on": "", "findings": [], "urgent": False})
+        row["count"] += 1
+        row["last_on"] = one.made_on
+        row["findings"] = one.findings
+        row["urgent"] = row["urgent"] or one.urgent
+    rows = sorted(seen.values(),
+                  key=lambda r: (not r["urgent"], r["last_on"]), reverse=False)
+    rows.sort(key=lambda r: (not r["urgent"], _neg(r["last_on"])))
+    return {"student": who, "structures": rows}
+
+
+def _neg(date: str) -> tuple:
+    """Sort a date string descending inside an otherwise ascending key."""
+    return tuple(-int(part) for part in date.split("-")) if date else (0,)
+
+
 def summary_of(store, who: str) -> dict:
     from .evaluation import summary
 

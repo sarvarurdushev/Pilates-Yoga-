@@ -280,6 +280,19 @@ class Handler(SimpleHTTPRequestHandler):
             self._answer(lambda store: api.evaluation_form(
                 store, self._viewer(store), who))
             return
+        if route.path == "/structure" and self.db:
+            q = parse_qs(route.query)
+            self._answer(lambda store: api.structure_form(
+                store, self._viewer(store),
+                q.get("username", [""])[0], q.get("structure", [""])[0],
+                q.get("kind", [""])[0], q.get("fma", [""])[0],
+                q.get("side", [""])[0]))
+            return
+        if route.path == "/structures-seen" and self.db:
+            who = parse_qs(route.query).get("username", [""])[0]
+            self._answer(lambda store: api.structures_seen(
+                store, self._viewer(store), who))
+            return
         if route.path == "/me/evaluations" and self.db:
             self._answer(lambda store: api.my_evaluations(
                 store, self._viewer(store)))
@@ -399,6 +412,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/admin/assign-all": lambda self, store, body: api.assign_everybody(
             store, self._viewer(store), body),
         "/evaluate": lambda self, store, body: api.evaluate(
+            store, self._viewer(store), body),
+        "/evaluate-structure": lambda self, store, body: api.evaluate_structure(
             store, self._viewer(store), body),
     }
 

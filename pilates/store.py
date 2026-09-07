@@ -317,6 +317,28 @@ CREATE TABLE IF NOT EXISTS evaluations (
 );
 CREATE INDEX IF NOT EXISTS evaluations_person ON evaluations(username, made_on);
 
+-- One coach's reading of one structure. Separate from `evaluations` because it
+-- answers a different question -- that table scores a class on five fixed axes,
+-- this one scores whatever is on the screen on axes that depend on what it is.
+-- `kind` is stored rather than derived because the atlas can be replaced and a
+-- note about a muscle should not become a note about a bone when it is.
+CREATE TABLE IF NOT EXISTS structure_evals (
+    id        INTEGER PRIMARY KEY,
+    username  TEXT NOT NULL REFERENCES people(username) ON DELETE CASCADE,
+    by        TEXT NOT NULL,
+    structure TEXT NOT NULL,
+    kind      TEXT NOT NULL,
+    fma       TEXT NOT NULL DEFAULT '',
+    side      TEXT NOT NULL DEFAULT '',
+    marks     TEXT NOT NULL DEFAULT '{}',
+    fields    TEXT NOT NULL DEFAULT '{}',
+    session   TEXT NOT NULL DEFAULT '',
+    made_on   TEXT NOT NULL DEFAULT '',
+    made_at   TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS structure_evals_person
+    ON structure_evals(username, structure, made_on);
+
 -- One-time links: a password reset, or an email verification. Hashed, for the
 -- same reason a session token is: the server needs to recognise one it is
 -- shown, never to reproduce it, and a stolen database should not be a stolen
@@ -897,6 +919,50 @@ class Store:
              evaluation.session, evaluation.made_on, evaluation.made_at))
         self.db.commit()
         return int(cursor.lastrowid)
+
+    def evaluate_structure(self, evaluation) -> int:
+        """Record one reading of one structure. Returns the row id."""
+        cursor = self.db.execute(
+            "INSERT INTO structure_evals (username, by, structure, kind, fma, "
+            "side, marks, fields, session, made_on, made_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (evaluation.username, evaluation.by, evaluation.structure,
+             evaluation.kind, evaluation.fma, evaluation.side,
+             json.dumps(evaluation.marks), json.dumps(evaluation.fields),
+             evaluation.session, evaluation.made_on, evaluation.made_at))
+        self.db.commit()
+        return int(cursor.lastrowid)
+
+    def structure_evals(self, username: str = "", structure: str = "",
+                        limit: int = 400) -> list:
+        """Readings, optionally for one person and one structure.
+
+        Matched on the structure name rather than the FMA id: a note written
+        before an atlas update carries the name it was written about, and losing
+        a coach's history because a mesh was renumbered would be indefensible.
+        """
+        from .structure_eval import StructureEval
+
+        sql = "SELECT * FROM structure_evals"
+        where, args = [], []
+        if username:
+            where.append("username = ?")
+            args.append(username)
+        if structure:
+            where.append("structure = ?")
+            args.append(structure)
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        args.append(int(limit))
+        return [StructureEval(username=row["username"], by=row["by"],
+                              structure=row["structure"], kind=row["kind"],
+                              fma=row["fma"], side=row["side"],
+                              marks=json.loads(row["marks"] or "{}"),
+                              fields=json.loads(row["fields"] or "{}"),
+                              session=row["session"], made_on=row["made_on"],
+                              made_at=row["made_at"], id=row["id"])
+                for row in self.db.execute(
+                    sql + " ORDER BY made_on, made_at LIMIT ?", args)]
 
     def evaluations(self, username: str = "", limit: int = 400) -> list:
         from .evaluation import Evaluation

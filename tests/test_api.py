@@ -645,6 +645,94 @@ class TestTheRosterSaysWhatToReadFirst:
         assert order.index("Ann") < order.index("Ben")
 
 
+class TestEvaluatingWhateverIsOnTheScreen:
+    """The form is a function of what was clicked, over the wire as well."""
+
+    def _coach(self, base, names):
+        coach = Client(base)
+        coach.sign_in("coach@b.co")
+        coach.post("/roster/add", {"student": names["ann"]})
+        return coach
+
+    def test_the_axes_change_with_the_kind(self, studio):
+        base, names, _ = studio
+        coach = self._coach(base, names)
+        muscle = coach.get(f"/structure?username={names['ann']}"
+                           "&structure=psoas+major&kind=muscle")[1]
+        bone = coach.get(f"/structure?username={names['ann']}"
+                         "&structure=atlas&kind=bone")[1]
+        assert [a["key"] for a in muscle["axes"]][0] == "recruitment"
+        assert [a["key"] for a in bone["axes"]][0] == "alignment"
+        assert muscle["axes"] != bone["axes"]
+
+    def test_a_brain_region_is_refused_with_a_reason(self, studio):
+        base, names, _ = studio
+        coach = self._coach(base, names)
+        status, out = coach.get(f"/structure?username={names['ann']}"
+                                "&structure=frontal+lobe&kind=brain")
+        assert status == 200
+        assert out["open"] is False and out["axes"] == []
+        assert "brain" in out["why"]
+        # And writing one is refused rather than quietly accepted.
+        assert coach.post("/evaluate-structure",
+                          {"username": names["ann"], "structure": "frontal lobe",
+                           "kind": "brain",
+                           "fields": {"cue": "x"}})[0] == 400
+
+    def test_writing_one_and_reading_it_back(self, studio):
+        base, names, _ = studio
+        coach = self._coach(base, names)
+        status, out = coach.post("/evaluate-structure", {
+            "username": names["ann"], "structure": "psoas major",
+            "kind": "muscle", "fma": "FMA18060",
+            "marks": {"recruitment": {"choice": "over",
+                                      "note": "doing the abdominals' job"},
+                      "timing": "early"},
+            "fields": {"substitutes": "hip flexors", "cue": "reach the heel away"}})
+        assert status == 200
+        assert out["evaluation"]["findings"] == ["recruitment: over-working",
+                                                 "timing: fires first"]
+        seen = coach.get(f"/structures-seen?username={names['ann']}")[1]
+        assert [r["structure"] for r in seen["structures"]] == ["psoas major"]
+
+    def test_a_nerve_referral_is_flagged_urgent(self, studio):
+        base, names, _ = studio
+        coach = self._coach(base, names)
+        out = coach.post("/evaluate-structure", {
+            "username": names["ann"], "structure": "sciatic nerve",
+            "kind": "nerve",
+            "marks": {"symptom": "tingling", "settled": "persisted",
+                      "action": "referred"},
+            "fields": {"where": "back of the left thigh"}})[1]
+        assert out["evaluation"]["urgent"] is True
+        seen = coach.get(f"/structures-seen?username={names['ann']}")[1]
+        assert seen["structures"][0]["urgent"] is True
+
+    def test_a_student_reads_their_own_and_cannot_write(self, studio):
+        base, names, _ = studio
+        coach = self._coach(base, names)
+        coach.post("/evaluate-structure", {
+            "username": names["ann"], "structure": "psoas major",
+            "kind": "muscle", "marks": {"recruitment": "over"}})
+        ann = Client(base)
+        ann.sign_in("ann@b.co")
+        mine = ann.get(f"/structure?username={names['ann']}"
+                       "&structure=psoas+major&kind=muscle")[1]
+        assert mine["may_write"] is False
+        assert mine["history"]["count"] == 1
+        assert ann.post("/evaluate-structure",
+                        {"username": names["ann"], "structure": "psoas major",
+                         "kind": "muscle", "marks": {"recruitment": "right"}})[0] == 403
+
+    def test_somebody_else_s_student_is_refused(self, studio):
+        base, names, _ = studio
+        self._coach(base, names)
+        other = Client(base)
+        other.sign_in("other@b.co")
+        assert other.get(f"/structure?username={names['ann']}"
+                         "&structure=psoas+major&kind=muscle")[0] == 403
+
+
 class TestGettingBackInOverHttp:
     """Three routes back in, and none of them tell a stranger who trains here."""
 

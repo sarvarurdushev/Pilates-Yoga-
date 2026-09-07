@@ -244,9 +244,12 @@ except the standing **Who sees my record** panel.
 
 **Coach.** Opens on the roster, not on a body: who is coming, who has a flag to
 read before class, who has a goal past its review date. Picking a student opens
-the body with that person's measurements on it and the writing tools live — the
-click-a-muscle-and-write-a-cue flow, with no toggle in front of it — plus
-**Evaluate** in the header for the five principles at the end of the class. And
+the body with that person's measurements on it and the writing tools live —
+click any structure and the reading for it opens, on the axes that structure
+actually takes — plus **Evaluate** in the header for the five principles at the
+end of the class. The explore panel folds away, because it is the widest thing
+on the screen and a coach reading a body does not need four tabs of prose in
+front of it. And
 the things the research says instructors actually track: contraindications, cues
 in the student's own words, modifications and why, springs and props, one to
 three live goals with review dates, and progress across the class as a group.
@@ -283,6 +286,43 @@ is not, and no switch changes that.
 
 **An evaluation, about the class.** The `Evaluate` button in the header opens
 five axes, scored 1–5, the same five every time.
+
+### Picking a structure, and the form that comes with it
+
+Clicking any muscle, bone or nerve on the body opens the reading for **that**
+structure, with no toggle and no second click — and **the questions change with
+what was picked**, because they have to. Asking "score the breathing, 1 to 5"
+about the sciatic nerve is nonsense; so is asking whether the fifth lumbar
+vertebra is over-recruiting. A form that asks the same thing everywhere is wrong
+almost everywhere, and gets filled in wrong or not at all.
+
+The server owns the rubric ([`pilates/structure_eval.py`](../pilates/structure_eval.py))
+and sends it with the request, so the page never has to know which questions a
+psoas takes and which an atlas takes.
+
+| Clicked | Asked about | Why those |
+|---|---|---|
+| **Muscle** | recruitment · timing · endurance · length · side-to-side | Instructor material is consistent that the characteristic Pilates fault is not weakness but **over**-gripping and substitution — "muscling through" with the shoulders or the quadriceps, hip flexors taking over from the abdominals in the teaser. So the recruitment axis is symmetrical around *about right*, with failure modes on both sides |
+| **Bone** | where it sits · range · where control is lost · under load · stacking | A bone is not recruited, it is *placed*. Clinical joint assessment records range and whether pain limited it; a coach cannot take an end feel through a reformer, so this asks what they can see |
+| **Nerve** | what they reported · what provoked it · **how long it lasted** · what you did | **Not a score.** No coach evaluates a nerve. They observe a symptom in a distribution and decide **stop, modify or refer** — the framework the fitness professions already use. The discriminator is time: cleared within about ten minutes is generally unremarkable; persisting, spreading, or happening away from class needs somebody qualified |
+| **Brain, organ** | nothing | Refused with the reason, not greyed out. Nothing in a Pilates class measures a brain, and a coach is not the person to judge one |
+
+Three rules the shape enforces:
+
+- **Only the unsettled answers come back.** Every axis names the answer that
+  means *nothing to do here*, so a saved reading reports the two things that
+  were not fine rather than all five answers.
+- **Only a nerve is allowed to shout.** A gripping psoas is a note; a symptom
+  that outlived the class is a flag. A system that alarms on everything gets
+  switched off.
+- **The note survives without an answer.** A coach who types the observation and
+  never presses a button has still said the useful half, and discarding it
+  because the other half is blank is data loss, not validation.
+
+Readings accumulate per structure, so *"recruitment: over-working, four classes
+running"* is visible the moment that muscle is clicked again — one class of
+over-recruitment is a bad day. **Body parts** in the Evaluate panel is the way
+back to everything written, newest first, nerve flags at the top.
 
 ### The five axes are not invented here
 

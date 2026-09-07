@@ -87,6 +87,10 @@ const CSS = `
   text-align:right;max-width:55%}
 #ss-eval .ss-said.ss-bad{color:var(--gold)}
 #ss-eval .ss-said.ss-good{color:var(--acc)}
+#ss-eval .ss-part{padding:11px 13px;margin:0 0 7px;border-radius:4px;
+  background:var(--glass);border:1px solid var(--line)}
+#ss-eval .ss-part-urgent{border-color:rgba(226,104,95,.5);
+  background:rgba(226,104,95,.07)}
 #ss-eval .ss-none{font-size:12.5px;color:var(--dim2);line-height:1.75;margin:0}
 #ss-eval .ss-line{padding:12px 13px;margin:0 0 8px;border-radius:4px;
   background:var(--glass);border:1px solid var(--line)}
@@ -212,8 +216,11 @@ async function panel(username, mine) {
   };
 
   let form;
+  let seen = [];
   try {
     form = await get(`evaluation?username=${encodeURIComponent(username)}`);
+    seen = (await get(`structures-seen?username=${encodeURIComponent(username)}`)
+      .catch(() => ({ structures: [] }))).structures ?? [];
   } catch (error) {
     host.querySelector('.ss-body').innerHTML =
       `<p class="ss-none">${esc(error.message)}</p>`;
@@ -236,12 +243,18 @@ async function panel(username, mine) {
         + 'can be compared with the first. Skip any you did not watch — a gap is '
         + 'a gap, not a zero.';
 
-    const tabs = canScore ? `<div class="ss-tabs" role="tablist">
-        <button type="button" data-tab="score" aria-selected="${tab === 'score'}"
-          >Score this class</button>
+    /* Three tabs, and the third is the way back. A reading of the left psoas
+     * written on the body exists only while the left psoas is on screen; without
+     * a list there is no route to it afterwards, which is the same bug as an
+     * analysis with nowhere to appear. */
+    const tabs = `<div class="ss-tabs" role="tablist">
+        ${canScore ? `<button type="button" data-tab="score"
+          aria-selected="${tab === 'score'}">Score this class</button>` : ''}
         <button type="button" data-tab="progress" aria-selected="${tab === 'progress'}"
           >Progress${form.evaluations ? ` (${form.evaluations})` : ''}</button>
-      </div>` : '';
+        <button type="button" data-tab="parts" aria-selected="${tab === 'parts'}"
+          >Body parts${seen.length ? ` (${seen.length})` : ''}</button>
+      </div>`;
 
     let body;
     if (tab === 'score') {
@@ -272,6 +285,23 @@ async function panel(username, mine) {
                aria-pressed="${effort === key}">
                <b>${esc(key)}</b><span>${esc(what)}</span></button>`).join('')}
            </div>`;
+    } else if (tab === 'parts') {
+      body = seen.length ? seen.map((row) => `<div class="ss-part${
+          row.urgent ? ' ss-part-urgent' : ''}">
+          <div class="ss-head"><b>${esc(row.structure)}</b>
+            <span class="ss-moved">${esc(row.kind)}</span>
+            <span class="ss-now" style="font-size:11px">${esc(row.last_on)}</span>
+          </div>
+          <span class="ss-said-note">${row.findings.length
+            ? esc(row.findings.join(' · '))
+            : 'nothing flagged'}${row.count > 1
+            ? ` — ${row.count} readings` : ''}</span>
+        </div>`).join('')
+        : `<p class="ss-none">${mine
+            ? 'Nothing has been written about a particular muscle, bone or nerve yet.'
+            : 'Nothing written about a particular part yet. Click any structure on '
+              + 'the body and the reading for it opens — the questions change with '
+              + 'what you picked.'}</p>`;
     } else if (!form.evaluations) {
       body = `<p class="ss-none">${mine
         ? 'Your coach has not scored a class yet. When they do, the five lines '
