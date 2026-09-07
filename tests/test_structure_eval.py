@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import pytest
 
-from pilates.structure_eval import (CLOSED, SUGGESTED, VERDICTS, StructureEval,
-                                    form_for, history)
+from pilates.structure_eval import (CLOSED, SCALE, SUGGESTED, VERDICTS,
+                                    StructureEval, form_for, history)
 
 
 class TestTheRubricIsNotOurs:
@@ -169,3 +169,108 @@ class TestEveryKindIsCovered:
     def test_the_closed_kinds_explain_rather_than_shrug(self):
         for kind, why in CLOSED.items():
             assert len(why) > 80, f"{kind} needs a reason, not a shrug"
+
+
+class TestScoredAndDrawable:
+    """A verdict cannot be drawn as a line, which is what the chart needs."""
+
+    def _one(self, **kw):
+        base = dict(username="ann", by="Coach", kind="muscle",
+                    structure="Psoas major")
+        base.update(kw)
+        return StructureEval(**base)
+
+    def test_a_check_carries_a_score(self):
+        one = self._one(checks=[{"label": "Its own job", "axis": "job",
+                                 "score": 7}])
+        assert one.checks[0]["score"] == 7
+
+    def test_a_score_outside_the_scale_is_refused(self):
+        with pytest.raises(ValueError, match="a score is 0 to"):
+            self._one(checks=[{"label": "x", "axis": "job",
+                               "score": SCALE + 1}])
+
+    def test_zero_is_a_real_score_and_not_an_absence(self):
+        one = self._one(checks=[{"label": "x", "axis": "job", "score": 0}])
+        assert one.checks[0]["score"] == 0 and one.average == 0
+
+    def test_a_check_with_no_score_is_still_allowed(self):
+        one = self._one(checks=[{"label": "x", "axis": "job",
+                                 "note": "looked, did not commit"}])
+        assert one.checks[0]["score"] is None and one.average is None
+
+    def test_the_axis_key_is_what_lines_up_across_classes(self):
+        """The wording on screen can change; the anatomy it came from does not."""
+        rows = [self._one(made_on="2026-06-01",
+                          checks=[{"label": "Its own job", "axis": "job",
+                                   "score": 3}]),
+                self._one(made_on="2026-06-08",
+                          checks=[{"label": "Its job", "axis": "job",
+                                   "score": 6}])]
+        lines = history(rows)["lines"]
+        assert list(lines) == ["job"]
+        assert [p["score"] for p in lines["job"]["points"]] == [3, 6]
+        assert lines["job"]["moved"] == 3
+
+    def test_a_free_typed_check_charts_by_its_label(self):
+        rows = [self._one(checks=[{"label": "does it let go", "score": 4}])]
+        assert list(history(rows)["lines"]) == ["does it let go"]
+
+    def test_the_overall_is_the_mean_of_what_was_scored(self):
+        one = self._one(checks=[{"label": "a", "axis": "x", "score": 4},
+                                {"label": "b", "axis": "y", "score": 7},
+                                {"label": "c", "axis": "z"}])
+        assert one.average == 5.5
+
+
+class TestWhatAStudentMaySee:
+    """Charts and the line written for them. Nothing else on the row."""
+
+    def _one(self, **kw):
+        base = dict(username="ann", by="Coach", kind="muscle",
+                    structure="Psoas major",
+                    note="private working note",
+                    shared="Your hips are letting go more",
+                    checks=[{"label": "Its own job", "axis": "job", "score": 6,
+                             "verdict": "watch", "note": "still gripping"}])
+        base.update(kw)
+        return StructureEval(**base)
+
+    def test_the_coach_s_own_note_never_leaves(self):
+        out = self._one().to_dict(private=False)
+        assert "note" not in out and "by" not in out
+        assert "private working note" not in str(out)
+
+    def test_nor_does_a_per_check_note_or_verdict(self):
+        out = self._one().to_dict(private=False)
+        assert out["checks"] == [{"label": "Its own job", "axis": "job",
+                                  "score": 6}]
+        assert "still gripping" not in str(out)
+
+    def test_the_line_written_for_them_does(self):
+        assert self._one().to_dict(private=False)["shared"] == (
+            "Your hips are letting go more")
+
+    def test_the_history_they_get_is_drawable_and_nothing_more(self):
+        past = history([self._one()], private=False)
+        assert set(past) == {"count", "latest", "first_on", "lines", "overall",
+                             "scale", "shared"}
+        point = past["lines"]["job"]["points"][0]
+        assert set(point) == {"date", "score"}
+
+    def test_the_coach_s_history_keeps_all_of_it(self):
+        past = history([self._one()])
+        assert past["lines"]["job"]["points"][0]["note"] == "still gripping"
+        assert past["latest"]["note"] == "private working note"
+
+    def test_an_unscored_check_cannot_reach_them_at_all(self):
+        """It would be a label with nothing to draw, and a label is vocabulary."""
+        one = self._one(checks=[{"label": "Something delicate", "axis": "x",
+                                 "note": "context they should not read"}])
+        assert one.to_dict(private=False)["checks"] == []
+
+    def test_a_reading_that_is_only_a_line_for_them_is_valid(self):
+        one = StructureEval(username="ann", by="C", kind="muscle",
+                            structure="Psoas major",
+                            shared="Nothing to worry about")
+        assert one.shared and one.checks == []

@@ -243,11 +243,17 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             def sheet(store, who=who):
                 api.guard_subject(store, self._viewer(store), who)
-                # The readings ride along, because "what to read before this
-                # class" that omits what the coach wrote last week is not what
-                # to read before this class.
-                return {**store.coach_sheet(who).to_dict(),
-                        **api.standing_readings(store, who)}
+                # The readings ride along for a coach, because "what to read
+                # before this class" that omits what they wrote last week is
+                # not what to read before this class. For the person whose body
+                # it is they do not: that list is the coach's working record,
+                # and what reaches the student is the chart and the line
+                # written for them.
+                viewer = self._viewer(store)
+                sheet = store.coach_sheet(who).to_dict()
+                if viewer and viewer.is_self(who):
+                    return sheet
+                return {**sheet, **api.standing_readings(store, who)}
 
             self._answer(sheet)
             return

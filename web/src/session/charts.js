@@ -73,6 +73,30 @@ export const CHART_CSS = `
 .ss-lane-key i.ss-vd-watch{background:var(--gold)}
 .ss-lane-key i.ss-vd-bad{background:#e2685f}
 .ss-lane-key em{display:block;font-style:normal;color:var(--dim2);margin-top:4px}
+/* The scored lines. One per axis, each on its own 0-to-scale baseline, because
+   a shared y-axis across questions that mean different things is a chart that
+   invites a comparison nobody should make. */
+.ss-scores{margin:9px 0 0}
+.ss-sl{margin:0 0 7px}
+.ss-sl-head{display:flex;gap:7px;align-items:baseline;margin:0 0 1px;
+  font-size:10.5px;color:var(--dim2)}
+.ss-sl-head b{flex:1;min-width:0;font-weight:500;color:var(--txt);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ss-sl-head span{flex:none;color:var(--txt);font-variant-numeric:tabular-nums}
+.ss-sl-head em{flex:none;font-style:normal;font-size:9.5px}
+.ss-sl-head em.ss-up{color:var(--acc)}
+.ss-sl-head em.ss-down{color:var(--gold)}
+.ss-sl svg{width:100%;height:46px;overflow:visible}
+.ss-sl-base{stroke:var(--line);stroke-width:1}
+.ss-sl-line{fill:none;stroke:var(--acc);stroke-width:1.6;
+  stroke-linejoin:round;stroke-linecap:round}
+.ss-sl circle{fill:var(--acc)}
+.ss-sl[style*="--n:1"] .ss-sl-line,.ss-sl[style*="--n:1"] circle{stroke:#8fb6e8;fill:#8fb6e8}
+.ss-sl[style*="--n:2"] .ss-sl-line,.ss-sl[style*="--n:2"] circle{stroke:#c9a35e;fill:#c9a35e}
+.ss-sl[style*="--n:3"] .ss-sl-line,.ss-sl[style*="--n:3"] circle{stroke:#7fc9b5;fill:#7fc9b5}
+.ss-sl[style*="--n:4"] .ss-sl-line,.ss-sl[style*="--n:4"] circle{stroke:#b79ad0;fill:#b79ad0}
+.ss-sl[style*="--n:1"] .ss-sl-line,.ss-sl[style*="--n:2"] .ss-sl-line,
+.ss-sl[style*="--n:3"] .ss-sl-line,.ss-sl[style*="--n:4"] .ss-sl-line{fill:none}
 .ss-spark .ss-line{fill:none;stroke:var(--acc);stroke-width:2;stroke-linejoin:round;
   stroke-linecap:round}
 .ss-spark .ss-dot{fill:var(--acc);stroke:#060b14;stroke-width:2}
@@ -242,6 +266,69 @@ export function verdictLane(history, dates = []) {
       <i class="ss-vd-bad"></i>a problem
       <em>Not measured. This is what a person thought, on the same dates —
         it does not move the number above it.</em></p>
+  </div>`;
+}
+
+/**
+ * The coach's scores over time, one line per axis.
+ *
+ * This is the chart the whole scoring exists for, and it is the only thing a
+ * student ever sees of a reading. It draws the same payload for both, because
+ * the redaction happens at the server: a student's copy of a point carries a
+ * date and a score and nothing else, so there is no branch here that could be
+ * got wrong and leak a coach's note into a student's chart.
+ *
+ * Deliberately not one line: a single number per class is how the last three
+ * versions of this went wrong. The per-axis lines are where the meaning is.
+ */
+export function scoreLines(history, opts = {}) {
+  const lines = Object.entries(history?.lines ?? {});
+  if (!lines.length) return '';
+  const scale = history.scale ?? 10;
+  const dates = [...new Set(lines.flatMap(([, l]) =>
+    l.points.map((p) => p.date)))].sort();
+  if (dates.length < 2) {
+    return `<p class="ss-readout">One reading so far. A line needs two.</p>`;
+  }
+  const at = new Map(dates.map((d, i) => [d, i]));
+  const w = 250, h = 46, padL = 2, padR = 26, padT = 5, padB = 5;
+  const x = (i) => padL + (w - padL - padR) * (i / (dates.length - 1));
+  const y = (v) => padT + (h - padT - padB) * (1 - v / scale);
+
+  const rows = lines.map(([key, line], n) => {
+    const path = line.points.map((p, i) =>
+      `${i ? 'L' : 'M'}${x(at.get(p.date)).toFixed(1)},${
+        y(p.score).toFixed(1)}`).join('');
+    const dots = line.points.map((p) =>
+      `<circle cx="${x(at.get(p.date)).toFixed(1)}" cy="${y(p.score).toFixed(1)}"
+        r="1.9"><title>${esc(p.date)} — ${esc(line.label)}: ${p.score}/${scale}${
+        p.note ? `\n${esc(p.note)}` : ''}</title></circle>`).join('');
+    const moved = line.moved > 0 ? `+${line.moved}` : `${line.moved}`;
+    return `<div class="ss-sl" style="--n:${n % 5}">
+      <p class="ss-sl-head"><b>${esc(line.label)}</b>
+        <span>${line.latest}/${scale}</span>
+        <em class="${line.moved > 0 ? 'ss-up' : line.moved < 0 ? 'ss-down' : ''}"
+          >${line.points.length > 1
+            ? (line.moved === 0 ? 'no change' : `${moved} since ${
+                esc(line.points[0].date.slice(2))}`)
+            : 'first score'}</em></p>
+      <svg viewBox="0 0 ${w} ${h}" role="img"
+           aria-label="${esc(line.label)}, ${line.points.length} readings, now ${
+             line.latest} out of ${scale}">
+        <line class="ss-sl-base" x1="${padL}" y1="${y(0).toFixed(1)}"
+          x2="${(w - padR).toFixed(1)}" y2="${y(0).toFixed(1)}"/>
+        <path class="ss-sl-line" d="${path}"/>${dots}
+        <text class="ss-value" x="${w - padR + 4}"
+          y="${(y(line.latest) + 3.4).toFixed(1)}">${line.latest}</text>
+      </svg></div>`;
+  }).join('');
+
+  return `<div class="ss-chart ss-scores">
+    ${opts.title ? `<p class="ss-lane-head">${esc(opts.title)}</p>` : ''}
+    ${rows}
+    <p class="ss-lane-dates"><span>${esc(dates[0].slice(2))}</span>
+      <span>${esc(dates[dates.length - 1].slice(2))}</span></p>
+    ${opts.note ? `<p class="ss-lane-key"><em>${esc(opts.note)}</em></p>` : ''}
   </div>`;
 }
 

@@ -317,6 +317,10 @@ CREATE TABLE IF NOT EXISTS structure_evals (
     -- theirs rather than this application's, so there is no column to put them
     -- in and no enum to validate them against.
     note      TEXT NOT NULL DEFAULT '',
+    -- The one line the student may read. Separate column rather than a flag on
+    -- `note`, so that "is this visible to them" is answered by which field it
+    -- is in and can never be got wrong by a query that forgets to check.
+    shared    TEXT NOT NULL DEFAULT '',
     checks    TEXT NOT NULL DEFAULT '[]',
     session   TEXT NOT NULL DEFAULT '',
     made_on   TEXT NOT NULL DEFAULT '',
@@ -495,6 +499,10 @@ class Store:
             "links": {"signature": "TEXT NOT NULL DEFAULT '{}'"},
             "measurements": {"at_time": "REAL"},
             "accounts": {"verified_at": "TEXT NOT NULL DEFAULT ''"},
+            # The line a student may read. A studio that had already written
+            # readings before this column existed opened to a crash on every
+            # one of them, which is exactly the failure this method is for.
+            "structure_evals": {"shared": "TEXT NOT NULL DEFAULT ''"},
         }
         for table, columns in wanted.items():
             have = {row["name"] for row in
@@ -897,11 +905,12 @@ class Store:
         """Record one reading of one structure. Returns the row id."""
         cursor = self.db.execute(
             "INSERT INTO structure_evals (username, by, structure, kind, fma, "
-            "side, note, checks, session, made_on, made_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "side, note, shared, checks, session, made_on, made_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (evaluation.username, evaluation.by, evaluation.structure,
              evaluation.kind, evaluation.fma, evaluation.side,
-             evaluation.note, json.dumps(evaluation.checks),
+             evaluation.note, evaluation.shared,
+             json.dumps(evaluation.checks),
              evaluation.session, evaluation.made_on, evaluation.made_at))
         self.db.commit()
         return int(cursor.lastrowid)
@@ -930,7 +939,7 @@ class Store:
         return [StructureEval(username=row["username"], by=row["by"],
                               structure=row["structure"], kind=row["kind"],
                               fma=row["fma"], side=row["side"],
-                              note=row["note"],
+                              note=row["note"], shared=row["shared"],
                               checks=json.loads(row["checks"] or "[]"),
                               session=row["session"], made_on=row["made_on"],
                               made_at=row["made_at"], id=row["id"])

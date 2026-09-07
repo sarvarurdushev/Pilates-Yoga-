@@ -395,6 +395,40 @@ class TestMigration:
             assert len(store.history("anna")) == 1
 
 
+    def test_a_store_written_before_shared_existed_still_opens(self, tmp_path):
+        """The readings table grew a column for the line a student may read.
+        A studio that had already written readings opened to a crash on every
+        one of them — which is exactly what this method exists to prevent."""
+        import sqlite3
+
+        path = tmp_path / "old.db"
+        old = sqlite3.connect(str(path))
+        old.executescript(
+            "CREATE TABLE people (username TEXT PRIMARY KEY, "
+            "display_name TEXT, enrolled_at TEXT, signature TEXT, "
+            "confirmations INTEGER, notes TEXT);"
+            "INSERT INTO people (username) VALUES ('ann');"
+            "CREATE TABLE structure_evals (id INTEGER PRIMARY KEY, "
+            "username TEXT, by TEXT, structure TEXT, kind TEXT, fma TEXT, "
+            "side TEXT, note TEXT, checks TEXT, session TEXT, made_on TEXT, "
+            "made_at TEXT);"
+            "INSERT INTO structure_evals (username, by, structure, kind, note, "
+            "checks, made_on, made_at) VALUES ('ann', 'Coach', 'Psoas major', "
+            "'muscle', 'written last year', '[]', '2025-09-01', "
+            "'2025-09-01T09:00:00+00:00');")
+        old.commit()
+        old.close()
+
+        with Store.open(path) as store:
+            columns = {r["name"] for r in
+                       store.db.execute("PRAGMA table_info(structure_evals)")}
+            assert "shared" in columns
+            rows = store.structure_evals("ann")
+            assert len(rows) == 1
+            assert rows[0].note == "written last year"
+            assert rows[0].shared == ""
+
+
 class TestArchiving:
     """Video is discarded, so the pose stream is the record. Everything else in
     a session can be recomputed from it; it can be recomputed from nothing."""

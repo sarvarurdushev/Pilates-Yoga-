@@ -382,10 +382,20 @@ def structure_form(store, viewer: Viewer | None, username: str,
     who = username or person.username
     guard_subject(store, person, who)
     account = store.account(who)
-    past = history(store.structure_evals(who, structure))
+    mine = person.is_self(who)
+    past = history(store.structure_evals(who, structure), private=not mine)
     # Their own wording first. Whatever this coach called things last time is a
     # better suggestion than anything this application could invent.
-    shape = form_for(kind, seen=past["labels"])
+    shape = form_for(kind, seen=past.get("labels", []))
+    if mine:
+        # A student looking at their own body gets the drawing and the line the
+        # coach wrote for them. Nothing else on the row is theirs to read.
+        return {"student": who,
+                "display_name": account.display_name if account else who,
+                "structure": structure, "kind": kind,
+                "kind_label": KIND_LABEL.get(kind, kind), "fma": fma,
+                "side": side, "may_write": False, "open": False,
+                "why": "", "mine": True, "history": past}
     return {
         "student": who,
         "display_name": account.display_name if account else who,
@@ -399,6 +409,7 @@ def structure_form(store, viewer: Viewer | None, username: str,
             None if person.is_self(who)
             else store.assignment_between(person.username, who, person.studio)),
         **shape,
+        "mine": False,
         "history": past,
     }
 
@@ -425,6 +436,7 @@ def evaluate_structure(store, viewer: Viewer | None, payload: dict) -> dict:
             fma=payload.get("fma", ""),
             side=payload.get("side", ""),
             note=payload.get("note", ""),
+            shared=payload.get("shared", ""),
             checks=payload.get("checks") or [],
             session=payload.get("session", ""))
     except ValueError as exc:
@@ -449,8 +461,6 @@ def standing_readings(store, username: str, weeks: int = 6) -> dict:
     finished and does not appear: a sheet that lists everything ever noticed is
     a sheet nobody reads twice.
     """
-    from .structure_eval import history
-
     latest: dict = {}
     for one in store.structure_evals(username):
         for check in one.checks:
@@ -507,8 +517,9 @@ def structure_history(store, viewer: Viewer | None, username: str,
     person = _need(viewer)
     who = username or person.username
     guard_subject(store, person, who)
-    return {"student": who, "structure": structure,
-            **history(store.structure_evals(who, structure))}
+    mine = person.is_self(who)
+    return {"student": who, "structure": structure, "mine": mine,
+            **history(store.structure_evals(who, structure), private=not mine)}
 
 
 def structures_seen(store, viewer: Viewer | None, username: str = "") -> dict:
@@ -521,17 +532,25 @@ def structures_seen(store, viewer: Viewer | None, username: str = "") -> dict:
     person = _need(viewer)
     who = username or person.username
     guard_subject(store, person, who)
+    mine = person.is_self(who)
     seen: dict[str, dict] = {}
     for one in store.structure_evals(who):
         row = seen.setdefault(one.structure, {
             "structure": one.structure, "kind": one.kind, "fma": one.fma,
             "count": 0, "last_on": "", "flagged": [], "note": "",
-            "urgent": False})
+            "shared": "", "score": None, "urgent": False})
         row["count"] += 1
         row["last_on"] = one.made_on
-        row["flagged"] = one.flagged
-        row["note"] = one.note
-        row["urgent"] = row["urgent"] or one.urgent
+        row["score"] = one.average if one.average is not None else row["score"]
+        if one.shared:
+            row["shared"] = one.shared
+        # Everything below is the coach's working record. A student reading
+        # their own list gets the structure, the date, the score and the line
+        # written for them, and nothing else.
+        if not mine:
+            row["flagged"] = one.flagged
+            row["note"] = one.note
+            row["urgent"] = row["urgent"] or one.urgent
     rows = sorted(seen.values(),
                   key=lambda r: (not r["urgent"], r["last_on"]), reverse=False)
     rows.sort(key=lambda r: (not r["urgent"], _neg(r["last_on"])))

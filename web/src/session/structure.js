@@ -15,6 +15,9 @@
  * 3. **It shouted.** A yellow banner on every nerve is noise; the one sentence
  *    worth saying sits in the same grey as everything else.
  */
+import { SCALE, axesFor } from './axes.js';
+import { scoreLines } from './charts.js';
+
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g,
   (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -103,6 +106,28 @@ body.ss-folded #ss-struct{right:14px}
 #ss-struct .sx-verdicts button[data-v=problem][aria-pressed=true]{
   border-color:#e2685f;background:rgba(226,104,95,.16)}
 #ss-struct .sx-check textarea{min-height:34px;margin-top:6px;font-size:11.5px}
+#ss-struct .sx-ask{display:block;font-size:10.5px;color:var(--dim2);
+  line-height:1.5;margin:4px 0 7px}
+#ss-struct .sx-cited{border-left:2px solid var(--line2);padding-left:7px}
+#ss-struct .sx-bridge{border-color:rgba(90,169,230,.4)}
+#ss-struct .sx-scale{display:flex;gap:2px;margin:6px 0 0}
+#ss-struct .sx-scale button{flex:1;padding:5px 0;border-radius:2px;font:inherit;
+  font-size:10.5px;cursor:pointer;border:1px solid var(--line2);
+  background:transparent;color:var(--dim2);min-width:0}
+#ss-struct .sx-scale button:hover{color:var(--txt)}
+#ss-struct .sx-scale button[aria-pressed=true]{background:var(--acc);
+  border-color:var(--acc);color:#04121f;font-weight:600}
+#ss-struct .sx-ends{display:flex;justify-content:space-between;gap:8px;
+  margin:4px 0 0;font-size:9.5px;color:var(--dim2);line-height:1.4}
+#ss-struct .sx-ends span{max-width:47%}
+#ss-struct .sx-ends span:last-child{text-align:right}
+#ss-struct .sx-shared{margin:15px 0 0;padding:11px 12px;border-radius:3px;
+  border:1px solid rgba(90,169,230,.35);background:rgba(90,169,230,.06)}
+#ss-struct .sx-shared label{margin:0 0 3px;color:var(--acc)}
+#ss-struct .sx-shared p{margin:0 0 7px;font-size:10.5px;color:var(--dim2);
+  line-height:1.5}
+#ss-struct .sx-why{font-size:10.5px;color:var(--dim2);line-height:1.55;
+  margin:0 0 12px;padding:0 0 10px;border-bottom:1px solid var(--hair)}
 #ss-struct .sx-add{width:100%;padding:7px;border-radius:3px;font:inherit;
   font-size:11.5px;cursor:pointer;border:1px dashed var(--line2);
   background:transparent;color:var(--dim2);margin:2px 0 0}
@@ -240,7 +265,7 @@ export function foldable() {
 let open = null;
 
 /** Open the reading for one structure. Called on every selection. */
-export async function show(record, me, username, session = '') {
+export async function show(record, me, username, session = '', context = {}) {
   styles();
   const name = record?.name?.en ?? record?.key ?? '';
   const kind = record?.kind ?? '';
@@ -274,31 +299,22 @@ export async function show(record, me, username, session = '') {
     return;
   }
   if (open !== name) return;
-  draw(host, form, { me, username, session, name, kind, record, shut });
+  draw(host, form, { me, username, session, name, kind, record, shut, context });
 }
 
 function runs(form) {
-  const rows = Object.entries(form.history?.runs ?? {});
-  if (!rows.length && !form.history?.count) return '';
-  const lines = rows.map(([label, points]) => {
-    /* A term's worth. Six showed half an arc, which is exactly the length at
-     * which "is this getting better" stops being answerable. */
-    const dots = points.slice(-14).map((p) =>
-      `<span class="${p.verdict === 'fine' ? '' : p.verdict}"
-        title="${esc(p.date)}: ${esc(p.verdict)}${
-        p.note ? ` — ${esc(p.note)}` : ''}"></span>`).join('');
-    const last = points[points.length - 1];
-    return `<p class="sx-run"><em>${esc(label)}</em>
-      <span class="sx-dots">${dots}</span>
-      <span style="flex:none;color:var(--dim2)">${esc(last.verdict)}</span></p>`;
-  }).join('');
-  const latest = form.history.latest;
-  return `<div class="sx-past">
-    <h5>Written about this before — ${form.history.count} time${
-      form.history.count === 1 ? '' : 's'}, since ${esc(form.history.first_on)}</h5>
-    ${lines}${latest?.note
-      ? `<p class="sx-run" style="margin-top:6px"><em>“${esc(latest.note)}”
-          — ${esc(latest.by)}, ${esc(latest.made_on)}</em></p>` : ''}</div>`;
+  const past = form.history;
+  if (!past?.count) return '';
+  const latest = past.latest;
+  return `<div class="sx-past${past.urgent ? ' sx-urgent' : ''}">
+      <h5>Written about this before — ${past.count} time${
+        past.count === 1 ? '' : 's'}, since ${esc(past.first_on)}</h5>
+      ${latest?.note ? `<p class="sx-run"><em>“${esc(latest.note)}”
+        — ${esc(latest.by)}, ${esc(latest.made_on)}</em></p>` : ''}
+      ${latest?.shared ? `<p class="sx-run" style="color:var(--acc)"><em>To
+        them: “${esc(latest.shared)}”</em></p>` : ''}
+    </div>`
+    + scoreLines(past, { title: 'Scored before' });
 }
 
 function draw(host, form, ctx) {
@@ -309,32 +325,106 @@ function draw(host, form, ctx) {
     + (form.note ? `<p class="sx-note">${esc(form.note)}</p>` : ''));
 
   const body = host.querySelector('.sx-body');
-  const may = form.may_write && form.open;
-  if (!form.open || !may) {
-    body.innerHTML = runs(form) + `<p class="sx-none">${esc(
-      !form.open ? form.why
-      : form.student === ctx.me?.acting?.username
-        ? 'This is what your coach wrote about this part of you.'
-        : 'You are not this person’s coach, so there is nothing to write here.'
-    )}</p>`;
+
+  /* The person whose body it is. Charts and the line written for them, and
+   * nothing else: the scores, the labels they were scored on, and any note the
+   * coach wrote here on purpose. The redaction happened at the server -- there
+   * is no branch here that could leak by being got wrong. */
+  if (form.mine) {
+    body.innerHTML = form.history?.count
+      ? scoreLines(form.history, {
+          title: `Your coach's readings — ${form.history.count} since ${
+            form.history.first_on}`,
+          note: 'Scored by your coach, not measured by the camera.',
+        })
+        + (form.history.shared ?? []).slice().reverse().map((one) =>
+          `<div class="sx-past"><h5>${esc(one.date)}</h5>
+            <p class="sx-run"><em>${esc(one.text)}</em></p></div>`).join('')
+      : '<p class="sx-none">Nothing has been written about this part of you '
+        + 'yet.</p>';
     return;
   }
 
+  if (!form.open || !form.may_write) {
+    body.innerHTML = runs(form) + `<p class="sx-none">${esc(
+      !form.open ? form.why
+                 : 'You are not this person\u2019s coach, so there is nothing '
+                   + 'to write here.')}</p>`;
+    return;
+  }
+
+  /* The questions for this structure, derived from this structure's own
+   * anatomy -- its actions, the muscles the atlas names as its synergists and
+   * antagonists, the joint angles the camera measured here. See axes.js. */
+  const derived = axesFor(ctx.record, ctx.context ?? {});
+  const scored = {};
+
+  const axisRow = (axis) => `<div class="sx-check sx-axis${
+      axis.cited ? ' sx-cited' : ''}${axis.bridge ? ' sx-bridge' : ''}"
+      data-axis="${esc(axis.key)}" data-label="${esc(axis.label)}">
+    <div class="sx-top"><b class="sx-label" style="font-weight:500"
+      >${esc(axis.label)}</b></div>
+    <span class="sx-ask">${esc(axis.ask)}</span>
+    <div class="sx-scale" role="group" aria-label="${esc(axis.label)}, 0 to ${SCALE}">
+      ${Array.from({ length: SCALE + 1 }, (_, n) =>
+        `<button type="button" data-score="${n}" aria-pressed="false">${n}</button>`
+      ).join('')}
+    </div>
+    <p class="sx-ends"><span>0 — ${esc(axis.low)}</span>
+      <span>${SCALE} — ${esc(axis.high)}</span></p>
+    <textarea data-cnote placeholder="…because? (yours, not theirs)"></textarea>
+  </div>`;
+
   body.innerHTML = runs(form)
-    + `<label>What you saw</label>
+    + (derived.why ? `<p class="sx-why">${esc(derived.why)}</p>` : '')
+    + derived.axes.map(axisRow).join('')
+    + (derived.decision ? `<label>${esc(derived.decision.label)}</label>
+        <div class="sx-opts" data-decision>${derived.decision.options.map(
+          ([value, text]) => `<button type="button" data-pick="${esc(value)}"
+            aria-pressed="false">${esc(text)}</button>`).join('')}</div>` : '')
+    + `<label style="margin-top:15px">Anything else you noticed</label>
        <textarea data-free
-         placeholder="Anything. This on its own is a complete reading."></textarea>
-       <label style="margin-top:15px">Checks — your words, not ours</label>
+         placeholder="Yours. The student never sees this."></textarea>
+       <label style="margin-top:15px">Your own checks</label>
        <p class="sx-hint">${form.yours
-         ? 'What you wrote about this before, and a few starting points. '
-         : 'Starting points only — press one, edit it, or write your own. '
-         }Every one is optional.</p>
+         ? 'What you added here before, plus a few general ones. '
+         : 'Only if the questions above missed something. '}Optional.</p>
        <div class="sx-chips">${(form.suggested ?? []).map((label, i) =>
          `<button type="button" data-chip="${esc(label)}"
            class="${i < (form.yours ?? 0) ? 'sx-mine' : ''}">${esc(label)}</button>`
          ).join('')}</div>
        <div data-checks></div>
-       <button type="button" class="sx-add" data-add>+ add a check of your own</button>`;
+       <button type="button" class="sx-add" data-add>+ add a check of your own</button>
+       <div class="sx-shared">
+         <label>A line for ${esc(form.display_name.split(' ')[0] || 'them')}</label>
+         <p>The only thing on this reading they will read. The scores reach
+           them as a chart; everything else above stays yours.</p>
+         <textarea data-shared
+           placeholder="e.g. hip flexors are letting go more than last month"></textarea>
+       </div>`;
+
+  for (const row of body.querySelectorAll('[data-axis]')) {
+    const key = row.dataset.axis;
+    for (const button of row.querySelectorAll('[data-score]')) {
+      button.addEventListener('click', () => {
+        const value = Number(button.dataset.score);
+        const now = scored[key]?.score === value ? null : value;
+        if (now === null) delete scored[key];
+        else scored[key] = { score: now, label: row.dataset.label };
+        for (const other of row.querySelectorAll('[data-score]')) {
+          other.setAttribute('aria-pressed',
+                             String(Number(other.dataset.score) === now));
+        }
+      });
+    }
+  }
+  for (const button of body.querySelectorAll('[data-decision] [data-pick]')) {
+    button.addEventListener('click', () => {
+      for (const other of body.querySelectorAll('[data-decision] [data-pick]')) {
+        other.setAttribute('aria-pressed', String(other === button));
+      }
+    });
+  }
 
   const list = body.querySelector('[data-checks]');
   const add = (label = '') => {
@@ -346,18 +436,18 @@ function draw(host, form, ctx) {
         <button type="button" class="sx-drop" data-drop
           aria-label="Remove this check">&times;</button>
       </div>
-      <div class="sx-verdicts">${Object.entries(form.verdicts).map(([key, text]) =>
-        `<button type="button" data-v="${esc(key)}"
-          aria-pressed="false">${esc(text)}</button>`).join('')}</div>
+      <div class="sx-scale" role="group" aria-label="0 to ${SCALE}">
+        ${Array.from({ length: SCALE + 1 }, (_, n) =>
+          `<button type="button" data-score="${n}" aria-pressed="false">${n}</button>`
+        ).join('')}</div>
       <textarea data-cnote placeholder="…because?"></textarea>`;
     list.appendChild(row);
     row.querySelector('[data-drop]').addEventListener('click', () => row.remove());
-    for (const button of row.querySelectorAll('[data-v]')) {
+    for (const button of row.querySelectorAll('[data-score]')) {
       button.addEventListener('click', () => {
         const on = button.getAttribute('aria-pressed') !== 'true';
-        for (const other of row.querySelectorAll('[data-v]')) {
-          other.setAttribute('aria-pressed',
-                             String(on && other === button));
+        for (const other of row.querySelectorAll('[data-score]')) {
+          other.setAttribute('aria-pressed', String(on && other === button));
         }
       });
     }
@@ -365,10 +455,7 @@ function draw(host, form, ctx) {
     return row;
   };
   for (const chip of body.querySelectorAll('[data-chip]')) {
-    chip.addEventListener('click', () => {
-      add(chip.dataset.chip);
-      chip.remove();
-    });
+    chip.addEventListener('click', () => { add(chip.dataset.chip); chip.remove(); });
   }
   body.querySelector('[data-add]').addEventListener('click', () => add());
 
@@ -386,24 +473,45 @@ function draw(host, form, ctx) {
     const button = host.querySelector('[data-save]');
     button.disabled = true;
     tell('Saving…');
-    const checks = [...list.querySelectorAll('.sx-check')].map((row) => ({
-      label: row.querySelector('[data-label]').value.trim(),
-      verdict: row.querySelector('[data-v][aria-pressed=true]')?.dataset.v ?? '',
-      note: row.querySelector('[data-cnote]').value.trim(),
-    })).filter((c) => c.label);
+
+    const checks = [];
+    for (const row of body.querySelectorAll('[data-axis]')) {
+      const key = row.dataset.axis;
+      const note = row.querySelector('[data-cnote]').value.trim();
+      const mark = scored[key];
+      if (mark === undefined && !note) continue;
+      checks.push({ axis: key, label: row.dataset.label,
+                    score: mark?.score ?? null, note });
+    }
+    for (const row of list.querySelectorAll('.sx-check')) {
+      const label = row.querySelector('[data-label]').value.trim();
+      if (!label) continue;
+      const picked = row.querySelector('[data-score][aria-pressed=true]');
+      checks.push({ label, axis: '',
+                    score: picked ? Number(picked.dataset.score) : null,
+                    note: row.querySelector('[data-cnote]').value.trim() });
+    }
+    const decision = body.querySelector('[data-decision] [aria-pressed=true]');
+    if (decision) {
+      checks.push({ axis: 'action', label: 'What you did',
+                    score: null, note: decision.textContent.trim() });
+    }
+
     try {
       const out = await post('evaluate-structure', {
         username: ctx.username, structure: ctx.name, kind: ctx.kind,
         fma: (ctx.record?.fma ?? [])[0] ?? '', session: ctx.session,
-        note: body.querySelector('[data-free]').value.trim(), checks,
+        note: body.querySelector('[data-free]').value.trim(),
+        shared: body.querySelector('[data-shared]').value.trim(),
+        checks,
       });
       form.history = out.history;
       forget(ctx.username, ctx.name);
-      const flagged = out.evaluation.flagged;
-      tell(flagged.length
-        ? `Saved — ${flagged[0]}${flagged.length > 1
-            ? ` and ${flagged.length - 1} more` : ''}.`
-        : 'Saved.', 'good');
+      const average = out.evaluation.average;
+      tell(average == null ? 'Saved.'
+        : `Saved. ${average} out of ${SCALE} across ${
+            out.evaluation.checks.filter((c) => c.score !== null).length
+          } questions.`, 'good');
       body.querySelector('.sx-past')?.remove();
       body.insertAdjacentHTML('afterbegin', runs(form));
     } catch (error) {

@@ -886,6 +886,101 @@ class TestWhereTheFeedbackGoes:
                          "&structure=pectoralis+major")[0] == 403
 
 
+class TestTheStudentSeesChartsAndOneLine:
+    """The redaction happens at the server. Anything the page never receives
+    cannot be leaked by a rendering mistake."""
+
+    PRIVATE = "she is avoiding this and I think I know why"
+    SHARED = "your hips are letting go more than last month"
+
+    def _write(self, base, names):
+        coach = Client(base)
+        coach.sign_in("coach@b.co")
+        coach.post("/roster/add", {"student": names["ann"]})
+        for n, score in enumerate((3, 5, 8)):
+            coach.post("/evaluate-structure", {
+                "username": names["ann"], "structure": "Psoas major",
+                "kind": "muscle", "note": self.PRIVATE,
+                "shared": self.SHARED if n == 2 else "",
+                "checks": [{"label": "Its own job", "axis": "job",
+                            "score": score, "verdict": "watch",
+                            "note": "hip flexors carrying it"}]})
+        ann = Client(base)
+        ann.sign_in("ann@b.co")
+        return coach, ann
+
+    def test_the_coach_s_note_never_crosses_the_wire(self, studio):
+        base, names, _ = studio
+        _, ann = self._write(base, names)
+        for path in (f"/structure?username={names['ann']}"
+                     "&structure=Psoas+major&kind=muscle",
+                     f"/structure-history?username={names['ann']}"
+                     "&structure=Psoas+major",
+                     "/structures-seen",
+                     f"/sheet?user={names['ann']}"):
+            body = json.dumps(ann.get(path)[1])
+            assert self.PRIVATE not in body, path
+            assert "hip flexors carrying it" not in body, path
+
+    def test_but_the_line_written_for_them_does(self, studio):
+        base, names, _ = studio
+        _, ann = self._write(base, names)
+        past = ann.get(f"/structure-history?username={names['ann']}"
+                       "&structure=Psoas+major")[1]
+        assert [one["text"] for one in past["shared"]] == [self.SHARED]
+
+    def test_and_the_chart_it_is_drawn_from(self, studio):
+        base, names, _ = studio
+        _, ann = self._write(base, names)
+        past = ann.get(f"/structure-history?username={names['ann']}"
+                       "&structure=Psoas+major")[1]
+        assert [p["score"] for p in past["lines"]["job"]["points"]] == [3, 5, 8]
+        assert past["lines"]["job"]["moved"] == 5
+        assert past["scale"] == 10
+
+    def test_a_point_they_receive_carries_only_a_date_and_a_score(self, studio):
+        base, names, _ = studio
+        _, ann = self._write(base, names)
+        past = ann.get(f"/structure-history?username={names['ann']}"
+                       "&structure=Psoas+major")[1]
+        for point in past["lines"]["job"]["points"]:
+            assert set(point) == {"date", "score"}
+
+    def test_the_coach_s_vocabulary_is_not_theirs_either(self, studio):
+        """No verdict words, no run of labels, no urgency flag."""
+        base, names, _ = studio
+        _, ann = self._write(base, names)
+        past = ann.get(f"/structure-history?username={names['ann']}"
+                       "&structure=Psoas+major")[1]
+        assert "runs" not in past and "labels" not in past
+        assert "urgent" not in past
+
+    def test_their_own_structure_panel_offers_no_form(self, studio):
+        base, names, _ = studio
+        _, ann = self._write(base, names)
+        form = ann.get(f"/structure?username={names['ann']}"
+                       "&structure=Psoas+major&kind=muscle")[1]
+        assert form["mine"] is True and form["may_write"] is False
+        assert form["open"] is False and form.get("suggested", []) == []
+
+    def test_the_pre_class_sheet_is_the_coach_s_working_record(self, studio):
+        """It carries the open findings for a coach and none of them for the
+        person whose body it is."""
+        base, names, _ = studio
+        coach, ann = self._write(base, names)
+        assert coach.get(f"/sheet?user={names['ann']}")[1]["open_readings"]
+        assert "open_readings" not in ann.get(f"/sheet?user={names['ann']}")[1]
+
+    def test_the_coach_still_gets_everything(self, studio):
+        base, names, _ = studio
+        coach, _ = self._write(base, names)
+        past = coach.get(f"/structure-history?username={names['ann']}"
+                         "&structure=Psoas+major")[1]
+        assert past["latest"]["note"] == self.PRIVATE
+        assert past["lines"]["job"]["points"][0]["note"] == (
+            "hip flexors carrying it")
+
+
 class TestGettingBackInOverHttp:
     """Three routes back in, and none of them tell a stranger who trains here."""
 

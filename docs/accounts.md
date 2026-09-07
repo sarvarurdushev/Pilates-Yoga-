@@ -276,63 +276,80 @@ it — it takes its own column beside the explore panel rather than replacing it
 The shape of that box is the part worth explaining, because two earlier versions
 of it were wrong.
 
-### The rubric is the coach's, not ours
+### The questions come from that structure's own anatomy
 
-The first version scored a whole class on five fixed principles. The second
-scored every structure on five fixed axes per kind — recruitment, timing,
-endurance, length, symmetry for every muscle in the body. Both were wrong in the
-same way: **they guessed.** The psoas and the anconeus do not raise the same
-questions, and somebody who has taught for fifteen years does not need a form
-telling them what to look at.
+Three versions of this were wrong the same way. The first scored a whole class
+on five fixed principles. The second scored every structure on five fixed axes
+per *kind* — recruitment, timing, endurance, length, symmetry for every muscle
+in the body. Both **guessed**, and a guess is wrong almost everywhere: the
+semimembranosus and the transversus abdominis do not fail in the same way, and
+asking them the same question produces an answer about neither.
 
-So the box holds two things:
+Nothing in the current version is invented. Every axis is built from a fact the
+atlas already holds about that one structure
+([`web/src/session/axes.js`](../web/src/session/axes.js)):
 
-- **What you saw.** Free prose. This on its own is a complete reading — a coach
-  who wants to write one sentence should never have to press a button first.
-- **Checks, in the coach's own words.** A check is a line they wrote — *"does it
-  let go at the bottom"*, *"left vs right at the top"*, *"does the shoulder
-  shrug"* — with an optional verdict and an optional note. They can add as many
-  as they like, edit any of them, or use none.
-
-**Whatever they wrote about a structure comes back the next time it is opened**,
-as a chip, above the suggestions. The second reading of a psoas is one press,
-and the vocabulary that builds up is theirs.
-
-### The one thing that is fixed
-
-The verdict, and it is three values: **fine · worth watching · a problem.**
-
-Three rather than five because the reliability literature on visual movement
-assessment is consistent that agreement improves with coarse rating and collapses
-on fine graded scales — and because a scale nobody uses the ends of is a
-three-point scale with extra typing anyway.
-
-### Starting points, not requirements
-
-Each kind of structure offers a few chips, because a blank box is its own kind of
-hostile. They are suggestions to press, edit or ignore.
-
-| Clicked | Offered as starting points |
+| Axis | Comes from |
 |---|---|
-| **Muscle** | how much work it's doing · when it comes in · does it hold through the set · left against right · what took over instead · does it let go between reps |
-| **Bone** | where it sits at the start · does it stay there under load · how much range · where the control goes · against the segment above and below |
-| **Nerve** | what they reported · what brought it on · how long it lasted · carried on / modified / sent them to get it looked at |
-| **Brain, organ** | Nothing. The panel says why instead of greying a form out: nothing in a Pilates class measures a brain, and a coach is not the person to judge one |
+| **Its own job** | `actions` — what this muscle is for, quoted |
+| **X covering** | `synergists` — who *specifically* takes over when it does not |
+| **X releasing** | `antagonists` — who has to let go for it to work |
+| **Where they feel it** | `feels` — where the student should notice it |
+| **The documented one** | `dysfunction` — the published failure mode, for the 25 muscles that have one |
+| **Against the number** | the quantity the camera measured here, this class |
 
-The nerve list is the one place this still asserts something, and it is a
-scope-of-practice boundary rather than a rubric. A coach does not assess a nerve;
-they notice a symptom in its area and decide whether to carry on, modify, or send
-the person to somebody qualified. One grey sentence under the heading says so.
-It is not a banner and not a colour — a yellow box on every nerve is noise, and
-noise is what gets a real warning ignored.
+So the psoas is asked about hip flexion and about whether *iliacus* and *rectus
+femoris* are covering. The pectoralis major is asked about adduction and medial
+rotation of the humerus and about *deltoid* and *triceps brachii*. Different
+muscles, different questions, and the difference comes from the anatomy rather
+than from an opinion in a file.
 
-### Only a nerve is allowed to shout
+A bone is asked about placement, stacking, load, and any joint angle the camera
+measured there. A nerve is not scored on performance at all — it records what
+was reported, how long it lasted, and the decision: carry on, modify, or refer.
 
-A muscle called *a problem* is a note. A **nerve** called *a problem* is the one
-thing that jumps the queue on the roster. A system that alarms on everything gets
-switched off.
+### Scored 0–10, because a chart needs a number
 
-### Does a reading change the measured number? No.
+A verdict cannot be drawn as a line, and the chart is the point. Each axis is
+scored 0 to 10 with **both ends written out in that structure's own terms** — a
+number nobody can anchor is not a measurement of anything:
+
+> **Its own job** — *Adduction and medial rotation of the humerus; clavicular
+> head flexes, sternocostal head extends from flexion.*
+> `0` not contributing to it at all &nbsp;·&nbsp; `10` doing all of it, cleanly, every rep
+
+Each axis gets its own line on its own 0–10 baseline. Never one number: a single
+score per class is how the first three versions went wrong, and a shared y-axis
+across questions that mean different things invites a comparison nobody should
+make.
+
+### What the student sees, and what they do not
+
+**They see the charts and one line.** Nothing else.
+
+| | Coach | Student |
+|---|---|---|
+| The scored lines over time | ✅ | ✅ |
+| A line the coach wrote *for them* | ✅ | ✅ |
+| The coach's own note on the reading | ✅ | ❌ |
+| The per-axis notes | ✅ | ❌ |
+| Verdict words, the run of labels, the urgency flag | ✅ | ❌ |
+| The pre-class sheet's open findings | ✅ | ❌ |
+| Any way to write | ✅ | ❌ |
+
+**The redaction happens at the server.** A student's copy of a data point
+carries a date and a score and nothing else — the coach's note never crosses
+the wire, so no rendering mistake can leak it. `shared` is its own column rather
+than a flag on the note, so *"is this visible to them"* is answered by which
+field it is in and cannot be got wrong by a query that forgets to check.
+
+The registers are different on purpose. The coach writes *"front of the shoulder
+doing the work of the chest"*; the line for the student says *"nothing to worry
+about — your hips are just doing more than their share while the middle catches
+up."* No muscle names they cannot place, no substitution vocabulary, and nothing
+that reads like a chart being explained to them.
+
+### Does a reading change the measured number? No.### Does a reading change the measured number? No.
 
 This is the question worth being exact about. The **7.2 Nm** on a muscle came
 off a camera: it is `measured`. A coach's verdict is what a person thought: it

@@ -589,10 +589,75 @@ PROSE = {
     ],
 }
 
+#: What the coach writes *for the student*. A different register from the notes
+#: above on purpose: no muscle names they cannot place, no substitution
+#: vocabulary, and nothing that reads like a chart being explained to them.
+SHARED = {
+    "kim.minji": {
+        11: "Your teaser is the best it has been — you did it today without me "
+            "touching you once.",
+        8: "We dropped the springs and everything got more even. That is "
+           "progress, not a step back.",
+        5: "The wall roll-downs before class are working. Keep doing them.",
+        2: "Nothing to worry about — your hips are just doing more than their "
+           "share while the middle catches up.",
+    },
+    "lee.joonho": {
+        10: "Your shoulders stayed down for the whole arm series today. First "
+            "time.",
+        6: "The “melt your shoulder blades into your back pockets” one is the "
+           "cue to remember.",
+        3: "You are strong here. The work is teaching a quieter muscle to go "
+           "first.",
+    },
+    "han.doyun": {
+        10: "Cleared, and back to full range. Tell me straight away if it "
+            "comes back.",
+        6: "Stopping today was the right call. Please get it looked at before "
+           "the next class.",
+        2: "Mention it every time you feel it, even if it goes away. That is "
+           "what I need to know.",
+    },
+    "choi.seoyeon": {
+        9: "Your left side is finally showing up on its own.",
+        7: "I still need your health form before we load anything.",
+    },
+    "jung.haeun": {
+        7: "Stop trying so hard to hold your middle. Breathe and it happens on "
+           "its own.",
+    },
+    "shin.yerin": {8: "Your upper back is moving in more places than it was."},
+    "moon.jaehyun": {9: "The length is coming. Forcing it would set you back."},
+    "song.arin": {8: "Your glutes are starting the bridge now instead of the "
+                     "back of your legs. That is the change we wanted."},
+    "yang.dowon": {4: "One shoulder sits higher than the other. That is how you "
+                      "are built, not something to fix."},
+}
+
 #: How many weeks of readings the fixture writes. Twelve because the question
 #: this fixture exists to answer is what it looks like after a term of classes,
 #: and twelve weeks is a term.
 WEEKS = 12
+
+
+#: A verdict names a band; the score moves inside it. A fixture whose lines step
+#: between exactly three heights looks like a state machine rather than like
+#: somebody watching a person, and the chart is what this fixture exists to fill.
+_BANDS = {"problem": (1, 3), "watch": (4, 7), "fine": (7, 10)}
+
+
+def _score(verdict: str, week: int) -> int:
+    low, high = _BANDS[verdict]
+    return low + (week * 3) % max(1, high - low + 1)
+
+
+def _axis_key(check: str) -> str:
+    """A stable key for a check, so the same question lines up across classes.
+
+    The live application takes this from the anatomy the page derived; the
+    fixture only needs the same string every week for the same question.
+    """
+    return check.lower().replace(" ", "-")[:60]
 
 
 def _write_readings(store, handles, into: str = "") -> int:
@@ -623,19 +688,26 @@ def _write_readings(store, handles, into: str = "") -> int:
                     continue
                 key = (structure, kind)
                 checks_by_structure.setdefault(key, []).append({
-                    "label": check, "verdict": verdict,
+                    "label": check, "axis": _axis_key(check),
+                    # A number, because a verdict cannot be drawn as a line and
+                    # the chart is the whole point. Spread inside the band the
+                    # verdict names so the line moves week to week rather than
+                    # stepping between three values.
+                    "score": _score(verdict, week),
+                    "verdict": verdict,
                     # The note explains the finding, so it belongs on the
                     # classes where there is one -- not on the weeks it is fine.
                     "note": note if verdict != "fine" else ""})
             # The week's prose goes on one structure, not repeated onto every
             # one the coach happened to look at that day.
             said = prose.get(week, "")
+            told = SHARED.get(handle, {}).get(week, "")
             for (structure, kind), checks in checks_by_structure.items():
                 store.evaluate_structure(StructureEval(
                     username=handles[handle], by=by, structure=structure,
-                    kind=kind, note=said, checks=checks, made_on=str(when),
-                    made_at=f"{when}T09:00:00+00:00"))
-                said = ""
+                    kind=kind, note=said, shared=told, checks=checks,
+                    made_on=str(when), made_at=f"{when}T09:00:00+00:00"))
+                said = told = ""
                 written += 1
     return written
 

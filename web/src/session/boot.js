@@ -249,9 +249,21 @@ export async function install(bundle) {
     /* Selecting a structure opens the reading for it, on the axes that
      * structure actually takes -- recruitment for a muscle, placement for a
      * bone, a symptom report for a nerve. The server owns which. */
-    onStructure: (record) => showStructure(record, identity,
-                                           session.person.username,
-                                           session.key ?? ''),
+    /* The reading, with what the camera measured at this structure handed to
+     * it -- that is what lets the axes ask "does what you saw agree with the
+     * 51.5 Nm" rather than asking the same thing about every muscle. */
+    onStructure: (record) => {
+      const about = session.about(record?.id);
+      const entry = about?.entry;
+      showStructure(record, identity, session.person.username,
+                    session.key ?? '', {
+                      measured: entry
+                        ? { value: entry.value.toFixed(1), unit: entry.unit,
+                            from: entry.from }
+                        : null,
+                      joints: entry ? session.jointsOf(entry.from) : [],
+                    });
+    },
     /* What the coach wrote about this structure, for the lane under the
      * measured line. Same dates, different kind of claim, never merged. */
     readings: (record) => readingsFor(session.person.username,
