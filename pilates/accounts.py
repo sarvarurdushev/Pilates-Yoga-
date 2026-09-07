@@ -404,15 +404,26 @@ class Screening:
 class Assignment:
     """A coach and a student, at a studio, between two dates.
 
-    Being in the same building is not a relationship, and it is not permission.
-    This is. It carries dates so that *who was coaching them in March* is
-    answerable a year later.
+    **Joining a studio is the consent; the studio assigns the coach.** This was
+    once the other way round -- a coach added you and nothing happened until you
+    accepted -- which is how two strangers share data and not how a studio
+    works. Nobody joins a gym and then negotiates with each instructor
+    separately, and making them do it meant a coach could not put their own
+    class on their own roster without a round trip.
+
+    What protects the student is not a block before the fact, it is control
+    after it, and that is worth more for being usable: they can see exactly who
+    can open their record, revoke any of them in one click, and read the log of
+    every time it was opened. A consent prompt nobody answers protects nobody.
+
+    Dates are still carried, so *who was coaching them in March* is answerable a
+    year later.
     """
 
     coach: str
     student: str
     studio: str
-    state: str = PENDING
+    state: str = ACTIVE
     scopes: tuple = DEFAULT_SCOPES
     since: str = field(default_factory=today)
     until: str = ""
@@ -421,7 +432,7 @@ class Assignment:
     def __post_init__(self) -> None:
         if self.coach == self.student:
             raise ValueError("a coach cannot be assigned to themselves")
-        if self.state not in (PENDING, ACTIVE, LEFT):
+        if self.state not in (ACTIVE, LEFT):
             raise ValueError(f"{self.state!r} is not a state an assignment has")
         unknown = set(self.scopes) - set(SCOPES)
         if unknown:

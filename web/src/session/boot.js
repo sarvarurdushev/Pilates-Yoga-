@@ -32,7 +32,7 @@ import { capabilities, mount as mountRecorder } from './record.js';
 import { mount as mountCoach } from './coach.js';
 import { mount as mountRecordings } from './recordings.js';
 import { chip, gate, whoami } from './account.js';
-import { mount as mountRoster, requests } from './roster.js';
+import { coaches as mountMyCoaches, mount as mountRoster } from './roster.js';
 import { mount as mountAdmin } from './admin.js';
 
 const BANNER_CSS = `
@@ -288,7 +288,8 @@ let identity = null;
  * exists to prevent.
  */
 function room(me) {
-  for (const id of ['ss-who-chip', 'ss-roster-open', 'ss-admin-open']) {
+  for (const id of ['ss-who-chip', 'ss-roster-open', 'ss-admin-open',
+                    'ss-mine-open']) {
     document.getElementById(id)?.remove();
   }
   if (!me?.signed_in) return;
@@ -301,9 +302,9 @@ function room(me) {
   });
   mountRoster(me, install);
   mountAdmin(me);
-  // A coach asking to work with you is a question, and a question that sits in
-  // a menu is one nobody answers.
-  requests(me, async () => { identity = await whoami(); room(identity); });
+  // The student's control over their own record, always present rather than a
+  // prompt that arrives once at a moment nobody is thinking about it.
+  if (!me.can?.coach) mountMyCoaches(me);
 }
 
 async function boot() {

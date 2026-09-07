@@ -207,7 +207,7 @@ class TestWhatACoachCanReach:
         status, payload = client.get("/directory")
         assert status == 200
         for person in payload["people"]:
-            assert set(person) == {"username", "display_name", "state", "mine"}
+            assert set(person) == {"username", "display_name", "mine"}
 
     def test_an_empty_roster_before_anybody_is_assigned(self, coach):
         client, _, _ = coach
@@ -218,27 +218,40 @@ class TestWhatACoachCanReach:
         status, payload = client.get(f"/student?username={names['ann']}")
         assert status == 403 and "permission" in payload["error"]
 
-    def test_asking_grants_nothing_by_itself(self, coach):
-        """A coach asking is not a student agreeing."""
+    def test_adding_takes_effect_at_once(self, coach):
+        """It used to be a request the student had to accept, which is how two
+        strangers share data and not how a studio works -- a coach could not put
+        their own class on their own roster without a round trip."""
         client, names, _ = coach
         assert client.post("/roster/add", {"student": names["ann"]})[0] == 200
-        assert client.get(f"/student?username={names['ann']}")[0] == 403
-        assert client.get("/roster")[1]["students"] == []
-
-    def test_the_student_accepting_is_what_grants_it(self, coach, studio):
-        base, names, _ = studio
-        client, _, _ = coach
-        client.post("/roster/add", {"student": names["ann"]})
-
-        ann = Client(base)
-        ann.sign_in("ann@b.co")
-        assert ann.post("/roster/answer",
-                        {"coach": names["coach"], "accept": True})[0] == 200
-
         status, payload = client.get(f"/student?username={names['ann']}")
         assert status == 200 and payload["seen_as"] == "coach"
         assert [s["username"] for s in client.get("/roster")[1]["students"]] \
             == [names["ann"]]
+
+    def test_a_whole_list_goes_on_in_one_press(self, coach):
+        client, names, _ = coach
+        status, payload = client.post(
+            "/roster/add", {"students": [names["ann"], names["ben"]]})
+        assert status == 200 and set(payload["added"]) == {names["ann"],
+                                                           names["ben"]}
+        assert len(client.get("/roster")[1]["students"]) == 2
+
+    def test_a_stale_name_in_a_bulk_add_does_not_fail_the_rest(self, coach):
+        """A bulk add that refuses everything because one row is stale is a
+        bulk add nobody uses twice."""
+        client, names, _ = coach
+        _, payload = client.post(
+            "/roster/add", {"students": [names["ann"], "somebody_who_left"]})
+        assert payload["added"] == [names["ann"]]
+        assert payload["missing"] == ["somebody_who_left"]
+
+    def test_the_directory_says_who_is_left_to_add(self, coach):
+        client, names, _ = coach
+        assert set(client.get("/directory")[1]["not_mine"]) == {
+            names["ann"], names["ben"], names["boss"]}
+        client.post("/roster/add", {"student": names["ann"]})
+        assert names["ann"] not in client.get("/directory")[1]["not_mine"]
 
     def test_another_coach_still_cannot_read_them(self, coach, studio):
         """The first place the naive same-building rule leaks, and health data
@@ -246,26 +259,52 @@ class TestWhatACoachCanReach:
         base, names, _ = studio
         client, _, _ = coach
         client.post("/roster/add", {"student": names["ann"]})
-        ann = Client(base)
-        ann.sign_in("ann@b.co")
-        ann.post("/roster/answer", {"coach": names["coach"], "accept": True})
 
         other = Client(base)
         other.sign_in("other@b.co")
         assert other.get(f"/student?username={names['ann']}")[0] == 403
 
     def test_the_student_revoking_takes_it_away_again(self, coach, studio):
+        """The half of consent that does the work now that adding is
+        immediate."""
+        base, names, _ = studio
+        client, _, _ = coach
+        client.post("/roster/add", {"student": names["ann"]})
+        assert client.get(f"/student?username={names['ann']}")[0] == 200
+
+        ann = Client(base)
+        ann.sign_in("ann@b.co")
+        assert ann.post("/roster/remove", {"coach": names["coach"]})[0] == 200
+        assert client.get(f"/student?username={names['ann']}")[0] == 403
+
+    def test_a_student_can_see_exactly_who_can_open_their_record(self, coach,
+                                                                studio):
         base, names, _ = studio
         client, _, _ = coach
         client.post("/roster/add", {"student": names["ann"]})
         ann = Client(base)
         ann.sign_in("ann@b.co")
-        ann.post("/roster/answer", {"coach": names["coach"], "accept": True})
-        assert client.get(f"/student?username={names['ann']}")[0] == 200
+        mine = ann.get("/me/coaches")[1]["coaches"]
+        assert [c["username"] for c in mine] == [names["coach"]]
+        assert "measurements" in mine[0]["sees"]
 
-        ann.post("/roster/end", {"coach": names["coach"],
-                                 "student": names["ann"]})
-        assert client.get(f"/student?username={names['ann']}")[0] == 403
+    def test_a_coach_can_take_somebody_off_their_own_roster(self, coach):
+        client, names, _ = coach
+        client.post("/roster/add", {"student": names["ann"]})
+        assert client.post("/roster/remove",
+                           {"coach": names["coach"],
+                            "student": names["ann"]})[0] == 200
+        assert client.get("/roster")[1]["students"] == []
+
+    def test_a_stranger_cannot_end_somebody_else_s_assignment(self, coach,
+                                                              studio):
+        base, names, _ = studio
+        client, _, _ = coach
+        client.post("/roster/add", {"student": names["ann"]})
+        ben = Client(base)
+        ben.sign_in("ben@b.co")
+        assert ben.post("/roster/remove", {"coach": names["coach"],
+                                           "student": names["ann"]})[0] == 403
 
     def test_a_coach_cannot_add_to_somebody_else_s_roster(self, coach):
         client, names, _ = coach
@@ -396,9 +435,6 @@ class TestTheOlderRoutesAreGuardedToo:
         coach = Client(base)
         coach.sign_in("coach@b.co")
         coach.post("/roster/add", {"student": names["ann"]})
-        ann = Client(base)
-        ann.sign_in("ann@b.co")
-        ann.post("/roster/answer", {"coach": names["coach"], "accept": True})
         status, payload = coach.post("/note", {
             "username": names["ann"], "kind": "cue", "by": "A Coach",
             "text": "reach the heel away"})
@@ -538,7 +574,6 @@ class TestTheRosterSaysWhatToReadFirst:
         coach.post("/roster/add", {"student": names["ann"]})
         ann = Client(base)
         ann.sign_in("ann@b.co")
-        ann.post("/roster/answer", {"coach": names["coach"], "accept": True})
         return coach, ann
 
     def test_never_screened_is_flagged_rather_than_silent(self, studio):
@@ -569,9 +604,6 @@ class TestTheRosterSaysWhatToReadFirst:
         coach, ann = self._assign(base, names)
         ann.post("/me/screening", {"answers": {k: False for k in PARQ}})
         coach.post("/roster/add", {"student": names["ben"]})
-        ben = Client(base)
-        ben.sign_in("ben@b.co")
-        ben.post("/roster/answer", {"coach": names["coach"], "accept": True})
         order = [s["display_name"] for s in coach.get("/roster")[1]["students"]]
         assert order[0] == "Ben"  # never screened
 

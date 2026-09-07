@@ -275,6 +275,10 @@ class Handler(SimpleHTTPRequestHandler):
         if route.path == "/admin/people" and self.db:
             self._answer(lambda store: api.everybody(store, self._viewer(store)))
             return
+        if route.path == "/me/coaches" and self.db:
+            self._answer(lambda store: api.my_coaches(
+                store, self._viewer(store)))
+            return
         if route.path == "/me/recovery" and self.db:
             self._answer(lambda store: api.recovery_state(
                 store, self._viewer(store)))
@@ -364,7 +368,7 @@ class Handler(SimpleHTTPRequestHandler):
             store, self._viewer(store), body),
         "/roster/add": lambda self, store, body: api.add_student(
             store, self._viewer(store), body),
-        "/roster/answer": lambda self, store, body: api.answer_request(
+        "/roster/remove": lambda self, store, body: api.end_assignment(
             store, self._viewer(store), body),
         "/roster/end": lambda self, store, body: api.end_assignment(
             store, self._viewer(store), body),

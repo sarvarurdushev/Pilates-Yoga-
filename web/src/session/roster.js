@@ -14,9 +14,14 @@
  * missing, which is knowing who to pick.
  *
  * **The directory is a phone book, not a record.** Names, and whether they are
- * already yours. A coach adds somebody from it, and that is a *request*: until
- * the student accepts it the coach can see the name they already saw and
- * nothing more.
+ * already yours. Adding somebody from it takes effect at once -- there used to
+ * be a round trip, the coach asking and the student accepting, and it was the
+ * wrong shape for a studio: nobody joins a gym and then negotiates with each
+ * instructor. **Add all** puts the room on your roster in one press.
+ *
+ * Removing is the same one press from either side, which is where the student's
+ * control actually lives: they see who can open their record and take any of
+ * them out of it, and every read is in the log either way.
  */
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g,
   (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -29,6 +34,13 @@ const CSS = `
   border:1px solid rgba(233,180,92,.45);color:var(--txt)}
 #ss-roster-open:hover{background:rgba(233,180,92,.2)}
 #ss-roster-open i{font-style:normal;color:var(--gold);font-weight:600}
+#ss-mine-open{flex:none;align-self:flex-start;display:inline-flex;
+  align-items:center;padding:7px 14px;border-radius:4px;cursor:pointer;
+  font:inherit;font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;
+  white-space:nowrap;background:var(--glass);border:1px solid var(--line2);
+  color:var(--dim)}
+#ss-mine-open:hover{color:var(--txt);border-color:var(--acc)}
+#ss-mine-open i{font-style:normal;font-weight:600}
 #ss-roster{position:fixed;inset:0;z-index:130;display:flex;align-items:center;
   justify-content:center;background:rgba(2,5,10,.8);backdrop-filter:blur(3px)}
 #ss-roster .ss-box{width:min(680px,94vw);max-height:86vh;display:flex;
@@ -74,15 +86,31 @@ const CSS = `
   background:var(--glass);color:var(--txt)}
 #ss-roster .ss-said{margin-left:auto;font-size:11.5px;color:var(--dim2)}
 #ss-roster .ss-said.ss-bad{color:var(--gold)}
-#ss-roster input.ss-find{width:100%;padding:8px 10px;margin:0 0 10px;
+#ss-roster input.ss-find{flex:1 1 160px;min-width:120px;padding:8px 10px;
   border-radius:3px;font:inherit;font-size:13px;background:var(--glass);
   border:1px solid var(--line);color:var(--txt)}
+/* One row of controls above the list: find, two filters, and the bulk add. */
+#ss-roster .ss-tools{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 11px;
+  align-items:center}
+#ss-roster .ss-chip{flex:none;padding:7px 11px;border-radius:3px;cursor:pointer;
+  font:inherit;font-size:11.5px;background:var(--glass);
+  border:1px solid var(--line);color:var(--dim)}
+#ss-roster .ss-chip:hover{color:var(--txt);border-color:var(--line2)}
+#ss-roster .ss-chip[aria-pressed=true]{border-color:var(--acc);color:var(--txt);
+  background:rgba(90,169,230,.12)}
+#ss-roster .ss-chip em{font-style:normal;margin-left:5px;color:var(--dim2)}
+#ss-roster .ss-all{flex:none;margin-left:auto;padding:7px 14px;border-radius:3px;
+  cursor:pointer;font:inherit;font-size:12px;font-weight:600;
+  background:var(--acc);border:1px solid var(--acc);color:#04121f}
+#ss-roster .ss-all:hover{filter:brightness(1.1)}
+#ss-roster .ss-all[disabled]{opacity:.4;cursor:default;filter:none}
 /* Flex arithmetic that has to be spelled out. Without flex:none on the
-   controls, a long email in the middle column is squeezed to one character
+   controls, a long name in the middle column is squeezed to one character
    wide and prints itself vertically -- which is exactly what happened. */
-#ss-roster .row .ss-main,#ss-roster .ss-who .ss-main{flex:1 1 auto;min-width:200px;overflow:hidden}
-#ss-roster .row .ss-meta,#ss-roster .ss-who .ss-meta{overflow-wrap:anywhere}
-#ss-roster .row .tag,#ss-roster .row button,#ss-roster .ss-who button,#ss-roster .ss-who .ss-n{flex:none}
+#ss-roster .ss-who .ss-main{flex:1 1 auto;min-width:180px;overflow:hidden}
+#ss-roster .ss-who .ss-meta{overflow-wrap:anywhere}
+#ss-roster .ss-who button,#ss-roster .ss-who .ss-n,
+#ss-roster .ss-who .ss-add{flex:none;align-self:center}
 
 `;
 
@@ -134,13 +162,18 @@ function student(row) {
   const facts = [row.age ? `${row.age}` : '', row.height_m ? `${row.height_m} m` : '',
                  row.mass_kg ? `${row.mass_kg} kg` : ''].filter(Boolean).join(' · ');
   return `<button type="button" class="ss-who${row.urgent ? ' ss-urgent' : ''}"
-      data-open="${esc(row.username)}">
+      data-open="${esc(row.username)}"
+      data-name="${esc((row.display_name || '').toLowerCase())}">
     <span class="ss-main">
       <b>${esc(row.display_name)}</b>
       <span class="ss-meta">${esc(facts || 'no measurements on file')}</span>
       <span class="ss-flags">${flags}${due}</span>
     </span>
     <span class="ss-n">${row.sessions ?? 0} class${row.sessions === 1 ? '' : 'es'}</span>
+    <span class="ss-add" role="button" tabindex="0"
+      data-drop="${esc(row.username)}"
+      title="Take them off your roster. They keep their record; you stop
+seeing anything new in it.">remove</span>
   </button>`;
 }
 
@@ -167,7 +200,43 @@ async function dialog(me, open) {
 
   const rows = host.querySelector('.ss-rows');
   const said = host.querySelector('.ss-said');
+  const mine = me?.acting?.username ?? '';
   let tab = 'roster';
+
+  const tell = (text, bad = false) => {
+    said.className = bad ? 'ss-said ss-bad' : 'ss-said';
+    said.textContent = text;
+  };
+
+  /**
+   * One search box and a couple of chips, wired the same way on both tabs.
+   *
+   * Filtering in the page rather than the server: these are the people at one
+   * studio, they are already here, and a round trip per keystroke to narrow
+   * twenty rows is a slower answer to a question already on screen.
+   */
+  const wireFilter = (root) => {
+    const find = root.querySelector('.ss-find');
+    let only = '';
+    const apply = () => {
+      const needle = (find?.value ?? '').trim().toLowerCase();
+      for (const row of root.querySelectorAll('[data-name]')) {
+        const matches = !needle || row.dataset.name.includes(needle);
+        const kind = only === 'urgent' ? row.classList.contains('ss-urgent')
+                   : only === 'spare' ? row.classList.contains('ss-spare')
+                   : true;
+        row.hidden = !(matches && kind);
+      }
+      for (const chip of root.querySelectorAll('[data-only]')) {
+        chip.setAttribute('aria-pressed', String(chip.dataset.only === only));
+      }
+    };
+    find?.addEventListener('input', apply);
+    for (const chip of root.querySelectorAll('[data-only]')) {
+      chip.addEventListener('click', () => { only = chip.dataset.only; apply(); });
+    }
+    apply();
+  };
 
   const openStudent = async (username) => {
     said.className = 'ss-said';
@@ -197,50 +266,83 @@ async function dialog(me, open) {
       if (tab === 'roster') {
         const { students } = await get('roster');
         rows.innerHTML = students.length
-          ? students.map(student).join('')
-          : `<p class="ss-none">Nobody on your roster yet. Open <b>Everyone here</b>
-             and add somebody — they get a request, and it is their yes that
-             lets you see their measurements. Being at the same studio is not
-             permission.</p>`;
+          ? `<div class="ss-tools">
+               <input class="ss-find" placeholder="Find a name…">
+               <button type="button" class="ss-chip" data-only="urgent">
+                 Needs attention</button>
+               <button type="button" class="ss-chip" data-only="">All
+                 <em>${students.length}</em></button>
+             </div>` + students.map(student).join('')
+          : `<p class="ss-none">Nobody on your roster yet. Open
+             <b>Everyone here</b> and press <b>Add all</b> — they go on
+             straight away.</p>`;
+        wireFilter(rows);
         for (const row of rows.querySelectorAll('[data-open]')) {
           row.addEventListener('click', () => openStudent(row.dataset.open));
         }
+        for (const drop of rows.querySelectorAll('[data-drop]')) {
+          drop.addEventListener('click', async (event) => {
+            event.stopPropagation();      // the row itself opens the student
+            try {
+              await post('roster/remove', { coach: mine, student: drop.dataset.drop });
+              tell('Removed.');
+              draw();
+            } catch (error) { tell(error.message, true); }
+          });
+        }
         return;
       }
-      const { people } = await get('directory');
-      rows.innerHTML = `<input class="ss-find" placeholder="Find a name…">`
-        + (people.length ? people.map((p) => `
-        <div class="ss-who" data-name="${esc(p.display_name.toLowerCase())}">
+
+      const { people, not_mine: spare } = await get('directory');
+      rows.innerHTML = people.length ? `
+        <div class="ss-tools">
+          <input class="ss-find" placeholder="Find a name…">
+          <button type="button" class="ss-chip" data-only="spare">Not yours
+            <em>${spare.length}</em></button>
+          <button type="button" class="ss-chip" data-only="">All
+            <em>${people.length}</em></button>
+          <button type="button" class="ss-all" data-addall
+            ${spare.length ? '' : 'disabled'}>Add all ${
+              spare.length ? `(${spare.length})` : ''}</button>
+        </div>` + people.map((p) => `
+        <div class="ss-who${p.mine ? '' : ' ss-spare'}"
+             data-name="${esc(p.display_name.toLowerCase())}">
           <span class="ss-main"><b>${esc(p.display_name)}</b>
             <span class="ss-meta">${p.mine ? 'on your roster'
-              : p.state === 'pending' ? 'waiting for their answer'
-              : 'not yours'}</span></span>
-          <button type="button" class="ss-add" data-add="${esc(p.username)}"
-            ${p.mine || p.state === 'pending' ? 'disabled' : ''}>${
-              p.mine ? 'yours' : p.state === 'pending' ? 'asked' : 'ask'}</button>
+                                           : 'not on your roster'}</span></span>
+          ${p.mine
+            ? `<button type="button" class="ss-add" data-drop="${esc(p.username)}"
+                 >remove</button>`
+            : `<button type="button" class="ss-add" data-add="${esc(p.username)}"
+                 >add</button>`}
         </div>`).join('')
-        : `<p class="ss-none">No students at this studio yet.</p>`);
+        : `<p class="ss-none">No students at this studio yet.</p>`;
 
-      const find = rows.querySelector('.ss-find');
-      find?.addEventListener('input', () => {
-        const needle = find.value.trim().toLowerCase();
-        for (const row of rows.querySelectorAll('[data-name]')) {
-          row.hidden = needle && !row.dataset.name.includes(needle);
+      wireFilter(rows);
+      const addThese = async (names, button) => {
+        if (button) button.disabled = true;
+        try {
+          const out = await post('roster/add', { students: names });
+          tell(out.message);
+          draw();
+        } catch (error) {
+          tell(error.message, true);
+          if (button) button.disabled = false;
         }
-      });
+      };
+      rows.querySelector('[data-addall]')?.addEventListener('click',
+        (event) => addThese(spare, event.currentTarget));
       for (const add of rows.querySelectorAll('[data-add]')) {
-        add.addEventListener('click', async () => {
-          add.disabled = true;
+        add.addEventListener('click',
+          (event) => addThese([add.dataset.add], event.currentTarget));
+      }
+      for (const drop of rows.querySelectorAll('[data-drop]')) {
+        drop.addEventListener('click', async () => {
           try {
-            await post('roster/add', { student: add.dataset.add });
-            add.textContent = 'asked';
-            said.className = 'ss-said';
-            said.textContent = 'Asked. They decide.';
-          } catch (error) {
-            said.className = 'ss-said ss-bad';
-            said.textContent = error.message;
-            add.disabled = false;
-          }
+            await post('roster/remove', { coach: mine, student: drop.dataset.drop });
+            tell('Removed.');
+            draw();
+          } catch (error) { tell(error.message, true); }
         });
       }
     } catch (error) {
@@ -261,55 +363,87 @@ async function dialog(me, open) {
 }
 
 /**
- * A coach has asked to work with you. Shown to the student, because consent is
- * theirs to give and a request that sits in a menu is a request nobody answers.
+ * Who can open my record, and a button to stop them.
+ *
+ * The student's half of the design, and the reason adding a student can be
+ * immediate. There used to be a prompt here instead -- a coach has asked, do
+ * you accept -- and a prompt is the weaker thing: it arrives once, at a moment
+ * nobody is thinking about it, and after that there is nowhere to go and look.
+ * This is always here, always current, and one press wide.
  */
-export function requests(me, onAnswer) {
-  const waiting = (me.my_coaches ?? []).filter((a) => a.state === 'pending');
-  if (!waiting.length) return null;
+export function coaches(me) {
   const style = document.createElement('style');
   style.textContent = CSS;
   document.head.appendChild(style);
 
+  const button = document.createElement('button');
+  button.id = 'ss-mine-open';
+  button.type = 'button';
+  button.innerHTML = '<i>Who sees my record</i>';
+  button.title = 'The coaches who can open your measurements, and how to '
+               + 'stop them';
+  button.addEventListener('click', () => panel());
+
+  const bar = document.getElementById('topbar');
+  const chips = document.getElementById('discBar');
+  if (bar && chips) bar.insertBefore(button, chips);
+  else document.body.appendChild(button);
+  return button;
+}
+
+async function panel() {
   const host = document.createElement('div');
   host.id = 'ss-roster';
   host.innerHTML = `<div class="ss-box">
-    <h2>${waiting.length === 1 ? 'A coach has asked to work with you'
-                               : 'Coaches have asked to work with you'}</h2>
-    <p class="ss-sub">Saying yes lets them see your measurements, the safety flags
-      from your health screening, and your phone number — and write cues and
-      goals onto your record. You can take it back at any time.</p>
-    <div class="ss-rows">${waiting.map((a) => `
-      <div class="ss-who"><span class="ss-main"><b>${esc(a.coach)}</b>
-        <span class="ss-meta">at ${esc(a.studio)}</span></span>
-        <button type="button" class="ss-add" data-yes="${esc(a.coach)}">Yes</button>
-        <button type="button" class="ss-add" data-no="${esc(a.coach)}">Not now</button>
-      </div>`).join('')}</div>
-    <div class="ss-go"><button type="button" data-close>Decide later</button>
+    <h2>Who can see my record</h2>
+    <p class="ss-sub">These coaches can open your measurements and the safety
+      flags from your health screening, and write cues and goals onto your
+      record. Every time one of them opens it, it is in your log. Take anybody
+      out and they stop seeing anything recorded from that moment.</p>
+    <div class="ss-rows">Reading…</div>
+    <div class="ss-go"><button type="button" data-close>Close</button>
       <span class="ss-said"></span></div>
   </div>`;
   document.body.appendChild(host);
-  const said = host.querySelector('.ss-said');
   const shut = () => host.remove();
   host.querySelector('[data-close]').addEventListener('click', shut);
+  host.addEventListener('click', (e) => { if (e.target === host) shut(); });
 
-  const answer = async (coach, accept) => {
-    said.className = 'ss-said';
-    said.textContent = 'Saving…';
+  const rows = host.querySelector('.ss-rows');
+  const said = host.querySelector('.ss-said');
+  const draw = async () => {
+    rows.innerHTML = 'Reading…';
     try {
-      await post('roster/answer', { coach, accept });
-      shut();
-      onAnswer?.();
+      const { coaches: mine } = await get('me/coaches');
+      rows.innerHTML = mine.length ? mine.map((c) => `
+        <div class="ss-who"><span class="ss-main">
+          <b>${esc(c.display_name)}</b>
+          <span class="ss-meta">at ${esc(c.studio)} · since ${esc(c.since)}
+            · sees ${esc((c.sees || []).join(', ') || 'nothing')}</span>
+        </span>
+        <button type="button" class="ss-add" data-drop="${esc(c.username)}"
+          >remove</button></div>`).join('')
+        : `<p class="ss-none">Nobody. No coach can open your record —
+           only you and an admin of your studio can.</p>`;
+      for (const drop of rows.querySelectorAll('[data-drop]')) {
+        drop.addEventListener('click', async () => {
+          drop.disabled = true;
+          try {
+            const out = await post('roster/remove', { coach: drop.dataset.drop });
+            said.className = 'ss-said';
+            said.textContent = out.message;
+            draw();
+          } catch (error) {
+            said.className = 'ss-said ss-bad';
+            said.textContent = error.message;
+            drop.disabled = false;
+          }
+        });
+      }
     } catch (error) {
-      said.className = 'ss-said ss-bad';
-      said.textContent = error.message;
+      rows.innerHTML = `<p class="ss-none">${esc(error.message)}</p>`;
     }
   };
-  for (const yes of host.querySelectorAll('[data-yes]')) {
-    yes.addEventListener('click', () => answer(yes.dataset.yes, true));
-  }
-  for (const no of host.querySelectorAll('[data-no]')) {
-    no.addEventListener('click', () => answer(no.dataset.no, false));
-  }
+  draw();
   return host;
 }

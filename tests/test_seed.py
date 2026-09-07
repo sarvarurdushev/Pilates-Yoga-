@@ -96,10 +96,14 @@ class TestTheStatesSomebodyNeedsToSee:
         printed = " ".join(screening.flags()).lower()
         assert "seeded" not in printed and "history" not in printed
 
-    def test_an_assignment_is_still_waiting_on_the_student(self, sown):
-        """So that signing in as them shows the consent prompt straight away."""
-        asked = [a for a in sown.assignments(student="oh_seah_example_com")]
-        assert asked and asked[0].state == PENDING and not asked[0].live
+    def test_somebody_is_left_for_the_coach_to_add(self, sown):
+        """Oh Se-ah is on nobody's roster on purpose, so there is somebody in
+        the directory to practise Add on."""
+        assert sown.assignments(student="oh_seah_example_com") == []
+
+    def test_every_assignment_that_exists_is_live(self, sown):
+        """Adding is immediate; there is no half-made assignment any more."""
+        assert all(a.live for a in sown.assignments())
 
     def test_the_live_assignments_are_live(self, sown):
         live = [a for a in sown.assignments(coach="park_minseok_example_com")

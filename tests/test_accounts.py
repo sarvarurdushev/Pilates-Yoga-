@@ -278,11 +278,18 @@ class TestReadingAndWritingMeasurements:
                            state=LEFT, until=today())
         assert not may_read_measurements(self._coach(), "student", ended)
 
-    def test_a_pending_request_grants_nothing(self):
-        """A coach asking is not a student agreeing."""
-        asked = Assignment(coach="coach", student="student", studio="gangnam",
-                           state=PENDING)
-        assert not may_read_measurements(self._coach(), "student", asked)
+    def test_no_assignment_at_all_grants_nothing(self):
+        """Being at the same studio is not permission -- being on somebody's
+        roster is, and that is a row that has to exist."""
+        assert not may_read_measurements(self._coach(), "student", None)
+
+    def test_an_assignment_cannot_arrive_in_a_state_nobody_uses(self):
+        """Adding is immediate now, so there is no pending state to reason
+        about. One that turns up from somewhere is refused rather than
+        interpreted as half a permission."""
+        with pytest.raises(ValueError, match="not a state"):
+            Assignment(coach="coach", student="student", studio="gangnam",
+                       state=PENDING)
 
     def test_consent_narrowed_to_exclude_measurements_stops_reading(self):
         narrow = self._live(scopes=(SEE_FLAGS,))

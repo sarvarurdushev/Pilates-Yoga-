@@ -211,37 +211,27 @@ def pending(store, studio: str = "") -> list[dict]:
     return sorted(out, key=lambda row: row["since"])
 
 
-def ask_to_coach(store, coach: str, student: str, studio: str,
-                 by: str = "") -> "object":
-    """A coach asking a student for permission, which is what an add really is.
+def assign(store, coach: str, student: str, studio: str, by: str = "",
+           scopes: tuple = ()) -> "object":
+    """Put a student on a coach's roster. Immediately.
 
-    The row is created pending. Until the student accepts it, the coach can see
-    the name they already saw in the directory and nothing more.
-    """
-    from .accounts import Assignment
+    There used to be a round trip here -- the coach asked, the student accepted,
+    and until then nothing happened -- and it was wrong for the thing this is.
+    Nobody joins a gym and then negotiates with each instructor separately: the
+    studio assigns the coach, and joining the studio was the consent. Making a
+    coach wait to put their own class on their own roster protected nobody and
+    stopped everybody.
 
-    assignment = Assignment(coach=coach, student=student, studio=studio,
-                            state=PENDING, asked_by=by or coach, since=today())
-    store.put_assignment(assignment)
-    store.record_audit(actor=by or coach, action="assignment:asked",
-                       subject=student, studio=studio, detail=coach)
-    return assignment
-
-
-def accept_coach(store, coach: str, student: str, studio: str, by: str,
-                 scopes: tuple = ()) -> "object":
-    """The student saying yes. This, and only this, is consent.
-
-    An admin may do it on their behalf -- a studio assigning a coach on paper is
-    a real thing -- and it is audited as having been done by the admin, which is
-    the point of recording who.
+    The student's control is real and it comes after: they can see who can open
+    their record, revoke any of them in one click, and read every time it was
+    opened. That is worth more than a prompt nobody answers.
     """
     from .accounts import DEFAULT_SCOPES, Assignment
 
     assignment = Assignment(coach=coach, student=student, studio=studio,
                             state=ACTIVE, scopes=scopes or DEFAULT_SCOPES,
-                            since=today(), asked_by=coach)
+                            since=today(), asked_by=by or coach)
     store.put_assignment(assignment)
-    store.record_audit(actor=by, action="assignment:accepted", subject=student,
-                       studio=studio, detail=coach)
+    store.record_audit(actor=by or coach, action="assignment:made",
+                       subject=student, studio=studio, detail=coach)
     return assignment

@@ -7,10 +7,16 @@ what they may ask for. Every function here takes the store and a
 ``(status, payload)``.
 
 The rule the whole thing is built on, stated once more because it is the thing
-that must not rot: **being at the same studio is not permission.** A coach may
-open a student's record when there is a live assignment the student accepted,
-and not otherwise. Admin is the exception, and every exception it takes is
-written to the audit log.
+that must not rot: **being at the same studio is not permission -- being on
+somebody's roster is.** A coach may open a student's record when there is a live
+assignment between them, and not otherwise. Admin is the exception, and every
+exception it takes is written to the audit log.
+
+Making that assignment is one press and takes effect at once. It used to need
+the student to accept, and that was a misreading of what this is: a studio
+assigns coaches, and joining the studio was the consent. The student's control
+comes after and is the stronger half -- they see who can open their record,
+revoke any of them in a click, and read every time it was opened.
 """
 from __future__ import annotations
 
@@ -18,7 +24,7 @@ from .accounts import (ACTIVE, ADMIN, COACH, PARQ, PENDING, REQUESTABLE, ROLES,
                        SCOPES, STUDENT, Profile, Screening, Viewer,
                        may_read_measurements, may_write_about, today,
                        visible_person)
-from .onboarding import (accept_coach, approve, ask_to_coach, grant, invite,
+from .onboarding import (approve, assign, grant, invite,
                          pending, sign_up)
 
 
@@ -224,10 +230,12 @@ def directory(store, viewer: Viewer | None) -> dict:
         assignment = mine.get(membership.username)
         rows.append({"username": account.username,
                      "display_name": account.display_name,
-                     "state": assignment.state if assignment else "",
                      "mine": bool(assignment and assignment.live)})
-    return {"studio": person.studio, "people": sorted(
-        rows, key=lambda r: r["display_name"].lower())}
+    rows.sort(key=lambda r: r["display_name"].lower())
+    return {"studio": person.studio, "people": rows,
+            # So the page can say "add the other nine" rather than making
+            # somebody count them.
+            "not_mine": [r["username"] for r in rows if not r["mine"]]}
 
 
 def roster(store, viewer: Viewer | None) -> dict:
@@ -272,61 +280,78 @@ def roster(store, viewer: Viewer | None) -> dict:
 
 
 def add_student(store, viewer: Viewer | None, payload: dict) -> dict:
-    """A coach asking; or an admin deciding.
+    """Put one student, or a whole list of them, on a coach's roster. Now.
 
-    A coach's add is a *request*: pending until the student says yes, and until
-    then the coach can see the name they already saw in the directory and
-    nothing more. An admin's add is an assignment, and the student is told
-    rather than asked -- a studio putting a client with an instructor is a real
-    thing, and pretending otherwise would just push it outside the system.
+    Takes ``student`` or ``students``, because "add all of them" is one press
+    and one request rather than twenty of each. Names that do not exist are
+    reported back rather than failing the lot: a bulk add that refuses
+    everything because one row is stale is a bulk add nobody uses twice.
     """
     person = _need_coach(viewer)
-    student = payload.get("student", "")
+    wanted = payload.get("students") or (
+        [payload["student"]] if payload.get("student") else [])
+    if not wanted:
+        raise Refused("which student?", 400)
     coach = payload.get("coach") or person.username
     if coach != person.username and not person.can_administer:
         raise Refused("you can only add students to your own roster", 403)
-    if store.account(student) is None:
-        raise Refused(f"nobody here is called {student!r}", 404)
-    if person.can_administer:
-        assignment = accept_coach(store, coach, student, person.studio,
-                                  by=person.username)
-    else:
-        assignment = ask_to_coach(store, coach, student, person.studio,
-                                  by=person.username)
-    return assignment.to_dict()
 
-
-def answer_request(store, viewer: Viewer | None, payload: dict) -> dict:
-    """The student saying yes or no. This, and only this, is consent."""
-    person = _need(viewer)
-    coach = payload.get("coach", "")
-    found = store.assignment_between(coach, person.username, person.studio)
-    if found is None:
-        raise Refused("there is no request from that coach", 404)
-    if payload.get("accept"):
-        scopes = tuple(payload.get("scopes") or ())
-        assignment = accept_coach(store, coach, person.username, person.studio,
-                                  by=person.username, scopes=scopes)
-        return assignment.to_dict()
-    store.end_assignment(coach, person.username, person.studio,
-                         by=person.username)
-    return {"coach": coach, "student": person.username, "live": False}
+    added, missing = [], []
+    for student in wanted:
+        if student == coach or store.account(student) is None:
+            missing.append(student)
+            continue
+        assign(store, coach, student, person.studio, by=person.username)
+        added.append(student)
+    return {"added": added, "missing": missing, "coach": coach,
+            "message": f"{len(added)} on the roster"
+                       + (f", {len(missing)} not found" if missing else "")}
 
 
 def end_assignment(store, viewer: Viewer | None, payload: dict) -> dict:
     """Either side can end it, and an admin can end anybody's.
 
+    This is the half of consent that does the work now that adding is
+    immediate: a student who does not want a coach in their record takes them
+    out of it in one press, and the coach cannot read a measurement recorded
+    after that moment.
+
     The notes stay. They are the studio's record of care and the research on
-    clinical notes is unambiguous that they are kept -- but no new measurement
-    is readable from the moment consent ends.
+    clinical notes is unambiguous that they are kept.
     """
     person = _need(viewer)
     coach = payload.get("coach", "")
-    student = payload.get("student", "")
+    student = payload.get("student", "") or (
+        person.username if coach else "")
+    if not coach or not student:
+        raise Refused("which coach, and which student?", 400)
     if not person.can_administer and person.username not in (coach, student):
         raise Refused("that is not yours to end", 403)
     store.end_assignment(coach, student, person.studio, by=person.username)
-    return {"coach": coach, "student": student, "live": False}
+    return {"coach": coach, "student": student, "live": False,
+            "message": "Removed. Nothing recorded from now on is readable "
+                       "by them."}
+
+
+def my_coaches(store, viewer: Viewer | None) -> dict:
+    """Who can open my record, and since when.
+
+    The student's half of the design, and the reason adding can be immediate:
+    the control is here, visible, and one press wide.
+    """
+    person = _need(viewer)
+    rows = []
+    for assignment in store.assignments(student=person.username):
+        if not assignment.live:
+            continue
+        account = store.account(assignment.coach)
+        rows.append({"username": assignment.coach,
+                     "display_name": account.display_name if account
+                                     else assignment.coach,
+                     "studio": assignment.studio,
+                     "since": assignment.since,
+                     "sees": list(assignment.scopes)})
+    return {"coaches": rows}
 
 
 def student_record(store, viewer: Viewer | None, username: str) -> dict:

@@ -74,22 +74,24 @@ both sound powerful, so somebody hands out Admin to be safe.*
 | Record a class / upload a clip | ✅ own | ✅ any assigned student | ✅ |
 | See the roster of students **assigned to them** | — | ✅ | ✅ |
 | See the studio directory (names only) | — | ✅ | ✅ |
-| Open an assigned student's record | — | ✅ with consent | ✅ |
+| Open a student on their roster | — | ✅ | ✅ |
 | Write feedback, cues, contraindications, goals | — | ✅ assigned only | ✅ |
 | Read a health screening | — | ✅ flags only | ✅ full |
 | Approve a role request | — | — | ✅ |
 | Grant admin | — | — | ✅ |
 | Create a studio | — | — | ✅ |
-| Assign a coach to a student | — | request | ✅ |
+| Add a student to their own roster | — | ✅ | ✅ |
+| Add a student to somebody else's roster | — | — | ✅ |
+| Remove a coach from their own record | ✅ | ✅ | ✅ |
 | See every studio | — | — | ✅ |
 | Erase a person | — | — | ✅ |
 | Read the audit log | own | own actions | ✅ |
 
 Two lines in that table are the ones that matter:
 
-**"Open an assigned student's record — with consent."** Same building is not
-permission. A studio with two coaches is the first place the naive rule leaks,
-and health data is the worst thing to leak.
+**"Open a student on their roster."** Same building is not permission — the
+assignment is. A studio with two coaches is the first place the naive rule
+leaks, and health data is the worst thing to leak.
 
 **"Read a health screening — flags only."** A coach needs to know *"left knee,
 no deep flexion"* and *"cleared by physician"*. They do not need the diagnosis,
@@ -166,18 +168,35 @@ The flow, in the order it happens:
    invitation with the studio already fixed.
 3. **The coach opens the directory** — everybody at their studio, names and
    nothing else. Not a record, a phone book.
-4. **The coach adds a student** from that directory. That creates an
-   *assignment request*.
-5. **The student accepts** — one tap, and it is also the consent: *"Sam may see
-   my measurements and screening flags at Gangnam Pilates."* An admin can
-   assign directly, and the student is told rather than asked.
-6. **From then on** that student is on the coach's roster, and the coach can
+4. **The coach adds them.** One press, or **Add all** for the room, and it takes
+   effect immediately.
+5. **From then on** that student is on the coach's roster, and the coach can
    open the record, read the flags, write cues and goals, and watch the line
    move.
-7. **Either side can end it.** The student revokes; the coach removes; the admin
+6. **Either side can end it.** The student opens *Who sees my record* and
+   removes anybody; the coach removes from their own roster; the admin
    reassigns. The notes stay — they are the studio's record of care, and the
    research on clinical notes is unambiguous that they are kept — but the coach
-   loses the ability to read new measurements the moment consent ends.
+   cannot read anything recorded after that moment.
+
+### Why adding is immediate, when it used to need consent
+
+Step 4 used to be a *request*, and nothing happened until the student accepted
+it. That was a misreading of what this is. Nobody joins a gym and then
+negotiates with each instructor separately: the studio assigns the coach, and
+joining the studio was the consent. What the round trip actually produced was a
+coach who could not put their own class on their own roster without waiting for
+twelve people to log in, and a screen full of *waiting for their answer*.
+
+The protection did not go anywhere; it moved to where it works. A prompt arrives
+once, at a moment nobody is thinking about it, and afterwards there is nowhere
+to go and look. **Who sees my record** is always there, always current, lists
+exactly who can open the record and what they can see, and removes any of them
+in one press — and every read is in the student's own log either way. Control
+you can exercise beats a question you clicked through.
+
+What did not change: a coach with no assignment sees a name and nothing else,
+and being in the same building still grants nothing.
 
 A student can have more than one coach. A coach has many students. Both are
 scoped to a studio, and the assignment carries dates, so *"who was coaching them
@@ -214,10 +233,10 @@ that changes.
 
 ## Privacy rules, stated once
 
-1. **Health data is not shared by default.** Not by location, not by role. Only
-   by an assignment the student accepted.
-2. **Consent is revocable and dated.** Revoking is one tap and takes effect
-   immediately for future reads.
+1. **Health data is not shared by location or by role.** Only by an assignment
+   between one coach and one student, at one studio.
+2. **Revoking is one press and takes effect immediately** for future reads, from
+   either side, and the student can always see the whole list of who has it.
 3. **Minimum necessary.** A coach sees screening *flags*, not the medical
    record. An admin sees the record because somebody has to, and every read is
    logged.

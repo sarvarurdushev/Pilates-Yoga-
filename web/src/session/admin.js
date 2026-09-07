@@ -76,6 +76,18 @@ const CSS = `
   border-radius:3px;font:inherit;font-size:13px;background:var(--glass);
   border:1px solid var(--line);color:var(--txt)}
 #ss-admin .ss-invite input{flex:1}
+#ss-admin .ss-tools{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 11px;
+  align-items:center}
+#ss-admin input.ss-find{flex:1 1 180px;min-width:140px;padding:8px 10px;
+  border-radius:3px;font:inherit;font-size:13px;background:var(--glass);
+  border:1px solid var(--line);color:var(--txt)}
+#ss-admin .ss-chip{flex:none;padding:7px 11px;border-radius:3px;cursor:pointer;
+  font:inherit;font-size:11.5px;background:var(--glass);
+  border:1px solid var(--line);color:var(--dim)}
+#ss-admin .ss-chip:hover{color:var(--txt);border-color:var(--line2)}
+#ss-admin .ss-chip[aria-pressed=true]{border-color:var(--acc);color:var(--txt);
+  background:rgba(90,169,230,.12)}
+#ss-admin .ss-chip em{font-style:normal;margin-left:5px;color:var(--dim2)}
 #ss-admin .ss-fill{flex:1;font-size:11.5px;color:var(--dim2);line-height:1.55;
   align-self:center}
 /* Flex arithmetic that has to be spelled out. Without flex:none on the
@@ -86,6 +98,46 @@ const CSS = `
 #ss-admin .ss-row .ss-tag,#ss-admin .ss-row button{flex:none}
 
 `;
+
+/** Whether somebody holds a role, and whether anything about them needs eyes. */
+const has = (person, role) => (person.memberships ?? [])
+  .some((m) => m.role === role && m.state === 'active');
+
+const flagged = (person) => {
+  const flags = person.screening?.flags ?? [];
+  return !person.screening
+      || flags.some((f) => /not screened|doctor|heart|supervision/i.test(f));
+};
+
+/**
+ * One search box and a row of role chips, filtering in the page.
+ *
+ * These are the people at one studio; they are already on screen. A round trip
+ * per keystroke to narrow twenty rows is a slower answer to a question that has
+ * already been answered.
+ */
+function wireFilter(root) {
+  const find = root.querySelector('.ss-find');
+  let only = '';
+  const apply = () => {
+    const needle = (find?.value ?? '').trim().toLowerCase();
+    for (const row of root.querySelectorAll('[data-name]')) {
+      const matches = !needle || row.dataset.name.includes(needle);
+      const kind = !only
+        || (only === 'flagged' ? row.dataset.flagged
+                               : row.dataset.roles.split(' ').includes(only));
+      row.hidden = !(matches && kind);
+    }
+    for (const chip of root.querySelectorAll('[data-only]')) {
+      chip.setAttribute('aria-pressed', String(chip.dataset.only === only));
+    }
+  };
+  find?.addEventListener('input', apply);
+  for (const chip of root.querySelectorAll('[data-only]')) {
+    chip.addEventListener('click', () => { only = chip.dataset.only; apply(); });
+  }
+  apply();
+}
 
 const get = async (path) => {
   const response = await fetch(path, { credentials: 'same-origin' });
@@ -228,6 +280,19 @@ async function dialog(me) {
           measurements — so there is something to click.</span>
         <button type="button" class="ss-act" data-seed>Add demo people</button>
       </div>
+      <div class="ss-tools">
+        <input class="ss-find" placeholder="Find a name or email…">
+        <button type="button" class="ss-chip" data-only="admin">Admins
+          <em>${people.filter((p) => has(p, 'admin')).length}</em></button>
+        <button type="button" class="ss-chip" data-only="coach">Coaches
+          <em>${people.filter((p) => has(p, 'coach')).length}</em></button>
+        <button type="button" class="ss-chip" data-only="student">Students
+          <em>${people.filter((p) => has(p, 'student')).length}</em></button>
+        <button type="button" class="ss-chip" data-only="flagged">Flagged
+          <em>${people.filter(flagged).length}</em></button>
+        <button type="button" class="ss-chip" data-only="">All
+          <em>${people.length}</em></button>
+      </div>
       ${people.map((person) => {
         const roles = (person.memberships ?? [])
           .filter((m) => m.state === 'active')
@@ -236,7 +301,12 @@ async function dialog(me) {
         const facts = [person.age && `${person.age}`, person.phone,
                        (person.screening?.flags ?? []).join(', ')]
           .filter(Boolean).join(' · ');
-        return `<div class="ss-row">
+        return `<div class="ss-row" data-roles="${
+            (person.memberships ?? []).filter((m) => m.state === 'active')
+              .map((m) => m.role).join(' ')}"
+            data-flagged="${flagged(person) ? '1' : ''}"
+            data-name="${esc(`${person.display_name} ${person.email ?? ''}`
+                             .toLowerCase())}">
           <span class="ss-main"><b>${esc(person.display_name)}</b>
             <span class="ss-meta">${esc(person.email ?? '')}${
               facts ? ` · ${esc(facts)}` : ''}</span></span>
@@ -251,6 +321,7 @@ async function dialog(me) {
         </div>`;
       }).join('')}`;
 
+    wireFilter(rows);
     for (const make of rows.querySelectorAll('[data-make]')) {
       make.addEventListener('click', async () => {
         const role = make.dataset.role;

@@ -1209,15 +1209,26 @@ one is made from the command line.
 
 The naive rule — *a coach sees the students at their studio* — leaks the first
 time a studio has two coaches, and health data is the worst thing to leak. So a
-coach sees a **directory** (names, nothing else), adds somebody from it, and
-that is a *request*. The student accepting is what creates the consent, it is
-dated and revocable, and it is what a read is checked against:
+coach sees a **directory** (names, nothing else) and adds from it: one press, or
+**Add all** for the room, and it takes effect at once.
+
+Adding used to be a *request* the student had to accept, and that was a
+misreading of what this is — nobody joins a gym and then negotiates with each
+instructor separately. What it produced was a coach who could not put their own
+class on their own roster without waiting for twelve people to log in. The
+protection moved rather than went: **Who sees my record** is always on the
+student's screen, lists exactly who can open it and what they see, and removes
+any of them in one press. Control you can exercise beats a question you clicked
+through, and every read is in the student's log either way.
+
+The assignment is dated and revocable from either side, and it is what a read is
+checked against:
 
 | Who | Sees |
 |---|---|
 | The person themselves | everything held about them |
 | An admin | everything, and every read is logged |
-| A coach, with a live assignment | name, age, height, weight, **screening flags**, contact — and the measurements |
+| A coach, with the student on their roster | name, age, height, weight, **screening flags**, contact — and the measurements |
 | A coach, without one | a name |
 
 "Screening flags" is the load-bearing distinction. A coach is told *left knee,

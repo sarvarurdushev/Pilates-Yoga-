@@ -151,14 +151,13 @@ PEOPLE = (
            1.74, 80, roles=(("haeundae", STUDENT),), flags=(), classes=2),
 )
 
-#: coach handle -> (student handles that accepted, student handles still asked)
+#: coach handle -> the students on their roster. Oh Se-ah is deliberately on
+#: nobody's, so there is somebody left in the directory to practise adding.
 ROSTERS = {
-    "park.minseok": (("kim.minji", "lee.joonho", "choi.seoyeon"), ()),
-    # One live and one still waiting on the student, so the consent prompt has
-    # something to show the first time somebody signs in as them.
-    "yoon.chaewon": (("jung.haeun", "han.doyun"), ("oh.seah",)),
-    "lim.hajun": (("shin.yerin", "moon.jaehyun"), ()),
-    "bae.soojin": (("song.arin", "yang.dowon"), ()),
+    "park.minseok": ("kim.minji", "lee.joonho", "choi.seoyeon"),
+    "yoon.chaewon": ("jung.haeun", "han.doyun"),
+    "lim.hajun": ("shin.yerin", "moon.jaehyun"),
+    "bae.soojin": ("song.arin", "yang.dowon"),
 }
 
 #: What a coach actually writes: cues in the student's own words, what to avoid,
@@ -312,7 +311,7 @@ def sow(store, password: str = PASSWORD, classes: bool = True,
 
     handles = {person.handle: username for person, username in made["people"]}
 
-    for coach_handle, (accepted, asked) in ROSTERS.items():
+    for coach_handle, students in ROSTERS.items():
         coach = handles[coach_handle]
         person = next(p for p in PEOPLE if p.handle == coach_handle)
         # The studio they coach at, found by the role rather than by position:
@@ -320,17 +319,12 @@ def sow(store, password: str = PASSWORD, classes: bool = True,
         # first membership would have put her students at the wrong place.
         studio = next(studio_key for studio_key, role
                       in _roles_for(person, into) if role == COACH)
-        for student_handle in accepted:
+        for student_handle in students:
             store.put_assignment(Assignment(
                 coach=coach, student=handles[student_handle], studio=studio,
                 state=ACTIVE, since=str(date.today() - timedelta(days=60)),
                 asked_by=coach))
             made["assignments"] += 1
-        for student_handle in asked:
-            store.put_assignment(Assignment(
-                coach=coach, student=handles[student_handle], studio=studio,
-                state=PENDING, since=str(date.today() - timedelta(days=2)),
-                asked_by=coach))
 
     if classes:
         made["sessions"] = _record_classes(store, made["people"])
@@ -406,8 +400,8 @@ def summary(made: dict, password: str = PASSWORD) -> str:
               "  2. Studio → Waiting: Kang Tae-yang has asked to be a coach.",
               "  3. Sign in as park.minseok@example.com — three students, and",
               "     Choi Seo-yeon is red because nobody has screened her.",
-              "  4. Sign in as oh.seah@example.com — Yoon Chae-won has asked to",
-              "     coach her, and the consent prompt is waiting.",
+              "  4. As a coach, open My students → Everyone here. Oh Se-ah is",
+              "     on nobody's roster; Add all puts the lot on yours at once.",
               "  5. Sign in as kim.minji@example.com — twelve weeks of",
               "     measurements, a knee flag and an overdue goal.",
               "  6. Sign in as seo.jiwoo@example.com — two roles at once; the",
