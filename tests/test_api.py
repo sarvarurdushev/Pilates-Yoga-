@@ -608,30 +608,28 @@ class TestTheRosterSaysWhatToReadFirst:
         assert order[0] == "Ben"  # never screened
 
 
-    def test_what_to_work_on_is_on_the_roster_not_two_clicks_inside_it(
+    def test_what_was_written_shows_on_the_roster_not_two_clicks_inside_it(
             self, studio):
-        """An evaluation nobody reads before the class changes nothing about
-        the class."""
+        """A reading nobody sees before the class changes nothing about it."""
         base, names, _ = studio
         coach, _ = self._assign(base, names)
-        coach.post("/evaluate", {
-            "username": names["ann"],
-            "scores": {"breathing": 4, "pelvic": 4, "ribcage": 2,
-                       "scapular": 4, "cervical": 5},
-            "plan": "Wall roll-downs before the mat work"})
+        coach.post("/evaluate-structure", {
+            "username": names["ann"], "structure": "psoas major",
+            "kind": "muscle", "note": "wall roll-downs before the mat work",
+            "checks": [{"label": "how much work", "verdict": "problem"}]})
         row = coach.get("/roster")[1]["students"][0]
-        assert row["focus"] == "Rib cage placement"
-        assert row["evaluations"] == 1
-        assert row["plan"] == "Wall roll-downs before the mat work"
+        assert row["focus"] == "psoas major: how much work — a problem"
+        assert row["readings"] == 1
+        assert row["note"] == "wall roll-downs before the mat work"
 
-    def test_never_scored_is_a_thing_to_see_not_an_absence(self, studio):
+    def test_nothing_written_is_a_thing_to_see_not_an_absence(self, studio):
         base, names, _ = studio
         coach, _ = self._assign(base, names)
         row = coach.get("/roster")[1]["students"][0]
-        assert row["evaluations"] == 0 and row["focus"] == ""
+        assert row["readings"] == 0 and row["focus"] == ""
 
-    def test_somebody_never_scored_sorts_above_somebody_scored(self, studio):
-        """It is the one row where the coach has nothing at all to go on."""
+    def test_a_nerve_problem_outranks_everything_else_on_the_list(self, studio):
+        """The one thing on this screen allowed to jump the queue."""
         base, names, _ = studio
         coach, ann = self._assign(base, names)
         ann.post("/me/screening", {"answers": {k: False for k in PARQ}})
@@ -639,14 +637,31 @@ class TestTheRosterSaysWhatToReadFirst:
         ben = Client(base)
         ben.sign_in("ben@b.co")
         ben.post("/me/screening", {"answers": {k: False for k in PARQ}})
-        coach.post("/evaluate", {"username": names["ben"],
-                                 "scores": {"breathing": 3}})
+        coach.post("/evaluate-structure", {
+            "username": names["ann"], "structure": "sciatic nerve",
+            "kind": "nerve",
+            "checks": [{"label": "how long it lasted", "verdict": "problem"}]})
+        order = [s["display_name"] for s in coach.get("/roster")[1]["students"]]
+        assert order[0] == "Ann"
+
+    def test_somebody_never_read_sorts_above_somebody_read(self, studio):
+        """It is the row where the coach has nothing at all to go on."""
+        base, names, _ = studio
+        coach, ann = self._assign(base, names)
+        ann.post("/me/screening", {"answers": {k: False for k in PARQ}})
+        coach.post("/roster/add", {"student": names["ben"]})
+        ben = Client(base)
+        ben.sign_in("ben@b.co")
+        ben.post("/me/screening", {"answers": {k: False for k in PARQ}})
+        coach.post("/evaluate-structure", {
+            "username": names["ben"], "structure": "psoas major",
+            "kind": "muscle", "note": "fine"})
         order = [s["display_name"] for s in coach.get("/roster")[1]["students"]]
         assert order.index("Ann") < order.index("Ben")
 
 
-class TestEvaluatingWhateverIsOnTheScreen:
-    """The form is a function of what was clicked, over the wire as well."""
+class TestReadingWhateverIsOnTheScreen:
+    """The coach writes the checks; this end validates almost nothing."""
 
     def _coach(self, base, names):
         coach = Client(base)
@@ -654,30 +669,25 @@ class TestEvaluatingWhateverIsOnTheScreen:
         coach.post("/roster/add", {"student": names["ann"]})
         return coach
 
-    def test_the_axes_change_with_the_kind(self, studio):
+    def test_the_starting_points_differ_by_kind(self, studio):
         base, names, _ = studio
         coach = self._coach(base, names)
         muscle = coach.get(f"/structure?username={names['ann']}"
                            "&structure=psoas+major&kind=muscle")[1]
         bone = coach.get(f"/structure?username={names['ann']}"
                          "&structure=atlas&kind=bone")[1]
-        assert [a["key"] for a in muscle["axes"]][0] == "recruitment"
-        assert [a["key"] for a in bone["axes"]][0] == "alignment"
-        assert muscle["axes"] != bone["axes"]
+        assert muscle["suggested"] and bone["suggested"]
+        assert muscle["suggested"] != bone["suggested"]
 
     def test_a_brain_region_is_refused_with_a_reason(self, studio):
         base, names, _ = studio
         coach = self._coach(base, names)
         status, out = coach.get(f"/structure?username={names['ann']}"
                                 "&structure=frontal+lobe&kind=brain")
-        assert status == 200
-        assert out["open"] is False and out["axes"] == []
-        assert "brain" in out["why"]
-        # And writing one is refused rather than quietly accepted.
+        assert status == 200 and out["open"] is False and "brain" in out["why"]
         assert coach.post("/evaluate-structure",
                           {"username": names["ann"], "structure": "frontal lobe",
-                           "kind": "brain",
-                           "fields": {"cue": "x"}})[0] == 400
+                           "kind": "brain", "note": "x"})[0] == 400
 
     def test_writing_one_and_reading_it_back(self, studio):
         base, names, _ = studio
@@ -685,44 +695,64 @@ class TestEvaluatingWhateverIsOnTheScreen:
         status, out = coach.post("/evaluate-structure", {
             "username": names["ann"], "structure": "psoas major",
             "kind": "muscle", "fma": "FMA18060",
-            "marks": {"recruitment": {"choice": "over",
-                                      "note": "doing the abdominals' job"},
-                      "timing": "early"},
-            "fields": {"substitutes": "hip flexors", "cue": "reach the heel away"}})
+            "note": "took over from the abdominals on every teaser",
+            "checks": [{"label": "how much work", "verdict": "problem",
+                        "note": "all of it"},
+                       {"label": "left against right", "verdict": "fine"}]})
         assert status == 200
-        assert out["evaluation"]["findings"] == ["recruitment: over-working",
-                                                 "timing: fires first"]
+        assert out["evaluation"]["flagged"] == ["how much work — a problem"]
         seen = coach.get(f"/structures-seen?username={names['ann']}")[1]
         assert [r["structure"] for r in seen["structures"]] == ["psoas major"]
 
-    def test_a_nerve_referral_is_flagged_urgent(self, studio):
+    def test_their_own_wording_comes_back_as_a_suggestion(self, studio):
+        """The second reading of a psoas is one press, not the same phrase
+        typed again."""
+        base, names, _ = studio
+        coach = self._coach(base, names)
+        coach.post("/evaluate-structure", {
+            "username": names["ann"], "structure": "psoas major",
+            "kind": "muscle",
+            "checks": [{"label": "does it let go at the bottom",
+                        "verdict": "watch"}]})
+        again = coach.get(f"/structure?username={names['ann']}"
+                          "&structure=psoas+major&kind=muscle")[1]
+        assert again["suggested"][0] == "does it let go at the bottom"
+        assert again["yours"] == 1
+
+    def test_a_nerve_called_a_problem_is_flagged(self, studio):
         base, names, _ = studio
         coach = self._coach(base, names)
         out = coach.post("/evaluate-structure", {
             "username": names["ann"], "structure": "sciatic nerve",
             "kind": "nerve",
-            "marks": {"symptom": "tingling", "settled": "persisted",
-                      "action": "referred"},
-            "fields": {"where": "back of the left thigh"}})[1]
+            "checks": [{"label": "how long it lasted", "verdict": "problem",
+                        "note": "still there when she left"}]})[1]
         assert out["evaluation"]["urgent"] is True
         seen = coach.get(f"/structures-seen?username={names['ann']}")[1]
         assert seen["structures"][0]["urgent"] is True
+
+    def test_a_note_on_its_own_is_accepted(self, studio):
+        base, names, _ = studio
+        coach = self._coach(base, names)
+        assert coach.post("/evaluate-structure", {
+            "username": names["ann"], "structure": "psoas major",
+            "kind": "muscle", "note": "nothing to report, best I have seen"
+        })[0] == 200
 
     def test_a_student_reads_their_own_and_cannot_write(self, studio):
         base, names, _ = studio
         coach = self._coach(base, names)
         coach.post("/evaluate-structure", {
             "username": names["ann"], "structure": "psoas major",
-            "kind": "muscle", "marks": {"recruitment": "over"}})
+            "kind": "muscle", "note": "gripping"})
         ann = Client(base)
         ann.sign_in("ann@b.co")
         mine = ann.get(f"/structure?username={names['ann']}"
                        "&structure=psoas+major&kind=muscle")[1]
-        assert mine["may_write"] is False
-        assert mine["history"]["count"] == 1
+        assert mine["may_write"] is False and mine["history"]["count"] == 1
         assert ann.post("/evaluate-structure",
                         {"username": names["ann"], "structure": "psoas major",
-                         "kind": "muscle", "marks": {"recruitment": "right"}})[0] == 403
+                         "kind": "muscle", "note": "no"})[0] == 403
 
     def test_somebody_else_s_student_is_refused(self, studio):
         base, names, _ = studio
@@ -909,114 +939,6 @@ class TestSeedingFromTheAdminConsole:
         found = park.get("/roster")[1]["students"]
         assert {s["display_name"] for s in found} == {
             "Kim Min-ji", "Lee Joon-ho", "Choi Seo-yeon"}
-
-
-class TestScoringAClass:
-    """The five principles, over HTTP, guarded like everything else."""
-
-    def _coach_with_ann(self, base, names):
-        coach = Client(base)
-        coach.sign_in("coach@b.co")
-        coach.post("/roster/add", {"student": names["ann"]})
-        return coach
-
-    def test_the_form_carries_the_rubric(self, studio):
-        """So what a 3 means is one definition in one file, not a number two
-        coaches guess at."""
-        base, names, _ = studio
-        coach = self._coach_with_ann(base, names)
-        status, form = coach.get(f"/evaluation?username={names['ann']}")
-        assert status == 200
-        assert set(form["principles"]) == {"breathing", "pelvic", "ribcage",
-                                           "scapular", "cervical"}
-        assert set(form["anchors"]) == {"1", "2", "3", "4", "5"}
-        assert form["may_write"] is True
-
-    def test_scoring_a_class_and_reading_it_back(self, studio):
-        base, names, _ = studio
-        coach = self._coach_with_ann(base, names)
-        status, out = coach.post("/evaluate", {
-            "username": names["ann"],
-            "scores": {"breathing": 4, "pelvic": 3, "ribcage": 2,
-                       "scapular": 4, "cervical": 4},
-            "notes": {"ribcage": "flares on the roll-down"},
-            "did": "Footwork, hundred", "settings": "two reds and a blue",
-            "cue": "reach the heel away", "plan": "wall roll-downs"})
-        assert status == 200
-        assert out["evaluation"]["average"] == 3.4
-        assert out["evaluation"]["weakest"] == "Rib cage placement"
-        assert out["focus"] == "ribcage"
-
-    def test_the_line_grows_with_each_class(self, studio):
-        base, names, _ = studio
-        coach = self._coach_with_ann(base, names)
-        for value in (2, 3, 4):
-            coach.post("/evaluate", {"username": names["ann"],
-                                     "scores": {"ribcage": value}})
-        _, form = coach.get(f"/evaluation?username={names['ann']}")
-        assert [p["value"] for p in form["lines"]["ribcage"]["points"]] == [2, 3, 4]
-        assert form["lines"]["ribcage"]["moved"] == 2
-
-    def test_it_is_signed_by_the_coach_without_being_asked(self, studio):
-        """A name typed into every note is a name that stops being typed."""
-        base, names, _ = studio
-        coach = self._coach_with_ann(base, names)
-        _, out = coach.post("/evaluate", {"username": names["ann"],
-                                          "scores": {"breathing": 4}})
-        assert out["evaluation"]["by"] == "A Coach"
-
-    def test_a_coach_cannot_score_somebody_who_is_not_theirs(self, studio):
-        base, names, _ = studio
-        coach = Client(base)
-        coach.sign_in("coach@b.co")
-        status, payload = coach.post("/evaluate", {"username": names["ann"],
-                                                   "scores": {"breathing": 4}})
-        assert status == 403 and "coach" in payload["error"]
-
-    def test_a_student_cannot_score_themselves(self, studio):
-        """An evaluation's whole authority is that a coach made it."""
-        base, names, _ = studio
-        ann = Client(base)
-        ann.sign_in("ann@b.co")
-        assert ann.post("/evaluate", {"username": names["ann"],
-                                      "scores": {"breathing": 5}})[0] == 403
-
-    def test_a_student_can_read_their_own(self, studio):
-        """What a coach thought of your rib cage is something you are owed."""
-        base, names, _ = studio
-        coach = self._coach_with_ann(base, names)
-        coach.post("/evaluate", {"username": names["ann"],
-                                 "scores": {"ribcage": 2},
-                                 "plan": "wall roll-downs"})
-        ann = Client(base)
-        ann.sign_in("ann@b.co")
-        status, mine = ann.get("/me/evaluations")
-        assert status == 200 and mine["evaluations"] == 1
-        assert mine["latest"]["plan"] == "wall roll-downs"
-
-    def test_a_student_cannot_read_another_student_s(self, studio):
-        base, names, _ = studio
-        ann = Client(base)
-        ann.sign_in("ann@b.co")
-        assert ann.get(f"/evaluation?username={names['ben']}")[0] == 403
-
-    def test_an_invented_axis_is_refused_at_the_door(self, studio):
-        base, names, _ = studio
-        coach = self._coach_with_ann(base, names)
-        status, payload = coach.post("/evaluate", {"username": names["ann"],
-                                                   "scores": {"vibes": 4}})
-        assert status == 400 and "five principles" in payload["error"]
-
-    def test_it_is_in_the_audit_log(self, studio):
-        base, names, _ = studio
-        coach = self._coach_with_ann(base, names)
-        coach.post("/evaluate", {"username": names["ann"],
-                                 "scores": {"ribcage": 2}})
-        boss = Client(base)
-        boss.sign_in("boss@b.co")
-        boss.post("/auth/switch", {"studio": "gangnam", "role": ADMIN})
-        events = boss.get(f"/audit?username={names['ann']}")[1]["events"]
-        assert any(e["action"] == "evaluated" for e in events)
 
 
 class TestRunningMoreThanOneLocation:

@@ -1236,39 +1236,38 @@ no deep flexion* and *cleared by a doctor*. They are never shown the diagnosis,
 the medication list or the date of birth. That is the difference between what a
 class needs and what a doctor keeps.
 
-### Feedback is written on the axes the instructor already teaches
+### The rubric belongs to the coach, not to this application
 
-A coach has two ways to say something, and the split is the difference between
-prose about one moment and the same judgement made every time.
+Click any structure on the body and the box to write about it opens. Two earlier
+versions of that box were wrong in the same way: one scored a whole class on five
+fixed principles, the next scored every structure on five fixed axes per kind.
+Both **guessed**. The psoas and the anconeus do not raise the same questions, and
+somebody who has taught for fifteen years does not need a form telling them what
+to look at.
 
-Clicking a muscle puts a note box under it — kind, the words, an optional rating
-that has to name *what* it rates. There is no toggle in front of it any more.
-There used to be a "coach mode" switch at the bottom of the screen, and the
-result was a coach looking at their own student's muscle with no way to say
-anything about it and no clue the switch existed.
+What is there now is thin on purpose:
 
-**Evaluate** scores the class on five axes, and the five are not invented here.
-They are the **STOTT PILATES Five Basic Principles** — breathing, pelvic
-placement, rib cage placement, scapular movement and stabilisation, head and
-cervical placement — which is what contemporary instructor training is built on
-and what an instructor is already watching for, in that order, on every
-repetition. A studio that scores anything else has to invent a vocabulary; a
-studio that scores these is writing down the lesson it just taught.
+- **What you saw** — free prose, and a complete reading on its own.
+- **Checks, in their own words** — *"does it let go at the bottom"*, *"left vs
+  right at the top"*. Add any number, edit any of them, use none. Whatever they
+  wrote about a structure comes back as a chip the next time it is opened, so
+  the second reading is one press and the vocabulary is theirs.
+- **One fixed thing**: the verdict, and it is three values — fine, worth
+  watching, a problem. Three rather than five because agreement on visual
+  movement judgements improves with coarse rating and falls apart on fine graded
+  scales.
 
-Three things follow, and they are the design:
+Each kind of structure offers a few starting-point chips, because a blank box is
+its own kind of hostile — press, edit or ignore them. A brain and an organ take
+no reading at all and the panel says why rather than greying a form out.
 
-- **Fixed and closed.** A coach who can add their own axis ends up with fifteen,
-  each used twice, and nothing that can be charted.
-- **Anchored.** 1 is *"needs hands-on cueing every repetition"*, 5 is *"holds it
-  under load, under fatigue, and in new movements"*. Two coaches have to mean
-  the same thing by a 3 or the line is not worth drawing.
-- **A skipped axis is a gap, not a zero.** The difference between *not looked
-  at* and *bad* is the whole reason for scoring anything, and the average is
-  shown only when all five were scored.
-
-Alongside the five sit the four fields a studio actually re-reads: what we did,
-springs and props, the cue that worked, and the plan for next time. The student
-sees all of it under **My feedback**.
+The one place this still asserts something is a nerve, and that is a
+scope-of-practice boundary rather than a rubric: a coach does not assess a nerve,
+they notice a symptom in its area and decide to carry on, modify, or send the
+person to somebody qualified. One grey sentence says so — not a banner and not a
+colour, because a yellow box on every nerve is noise, and noise is what gets a
+real warning ignored. A nerve called *a problem* is also the only thing in the
+system allowed to jump the queue on the roster.
 
 ### Every read of a health record is written down
 

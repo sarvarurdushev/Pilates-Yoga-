@@ -52,7 +52,12 @@ button{font:inherit;cursor:pointer}
  color:var(--txt)}
 .wm span{color:var(--dim2);font-size:11px;letter-spacing:.02em;white-space:nowrap;
  overflow:hidden;text-overflow:ellipsis}
-#discBar{display:flex;gap:5px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
+/* Not in the working view. All four are set out in full, with their reasoning,
+   in the About tab -- which is where a reference belongs. Four amber chips
+   standing over the body on every screen is not a disclosure, it is noise, and
+   noise is what gets a real warning ignored. `margin-left:auto` stays because
+   the elements after it in the bar rely on it for their position. */
+#discBar{display:none;margin-left:auto}
 /* The four lines that must not move, as instrument annunciators: hairline, amber, and lit
    rather than filled. They have to stay legible against a moving 3D scene, which is what the
    backdrop blur is for — not decoration, contrast insurance. */

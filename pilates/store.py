@@ -299,23 +299,6 @@ CREATE TABLE IF NOT EXISTS invitations (
 -- What a coach scored after a class, on the five principles instructor
 -- training is built on. Kept apart from observations because they are
 -- different jobs: a note is prose about one moment, an evaluation is the same
--- five judgements every time so that the third can be compared with the first.
-CREATE TABLE IF NOT EXISTS evaluations (
-    id       INTEGER PRIMARY KEY,
-    username TEXT NOT NULL REFERENCES people(username) ON DELETE CASCADE,
-    by       TEXT NOT NULL,
-    scores   TEXT NOT NULL DEFAULT '{}',
-    notes    TEXT NOT NULL DEFAULT '{}',
-    did      TEXT NOT NULL DEFAULT '',
-    settings TEXT NOT NULL DEFAULT '',
-    cue      TEXT NOT NULL DEFAULT '',
-    plan     TEXT NOT NULL DEFAULT '',
-    effort   TEXT NOT NULL DEFAULT 'steady',
-    session  TEXT NOT NULL DEFAULT '',
-    made_on  TEXT NOT NULL DEFAULT '',
-    made_at  TEXT NOT NULL DEFAULT ''
-);
-CREATE INDEX IF NOT EXISTS evaluations_person ON evaluations(username, made_on);
 
 -- One coach's reading of one structure. Separate from `evaluations` because it
 -- answers a different question -- that table scores a class on five fixed axes,
@@ -330,8 +313,11 @@ CREATE TABLE IF NOT EXISTS structure_evals (
     kind      TEXT NOT NULL,
     fma       TEXT NOT NULL DEFAULT '',
     side      TEXT NOT NULL DEFAULT '',
-    marks     TEXT NOT NULL DEFAULT '{}',
-    fields    TEXT NOT NULL DEFAULT '{}',
+    -- Free prose, and the coach's own checks as a JSON list. The labels are
+    -- theirs rather than this application's, so there is no column to put them
+    -- in and no enum to validate them against.
+    note      TEXT NOT NULL DEFAULT '',
+    checks    TEXT NOT NULL DEFAULT '[]',
     session   TEXT NOT NULL DEFAULT '',
     made_on   TEXT NOT NULL DEFAULT '',
     made_at   TEXT NOT NULL DEFAULT ''
@@ -907,28 +893,15 @@ class Store:
 
     # -- evaluations ----------------------------------------------------
 
-    def evaluate(self, evaluation) -> int:
-        """Score one class. Returns the row id."""
-        cursor = self.db.execute(
-            "INSERT INTO evaluations (username, by, scores, notes, did, "
-            "settings, cue, plan, effort, session, made_on, made_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (evaluation.username, evaluation.by, json.dumps(evaluation.scores),
-             json.dumps(evaluation.notes), evaluation.did, evaluation.settings,
-             evaluation.cue, evaluation.plan, evaluation.effort,
-             evaluation.session, evaluation.made_on, evaluation.made_at))
-        self.db.commit()
-        return int(cursor.lastrowid)
-
     def evaluate_structure(self, evaluation) -> int:
         """Record one reading of one structure. Returns the row id."""
         cursor = self.db.execute(
             "INSERT INTO structure_evals (username, by, structure, kind, fma, "
-            "side, marks, fields, session, made_on, made_at) "
+            "side, note, checks, session, made_on, made_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (evaluation.username, evaluation.by, evaluation.structure,
              evaluation.kind, evaluation.fma, evaluation.side,
-             json.dumps(evaluation.marks), json.dumps(evaluation.fields),
+             evaluation.note, json.dumps(evaluation.checks),
              evaluation.session, evaluation.made_on, evaluation.made_at))
         self.db.commit()
         return int(cursor.lastrowid)
@@ -957,30 +930,10 @@ class Store:
         return [StructureEval(username=row["username"], by=row["by"],
                               structure=row["structure"], kind=row["kind"],
                               fma=row["fma"], side=row["side"],
-                              marks=json.loads(row["marks"] or "{}"),
-                              fields=json.loads(row["fields"] or "{}"),
+                              note=row["note"],
+                              checks=json.loads(row["checks"] or "[]"),
                               session=row["session"], made_on=row["made_on"],
                               made_at=row["made_at"], id=row["id"])
-                for row in self.db.execute(
-                    sql + " ORDER BY made_on, made_at LIMIT ?", args)]
-
-    def evaluations(self, username: str = "", limit: int = 400) -> list:
-        from .evaluation import Evaluation
-
-        sql = "SELECT * FROM evaluations"
-        args: list = []
-        if username:
-            sql += " WHERE username = ?"
-            args.append(username)
-        args.append(int(limit))
-        return [Evaluation(username=row["username"], by=row["by"],
-                           scores=json.loads(row["scores"] or "{}"),
-                           notes=json.loads(row["notes"] or "{}"),
-                           did=row["did"], settings=row["settings"],
-                           cue=row["cue"], plan=row["plan"],
-                           effort=row["effort"], session=row["session"],
-                           made_on=row["made_on"], made_at=row["made_at"],
-                           id=row["id"])
                 for row in self.db.execute(
                     sql + " ORDER BY made_on, made_at LIMIT ?", args)]
 

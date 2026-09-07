@@ -8,13 +8,15 @@ serve as ground truth?*
 The coach is the expert labeller. The model comes afterwards and is not designed
 here.
 
-**What this document replaces.** The five-axis 1–5 rubric currently in the app
-(`pilates/evaluation.py`) is a *studio* instrument: it gives a coach a way to
-track a client over months and gives the client something to read. It is not a
-labelling instrument and must not be used as one. Section 2 explains why in
-detail, but the short version is that a scalar score per principle throws away
-the timestamp, the body region, the reasoning, the wording and the outcome —
-which is to say, all four of the things that are actually worth money.
+**What this document replaced.** A five-axis 1–5 rubric that scored a whole
+class. It has since been removed from the application entirely, for the reasons
+set out here: a scalar score per principle throws away the timestamp, the body
+region, the reasoning, the wording and the outcome — which is to say, all of the
+things that are actually worth money. What the app now has is a per-structure
+reading whose checks the coach writes themselves
+(`pilates/structure_eval.py`); that is closer to what this document argues for,
+but it is still a studio instrument, not the annotation pipeline described
+below.
 
 ---
 

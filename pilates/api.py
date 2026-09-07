@@ -245,8 +245,6 @@ def roster(store, viewer: Viewer | None) -> dict:
     student and a goal past its review date are the two things that should not
     be found by scrolling.
     """
-    from .evaluation import summary
-
     person = _need_coach(viewer)
     if person.can_administer:
         live = [a for a in store.assignments(studio=person.studio) if a.live]
@@ -275,19 +273,25 @@ def roster(store, viewer: Viewer | None) -> dict:
         seen["urgent"] = bool(sheet.urgent) or "not screened yet" in flags
         seen["since"] = assignment.since
 
-        # What the coach is going to work on with this person, on the roster
-        # rather than two clicks inside it. An evaluation nobody sees on the way
-        # into the class is an evaluation that changes nothing about the class.
-        scored = summary(store.evaluations(assignment.student))
-        seen["focus"] = scored["focus_label"]
-        seen["evaluations"] = scored["evaluations"]
-        seen["last_scored"] = (scored["latest"] or {}).get("made_on", "")
-        seen["plan"] = (scored["latest"] or {}).get("plan", "")
+        # What was written about this person's body, on the roster rather than
+        # two clicks inside it. A reading nobody sees on the way into the class
+        # is a reading that changes nothing about the class.
+        read = store.structure_evals(assignment.student)
+        flagged = [f"{one.structure}: {one.flagged[0]}"
+                   for one in reversed(read) if one.flagged][:2]
+        seen["readings"] = len(read)
+        seen["focus"] = flagged[0] if flagged else ""
+        seen["also"] = flagged[1] if len(flagged) > 1 else ""
+        seen["last_read"] = read[-1].made_on if read else ""
+        seen["note"] = read[-1].note if read else ""
+        # A nerve symptom called a problem is the one thing that outranks
+        # everything else on this list.
+        seen["urgent"] = seen["urgent"] or any(one.urgent for one in read[-6:])
         rows.append(seen)
-    # Never scored sorts up with the other things that should not be found by
-    # scrolling: it is the one row where the coach has nothing to go on.
+    # Nothing written yet sorts up with the other things that should not be
+    # found by scrolling: it is the row where the coach has nothing to go on.
     rows.sort(key=lambda r: (not r["urgent"], not r["goals_due"],
-                             bool(r["evaluations"]), r["display_name"].lower()))
+                             bool(r["readings"]), r["display_name"].lower()))
     return {"studio": person.studio, "students": rows,
             "as_admin": person.can_administer}
 
@@ -348,61 +352,6 @@ def end_assignment(store, viewer: Viewer | None, payload: dict) -> dict:
 
 # -- what the coach scores --------------------------------------------------
 
-def evaluation_form(store, viewer: Viewer | None, username: str) -> dict:
-    """The rubric, plus everything already scored for this person.
-
-    The rubric travels with the form rather than being hard-coded in the page,
-    so the five axes, what to watch for on each, and what a 3 means are one
-    definition in one file.
-    """
-    from .evaluation import ANCHORS, EFFORT, PRINCIPLES, summary
-
-    person = _need(viewer)
-    who = username or person.username
-    guard_subject(store, person, who)
-    account = store.account(who)
-    return {
-        "student": who,
-        "display_name": account.display_name if account else who,
-        "principles": PRINCIPLES,
-        "anchors": ANCHORS,
-        "effort": EFFORT,
-        "may_write": may_write_about(
-            person, who,
-            None if person.is_self(who)
-            else store.assignment_between(person.username, who, person.studio)),
-        **summary(store.evaluations(who)),
-    }
-
-
-def evaluate(store, viewer: Viewer | None, payload: dict) -> dict:
-    """Score a class on the five principles.
-
-    A coach's act, like any observation: it says who made it and when, and it
-    never appears as though a camera produced it.
-    """
-    from .evaluation import Evaluation
-
-    person = _need_coach(viewer)
-    who = payload.get("username", "")
-    guard_subject(store, person, who, write=True)
-    account = store.account(person.username)
-    evaluation = Evaluation(
-        username=who,
-        by=payload.get("by") or (account.display_name if account
-                                 else person.username),
-        scores=payload.get("scores") or {},
-        notes=payload.get("notes") or {},
-        did=payload.get("did", ""), settings=payload.get("settings", ""),
-        cue=payload.get("cue", ""), plan=payload.get("plan", ""),
-        effort=payload.get("effort") or "steady",
-        session=payload.get("session", ""))
-    evaluation.id = store.evaluate(evaluation)
-    store.record_audit(actor=person.username, action="evaluated", subject=who,
-                       studio=person.studio,
-                       detail=f"weakest: {evaluation.weakest}")
-    return {"evaluation": evaluation.to_dict(),
-            **summary_of(store, who)}
 
 
 def structure_form(store, viewer: Viewer | None, username: str,
@@ -420,7 +369,10 @@ def structure_form(store, viewer: Viewer | None, username: str,
     who = username or person.username
     guard_subject(store, person, who)
     account = store.account(who)
-    shape = form_for(kind)
+    past = history(store.structure_evals(who, structure))
+    # Their own wording first. Whatever this coach called things last time is a
+    # better suggestion than anything this application could invent.
+    shape = form_for(kind, seen=past["labels"])
     return {
         "student": who,
         "display_name": account.display_name if account else who,
@@ -434,7 +386,7 @@ def structure_form(store, viewer: Viewer | None, username: str,
             None if person.is_self(who)
             else store.assignment_between(person.username, who, person.studio)),
         **shape,
-        "history": history(store.structure_evals(who, structure)),
+        "history": past,
     }
 
 
@@ -459,8 +411,8 @@ def evaluate_structure(store, viewer: Viewer | None, payload: dict) -> dict:
             kind=kind,
             fma=payload.get("fma", ""),
             side=payload.get("side", ""),
-            marks=payload.get("marks") or {},
-            fields=payload.get("fields") or {},
+            note=payload.get("note", ""),
+            checks=payload.get("checks") or [],
             session=payload.get("session", ""))
     except ValueError as exc:
         raise Refused(str(exc), 400) from exc
@@ -469,7 +421,7 @@ def evaluate_structure(store, viewer: Viewer | None, payload: dict) -> dict:
         actor=person.username, action="evaluated:structure", subject=who,
         studio=person.studio,
         detail=f"{evaluation.structure}: "
-               f"{'; '.join(evaluation.findings) or 'nothing flagged'}")
+               f"{'; '.join(evaluation.flagged) or 'nothing flagged'}")
     return {"evaluation": evaluation.to_dict(),
             "history": history(store.structure_evals(
                 who, evaluation.structure))}
@@ -489,10 +441,12 @@ def structures_seen(store, viewer: Viewer | None, username: str = "") -> dict:
     for one in store.structure_evals(who):
         row = seen.setdefault(one.structure, {
             "structure": one.structure, "kind": one.kind, "fma": one.fma,
-            "count": 0, "last_on": "", "findings": [], "urgent": False})
+            "count": 0, "last_on": "", "flagged": [], "note": "",
+            "urgent": False})
         row["count"] += 1
         row["last_on"] = one.made_on
-        row["findings"] = one.findings
+        row["flagged"] = one.flagged
+        row["note"] = one.note
         row["urgent"] = row["urgent"] or one.urgent
     rows = sorted(seen.values(),
                   key=lambda r: (not r["urgent"], r["last_on"]), reverse=False)
@@ -505,21 +459,7 @@ def _neg(date: str) -> tuple:
     return tuple(-int(part) for part in date.split("-")) if date else (0,)
 
 
-def summary_of(store, who: str) -> dict:
-    from .evaluation import summary
 
-    return summary(store.evaluations(who))
-
-
-def my_evaluations(store, viewer: Viewer | None) -> dict:
-    """A student's own scores, in the words that were written about them."""
-    from .evaluation import PRINCIPLES, summary
-
-    person = _need(viewer)
-    return {"principles": PRINCIPLES, **summary(store.evaluations(person.username))}
-
-
-# -- studios, for an admin who has more than one ----------------------------
 
 def studios(store, viewer: Viewer | None) -> dict:
     """Every studio, with how many people are in it and who runs it."""

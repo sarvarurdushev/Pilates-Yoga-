@@ -1,123 +1,136 @@
 /**
- * Evaluating whatever is on the screen, on the axes that thing actually takes.
+ * A reading of whatever is on the screen, written the coach's way.
  *
- * The five-principle dialog scores a class. This scores a *structure*, and the
- * reason it is a separate surface is that the questions are not the same for
- * every structure: a muscle is judged by recruitment, a bone by placement, and
- * a nerve is not judged at all -- it is a symptom report that ends in stop,
- * modify or refer. The server owns that rubric (see pilates/structure_eval.py)
- * and sends it down with the request, so the page never has to know which
- * questions a psoas takes and which a fifth lumbar vertebra takes.
+ * Three things this had wrong and now does not:
  *
- * Two behaviours the coach asked for and both are load-bearing:
- *
- * 1. **It opens by itself.** Clicking a muscle with no way to say anything
- *    about it is the same failure as the old hidden "coach mode" toggle. Select
- *    a structure and the box is there.
- * 2. **It takes the right-hand dock rather than adding to it.** The explore
- *    panel is already the widest thing on the screen; putting a form beside it
- *    would leave the body a letterbox. This sits in front of it and gives it
- *    back on close.
+ * 1. **It took the explore panel's place.** Selecting a muscle hid the panel
+ *    the coach was reading and left no obvious way back. It now has its own
+ *    space beside it and never touches it; folding the panel is a separate
+ *    control the coach presses on purpose.
+ * 2. **Every muscle asked the same five questions.** They do not raise the same
+ *    questions, and a person who has taught for fifteen years does not need a
+ *    form telling them what to look at. The checks are now the coach's own
+ *    words -- suggested, editable, ignorable -- and whatever they wrote about
+ *    this structure last time comes back as a chip.
+ * 3. **It shouted.** A yellow banner on every nerve is noise; the one sentence
+ *    worth saying sits in the same grey as everything else.
  */
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g,
   (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 const CSS = `
-#ss-struct{position:fixed;right:14px;top:calc(var(--barh) - 6px);bottom:14px;
-  width:var(--panelw);z-index:9;display:flex;flex-direction:column;min-height:0;
-  border-radius:3px;border:1px solid var(--acc);
-  background:linear-gradient(200deg,rgba(8,15,25,.94) 0%,rgba(4,8,14,.97) 100%);
-  box-shadow:0 30px 90px rgba(0,0,0,.7),inset 0 1px 0 rgba(160,200,245,.09);
+/* Its own column, to the left of the explore panel rather than on top of it.
+ * Narrow enough that both fit, and it falls back to the panel's slot only when
+ * the panel itself has been folded away. */
+#ss-struct{position:fixed;z-index:8;top:calc(var(--barh) - 6px);bottom:14px;
+  right:calc(var(--panelw) + 24px);width:310px;display:flex;flex-direction:column;
+  min-height:0;border-radius:3px;border:1px solid var(--line2);
+  background:linear-gradient(200deg,rgba(8,15,25,.95) 0%,rgba(4,8,14,.98) 100%);
+  box-shadow:0 30px 90px rgba(0,0,0,.66);
   backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
+body.ss-folded #ss-struct{right:14px}
+@media(max-width:1240px){#ss-struct{right:14px;z-index:10}}
 @media(max-width:900px){#ss-struct{right:0;left:0;bottom:0;top:auto;width:auto;
-  height:74vh;border-radius:0}}
-#ss-struct .sx-head{flex:none;padding:14px 16px 12px;
-  border-bottom:1px solid var(--hair)}
+  height:72vh;border-radius:0}}
+#ss-struct .sx-head{flex:none;padding:13px 15px 11px;
+  border-bottom:1px solid var(--hair);position:relative}
 #ss-struct .sx-kind{font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;
-  color:var(--acc);margin:0 0 5px}
-#ss-struct h3{margin:0;font-size:16px;font-weight:500;color:var(--txt);
-  line-height:1.2}
-#ss-struct .sx-who{font-size:11px;color:var(--dim2);margin:5px 0 0}
-#ss-struct .sx-lede{font-size:11.5px;color:var(--dim2);line-height:1.55;
-  margin:9px 0 0}
-#ss-struct .sx-banner{margin:10px 0 0;padding:9px 11px;border-radius:3px;
-  font-size:11.5px;line-height:1.5;color:var(--gold);
-  border:1px solid rgba(233,180,92,.4);background:rgba(233,180,92,.07)}
-#ss-struct .sx-body{overflow:auto;flex:1;min-height:0;padding:14px 16px 20px}
+  color:var(--dim2);margin:0 0 4px}
+#ss-struct h3{margin:0;font-size:15px;font-weight:500;color:var(--txt);
+  line-height:1.2;padding-right:22px}
+#ss-struct .sx-who{font-size:11px;color:var(--dim2);margin:4px 0 0}
+#ss-struct .sx-note{font-size:11px;color:var(--dim2);line-height:1.5;
+  margin:8px 0 0}
+#ss-struct .sx-shut{position:absolute;right:9px;top:11px;width:22px;height:22px;
+  border-radius:3px;border:1px solid var(--line2);background:var(--glass);
+  color:var(--dim);cursor:pointer;font-size:13px;line-height:1;padding:0}
+#ss-struct .sx-shut:hover{color:var(--txt);border-color:var(--acc)}
+#ss-struct .sx-body{overflow:auto;flex:1;min-height:0;padding:13px 15px 18px}
 #ss-struct .sx-foot{flex:none;border-top:1px solid var(--hair);
-  padding:11px 16px 13px;background:rgba(2,5,10,.5);display:flex;gap:9px;
+  padding:10px 15px 12px;background:rgba(2,5,10,.5);display:flex;gap:8px;
   align-items:center;flex-wrap:wrap}
-#ss-struct .sx-foot button{padding:8px 14px;border-radius:3px;font:inherit;
-  font-size:12.5px;cursor:pointer;border:1px solid var(--line2);
+#ss-struct .sx-foot button{padding:7px 12px;border-radius:3px;font:inherit;
+  font-size:12px;cursor:pointer;border:1px solid var(--line2);
   background:var(--glass);color:var(--dim)}
 #ss-struct .sx-foot button.sx-primary{background:var(--acc);border-color:var(--acc);
   color:#04121f;font-weight:600}
 #ss-struct .sx-foot button:disabled{opacity:.5;cursor:default}
-/* Its own row under the buttons, not squeezed beside them. Sharing the row
- * made a four-finding nerve confirmation wrap to one word per line and run off
- * the bottom of the panel. */
 #ss-struct .sx-said{font-size:11px;color:var(--dim2);flex:1 0 100%;min-width:0;
-  line-height:1.45;max-height:44px;overflow:auto}
+  line-height:1.45;max-height:40px;overflow:auto}
 #ss-struct .sx-said:empty{display:none}
 #ss-struct .sx-said.sx-good{color:var(--acc)}
 #ss-struct .sx-said.sx-bad{color:var(--gold)}
 
-#ss-struct .sx-axis{padding:11px 12px;margin:0 0 8px;border-radius:3px;
-  background:var(--glass);border:1px solid var(--line)}
-#ss-struct .sx-axis b{display:block;font-size:12.5px;font-weight:500;
-  color:var(--txt)}
-#ss-struct .sx-ask{display:block;font-size:11px;color:var(--dim2);
-  line-height:1.5;margin:3px 0 8px}
-#ss-struct .sx-opts{display:flex;flex-direction:column;gap:4px}
-#ss-struct .sx-opts button{text-align:left;padding:6px 9px;border-radius:3px;
-  font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line2);
-  background:transparent;color:var(--dim);line-height:1.35}
-#ss-struct .sx-opts button:hover{color:var(--txt);border-color:var(--acc)}
-#ss-struct .sx-opts button[aria-pressed=true]{border-color:var(--acc);
-  background:rgba(90,169,230,.14);color:var(--txt)}
-#ss-struct .sx-opts button i{display:block;font-style:normal;font-size:10.5px;
-  color:var(--dim2);margin-top:2px}
-#ss-struct .sx-opts button[aria-pressed=true] i{color:var(--dim)}
-#ss-struct .sx-opts button.sx-loud[aria-pressed=true]{border-color:var(--gold);
-  background:rgba(233,180,92,.14)}
 #ss-struct label{display:block;font-size:9.5px;letter-spacing:.12em;
-  text-transform:uppercase;color:var(--dim2);margin:13px 0 0}
-#ss-struct input,#ss-struct textarea{width:100%;box-sizing:border-box;
-  margin-top:6px;padding:7px 9px;border-radius:3px;font:inherit;font-size:12px;
+  text-transform:uppercase;color:var(--dim2);margin:0 0 6px}
+#ss-struct textarea,#ss-struct input{width:100%;box-sizing:border-box;
+  padding:7px 9px;border-radius:3px;font:inherit;font-size:12px;
   background:#05070d;border:1px solid var(--line);color:var(--txt)}
+#ss-struct textarea{min-height:64px;resize:vertical;line-height:1.5}
 #ss-struct input::placeholder,#ss-struct textarea::placeholder{color:var(--dim2)}
-#ss-struct textarea{min-height:46px;resize:vertical;line-height:1.5}
 #ss-struct input:focus,#ss-struct textarea:focus{outline:0;border-color:var(--acc)}
-#ss-struct .sx-none{font-size:12px;color:var(--dim2);line-height:1.65;margin:0}
-#ss-struct .sx-shut{position:absolute;right:9px;top:9px;width:24px;height:24px;
-  border-radius:3px;border:1px solid var(--line2);background:var(--glass);
-  color:var(--dim);cursor:pointer;font-size:14px;line-height:1;padding:0}
-#ss-struct .sx-shut:hover{color:var(--txt);border-color:var(--acc)}
 
-#ss-struct .sx-past{margin:0 0 12px;padding:10px 12px;border-radius:3px;
+#ss-struct .sx-chips{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 4px}
+#ss-struct .sx-chips button{padding:4px 9px;border-radius:11px;font:inherit;
+  font-size:11px;cursor:pointer;border:1px dashed var(--line2);
+  background:transparent;color:var(--dim2);line-height:1.3}
+#ss-struct .sx-chips button:hover{color:var(--txt);border-color:var(--acc);
+  border-style:solid}
+#ss-struct .sx-chips button.sx-mine{border-style:solid;color:var(--dim)}
+#ss-struct .sx-hint{font-size:10.5px;color:var(--dim2);line-height:1.5;
+  margin:0 0 10px}
+
+#ss-struct .sx-check{padding:9px 10px;margin:0 0 6px;border-radius:3px;
+  background:var(--glass);border:1px solid var(--line)}
+#ss-struct .sx-check .sx-top{display:flex;gap:7px;align-items:flex-start}
+#ss-struct .sx-check .sx-label{flex:1;min-width:0;font-size:12.5px;
+  color:var(--txt);line-height:1.35;background:transparent;border:0;padding:2px 0}
+#ss-struct .sx-check .sx-label:focus{outline:0;border-bottom:1px solid var(--acc)}
+#ss-struct .sx-drop{flex:none;width:20px;height:20px;border-radius:3px;
+  border:1px solid transparent;background:transparent;color:var(--dim2);
+  cursor:pointer;font-size:13px;line-height:1;padding:0}
+#ss-struct .sx-drop:hover{color:var(--gold);border-color:var(--line2)}
+#ss-struct .sx-verdicts{display:flex;gap:4px;margin:7px 0 0}
+#ss-struct .sx-verdicts button{flex:1;padding:5px 2px;border-radius:3px;
+  font:inherit;font-size:11px;cursor:pointer;border:1px solid var(--line2);
+  background:transparent;color:var(--dim2)}
+#ss-struct .sx-verdicts button:hover{color:var(--txt)}
+#ss-struct .sx-verdicts button[aria-pressed=true]{color:var(--txt)}
+#ss-struct .sx-verdicts button[data-v=fine][aria-pressed=true]{
+  border-color:var(--acc);background:rgba(90,169,230,.15)}
+#ss-struct .sx-verdicts button[data-v=watch][aria-pressed=true]{
+  border-color:var(--gold);background:rgba(233,180,92,.14)}
+#ss-struct .sx-verdicts button[data-v=problem][aria-pressed=true]{
+  border-color:#e2685f;background:rgba(226,104,95,.16)}
+#ss-struct .sx-check textarea{min-height:34px;margin-top:6px;font-size:11.5px}
+#ss-struct .sx-add{width:100%;padding:7px;border-radius:3px;font:inherit;
+  font-size:11.5px;cursor:pointer;border:1px dashed var(--line2);
+  background:transparent;color:var(--dim2);margin:2px 0 0}
+#ss-struct .sx-add:hover{color:var(--txt);border-color:var(--acc)}
+#ss-struct .sx-none{font-size:11.5px;color:var(--dim2);line-height:1.65;margin:0}
+
+#ss-struct .sx-past{margin:0 0 12px;padding:9px 11px;border-radius:3px;
   border:1px solid var(--line);background:rgba(90,169,230,.05)}
-#ss-struct .sx-past h5{margin:0 0 7px;font-size:9.5px;letter-spacing:.12em;
+#ss-struct .sx-past h5{margin:0 0 6px;font-size:9.5px;letter-spacing:.12em;
   text-transform:uppercase;color:var(--dim2);font-weight:500}
-#ss-struct .sx-run{display:flex;gap:7px;align-items:baseline;font-size:11.5px;
-  color:var(--dim);margin:0 0 4px;line-height:1.4}
-#ss-struct .sx-run em{font-style:normal;color:var(--txt);min-width:88px}
+#ss-struct .sx-run{display:flex;gap:6px;align-items:baseline;font-size:11px;
+  color:var(--dim);margin:0 0 3px;line-height:1.4}
+#ss-struct .sx-run em{font-style:normal;color:var(--txt);flex:1;min-width:0}
 #ss-struct .sx-dots{display:flex;gap:3px;flex:none}
 #ss-struct .sx-dots span{width:7px;height:7px;border-radius:50%;
-  background:var(--line2);display:block}
-#ss-struct .sx-dots span.on{background:var(--gold)}
-#ss-struct .sx-urgent{border-color:rgba(226,104,95,.5);
-  background:rgba(226,104,95,.08);color:#e2685f}
+  background:rgba(90,169,230,.35);display:block}
+#ss-struct .sx-dots span.watch{background:var(--gold)}
+#ss-struct .sx-dots span.problem{background:#e2685f}
 
-/* The explore dock, collapsed to a strip. It is the widest thing on screen and
- * a coach reading a body does not need four tabs of prose in the way. */
-#ss-dock{position:fixed;z-index:7;right:14px;top:calc(var(--barh) - 6px);
-  width:26px;padding:10px 0;border-radius:3px;border:1px solid var(--line);
-  background:rgba(6,11,19,.86);color:var(--dim);cursor:pointer;
+/* The explore dock, folded to a strip the coach can always press back open. */
+#ss-dock{position:fixed;z-index:11;right:14px;top:calc(var(--barh) - 6px);
+  padding:11px 6px;border-radius:3px;border:1px solid var(--line2);
+  background:rgba(6,11,19,.92);color:var(--dim);cursor:pointer;
   writing-mode:vertical-rl;font:inherit;font-size:9.5px;letter-spacing:.16em;
   text-transform:uppercase;backdrop-filter:var(--blur)}
 #ss-dock:hover{color:var(--txt);border-color:var(--acc)}
 #panel.ss-away{display:none}
-#ss-fold{flex:none;width:26px;background:transparent;border:0;color:var(--dim2);
+#ss-fold{flex:none;width:24px;background:transparent;border:0;color:var(--dim2);
   cursor:pointer;font-size:13px;line-height:1;padding:0}
 #ss-fold:hover{color:var(--txt)}
 `;
@@ -156,33 +169,35 @@ const FOLDED = 'ss-panel-folded';
 /**
  * Fold the explore panel away, and give it back.
  *
- * Remembered per browser, because a coach who wants the body full-width wants
- * it full-width tomorrow as well.
+ * Only the coach folds it. Nothing else in this file touches the panel: it was
+ * hidden automatically once and the way back was not obvious, which is the
+ * worst kind of clever.
  */
 export function foldable() {
   styles();
   const panel = document.getElementById('panel');
   const tabs = document.getElementById('tabs');
-  if (!panel || !tabs || document.getElementById('ss-fold')) return;
+  if (!panel || !tabs || document.getElementById('ss-fold')) return null;
 
   const strip = document.createElement('button');
   strip.id = 'ss-dock';
   strip.type = 'button';
   strip.hidden = true;
-  strip.textContent = 'Explore';
-  strip.title = 'Bring the panel back';
+  strip.textContent = 'Show panel';
+  strip.title = 'Bring the explore panel back';
   document.body.appendChild(strip);
 
   const fold = document.createElement('button');
   fold.id = 'ss-fold';
   fold.type = 'button';
   fold.textContent = '›';
-  fold.title = 'Fold the panel away — the body gets the whole screen';
+  fold.title = 'Fold the panel away — press "Show panel" to bring it back';
   fold.setAttribute('aria-label', 'Fold the panel away');
   tabs.appendChild(fold);
 
   const set = (away) => {
     panel.classList.toggle('ss-away', away);
+    document.body.classList.toggle('ss-folded', away);
     strip.hidden = !away;
     try { localStorage.setItem(FOLDED, away ? '1' : '0'); } catch { /* private */ }
   };
@@ -190,22 +205,15 @@ export function foldable() {
   strip.addEventListener('click', () => set(false));
   let was = false;
   try { was = localStorage.getItem(FOLDED) === '1'; } catch { /* private */ }
-  if (was) set(true);
+  set(was);
   return { set };
 }
 
 /* ------------------------------------------------------------- the panel */
 
-let open = null;   // the structure currently on screen, so a re-select is a no-op
+let open = null;
 
-/**
- * Open the evaluation for one structure. Called on every selection.
- *
- * @param {object} record   the registry entry: name, kind, fma, sides
- * @param {object} me       whoami
- * @param {string} username whose body is loaded
- * @param {string} session  the session key, for provenance
- */
+/** Open the reading for one structure. Called on every selection. */
 export async function show(record, me, username, session = '') {
   styles();
   const name = record?.name?.en ?? record?.key ?? '';
@@ -213,13 +221,9 @@ export async function show(record, me, username, session = '') {
   if (!name || !username) return;
 
   const already = document.getElementById('ss-struct');
-  if (already && open === name) return;      // same structure, already open
+  if (already && open === name) return;
   already?.remove();
   open = name;
-
-  const panel = document.getElementById('panel');
-  const wasAway = panel?.classList.contains('ss-away');
-  panel?.classList.add('ss-away');
 
   const host = document.createElement('div');
   host.id = 'ss-struct';
@@ -227,120 +231,119 @@ export async function show(record, me, username, session = '') {
       <p class="sx-kind">Reading…</p><h3>${esc(name)}</h3>
       <button type="button" class="sx-shut" data-shut
         aria-label="Close">&times;</button>
-    </div>
-    <div class="sx-body"></div>`;
+    </div><div class="sx-body"></div>`;
   document.body.appendChild(host);
 
-  const shut = () => {
-    host.remove();
-    open = null;
-    if (!wasAway) panel?.classList.remove('ss-away');
-  };
+  const shut = () => { host.remove(); open = null; };
   host.querySelector('[data-shut]').addEventListener('click', shut);
 
   let form;
   try {
     form = await get('structure?' + new URLSearchParams({
-      username, structure: name, kind,
-      fma: (record?.fma ?? [])[0] ?? '', side: record?.sides ? '' : '',
+      username, structure: name, kind, fma: (record?.fma ?? [])[0] ?? '',
     }));
   } catch (error) {
     host.querySelector('.sx-body').innerHTML =
       `<p class="sx-none">${esc(error.message)}</p>`;
     return;
   }
-  if (open !== name) return;                 // they moved on while we fetched
+  if (open !== name) return;
   draw(host, form, { me, username, session, name, kind, record, shut });
 }
 
 function runs(form) {
-  const axes = form.history?.axes ?? {};
-  const keys = Object.keys(axes);
-  if (!keys.length) return '';
-  const rows = keys.map((key) => {
-    const line = axes[key];
-    const dots = line.points.slice(-6).map((p) =>
-      `<span class="${p.settled ? '' : 'on'}" title="${esc(p.date)}: ${
-        esc(p.label)}"></span>`).join('');
-    const last = line.points[line.points.length - 1];
-    return `<p class="sx-run"><em>${esc(line.label)}</em>
-      <span class="sx-dots">${dots}</span>
-      <span>${esc(last.label)}${line.unsettled > 1
-        ? ` · ${line.unsettled} classes running` : ''}</span></p>`;
+  const rows = Object.entries(form.history?.runs ?? {});
+  if (!rows.length && !form.history?.count) return '';
+  const lines = rows.map(([label, points]) => {
+    const dots = points.slice(-6).map((p) =>
+      `<span class="${p.verdict === 'fine' ? '' : p.verdict}"
+        title="${esc(p.date)}: ${esc(p.verdict)}${
+        p.note ? ` — ${esc(p.note)}` : ''}"></span>`).join('');
+    return `<p class="sx-run"><em>${esc(label)}</em>
+      <span class="sx-dots">${dots}</span></p>`;
   }).join('');
-  return `<div class="sx-past${form.history.urgent ? ' sx-urgent' : ''}">
+  const last = form.history.latest;
+  return `<div class="sx-past">
     <h5>Written about this before — ${form.history.count} time${
-      form.history.count === 1 ? '' : 's'}, since ${
-      esc(form.history.first_on)}</h5>${rows}</div>`;
+      form.history.count === 1 ? '' : 's'}, since ${esc(form.history.first_on)}</h5>
+    ${lines}${last?.note
+      ? `<p class="sx-run" style="margin-top:6px"><em>“${esc(last.note)}”
+          — ${esc(last.by)}, ${esc(last.made_on)}</em></p>` : ''}</div>`;
 }
 
 function draw(host, form, ctx) {
   const head = host.querySelector('.sx-head');
   head.querySelector('.sx-kind').textContent = form.kind_label || form.kind;
-  head.querySelector('h3').textContent = ctx.name;
-  const may = form.may_write && form.open;
-
   head.insertAdjacentHTML('beforeend',
     `<p class="sx-who">${esc(form.display_name)}</p>`
-    + (form.lede && may ? `<p class="sx-lede">${esc(form.lede)}</p>` : '')
-    + (form.banner ? `<p class="sx-banner">${esc(form.banner)}</p>` : ''));
+    + (form.note ? `<p class="sx-note">${esc(form.note)}</p>` : ''));
 
   const body = host.querySelector('.sx-body');
-  if (!form.open) {
-    /* A refusal with a reason, not a greyed-out form. The reason is the
-     * content: a coach who is told *why* a brain has no fields learns
-     * something; one who is told "unavailable" files a bug. */
-    body.innerHTML = runs(form) + `<p class="sx-none">${esc(form.why)}</p>`;
-    return;
-  }
-  if (!may) {
-    body.innerHTML = runs(form) + `<p class="sx-none">${
-      form.student === ctx.me?.acting?.username
+  const may = form.may_write && form.open;
+  if (!form.open || !may) {
+    body.innerHTML = runs(form) + `<p class="sx-none">${esc(
+      !form.open ? form.why
+      : form.student === ctx.me?.acting?.username
         ? 'This is what your coach wrote about this part of you.'
-        : 'You are not this person&rsquo;s coach, so there is nothing to write here.'
-    }</p>`;
+        : 'You are not this person’s coach, so there is nothing to write here.'
+    )}</p>`;
     return;
   }
 
-  const marks = {};
   body.innerHTML = runs(form)
-    + form.axes.map((axis) => `<div class="sx-axis" data-axis="${esc(axis.key)}">
-        <b>${esc(axis.label)}</b>
-        ${axis.ask ? `<span class="sx-ask">${esc(axis.ask)}</span>` : ''}
-        <div class="sx-opts">${axis.options.map(([value, label, why]) => `
-          <button type="button" data-pick="${esc(value)}" aria-pressed="false"
-            class="${value !== axis.mid ? 'sx-loud' : ''}">${esc(label)}${
-            why ? `<i>${esc(why)}</i>` : ''}</button>`).join('')}</div>
-        ${axis.note ? `<textarea data-note
-          placeholder="${esc(form.note_hint)}"></textarea>` : ''}
-      </div>`).join('')
-    + form.fields.map(([key, label, hint, shape]) => `<label>${esc(label)}</label>${
-        shape === 'area'
-          ? `<textarea data-field="${esc(key)}" placeholder="${esc(hint)}"></textarea>`
-          : `<input data-field="${esc(key)}" placeholder="${esc(hint)}">`}`).join('');
+    + `<label>What you saw</label>
+       <textarea data-free
+         placeholder="Anything. This on its own is a complete reading."></textarea>
+       <label style="margin-top:15px">Checks — your words, not ours</label>
+       <p class="sx-hint">${form.yours
+         ? 'What you wrote about this before, and a few starting points. '
+         : 'Starting points only — press one, edit it, or write your own. '
+         }Every one is optional.</p>
+       <div class="sx-chips">${(form.suggested ?? []).map((label, i) =>
+         `<button type="button" data-chip="${esc(label)}"
+           class="${i < (form.yours ?? 0) ? 'sx-mine' : ''}">${esc(label)}</button>`
+         ).join('')}</div>
+       <div data-checks></div>
+       <button type="button" class="sx-add" data-add>+ add a check of your own</button>`;
 
-  for (const axis of body.querySelectorAll('[data-axis]')) {
-    const key = axis.dataset.axis;
-    for (const pick of axis.querySelectorAll('[data-pick]')) {
-      pick.addEventListener('click', () => {
-        const value = pick.dataset.pick;
-        const now = marks[key]?.choice === value ? null : value;
-        if (now) marks[key] = { choice: now, note: marks[key]?.note ?? '' };
-        else delete marks[key];
-        for (const other of axis.querySelectorAll('[data-pick]')) {
+  const list = body.querySelector('[data-checks]');
+  const add = (label = '') => {
+    const row = document.createElement('div');
+    row.className = 'sx-check';
+    row.innerHTML = `<div class="sx-top">
+        <input class="sx-label" data-label value="${esc(label)}"
+          placeholder="What did you watch?">
+        <button type="button" class="sx-drop" data-drop
+          aria-label="Remove this check">&times;</button>
+      </div>
+      <div class="sx-verdicts">${Object.entries(form.verdicts).map(([key, text]) =>
+        `<button type="button" data-v="${esc(key)}"
+          aria-pressed="false">${esc(text)}</button>`).join('')}</div>
+      <textarea data-cnote placeholder="…because?"></textarea>`;
+    list.appendChild(row);
+    row.querySelector('[data-drop]').addEventListener('click', () => row.remove());
+    for (const button of row.querySelectorAll('[data-v]')) {
+      button.addEventListener('click', () => {
+        const on = button.getAttribute('aria-pressed') !== 'true';
+        for (const other of row.querySelectorAll('[data-v]')) {
           other.setAttribute('aria-pressed',
-                             String(other.dataset.pick === now));
+                             String(on && other === button));
         }
       });
     }
-    axis.querySelector('[data-note]')?.addEventListener('input', (event) => {
-      if (marks[key]) marks[key].note = event.target.value;
-      else marks[key] = { choice: '', note: event.target.value };
+    if (!label) row.querySelector('[data-label]').focus();
+    return row;
+  };
+  for (const chip of body.querySelectorAll('[data-chip]')) {
+    chip.addEventListener('click', () => {
+      add(chip.dataset.chip);
+      chip.remove();
     });
   }
+  body.querySelector('[data-add]').addEventListener('click', () => add());
 
   host.insertAdjacentHTML('beforeend', `<div class="sx-foot">
-    <button type="button" class="sx-primary" data-save>Save this reading</button>
+    <button type="button" class="sx-primary" data-save>Save</button>
     <button type="button" data-close>Close</button>
     <span class="sx-said"></span></div>`);
   const said = host.querySelector('.sx-said');
@@ -353,29 +356,23 @@ function draw(host, form, ctx) {
     const button = host.querySelector('[data-save]');
     button.disabled = true;
     tell('Saving…');
-    const fields = {};
-    for (const el of host.querySelectorAll('[data-field]')) {
-      if (el.value.trim()) fields[el.dataset.field] = el.value.trim();
-    }
-    const sending = {};
-    for (const [key, mark] of Object.entries(marks)) {
-      if (mark.choice) sending[key] = mark;
-    }
+    const checks = [...list.querySelectorAll('.sx-check')].map((row) => ({
+      label: row.querySelector('[data-label]').value.trim(),
+      verdict: row.querySelector('[data-v][aria-pressed=true]')?.dataset.v ?? '',
+      note: row.querySelector('[data-cnote]').value.trim(),
+    })).filter((c) => c.label);
     try {
       const out = await post('evaluate-structure', {
         username: ctx.username, structure: ctx.name, kind: ctx.kind,
         fma: (ctx.record?.fma ?? [])[0] ?? '', session: ctx.session,
-        marks: sending, fields,
+        note: body.querySelector('[data-free]').value.trim(), checks,
       });
-      Object.assign(form, { history: out.history });
-      /* Short on purpose. Reading back every answer is the panel's job and it
-       * is doing it two inches above; a confirmation that repeats all four
-       * findings is a paragraph in a status line. */
-      const found = out.evaluation.findings;
-      tell(found.length
-        ? `Saved — ${found[0]}${found.length > 1
-            ? ` and ${found.length - 1} more` : ''}.`
-        : 'Saved. Nothing flagged.', 'good');
+      form.history = out.history;
+      const flagged = out.evaluation.flagged;
+      tell(flagged.length
+        ? `Saved — ${flagged[0]}${flagged.length > 1
+            ? ` and ${flagged.length - 1} more` : ''}.`
+        : 'Saved.', 'good');
       body.querySelector('.sx-past')?.remove();
       body.insertAdjacentHTML('afterbegin', runs(form));
     } catch (error) {
@@ -389,5 +386,105 @@ function draw(host, form, ctx) {
 export function reset() {
   document.getElementById('ss-struct')?.remove();
   open = null;
-  document.getElementById('panel')?.classList.remove('ss-away');
+}
+
+/* ---------------------------------------------------------- the way back */
+
+const LIST_CSS = `
+#ss-notes{position:fixed;inset:0;z-index:150;display:flex;align-items:center;
+  justify-content:center;background:rgba(2,5,10,.8);backdrop-filter:blur(3px)}
+#ss-notes .nx-box{width:min(660px,94vw);max-height:86vh;display:flex;
+  flex-direction:column;border-radius:5px;padding:20px 22px;
+  border:1px solid var(--line2);
+  background:linear-gradient(200deg,rgba(10,17,28,.98),rgba(5,9,16,.99));
+  box-shadow:0 40px 120px rgba(0,0,0,.6)}
+#ss-notes h2{margin:0 0 3px;font-size:16px;font-weight:500;color:var(--txt)}
+#ss-notes .nx-sub{margin:0 0 14px;font-size:11.5px;color:var(--dim2);
+  line-height:1.6}
+#ss-notes .nx-body{overflow:auto;flex:1;min-height:80px}
+#ss-notes .nx-row{padding:10px 12px;margin:0 0 6px;border-radius:3px;
+  background:var(--glass);border:1px solid var(--line)}
+#ss-notes .nx-row.nx-urgent{border-color:rgba(226,104,95,.5);
+  background:rgba(226,104,95,.07)}
+#ss-notes .nx-row b{font-size:13px;font-weight:500;color:var(--txt)}
+#ss-notes .nx-row .nx-meta{font-size:10.5px;color:var(--dim2);margin-left:7px}
+#ss-notes .nx-row p{margin:4px 0 0;font-size:11.5px;color:var(--dim);
+  line-height:1.5}
+#ss-notes .nx-go{margin-top:14px;display:flex;gap:9px;align-items:center}
+#ss-notes .nx-go button{padding:8px 14px;border-radius:3px;font:inherit;
+  font-size:12.5px;cursor:pointer;border:1px solid var(--line2);
+  background:var(--glass);color:var(--dim)}
+#ss-notes .nx-none{font-size:12px;color:var(--dim2);line-height:1.7;margin:0}
+`;
+
+let listStyled = false;
+
+/**
+ * Everything written about this person's body, newest first.
+ *
+ * A reading written on the body exists only while that structure is on screen.
+ * Without a list there is no route back to it, which is the same bug as an
+ * analysis with nowhere to appear.
+ */
+export function notes(me, username) {
+  if (!username) return null;
+  styles();
+  if (!listStyled) {
+    listStyled = true;
+    const tag = document.createElement('style');
+    tag.textContent = LIST_CSS;
+    document.head.appendChild(tag);
+  }
+  const mine = me?.acting?.username === username;
+  const button = document.createElement('button');
+  button.id = 'ss-notes-open';
+  button.type = 'button';
+  button.innerHTML = mine ? '<i>My notes</i>' : '<i>Notes</i>';
+  button.title = mine
+    ? 'What your coach wrote about parts of your body'
+    : 'Everything written about this body, newest first';
+  button.addEventListener('click', () => openList(mine, username));
+
+  const bar = document.getElementById('topbar');
+  const chips = document.getElementById('discBar');
+  if (bar) bar.insertBefore(button, chips ?? null);
+  else document.body.appendChild(button);
+  return button;
+}
+
+async function openList(mine, username) {
+  const host = document.createElement('div');
+  host.id = 'ss-notes';
+  host.innerHTML = `<div class="nx-box">
+    <h2>${mine ? 'My notes' : 'Notes on this body'}</h2>
+    <p class="nx-sub">Click any structure on the body to write one. The
+      questions are yours to write — nothing here is a fixed form.</p>
+    <div class="nx-body"><p class="nx-none">Reading…</p></div>
+    <div class="nx-go"><button type="button" data-close>Close</button></div>
+  </div>`;
+  document.body.appendChild(host);
+  const shut = () => host.remove();
+  host.querySelector('[data-close]').addEventListener('click', shut);
+  host.addEventListener('click', (e) => { if (e.target === host) shut(); });
+
+  const body = host.querySelector('.nx-body');
+  try {
+    const { structures } = await get(
+      `structures-seen?username=${encodeURIComponent(username)}`);
+    body.innerHTML = structures.length ? structures.map((row) => `
+      <div class="nx-row${row.urgent ? ' nx-urgent' : ''}">
+        <b>${esc(row.structure)}</b>
+        <span class="nx-meta">${esc(row.kind)} · ${esc(row.last_on)}${
+          row.count > 1 ? ` · ${row.count} readings` : ''}</span>
+        ${row.flagged.length
+          ? `<p>${esc(row.flagged.join(' · '))}</p>` : ''}
+        ${row.note ? `<p>“${esc(row.note)}”</p>` : ''}
+      </div>`).join('')
+      : `<p class="nx-none">${mine
+          ? 'Nothing written about a particular part of you yet.'
+          : 'Nothing yet. Click any muscle, bone or nerve on the body and the '
+            + 'box to write about it opens.'}</p>`;
+  } catch (error) {
+    body.innerHTML = `<p class="nx-none">${esc(error.message)}</p>`;
+  }
 }

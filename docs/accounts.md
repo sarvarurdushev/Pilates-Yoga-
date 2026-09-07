@@ -246,10 +246,10 @@ except the standing **Who sees my record** panel.
 read before class, who has a goal past its review date. Picking a student opens
 the body with that person's measurements on it and the writing tools live —
 click any structure and the reading for it opens, on the axes that structure
-actually takes — plus **Evaluate** in the header for the five principles at the
-end of the class. The explore panel folds away, because it is the widest thing
-on the screen and a coach reading a body does not need four tabs of prose in
-front of it. And
+actually takes, in their own words — plus **Notes** in the header, which is
+everything already written about this body. The explore panel folds away,
+because it is the widest thing on the screen and a coach reading a body does not
+need four tabs of prose in front of it. And
 the things the research says instructors actually track: contraindications, cues
 in the student's own words, modifications and why, springs and props, one to
 three live goals with review dates, and progress across the class as a group.
@@ -269,109 +269,91 @@ that changes.
 
 ## How a coach gives feedback
 
-There are two surfaces, and the split is not arbitrary — it is the difference
-between prose about one moment and the same judgement made every time.
+**Click any structure on the body and the box to write about it opens.** No
+toggle, no second click, and nothing else on the screen moves out of the way for
+it — it takes its own column beside the explore panel rather than replacing it.
 
-**A note, about one structure.** Click a muscle on the body and the box is
-under it: kind (cue, modification, contraindication, goal…), the words, and an
-optional rating that has to say *what* it rates — a bare "4" is exactly the
-thing this project exists not to produce. The note sits with the measurements
-because that is where it will be read.
+The shape of that box is the part worth explaining, because two earlier versions
+of it were wrong.
 
-There is no toggle in front of it. There used to be: "coach mode", a switch at
-the bottom of the screen, and the result was a coach looking at their own
-student's muscle with no way to say anything about it and no clue the switch
-existed. If you are this person's coach, the box is there. If you are not, it
-is not, and no switch changes that.
+### The rubric is the coach's, not ours
 
-**An evaluation, about the class.** The `Evaluate` button in the header opens
-five axes, scored 1–5, the same five every time.
+The first version scored a whole class on five fixed principles. The second
+scored every structure on five fixed axes per kind — recruitment, timing,
+endurance, length, symmetry for every muscle in the body. Both were wrong in the
+same way: **they guessed.** The psoas and the anconeus do not raise the same
+questions, and somebody who has taught for fifteen years does not need a form
+telling them what to look at.
 
-### Picking a structure, and the form that comes with it
+So the box holds two things:
 
-Clicking any muscle, bone or nerve on the body opens the reading for **that**
-structure, with no toggle and no second click — and **the questions change with
-what was picked**, because they have to. Asking "score the breathing, 1 to 5"
-about the sciatic nerve is nonsense; so is asking whether the fifth lumbar
-vertebra is over-recruiting. A form that asks the same thing everywhere is wrong
-almost everywhere, and gets filled in wrong or not at all.
+- **What you saw.** Free prose. This on its own is a complete reading — a coach
+  who wants to write one sentence should never have to press a button first.
+- **Checks, in the coach's own words.** A check is a line they wrote — *"does it
+  let go at the bottom"*, *"left vs right at the top"*, *"does the shoulder
+  shrug"* — with an optional verdict and an optional note. They can add as many
+  as they like, edit any of them, or use none.
 
-The server owns the rubric ([`pilates/structure_eval.py`](../pilates/structure_eval.py))
-and sends it with the request, so the page never has to know which questions a
-psoas takes and which an atlas takes.
+**Whatever they wrote about a structure comes back the next time it is opened**,
+as a chip, above the suggestions. The second reading of a psoas is one press,
+and the vocabulary that builds up is theirs.
 
-| Clicked | Asked about | Why those |
-|---|---|---|
-| **Muscle** | recruitment · timing · endurance · length · side-to-side | Instructor material is consistent that the characteristic Pilates fault is not weakness but **over**-gripping and substitution — "muscling through" with the shoulders or the quadriceps, hip flexors taking over from the abdominals in the teaser. So the recruitment axis is symmetrical around *about right*, with failure modes on both sides |
-| **Bone** | where it sits · range · where control is lost · under load · stacking | A bone is not recruited, it is *placed*. Clinical joint assessment records range and whether pain limited it; a coach cannot take an end feel through a reformer, so this asks what they can see |
-| **Nerve** | what they reported · what provoked it · **how long it lasted** · what you did | **Not a score.** No coach evaluates a nerve. They observe a symptom in a distribution and decide **stop, modify or refer** — the framework the fitness professions already use. The discriminator is time: cleared within about ten minutes is generally unremarkable; persisting, spreading, or happening away from class needs somebody qualified |
-| **Brain, organ** | nothing | Refused with the reason, not greyed out. Nothing in a Pilates class measures a brain, and a coach is not the person to judge one |
+### The one thing that is fixed
 
-Three rules the shape enforces:
+The verdict, and it is three values: **fine · worth watching · a problem.**
 
-- **Only the unsettled answers come back.** Every axis names the answer that
-  means *nothing to do here*, so a saved reading reports the two things that
-  were not fine rather than all five answers.
-- **Only a nerve is allowed to shout.** A gripping psoas is a note; a symptom
-  that outlived the class is a flag. A system that alarms on everything gets
-  switched off.
-- **The note survives without an answer.** A coach who types the observation and
-  never presses a button has still said the useful half, and discarding it
-  because the other half is blank is data loss, not validation.
+Three rather than five because the reliability literature on visual movement
+assessment is consistent that agreement improves with coarse rating and collapses
+on fine graded scales — and because a scale nobody uses the ends of is a
+three-point scale with extra typing anyway.
 
-Readings accumulate per structure, so *"recruitment: over-working, four classes
-running"* is visible the moment that muscle is clicked again — one class of
-over-recruitment is a bad day. **Body parts** in the Evaluate panel is the way
-back to everything written, newest first, nerve flags at the top.
+### Starting points, not requirements
 
-### The five axes are not invented here
+Each kind of structure offers a few chips, because a blank box is its own kind of
+hostile. They are suggestions to press, edit or ignore.
 
-They are the **STOTT PILATES Five Basic Principles**, which is what
-contemporary instructor training is built on and what an instructor is already
-watching for, in this order, on every repetition:
-
-| | Watching for |
+| Clicked | Offered as starting points |
 |---|---|
-| **Breathing** | Three-dimensional rib expansion, in synch with the deep abdominals and pelvic floor. |
-| **Pelvic placement** | Neutral or imprint, held on purpose rather than by gripping. |
-| **Rib cage placement** | Ribs staying knitted as the arms move, rather than flaring into extension. |
-| **Scapular movement** | Organised on the rib cage and still free to move. |
-| **Head and cervical** | The neck continuing the curve of the spine. |
+| **Muscle** | how much work it's doing · when it comes in · does it hold through the set · left against right · what took over instead · does it let go between reps |
+| **Bone** | where it sits at the start · does it stay there under load · how much range · where the control goes · against the segment above and below |
+| **Nerve** | what they reported · what brought it on · how long it lasted · carried on / modified / sent them to get it looked at |
+| **Brain, organ** | Nothing. The panel says why instead of greying a form out: nothing in a Pilates class measures a brain, and a coach is not the person to judge one |
 
-A studio that scores anything else has to invent a vocabulary. A studio that
-scores these is writing down the lesson it just taught.
+The nerve list is the one place this still asserts something, and it is a
+scope-of-practice boundary rather than a rubric. A coach does not assess a nerve;
+they notice a symptom in its area and decide whether to carry on, modify, or send
+the person to somebody qualified. One grey sentence under the heading says so.
+It is not a banner and not a colour — a yellow box on every nerve is noise, and
+noise is what gets a real warning ignored.
 
-Three consequences, and they are the design:
+### Only a nerve is allowed to shout
 
-1. **The axes are fixed and closed.** A coach who can add their own axis ends
-   up with fifteen, each used twice, and nothing that can be charted.
-2. **Every score has an anchor.** 1 is *"not there yet, needs hands-on cueing
-   every repetition"*; 5 is *"holds it under load, under fatigue, and in new
-   movements"*. Two coaches at the same studio have to mean the same thing by
-   a 3 or the line is not worth drawing.
-3. **Every score carries a note, and the note is the valuable half.** *"3 — rib
-   cage flares on the second half of every roll-down"* is worth more than the 3.
+A muscle called *a problem* is a note. A **nerve** called *a problem* is the one
+thing that jumps the queue on the roster. A system that alarms on everything gets
+switched off.
 
-A skipped axis is a **gap in the line, not a zero** — the difference between
-*not looked at* and *bad* is the whole reason for scoring anything. The average
-is shown only when all five were scored; a mean of the two somebody happened to
-fill in is not comparable with a mean of five.
+### Where it all shows up
 
-Alongside the five, the four fields a studio actually re-reads: **what we did**,
-**springs, box, props**, **the cue that worked** (their words where possible),
-and **the plan for next time**. Plus how the class went — light, steady, hard —
-which is not the average of the five and is not computed as one: a session can
-be technically poor and exactly the right session for somebody who came in
-exhausted.
+- **On the structure**, when it is next selected: the runs of dots beside each
+  check, so *"a problem, four classes running"* is visible immediately. Once is a
+  bad day.
+- **On the roster**, as the last flagged reading — *"psoas major: how much work —
+  a problem"* — because a reading nobody sees on the way into the class changes
+  nothing about the class.
+- **In Notes**, in the header: everything written about this body, newest first,
+  nerve flags at the top. Without it a reading exists only while that structure
+  is on screen.
 
-The student sees the same panel under **My feedback**, with the scoring form
-replaced by the progress lines. Nothing a coach writes about them is hidden
-from them.
+The student sees the same, under **My notes**. Nothing written about them is
+hidden from them.
 
-And the result goes back onto the roster: each row carries the axis to work on
-and the plan from the last class, and a student nobody has scored says **never
-scored** and sorts up with the safety flags. An evaluation nobody reads on the
-way into the class changes nothing about the class.
+### Two controls that stay out of the way
+
+The explore panel **folds** to a strip labelled *Show panel* — the coach's
+choice, never automatic, because it was hidden automatically once and the way
+back was not obvious. And the four amber disclaimer chips are no longer stacked
+over the body: all four are set out in full, with their reasoning, in the
+**About** tab, which is where a reference belongs.
 
 ---
 

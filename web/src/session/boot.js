@@ -34,8 +34,7 @@ import { mount as mountRecordings } from './recordings.js';
 import { chip, gate, whoami } from './account.js';
 import { coaches as mountMyCoaches, mount as mountRoster } from './roster.js';
 import { mount as mountAdmin } from './admin.js';
-import { mount as mountEvaluate } from './evaluate.js';
-import { foldable, reset as resetStructure,
+import { foldable, notes as mountNotes, reset as resetStructure,
          show as showStructure } from './structure.js';
 
 const BANNER_CSS = `
@@ -269,8 +268,11 @@ export async function install(bundle) {
    * rubric; the student whose body it is gets the same panel with the scoring
    * half removed, because what a coach thought of your rib cage is something
    * you are owed rather than something kept from you. */
-  document.getElementById('ss-eval-open')?.remove();
-  if (identity?.signed_in) mountEvaluate(identity, session.person.username);
+  /* The way back to a reading once the structure has been deselected. Not a
+   * form of its own: the writing happens on the body, and this is only a list
+   * of what is already there. */
+  document.getElementById('ss-notes-open')?.remove();
+  if (identity?.signed_in) mountNotes(identity, session.person.username);
 
   // For the render harness and for anybody poking at it in a console.
   globalThis.__session = { session, lit, coach };
@@ -310,7 +312,7 @@ let identity = null;
  */
 function room(me) {
   for (const id of ['ss-who-chip', 'ss-roster-open', 'ss-admin-open',
-                    'ss-mine-open', 'ss-eval-open']) {
+                    'ss-mine-open', 'ss-notes-open']) {
     document.getElementById(id)?.remove();
   }
   if (!me?.signed_in) return;
@@ -327,12 +329,11 @@ function room(me) {
   // prompt that arrives once at a moment nobody is thinking about it.
   if (!me.can?.coach) {
     mountMyCoaches(me);
-    /* And what their coach scored, on the same terms: in the header, before any
-     * session is loaded. It used to appear only once a recording had been
-     * opened, so a student who had been evaluated but never analysed -- which
-     * is most students in their first month -- had no way to reach the feedback
-     * written about them at all. */
-    mountEvaluate(me, me.acting?.username ?? '');
+    /* And what their coach wrote, on the same terms: in the header, before any
+     * session is loaded. A student who has been written about but never
+     * analysed -- most students in their first month -- would otherwise have no
+     * way to reach any of it. */
+    mountNotes(me, me.acting?.username ?? '');
   }
 }
 
