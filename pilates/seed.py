@@ -361,6 +361,17 @@ def sow(store, password: str = PASSWORD, classes: bool = True,
 #: that flatters the interface.
 ARCS = {
     "kim.minji": [
+        # A structure the camera also measures, so the verdict lane and the
+        # newton-metre line sit on one date axis -- which is the comparison the
+        # whole tier system exists to make possible.
+        ("Pectoralis major", "muscle", "does it let go between reps",
+         ["problem", "problem", "watch", "watch", "watch", "watch",
+          "watch", "watch", "fine", "watch", "watch", "watch"],
+         "still needs a bit more work — grips through the whole arm series"),
+        ("Pectoralis major", "muscle", "what took over instead",
+         ["watch", "watch", "watch", "watch", "fine", "watch",
+          "fine", "fine", "fine", "fine", "fine", "fine"],
+         "front of the shoulder doing the work of the chest"),
         ("Psoas major", "muscle", "how much work it's doing",
          ["problem", "problem", "problem", "watch", "watch", "watch",
           "watch", "fine", "watch", "fine", "fine", "fine"],
@@ -492,39 +503,90 @@ ARCS = {
 #: week: a coach with ninety seconds between classes writes prose sometimes.
 PROSE = {
     "kim.minji": [
-        (11, "Best teaser she has done. Did not need the hands-on cue once."),
+        (11, "Best teaser she has done — did not need the hands-on cue once. "
+             "Chest still needs a little more work but everything else has "
+             "landed. Two reds is the right load now."),
+        (9, "Asked her what she felt and she said “my hips”, which is the "
+            "whole problem in three words. Spent the class on breath instead "
+            "of cueing the abdominals directly and it went better."),
         (8, "Dropped to two reds and everything got more even. Keep it there."),
-        (5, "Wall roll-downs before the mat work are doing it — third week in a row."),
-        (2, "Everything upstream of the pelvis is fine; it is all the psoas."),
-        (0, "First proper look. Teaser is all hip flexor, no abdominal at all."),
+        (6, "Rib cage is the thing now, not the pelvis. Moving the focus."),
+        (5, "Wall roll-downs before the mat work are doing it — third week in "
+            "a row. Left hip still drifts on the last two reps of anything."),
+        (3, "Slept badly, took it light. Not a fair read on anything today."),
+        (2, "Everything upstream of the pelvis is fine; it is all the psoas. "
+            "Hands on the lower ribs works where words do not."),
+        (0, "First proper look. Teaser is all hip flexor, no abdominal at all. "
+            "Knee history means nothing loaded in deep flexion for now."),
     ],
     "lee.joonho": [
-        (10, "Shoulders stayed down through the whole arm series for the first time."),
-        (6, "Tried the imagery cue instead of anatomy and it landed immediately."),
+        (10, "Shoulders stayed down through the whole arm series for the first "
+             "time. Whatever we changed three weeks ago, keep doing it."),
+        (8, "He can feel the difference himself now, which matters more than "
+            "whether I can see it."),
+        (6, "Tried the imagery cue — “melt the shoulder blades into your back "
+            "pockets” — instead of naming muscles, and it landed immediately."),
+        (4, "Serratus is finally showing up in quadruped. Traps still win the "
+            "moment anything gets heavy."),
         (3, "Hands-on at the lower ribs works where words do not."),
-        (0, "Traps do everything. Serratus needs to be taught before anything loaded."),
+        (0, "Traps do everything. Serratus needs to be taught before anything "
+            "loaded goes near him."),
     ],
     "han.doyun": [
-        (10, "Cleared by his GP, back to full range. Watch it for a month."),
-        (6, "Symptom outlasted the class again — stopped and sent him off. "
-            "Nothing loaded until somebody qualified has looked."),
-        (5, "Second week of pins and needles. Modified everything in flexion."),
-        (2, "Mentioned tingling after class. Nothing during. Watching it."),
+        (11, "Full class, no symptoms, no modifications. First time since June."),
+        (10, "Cleared by his GP — nothing structural. Back to full range, "
+             "watching it for a month."),
+        (8, "Nothing this week. Keeping everything in neutral until the "
+            "clinic has seen him."),
+        (6, "Symptom outlasted the class again — stopped there and sent him "
+            "off. Nothing loaded until somebody qualified has looked at it. "
+            "This is not mine to manage."),
+        (5, "Second week of pins and needles, same distribution. Modified "
+            "everything in flexion and told him to book an appointment."),
+        (2, "Mentioned tingling in the back of the left thigh after class. "
+            "Nothing during. Watching it."),
+        (0, "Blood pressure flag on file, cleared to train. Hinges at one "
+            "segment rather than articulating — that is the whole programme."),
     ],
     "choi.seoyeon": [
-        (9, "Left glute finally firing without the cue."),
-        (4, "Single-leg work rather than cueing it in bilateral — better."),
+        (10, "Left glute finally firing without the cue. Knee tracking looks "
+             "after itself once that happens."),
+        (7, "Never screened — chased her about it again. Nothing loaded until "
+            "she fills it in."),
+        (4, "Single-leg work rather than cueing it in bilateral — much better. "
+            "She cannot find it on the left while the right is available."),
         (0, "TFL doing the whole job. Everything else follows from that."),
     ],
     "jung.haeun": [
-        (7, "Stopped over-gripping once we stopped talking about the core."),
-        (1, "Holds her breath the moment she concentrates."),
+        (9, "Second trimester. Everything supine is off; side-lying and "
+            "standing only from here."),
+        (7, "Stopped over-gripping once we stopped talking about the core at "
+            "all. Cued the breath and the rest arrived on its own."),
+        (1, "Holds her breath the moment she concentrates. Everything else is "
+            "downstream of that."),
     ],
-    "shin.yerin": [(8, "Thoracic is opening. Rhomboids still quiet.")],
-    "moon.jaehyun": [(6, "Range is coming, slowly. Not forcing it.")],
-    "song.arin": [(7, "Glutes are leading the bridge now.")],
-    "yang.dowon": [(4, "The shoulder difference is structural, not a fault. "
-                       "Leaving it alone and noting it.")],
+    "shin.yerin": [
+        (9, "Thoracic is opening. Rhomboids still quiet — traps take it the "
+            "moment she stops thinking about it."),
+        (2, "Moves as a block from T4 down. Nothing wrong with her, that is "
+            "just a desk."),
+    ],
+    "moon.jaehyun": [
+        (9, "Range is coming, slowly. Not forcing it — the hamstrings genuinely "
+            "are not long enough yet and no amount of cueing changes that."),
+        (2, "Toes grip the footbar on everything. Start there."),
+    ],
+    "song.arin": [
+        (8, "Glutes are leading the bridge now rather than the hamstrings. "
+            "Took six weeks and it happened in one class."),
+        (1, "Quads never switch off between reps. Everything else is fine."),
+    ],
+    "yang.dowon": [
+        (9, "Still asymmetric, still fine. Noting it every time so nobody "
+            "later mistakes it for something that appeared."),
+        (4, "The shoulder difference is structural, not a fault. Right sits "
+            "higher and always has. Leaving it alone and writing it down."),
+    ],
 }
 
 #: How many weeks of readings the fixture writes. Twelve because the question

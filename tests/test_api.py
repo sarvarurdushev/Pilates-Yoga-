@@ -782,6 +782,110 @@ class TestReadingWhateverIsOnTheScreen:
                          "&structure=psoas+major&kind=muscle")[0] == 403
 
 
+class TestWhereTheFeedbackGoes:
+    """A measurement and a judgement share a date axis and nothing else."""
+
+    def _coach(self, base, names):
+        coach = Client(base)
+        coach.sign_in("coach@b.co")
+        coach.post("/roster/add", {"student": names["ann"]})
+        return coach
+
+    def _write(self, coach, names, verdict, structure="pectoralis major"):
+        return coach.post("/evaluate-structure", {
+            "username": names["ann"], "structure": structure, "kind": "muscle",
+            "checks": [{"label": "does it let go between reps",
+                        "verdict": verdict}]})
+
+    def test_the_readings_come_back_on_their_own_route(self, studio):
+        """Deliberately separate from the measurement bundle, so nothing
+        downstream can treat one kind of claim as the other."""
+        base, names, _ = studio
+        coach = self._coach(base, names)
+        self._write(coach, names, "problem")
+        status, out = coach.get(
+            f"/structure-history?username={names['ann']}"
+            "&structure=pectoralis+major")
+        assert status == 200 and out["count"] == 1
+        assert "does it let go between reps" in out["runs"]
+
+    def test_the_run_carries_a_date_for_every_point(self, studio):
+        """The lane is drawn against the measured series' dates, so a point
+        without one cannot be placed."""
+        base, names, _ = studio
+        coach = self._coach(base, names)
+        self._write(coach, names, "watch")
+        out = coach.get(f"/structure-history?username={names['ann']}"
+                        "&structure=pectoralis+major")[1]
+        for point in out["runs"]["does it let go between reps"]:
+            assert point["date"] and point["verdict"] and point["by"]
+
+    def test_a_reading_never_reaches_the_measurements_table(self, studio):
+        """The number came off a camera. A verdict must not move it, and the
+        cheapest way to guarantee that is for it to live somewhere else."""
+        base, names, db = studio
+        coach = self._coach(base, names)
+        self._write(coach, names, "problem")
+        with Store.open(db) as store:
+            for table in ("measurements", "findings"):
+                rows = store.db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
+                assert rows[0] == 0, f"a reading reached {table}"
+            kept = store.db.execute(
+                "SELECT COUNT(*) FROM structure_evals").fetchone()
+            assert kept[0] == 1
+
+    def test_what_is_still_open_reaches_the_pre_class_sheet(self, studio):
+        """A sheet called "what to read before this class" that omits what was
+        written last week is not what to read before this class."""
+        base, names, _ = studio
+        coach = self._coach(base, names)
+        for _ in range(3):
+            self._write(coach, names, "problem")
+        sheet = coach.get(f"/sheet?user={names['ann']}")[1]
+        assert sheet["open_readings"], sheet.keys()
+        row = sheet["open_readings"][0]
+        assert row["structure"] == "pectoralis major"
+        assert row["streak"] == 3 and row["verdict"] == "problem"
+
+    def test_something_now_fine_leaves_the_open_list(self, studio):
+        """A sheet listing everything ever noticed is a sheet nobody reads."""
+        base, names, _ = studio
+        coach = self._coach(base, names)
+        for verdict in ("problem", "watch", "fine"):
+            self._write(coach, names, verdict)
+        sheet = coach.get(f"/sheet?user={names['ann']}")[1]
+        assert sheet["open_readings"] == []
+        assert [r["check"] for r in sheet["fixed_readings"]] == [
+            "does it let go between reps"]
+
+    def test_a_problem_outranks_a_watch_on_the_sheet(self, studio):
+        base, names, _ = studio
+        coach = self._coach(base, names)
+        self._write(coach, names, "watch", "trapezius")
+        self._write(coach, names, "problem", "psoas major")
+        sheet = coach.get(f"/sheet?user={names['ann']}")[1]
+        assert sheet["open_readings"][0]["structure"] == "psoas major"
+
+    def test_a_longer_streak_outranks_a_shorter_one(self, studio):
+        """Four classes running is a different thing from noticed once."""
+        base, names, _ = studio
+        coach = self._coach(base, names)
+        self._write(coach, names, "watch", "trapezius")
+        for _ in range(4):
+            self._write(coach, names, "watch", "psoas major")
+        sheet = coach.get(f"/sheet?user={names['ann']}")[1]
+        assert sheet["open_readings"][0]["structure"] == "psoas major"
+        assert sheet["open_readings"][0]["streak"] == 4
+
+    def test_a_student_cannot_read_somebody_else_s(self, studio):
+        base, names, _ = studio
+        self._coach(base, names)
+        other = Client(base)
+        other.sign_in("other@b.co")
+        assert other.get(f"/structure-history?username={names['ann']}"
+                         "&structure=pectoralis+major")[0] == 403
+
+
 class TestGettingBackInOverHttp:
     """Three routes back in, and none of them tell a stranger who trains here."""
 

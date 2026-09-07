@@ -440,6 +440,77 @@ def evaluate_structure(store, viewer: Viewer | None, payload: dict) -> dict:
                 who, evaluation.structure))}
 
 
+def standing_readings(store, username: str, weeks: int = 6) -> dict:
+    """What is still open from the coach's readings, for the pre-class sheet.
+
+    A finding that has come back three classes running is a different thing
+    from one written once and never seen again, so this reports the run length
+    rather than the last row. Anything whose most recent verdict is ``fine`` is
+    finished and does not appear: a sheet that lists everything ever noticed is
+    a sheet nobody reads twice.
+    """
+    from .structure_eval import history
+
+    latest: dict = {}
+    for one in store.structure_evals(username):
+        for check in one.checks:
+            if not check["verdict"]:
+                continue
+            key = (one.structure, one.kind, check["label"])
+            row = latest.setdefault(key, {"structure": one.structure,
+                                          "kind": one.kind,
+                                          "check": check["label"],
+                                          "runs": [], "note": "", "by": one.by,
+                                          "last_on": ""})
+            row["runs"].append(check["verdict"])
+            row["last_on"] = one.made_on
+            row["by"] = one.by
+            if check["note"]:
+                row["note"] = check["note"]
+
+    open_now, settled = [], []
+    for row in latest.values():
+        run = row["runs"]
+        row["verdict"] = run[-1]
+        # How many classes in a row it has been unsettled, counting back.
+        streak = 0
+        for verdict in reversed(run):
+            if verdict == "fine":
+                break
+            streak += 1
+        row["streak"] = streak
+        row["seen"] = len(run)
+        row.pop("runs")
+        (settled if row["verdict"] == "fine" else open_now).append(row)
+
+    open_now.sort(key=lambda r: (r["verdict"] != "problem", -r["streak"],
+                                 r["structure"]))
+    # Something that was a problem and is now fine is worth one line, because
+    # "this is fixed" is a thing a coach wants to walk in knowing.
+    fixed = [r for r in settled if r["seen"] > 2][:4]
+    fixed.sort(key=lambda r: r["last_on"], reverse=True)
+    return {"open_readings": open_now[:8], "fixed_readings": fixed,
+            "readings": sum(1 for _ in store.structure_evals(username))}
+
+
+def structure_history(store, viewer: Viewer | None, username: str,
+                      structure: str) -> dict:
+    """The coach's readings for one structure, for drawing beside the numbers.
+
+    Deliberately its own route rather than folded into the measurement bundle.
+    A measurement and a judgement are different kinds of claim and they are
+    fetched separately so that nothing downstream can accidentally treat one as
+    the other.
+    """
+    from .structure_eval import history
+
+    person = _need(viewer)
+    who = username or person.username
+    guard_subject(store, person, who)
+    return {"student": who, "structure": structure,
+            **history(store.structure_evals(who, structure))}
+
+
 def structures_seen(store, viewer: Viewer | None, username: str = "") -> dict:
     """Every structure anybody has written about this person, newest first.
 

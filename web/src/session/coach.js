@@ -143,9 +143,31 @@ function renderSheet(host) {
   const block = (title, notes, render) => notes.length
     ? `<h4>${esc(title)}</h4>${notes.map(render).join('')}` : '';
 
+  /* What the coach's own readings still have open. A sheet called "what to
+   * read before this class" that omits what was written about this person's
+   * body last week is not what to read before this class. Streaks first,
+   * because a finding that has come back four classes running is a different
+   * thing from one noticed once. */
+  const open = s.open_readings ?? [];
+  const fixed = s.fixed_readings ?? [];
+  const reading = (r) => `<div class="${
+      r.verdict === 'problem' ? 'flag' : 'item'}">
+    <b>${esc(r.structure)} — ${esc(r.check)}</b>
+    <span class="meta">${esc(r.verdict === 'problem' ? 'a problem'
+                                                     : 'worth watching')}${
+      r.streak > 1 ? ` · ${r.streak} classes running` : ''} · ${esc(r.by)} · ${
+      esc(r.last_on)}</span>
+    ${r.note ? `<span class="meta">${esc(r.note)}</span>` : ''}</div>`;
+
   host.innerHTML = `
     <h3>${esc(s.display_name || s.username)}</h3>
     <p class="who">What to read before the next class</p>
+    ${open.length ? `<h4>Still open — from what you wrote</h4>${
+      open.map(reading).join('')}` : ''}
+    ${fixed.length ? `<h4>Settled since</h4>${fixed.map((r) =>
+      `<div class="item"><b>${esc(r.structure)} — ${esc(r.check)}</b>
+        <span class="meta">fine now · ${esc(r.seen)} readings · last ${
+          esc(r.last_on)}</span></div>`).join('')}` : ''}
     ${block('Before you start', s.flags, (n) =>
       `<div class="flag">${esc(n.text)}
         <span class="meta">${esc(n.about)} · ${esc(n.by)} · ${esc(n.made_on)}</span>
@@ -158,8 +180,9 @@ function renderSheet(host) {
     ${block('Last few classes', s.recent, (n) => item(n,
       n.rating != null ? ` · ${n.rating}/${n.scale} ${esc(n.rates)}` : ''))}
     ${!s.flags.length && !s.cues.length && !s.goals.length && !s.recent.length
+      && !open.length && !fixed.length
       ? '<p class="none">Nothing written down yet. Choose a muscle, a bone or a '
-      + 'nerve on the body and write the first note.</p>' : ''}`;
+      + 'nerve on the body and write the first reading.</p>' : ''}`;
 }
 
 async function loadSheet(user) {

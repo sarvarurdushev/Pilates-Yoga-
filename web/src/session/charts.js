@@ -47,6 +47,32 @@ export const CHART_CSS = `
 .ss-chart{position:relative}
 .ss-chart svg{display:block;width:100%;height:auto;overflow:visible}
 .ss-spark .ss-band{fill:rgba(146,178,222,.11)}
+/* The coach's lane. Deliberately not a line and deliberately not on the same
+   scale: squares on a shared date axis, so it reads as a different kind of
+   claim rather than as a second measurement of the same thing. */
+.ss-lane{margin:9px 0 0;padding:9px 0 0;border-top:1px dashed var(--line2)}
+.ss-lane-head{margin:0 0 6px;font-size:9px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--dim2)}
+.ss-lane-grid{display:grid;grid-template-columns:minmax(0,88px) 1fr;
+  gap:4px 8px;align-items:center}
+.ss-lane-label{font-size:10px;line-height:1.25;color:var(--dim);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.ss-lane-marks{display:grid;gap:2px;min-width:0}
+.ss-lane-marks i{height:9px;border-radius:1.5px;min-width:2px;
+  background:var(--line2)}
+.ss-lane-dates{display:flex;justify-content:space-between;margin:5px 0 0;
+  padding-left:96px;font-size:9.5px;color:var(--dim2)}
+.ss-lane-marks i.ss-vd-ok{background:rgba(90,169,230,.6)}
+.ss-lane-marks i.ss-vd-watch{background:var(--gold)}
+.ss-lane-marks i.ss-vd-bad{background:#e2685f}
+.ss-lane-key{margin:7px 0 0;font-size:10px;color:var(--dim2);line-height:1.6}
+.ss-lane-key i{display:inline-block;width:8px;height:8px;border-radius:1.5px;
+  margin:0 4px 0 10px;vertical-align:baseline}
+.ss-lane-key i:first-child{margin-left:0}
+.ss-lane-key i.ss-vd-ok{background:rgba(90,169,230,.55)}
+.ss-lane-key i.ss-vd-watch{background:var(--gold)}
+.ss-lane-key i.ss-vd-bad{background:#e2685f}
+.ss-lane-key em{display:block;font-style:normal;color:var(--dim2);margin-top:4px}
 .ss-spark .ss-line{fill:none;stroke:var(--acc);stroke-width:2;stroke-linejoin:round;
   stroke-linecap:round}
 .ss-spark .ss-dot{fill:var(--acc);stroke:#060b14;stroke-width:2}
@@ -154,6 +180,68 @@ export function spark(series, opts = {}) {
     <p class="ss-readout">${points.length} sessions.${floor > 0
       ? ` The band is this measurement's own wobble, ±${showValue(floor, unit)}
          — anything inside it is not a change.` : ''}</p>
+  </div>`;
+}
+
+/**
+ * What the coach saw, on the same time axis as what the camera measured.
+ *
+ * **This does not touch the number.** A measurement is what came off the video;
+ * a verdict is what a person thought. Letting the second alter the first would
+ * be falsifying the record, and the whole tier system in this application exists
+ * to stop exactly that. So the verdicts get their own lane underneath, sharing
+ * only the dates — because the interesting reading is the comparison:
+ *
+ *   the load has been flat at 7.2 Nm for twelve weeks
+ *   and over the same twelve weeks the coach went problem → fine
+ *
+ * which is a finding neither half could produce alone. The number did not move
+ * and the quality did; or the number moved and nobody noticed.
+ *
+ * @param {object} history  a `/structure-history` payload
+ * @param {string[]} [dates] the measured series' dates, so the two lanes line up
+ */
+export function verdictLane(history, dates = []) {
+  const runs = Object.entries(history?.runs ?? {});
+  if (!runs.length) return '';
+
+  /* One shared axis. Every date either half knows about, in order, so a class
+   * the coach wrote about but the camera did not measure still gets a column --
+   * dropping it would quietly hide the sessions nobody recorded. */
+  const all = [...new Set([...dates,
+    ...runs.flatMap(([, points]) => points.map((p) => p.date))])].sort();
+  if (all.length < 2) return '';
+  const at = new Map(all.map((d, i) => [d, i]));
+
+  /* A grid rather than an SVG. The labels are HTML and the marks have to line
+   * up with them row for row; an SVG scales its viewBox to the width it is
+   * given and the two columns drifted apart the moment the panel was narrow. */
+  const rows = runs.map(([label, points]) => {
+    const marks = points.map((p) => {
+      const i = at.get(p.date);
+      if (i === undefined) return '';
+      const tone = p.verdict === 'fine' ? 'ok'
+                 : p.verdict === 'watch' ? 'watch' : 'bad';
+      return `<i class="ss-vd-${tone}" style="grid-column:${i + 1}"
+        title="${esc(p.date)} — ${esc(label)}: ${esc(p.verdict)}${
+        p.note ? ` — ${esc(p.note)}` : ''} (${esc(p.by)})"></i>`;
+    }).join('');
+    return `<span class="ss-lane-label" title="${esc(label)}">${esc(label)}</span>
+      <span class="ss-lane-marks"
+        style="grid-template-columns:repeat(${all.length},1fr)">${marks}</span>`;
+  }).join('');
+
+  return `<div class="ss-chart ss-lane">
+    <p class="ss-lane-head">What the coach saw${history.count
+      ? ` · ${history.count} reading${history.count === 1 ? '' : 's'}` : ''}</p>
+    <div class="ss-lane-grid">${rows}</div>
+    <p class="ss-lane-dates"><span>${esc(all[0].slice(2))}</span>
+      <span>${esc(all[all.length - 1].slice(2))}</span></p>
+    <p class="ss-lane-key"><i class="ss-vd-ok"></i>fine
+      <i class="ss-vd-watch"></i>worth watching
+      <i class="ss-vd-bad"></i>a problem
+      <em>Not measured. This is what a person thought, on the same dates —
+        it does not move the number above it.</em></p>
   </div>`;
 }
 

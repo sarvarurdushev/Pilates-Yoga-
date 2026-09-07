@@ -332,11 +332,50 @@ A muscle called *a problem* is a note. A **nerve** called *a problem* is the one
 thing that jumps the queue on the roster. A system that alarms on everything gets
 switched off.
 
+### Does a reading change the measured number? No.
+
+This is the question worth being exact about. The **7.2 Nm** on a muscle came
+off a camera: it is `measured`. A coach's verdict is what a person thought: it
+is `observed`. Letting the second alter the first would be falsifying the
+record, and the tier system in this application exists to stop precisely that.
+A reading is written to `structure_evals` and reaches neither `measurements` nor
+`findings` — there is a test that asserts exactly this, by counting rows.
+
+What the two **do** share is a date axis, and that is where the value is. Under
+the measured line, on the same dates, sits a lane of the coach's verdicts:
+
+```
+7.2 Nm  ·····•·····•·····•·····•·····•·····      the camera, twelve sessions
+        ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+        ■ ■ ▪ ▪ ▪ ▪ ▪ ▪ ▫ ▪ ▪ ▪            a person, the same twelve dates
+```
+
+Read together they say something neither half can say alone: *the load has been
+flat at 7.2 Nm for twelve weeks, and over the same twelve weeks the coach went
+problem → worth watching.* The number did not move and the quality did. Or the
+other way round: the number moved and nobody noticed.
+
+The lane is drawn as blocks rather than a line, on no vertical scale, with the
+sentence **"Not measured. This is what a person thought, on the same dates — it
+does not move the number above it."** underneath. That is deliberate: it must
+not be mistakable for a second measurement of the same thing.
+
+The axis is the **union** of both sets of dates, so a class the coach wrote
+about but the camera never recorded still gets a column. Dropping it would
+quietly hide the sessions nobody filmed.
+
 ### Where it all shows up
 
 - **On the structure**, when it is next selected: the runs of dots beside each
   check, so *"a problem, four classes running"* is visible immediately. Once is a
   bad day.
+- **Beside the measurement**, as the verdict lane described above.
+- **On the pre-class sheet** (*Before class*), under **Still open — from what
+  you wrote**: everything whose latest verdict is not `fine`, worst first, with
+  how many classes in a row it has come back. Anything now settled drops to
+  **Settled since**, because a sheet that lists everything ever noticed is a
+  sheet nobody reads twice — and *"this is fixed"* is worth one line, because it
+  is a thing a coach wants to walk in knowing.
 - **On the roster**, as the last flagged reading — *"psoas major: how much work —
   a problem"* — because a reading nobody sees on the way into the class changes
   nothing about the class.

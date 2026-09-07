@@ -162,6 +162,32 @@ const post = async (path, payload) => {
   return body;
 };
 
+/**
+ * The coach's readings for one structure, cached for the life of the page.
+ *
+ * The measurement panel wants them to draw its verdict lane, and this panel
+ * wants them for its runs. Fetching twice on every selection would be two
+ * requests for one answer, so they share this.
+ */
+const readingCache = new Map();
+
+export function readingsFor(username, structure) {
+  if (!username || !structure) return Promise.resolve(null);
+  const key = `${username}\u0000${structure}`;
+  if (!readingCache.has(key)) {
+    readingCache.set(key, get('structure-history?' + new URLSearchParams({
+      username, structure,
+    })).catch(() => null));
+  }
+  return readingCache.get(key);
+}
+
+/** Drop a structure's cached readings, so the next look re-fetches. */
+export function forget(username, structure) {
+  if (structure) readingCache.delete(`${username}\u0000${structure}`);
+  else readingCache.clear();
+}
+
 /* --------------------------------------------------------------- the dock */
 
 const FOLDED = 'ss-panel-folded';
@@ -372,6 +398,7 @@ function draw(host, form, ctx) {
         note: body.querySelector('[data-free]').value.trim(), checks,
       });
       form.history = out.history;
+      forget(ctx.username, ctx.name);
       const flagged = out.evaluation.flagged;
       tell(flagged.length
         ? `Saved — ${flagged[0]}${flagged.length > 1
@@ -390,6 +417,7 @@ function draw(host, form, ctx) {
 export function reset() {
   document.getElementById('ss-struct')?.remove();
   open = null;
+  forget('');
 }
 
 /* ---------------------------------------------------------- the way back */

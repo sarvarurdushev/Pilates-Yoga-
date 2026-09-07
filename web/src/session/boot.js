@@ -34,8 +34,8 @@ import { mount as mountRecordings } from './recordings.js';
 import { chip, gate, whoami } from './account.js';
 import { coaches as mountMyCoaches, mount as mountRoster } from './roster.js';
 import { mount as mountAdmin } from './admin.js';
-import { foldable, notes as mountNotes, reset as resetStructure,
-         show as showStructure } from './structure.js';
+import { foldable, notes as mountNotes, readingsFor,
+         reset as resetStructure, show as showStructure } from './structure.js';
 
 const BANNER_CSS = `
 #sessbar{position:fixed;left:0;right:0;top:0;z-index:60;display:flex;gap:14px;
@@ -252,6 +252,10 @@ export async function install(bundle) {
     onStructure: (record) => showStructure(record, identity,
                                            session.person.username,
                                            session.key ?? ''),
+    /* What the coach wrote about this structure, for the lane under the
+     * measured line. Same dates, different kind of claim, never merged. */
+    readings: (record) => readingsFor(session.person.username,
+                                      record?.name?.en ?? ''),
   });
 
   /* The coach's half. Drawn everywhere; writable only where there is a record

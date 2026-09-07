@@ -20,7 +20,7 @@
  * one is not.
  */
 import { CHART_CSS, bar, chip, group, showValue, spark, stat, verdictChip,
-         wireCharts } from './charts.js';
+         verdictLane, wireCharts } from './charts.js';
 import { MEASURED, RESEARCH } from './session.js';
 import { saidAbout } from './coach.js';
 
@@ -64,6 +64,11 @@ function muscleBlock(about, session) {
   const parts = [kind('Measured this class', session.date), view(record.id),
                  stat(entry.value.toFixed(1), entry.unit, chips)];
   if (series) parts.push(spark(series, { id: `m${record.id}` }));
+  /* An empty slot for the coach's verdicts on the same dates. Filled in when
+   * the readings arrive, because they come from the studio's record and not
+   * from the bundle -- a measurement and a judgement are fetched separately so
+   * nothing downstream can mistake one for the other. */
+  parts.push(`<div data-lane="${esc(record?.name?.en ?? '')}"></div>`);
 
   // Where it sits among the session's other groups: the one comparison this
   // measurement genuinely supports, since both halves came off one video.
@@ -208,6 +213,19 @@ export function attachPanel(session, nw, hooks = {}) {
     (anchor ?? detail).insertAdjacentHTML(
       'afterend', html + saidAbout(name) + button);
     writing = false;
+
+    /* The verdict lane, once it has been fetched. It lands under the measured
+     * line on the same date axis and never alters it: the number came off a
+     * camera and the verdict came off a person. */
+    const slot = detail.querySelector('[data-lane]');
+    if (slot && hooks.readings) {
+      hooks.readings(record).then((past) => {
+        if (!past || !slot.isConnected) return;
+        const dates = (session.history(about?.entry?.from)?.points ?? [])
+          .map((p) => p.date);
+        slot.innerHTML = verdictLane(past, dates);
+      }).catch(() => { /* no studio record behind this viewer */ });
+    }
 
     hooks.onProse?.(carried, id, record);
     /* The structure is selected; the box to say something about it opens now,

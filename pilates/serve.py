@@ -243,7 +243,11 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             def sheet(store, who=who):
                 api.guard_subject(store, self._viewer(store), who)
-                return store.coach_sheet(who).to_dict()
+                # The readings ride along, because "what to read before this
+                # class" that omits what the coach wrote last week is not what
+                # to read before this class.
+                return {**store.coach_sheet(who).to_dict(),
+                        **api.standing_readings(store, who)}
 
             self._answer(sheet)
             return
@@ -282,6 +286,12 @@ class Handler(SimpleHTTPRequestHandler):
                 q.get("username", [""])[0], q.get("structure", [""])[0],
                 q.get("kind", [""])[0], q.get("fma", [""])[0],
                 q.get("side", [""])[0]))
+            return
+        if route.path == "/structure-history" and self.db:
+            q = parse_qs(route.query)
+            self._answer(lambda store: api.structure_history(
+                store, self._viewer(store),
+                q.get("username", [""])[0], q.get("structure", [""])[0]))
             return
         if route.path == "/structures-seen" and self.db:
             who = parse_qs(route.query).get("username", [""])[0]
