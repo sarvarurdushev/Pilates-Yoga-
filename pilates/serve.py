@@ -165,6 +165,38 @@ class Handler(SimpleHTTPRequestHandler):
             with self._store() as store:
                 self._json(store.coach_sheet(who).to_dict())
             return
+        if route.path == "/recordings" and self.db:
+            # Everything on record here, newest first. Without this a finished
+            # analysis had exactly one place it could ever appear -- the dialog
+            # that was watching the job -- and closing that dialog threw the
+            # result away with nowhere to get it back from.
+            with self._store() as store:
+                self._json({"recordings": store.recordings()})
+            return
+        if route.path == "/recording" and self.db:
+            # One of them, built into a bundle the page can put on the body.
+            from .bundle import build, validate
+
+            query = parse_qs(route.query)
+            who = query.get("user", [""])[0]
+            key = query.get("session", [""])[0]
+            if not who or not key:
+                self._json({"error": "which person, and which session?"}, 400)
+                return
+            with self._store() as store:
+                try:
+                    bundle = build(store, who, key, include_poses=False)
+                except (ValueError, KeyError) as exc:
+                    self._json({"error": str(exc)}, 404)
+                    return
+            problems = validate(bundle)
+            if problems:
+                # The same refusal the viewer makes, made here instead, so the
+                # reason travels rather than a blank body.
+                self._json({"error": "; ".join(problems)}, 409)
+                return
+            self._json(bundle)
+            return
         if route.path == "/people" and self.db:
             with self._store() as store:
                 self._json({"people": [dict(p) for p in store.people()]})

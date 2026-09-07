@@ -409,8 +409,19 @@ async function dialog(nw, install, can) {
     $('[data-cam=record]').disabled = false;
   });
 
+  /* Closing while a job runs no longer abandons it -- see the polling loop --
+   * but it is still worth saying, because on a small machine "when it
+   * finishes" is half an hour away and a closed *tab* does take the poller
+   * with it. The result is on record either way. */
+  let watching = false;
   const shut = () => {
     stream?.getTracks().forEach((t) => t.stop());
+    if (watching && !window.confirm(
+        'The analysis is still running. Close this and it keeps going — the '
+      + 'result appears on the body when it finishes, as long as this tab stays '
+      + 'open, and it is saved either way: reopen it from Recordings.')) {
+      return;
+    }
     host.remove();
   };
   $('[data-close]').addEventListener('click', shut);
@@ -467,28 +478,45 @@ async function dialog(nw, install, can) {
 
     /* Poll rather than stream. The pipeline's own output is what is shown, so a
      * reader can see it finding people and measuring joints rather than
-     * watching a bar that means nothing. */
+     * watching a bar that means nothing.
+     *
+     * The loop outlives the dialog on purpose. Closing used to abandon it: the
+     * analysis carried on server-side, finished, and had nowhere to appear.
+     * Now it writes to the log only while the dialog is still in the document,
+     * and installs the bundle either way. */
+    watching = true;
+    const alive = () => host.isConnected;
     for (;;) {
       await new Promise((r) => setTimeout(r, 1200));
       let state;
       try {
         state = await (await fetch(`job/${job.id}`)).json();
       } catch { continue; }
-      log.hidden = false;
-      log.textContent = `${state.seconds}s\n` + (state.lines || []).join('\n');
+      if (alive()) {
+        log.hidden = false;
+        log.textContent = `${state.seconds}s\n` + (state.lines || []).join('\n');
+      }
       if (state.state === 'done') {
-        log.textContent += '\n\nDone. Loading it onto the body…';
+        watching = false;
+        if (alive()) log.textContent += '\n\nDone. Loading it onto the body…';
         try {
           await install(state.bundle);
-          shut();
+          host.remove();
         } catch (error) {
-          say(`The result could not be shown: ${error.message}`, true);
+          if (alive()) say(`The result could not be shown: ${error.message}`, true);
+          else console.error('[session] finished analysis could not be shown:', error);
         }
         return;
       }
       if (state.state === 'failed') {
-        say(`${state.error}\\n\\n${(state.lines || []).join('\n')}`, true);
-        goButton.disabled = false;
+        watching = false;
+        if (alive()) {
+          say(`${state.error}\n\n${(state.lines || []).join('\n')}`, true);
+          goButton.disabled = false;
+        } else {
+          console.error('[session] analysis failed after the dialog closed:',
+                        state.error);
+        }
         return;
       }
     }

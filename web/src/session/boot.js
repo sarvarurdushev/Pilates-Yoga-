@@ -30,6 +30,7 @@ import { Session } from './session.js';
 import { attachLab, showReading } from './lab.js';
 import { capabilities, mount as mountRecorder } from './record.js';
 import { mount as mountCoach } from './coach.js';
+import { mount as mountRecordings } from './recordings.js';
 
 const BANNER_CSS = `
 #sessbar{position:fixed;left:0;right:0;top:0;z-index:60;display:flex;gap:14px;
@@ -275,6 +276,10 @@ async function boot() {
    * with silence. */
   served = await capabilities();
   mountRecorder(nw, install, served);
+  /* And a way back into what has already been measured. Without it a finished
+   * analysis could only ever appear in the dialog that was watching the job,
+   * and closing that dialog lost the result with nowhere to recover it. */
+  mountRecordings(served, install);
 
   const url = new URLSearchParams(location.search).get('session');
   /* No session named. The demo chip is offered whatever the server is: a studio

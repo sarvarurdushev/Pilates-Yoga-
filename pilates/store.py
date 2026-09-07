@@ -366,6 +366,33 @@ class Store:
         return [dict(r) for r in
                 self.db.execute("SELECT * FROM sessions ORDER BY date, key")]
 
+    def recordings(self) -> list[dict]:
+        """Every session, with who is in it -- newest first.
+
+        What a person needs to find a recording again: whose it is, when, and
+        how much came out of it. Newest first because the thing somebody is
+        looking for is almost always the one they just made.
+
+        A session with no attributed measurements is still listed. It happened,
+        it is on record, and hiding it would leave somebody hunting for a
+        recording the system is quietly refusing to mention.
+        """
+        rows = self.db.execute("""
+            SELECT s.key, s.date, s.studio, s.duration_s,
+                   l.username AS username,
+                   p.display_name AS display_name,
+                   COUNT(DISTINCT m.id) AS measurements
+              FROM sessions s
+              LEFT JOIN links l ON l.session_id = s.id AND l.status = 'confirmed'
+              LEFT JOIN people p ON p.username = l.username
+              LEFT JOIN measurements m
+                     ON m.session_id = s.id AND m.track_id = l.track_id
+             GROUP BY s.key, s.date, s.studio, s.duration_s, l.username,
+                      p.display_name
+             ORDER BY s.date DESC, s.key DESC
+        """)
+        return [dict(r) for r in rows]
+
     # -- identity -------------------------------------------------------
     def put_link(self, link: Link, signature: Signature | None = None) -> None:
         """Record a link, optionally with the proportions measured for the track.

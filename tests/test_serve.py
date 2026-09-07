@@ -33,6 +33,24 @@ def get(url):
         return response.status, json.loads(response.read())
 
 
+def fetch(url):
+    """A GET that reports a refusal instead of raising it.
+
+    The refusals are half of what this server is tested for, so they have to be
+    readable as values rather than as exceptions in every other test.
+    """
+    try:
+        return get(url)
+    except urllib.error.HTTPError as error:
+        body = error.read()
+        try:
+            return error.code, json.loads(body)
+        except ValueError:
+            # A route that is not there at all falls through to the static file
+            # handler, which answers in HTML. The code is the answer then.
+            return error.code, {}
+
+
 def post(url, data, headers=None):
     request = urllib.request.Request(url, data=data, method="POST",
                                      headers=headers or {})
@@ -408,3 +426,81 @@ class TestThePasscode:
             assert self.note(base)[0] == 201
         finally:
             server.shutdown()
+
+
+class TestGettingBackToARecording:
+    """The hole that cost somebody a recording.
+
+    A finished analysis had exactly one place it could appear: the dialog that
+    was watching the job. Close it -- or reload the tab, or walk away while a
+    small machine worked -- and the measurements sat in the database with no
+    route in the interface that could reach them. The honest answer to "where
+    do I see the analysis I just recorded" was nowhere.
+    """
+
+    @pytest.fixture
+    def studio(self, tmp_path):
+        from pilates.demo import fill
+        from pilates.store import Store
+
+        db = tmp_path / "studio.db"
+        with Store.open(db) as store:
+            fill(store, session="s1", date="2026-03-03")
+            fill(store, session="s2", date="2026-04-04")
+        server, url = serve(None, root=WEB, port=0, analyse=True, db=str(db))
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        yield url.split("/index.html")[0], db
+        server.shutdown()
+
+    def test_everything_measured_here_is_listed(self, studio):
+        base, _ = studio
+        status, payload = get(f"{base}/recordings")
+        assert status == 200
+        assert {r["key"] for r in payload["recordings"]} == {"s1", "s2"}
+
+    def test_the_newest_is_first(self, studio):
+        """The one somebody is looking for is almost always the one they just
+        made."""
+        base, _ = studio
+        _, payload = get(f"{base}/recordings")
+        assert [r["key"] for r in payload["recordings"]] == ["s2", "s1"]
+
+    def test_each_row_says_whose_it_is_and_how_much_came_out(self, studio):
+        base, _ = studio
+        _, payload = get(f"{base}/recordings")
+        row = payload["recordings"][0]
+        assert row["username"] and row["display_name"]
+        assert row["measurements"] > 0 and row["date"] == "2026-04-04"
+
+    def test_one_comes_back_as_a_bundle_the_page_can_show(self, studio):
+        base, _ = studio
+        _, listing = get(f"{base}/recordings")
+        row = listing["recordings"][0]
+        status, bundle = get(f"{base}/recording?user={row['username']}"
+                             f"&session={row['key']}")
+        assert status == 200
+        assert bundle["session"]["key"] == row["key"]
+        assert bundle["structures"]
+
+    def test_the_history_travels_with_it(self, studio):
+        """Reopening the second class has to show the first one under it, or
+        the list is a filing cabinet rather than a record."""
+        base, _ = studio
+        _, bundle = get(f"{base}/recording?user=anna&session=s2")
+        assert max(h["sessions"] for h in bundle["history"].values()) == 2
+
+    def test_a_session_nobody_recorded_is_a_404(self, studio):
+        base, _ = studio
+        status, payload = fetch(f"{base}/recording?user=anna&session=nope")
+        assert status == 404 and payload["error"]
+
+    def test_half_a_question_is_refused_rather_than_guessed(self, studio):
+        base, _ = studio
+        assert fetch(f"{base}/recording?user=anna")[0] == 400
+        assert fetch(f"{base}/recording?session=s1")[0] == 400
+
+    def test_a_viewer_has_no_list_to_offer(self, running):
+        """Serving one exported bundle is not a record, and an empty list
+        behind a button is worse than no button."""
+        base, _ = running
+        assert fetch(f"{base}/recordings")[0] == 404

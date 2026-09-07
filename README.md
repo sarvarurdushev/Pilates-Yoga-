@@ -1115,6 +1115,28 @@ browser window; leave it unset and the URL is the only secret there is. Reading
 the page is never gated — nothing about looking at an anatomy model changes
 anything.
 
+### Getting back to a recording
+
+**A hole that cost somebody a recording, and the fix.** A finished analysis had
+exactly one place it could ever appear: the dialog that was watching the job.
+Close it — or reload the tab, or walk away while a small machine worked — and
+the measurements sat in the database with no route in the interface that could
+reach them. The honest answer to *where do I see the analysis I just recorded*
+was: nowhere.
+
+So there is a **Recordings** button beside Record, on any server that keeps a
+record. It lists every class this machine has measured, newest first, with whose
+it is and how much came out of it; clicking one puts it back on the body without
+a page reload, history and coach notes included. A session nobody was attributed
+to is still listed, greyed — it happened, and hiding it would leave somebody
+hunting for a recording the system was quietly refusing to mention.
+
+And closing the dialog mid-analysis no longer abandons the job: the polling
+outlives the dialog and the result lands on the body when it finishes. Closing
+the *tab* still takes the poller with it, which is what the warning on close
+says — but the measurements are on record either way, and Recordings is where
+they are.
+
 ### Click any structure
 
 The right-hand column is that part's dashboard: the structure rendered from the
