@@ -1248,10 +1248,42 @@ login flood cannot exhaust a small container's memory, and lowerable through
 than the risk. Session tokens are stored hashed; the cookie is `HttpOnly`,
 `SameSite=Strict`, and `Secure` with the `__Host-` prefix over HTTPS.
 
-**A database with no accounts on it keeps the behaviour it had.** The moment the
-first account exists, permission is enforced on every route including the ones
-that predate it — a half-enforced system is one where somebody believes they are
-protected and is not.
+**A database with no accounts serves nothing at all.** This was once a
+compatibility rule — an account-less database kept its old unguarded behaviour —
+and it was a hole: the way to read every health record in a studio was to find
+one that had not got round to making an account. Now such a database offers
+exactly one route, the first-run setup that makes the first admin, and that
+route works once, in a single exclusive transaction, because two people opening
+the setup page of a shared URL at the same moment is not hypothetical.
+
+The passcode and the accounts are two locks in series, not one instead of the
+other: `PILATES_PASSCODE` says this machine may be spoken to, the session says
+who is speaking, and a correct passcode with nobody signed in still reaches
+nothing.
+
+### Three ways back in
+
+A studio locked out of its own record starts a new one, and the whole value here
+is that the record is long. So recovery does not depend on any single thing
+being available:
+
+| | Needs | For |
+|---|---|---|
+| **Recovery codes** | nothing at all | a studio with no mail server — most of them |
+| **An emailed link** | `$PILATES_SMTP_URL` | the flow everybody expects |
+| **An admin issues a link** | an admin | somebody standing at the desk |
+
+Eight one-time codes are printed once when an account is made. Email is
+optional, and `smtps://` or `smtp+starttls://` only — plain `smtp://` to
+anywhere but localhost is refused, because a reset link crossing the internet in
+clear text is worse than no reset link. And an admin issues a **link, not a
+password**: an admin who sets a password knows it, and then a student's record
+has two people who can open it and only one who should.
+
+All three end in a one-time token the person redeems themselves, redeeming signs
+every open session out on every device, and no refusal ever says which half was
+wrong — an unknown address and a wrong code produce the same sentence, because
+anything else tells a stranger which of a studio's students have accounts.
 
 ## The body, on one page
 

@@ -202,7 +202,12 @@ CREATE TABLE IF NOT EXISTS accounts (
     phone         TEXT NOT NULL DEFAULT '',
     password_hash TEXT NOT NULL DEFAULT '',
     created_at    TEXT NOT NULL DEFAULT '',
-    active        INTEGER NOT NULL DEFAULT 1
+    active        INTEGER NOT NULL DEFAULT 1,
+    -- Empty until the address has been proved, which needs an email service.
+    -- Where there is none this stays empty for everybody and means nothing;
+    -- where there is one it is the difference between an address somebody
+    -- typed and an address somebody has.
+    verified_at   TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS studios (
@@ -290,6 +295,32 @@ CREATE TABLE IF NOT EXISTS invitations (
     expires_at  TEXT NOT NULL DEFAULT '',
     accepted_at TEXT NOT NULL DEFAULT ''
 );
+
+-- One-time links: a password reset, or an email verification. Hashed, for the
+-- same reason a session token is: the server needs to recognise one it is
+-- shown, never to reproduce it, and a stolen database should not be a stolen
+-- set of live reset links.
+CREATE TABLE IF NOT EXISTS tokens (
+    token_hash TEXT PRIMARY KEY,
+    username   TEXT NOT NULL REFERENCES accounts(username) ON DELETE CASCADE,
+    purpose    TEXT NOT NULL,
+    issued_by  TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT '',
+    expires_at TEXT NOT NULL DEFAULT '',
+    used_at    TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS tokens_person ON tokens(username, purpose);
+
+-- Recovery codes: the way back in for a studio with no email service at all,
+-- which is most of them. Printed once at signup, kept by the person, spent one
+-- at a time. Hashed like everything else that is shown once.
+CREATE TABLE IF NOT EXISTS recovery_codes (
+    code_hash  TEXT PRIMARY KEY,
+    username   TEXT NOT NULL REFERENCES accounts(username) ON DELETE CASCADE,
+    created_at TEXT NOT NULL DEFAULT '',
+    used_at    TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS recovery_person ON recovery_codes(username, used_at);
 
 -- Who did what to whom. The only way "who saw my health record" has an answer.
 CREATE TABLE IF NOT EXISTS audit (
@@ -405,6 +436,7 @@ class Store:
         wanted = {
             "links": {"signature": "TEXT NOT NULL DEFAULT '{}'"},
             "measurements": {"at_time": "REAL"},
+            "accounts": {"verified_at": "TEXT NOT NULL DEFAULT ''"},
         }
         for table, columns in wanted.items():
             have = {row["name"] for row in
@@ -539,6 +571,43 @@ class Store:
         row = self.db.execute("SELECT * FROM studios WHERE key = ?",
                               (key,)).fetchone()
         return dict(row) if row else None
+
+    def claim_first_admin(self, account: "Account", password: str,
+                          studio: "Studio") -> str:
+        """Make the first admin, and only ever the first.
+
+        Atomic on purpose. Two people opening the setup page of a fresh
+        deployment at the same moment is not a hypothetical -- it is a URL
+        somebody shared -- and the loser of that race must be refused rather
+        than quietly made a second owner. SQLite gives us the guarantee for
+        free if the check and the insert are in one exclusive transaction.
+        """
+        from .accounts import ACTIVE, ADMIN, COACH, Membership, STUDENT, now
+
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            if self.db.execute("SELECT 1 FROM accounts LIMIT 1").fetchone():
+                raise ValueError("this studio already has an owner; sign in "
+                                 "instead, or ask them for an invitation")
+            self.db.execute("COMMIT")
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
+
+        self.add_studio(studio)
+        username = self.create_account(account, password=password)
+        # All three roles, because the person setting a studio up is the person
+        # who will also teach in it and be measured by it -- and finding out
+        # what a student sees is something an owner should not have to make a
+        # second account for.
+        for role in (ADMIN, COACH, STUDENT):
+            self.put_membership(Membership(username=username, studio=studio.key,
+                                           role=role, state=ACTIVE,
+                                           decided_by="setup", decided_at=now()))
+        self.record_audit(actor=username, action="studio:created",
+                          subject=username, studio=studio.key,
+                          detail="first admin")
+        return username
 
     def create_account(self, account: "Account", password: str = "") -> str:
         """Make a person who can log in.

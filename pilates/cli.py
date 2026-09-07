@@ -1657,6 +1657,15 @@ def cmd_web(args: argparse.Namespace) -> int:
     else:
         print("  viewer only: the Record button is still there and says how to "
               "turn analysis on, but this server will not take a clip")
+    if record:
+        from .api import unclaimed as _unclaimed
+
+        with Store.open(record) as _store:
+            if _unclaimed(_store):
+                print("  nobody can sign in to this record yet, so nothing on "
+                      "it is being served. Open the page to set up the studio, "
+                      "or run `pilates account <email> --name ... --role admin "
+                      "--studio <key>`")
     if bundle is None:
         print("  no session: this is the anatomy application on its own, which "
               "is how it is meant to work without one")
@@ -2227,6 +2236,41 @@ def cmd_account(args) -> int:
     return 0
 
 
+def cmd_reset(args) -> int:
+    """Issue somebody a way back in, from the terminal.
+
+    A link rather than a password, for the same reason the web console issues
+    one: an admin who sets a password knows it, and then a student's record has
+    two people who can open it and only one who should. ``--codes`` prints a
+    fresh set of recovery codes instead, which is the path for a machine with
+    no mail server and nobody at the desk.
+    """
+    from .recovery import ADMIN_HOURS, issue_codes, issue_token, link_for
+    from .store import Store
+
+    with Store.open(args.db) as store:
+        account = store.account_by_email(args.email)
+        if account is None:
+            print(f"no account here for {args.email}", file=sys.stderr)
+            return 1
+        if args.codes:
+            codes = issue_codes(store, account.username)
+            print(f"Fresh recovery codes for {account.email}. The previous set "
+                  "no longer works.")
+            for code in codes:
+                print(f"  {code}")
+            print("\nEach works once. Hand them over and do not keep a copy.")
+            return 0
+        token = issue_token(store, account.username, "reset",
+                            by=args.by, hours=ADMIN_HOURS)
+        print(f"A reset link for {account.email}, good for {ADMIN_HOURS} hours "
+              "and one use:")
+        print(f"  {link_for(args.at, 'reset', token)}")
+        print("\nIt is not stored and cannot be looked up again. Issuing "
+              "another cancels this one.")
+    return 0
+
+
 def cmd_roles(args) -> int:
     """Show, approve or refuse what people have asked for."""
     from .accounts import ACTIVE, SUSPENDED
@@ -2588,6 +2632,17 @@ def main(argv: list[str] | None = None) -> int:
     ac.add_argument("--list", action="store_true")
     ac.add_argument("--db", default="studio.db")
     ac.set_defaults(func=cmd_account)
+
+    rs = sub.add_parser("reset",
+                        help="issue somebody a link to choose a new password")
+    rs.add_argument("email")
+    rs.add_argument("--codes", action="store_true",
+                    help="print fresh recovery codes instead of a link")
+    rs.add_argument("--at", default="http://localhost:8000",
+                    help="where the studio is served, so the link points at it")
+    rs.add_argument("--by", default="command line")
+    rs.add_argument("--db", default="studio.db")
+    rs.set_defaults(func=cmd_reset)
 
     rl = sub.add_parser("roles", help="what people have asked to be")
     rl.add_argument("--studio")

@@ -411,11 +411,15 @@ class TestTheOlderRoutesAreGuardedToo:
         assert client.get(f"/student?username={names['ann']}")[0] == 401
         assert client.get("/roster")[0] == 401
 
-    def test_a_database_with_no_accounts_keeps_the_old_behaviour(self, tmp_path):
-        """A studio that never created an account keeps what it had. The moment
-        the first account exists, permission is enforced everywhere -- a
-        half-enforced system is one where somebody believes they are protected
-        and is not."""
+    def test_a_database_with_no_accounts_serves_nobody_s_record(self, tmp_path):
+        """This used to be the compatibility rule and it was a hole.
+
+        A studio that had not got round to making an account served every
+        record on it to whoever asked -- so "not set up yet" was a way through
+        the door, on exactly the deployments least likely to notice. Now an
+        account-less database offers one thing, which is the setup that makes
+        the first admin.
+        """
         from pilates.demo import fill
 
         db = tmp_path / "plain.db"
@@ -425,8 +429,48 @@ class TestTheOlderRoutesAreGuardedToo:
         threading.Thread(target=server.serve_forever, daemon=True).start()
         try:
             client = Client(url.split("/index.html")[0])
-            assert client.get("/sheet?user=anna")[0] == 200
+            assert client.get("/sheet?user=anna")[0] == 401
+            assert client.get("/recordings")[0] == 401
+            assert client.get("/student?username=anna")[0] == 401
+            # And it says which screen to draw rather than leaving the page to
+            # guess between "sign in" and "there is nobody to sign in as".
+            me = client.get("/auth/me")[1]
+            assert me["accounts"] is True and me["setup"] is True
+        finally:
+            server.shutdown()
+
+    def test_the_first_admin_can_be_made_and_only_once(self, tmp_path,
+                                                       monkeypatch):
+        """Two people opening the setup page of a fresh deployment at the same
+        moment is not hypothetical -- it is a URL somebody shared."""
+        monkeypatch.setattr("pilates.passwords.N", 2 ** 14)
+        from pilates.demo import fill
+
+        db = tmp_path / "plain.db"
+        with Store.open(db) as store:
+            fill(store, session="s1", date="2026-03-03")
+        server, url = serve(None, root=WEB, port=0, analyse=True, db=str(db))
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            base = url.split("/index.html")[0]
+            client = Client(base)
+            made = {"email": "owner@b.co", "display_name": "The Owner",
+                    "password": PASSWORD, "studio_key": "here",
+                    "studio_name": "The Studio"}
+            status, payload = client.post("/auth/setup", made)
+            assert status == 201 and payload["username"]
+            # Shown once, at the only moment they can be: the owner of a studio
+            # locking themselves out of it is the failure with no way back.
+            assert len(payload["recovery_codes"]) == 8
+
+            # The second attempt is refused, whoever makes it.
+            again, refusal = Client(base).post("/auth/setup", made)
+            assert again == 409 and "already has an owner" in refusal["error"]
+
+            # And now the records are reachable, by the person who claimed it.
+            client.sign_in("owner@b.co")
             assert client.get("/recordings")[0] == 200
+            assert Client(base).get("/recordings")[0] == 401
         finally:
             server.shutdown()
 
@@ -530,3 +574,112 @@ class TestTheRosterSaysWhatToReadFirst:
         ben.post("/roster/answer", {"coach": names["coach"], "accept": True})
         order = [s["display_name"] for s in coach.get("/roster")[1]["students"]]
         assert order[0] == "Ben"  # never screened
+
+
+class TestGettingBackInOverHttp:
+    """Three routes back in, and none of them tell a stranger who trains here."""
+
+    def test_forgot_says_the_same_thing_for_a_real_and_a_made_up_address(
+            self, studio):
+        base, _, _ = studio
+        known = Client(base).post("/auth/forgot", {"email": "ann@b.co"})
+        unknown = Client(base).post("/auth/forgot", {"email": "nobody@b.co"})
+        assert known == unknown
+
+    def test_with_no_mail_server_it_names_the_other_two_ways(self, studio):
+        base, _, _ = studio
+        _, payload = Client(base).post("/auth/forgot", {"email": "ann@b.co"})
+        assert payload["email_possible"] is False
+        assert "recovery codes" in payload["message"]
+        assert "admin" in payload["message"]
+
+    def test_a_signup_hands_over_recovery_codes_once(self, studio):
+        base, _, _ = studio
+        client = Client(base)
+        _, welcome = client.post("/auth/signup", {
+            "email": "new@b.co", "display_name": "New", "password": PASSWORD,
+            "studio": "tashkent", "wants": STUDENT})
+        assert len(welcome["recovery_codes"]) == 8
+        assert "not this computer" in welcome["recovery_note"]
+
+    def test_a_code_gets_you_a_new_password(self, studio):
+        base, _, _ = studio
+        client = Client(base)
+        _, welcome = client.post("/auth/signup", {
+            "email": "new@b.co", "display_name": "New", "password": PASSWORD,
+            "studio": "tashkent", "wants": STUDENT})
+        code = welcome["recovery_codes"][0]
+        status, _ = Client(base).post("/auth/recover", {
+            "email": "new@b.co", "code": code, "password": "a whole new one now"})
+        assert status == 200
+        assert Client(base).sign_in("new@b.co", "a whole new one now")[0] == 200
+        assert Client(base).sign_in("new@b.co", PASSWORD)[0] == 401
+
+    def test_a_wrong_code_is_refused_without_saying_which_half_was_wrong(
+            self, studio):
+        base, _, _ = studio
+        status, payload = Client(base).post("/auth/recover", {
+            "email": "ann@b.co", "code": "nope-nope", "password": PASSWORD})
+        assert status == 400
+        assert payload["error"] == "that email and recovery code do not match"
+
+    def test_an_admin_issues_a_link_not_a_password(self, studio):
+        base, names, _ = studio
+        boss = Client(base)
+        boss.sign_in("boss@b.co")
+        boss.post("/auth/switch", {"studio": "tashkent", "role": ADMIN})
+        status, payload = boss.post("/admin/reset", {"username": names["ann"]})
+        assert status == 200 and "reset=" in payload["link"]
+        token = payload["link"].split("reset=")[1]
+        assert Client(base).post("/auth/reset", {
+            "token": token, "password": "handed over in person"})[0] == 200
+        assert Client(base).sign_in("ann@b.co", "handed over in person")[0] == 200
+
+    def test_only_an_admin_can_issue_one(self, studio):
+        base, names, _ = studio
+        coach = Client(base)
+        coach.sign_in("coach@b.co")
+        assert coach.post("/admin/reset", {"username": names["ann"]})[0] == 403
+        ann = Client(base)
+        ann.sign_in("ann@b.co")
+        assert ann.post("/admin/reset", {"username": names["ben"]})[0] == 403
+
+    def test_resetting_signs_every_open_session_out(self, studio):
+        base, names, _ = studio
+        ann = Client(base)
+        ann.sign_in("ann@b.co")
+        assert ann.get("/auth/me")[1]["signed_in"] is True
+
+        boss = Client(base)
+        boss.sign_in("boss@b.co")
+        boss.post("/auth/switch", {"studio": "tashkent", "role": ADMIN})
+        token = boss.post("/admin/reset",
+                          {"username": names["ann"]})[1]["link"].split("reset=")[1]
+        Client(base).post("/auth/reset", {"token": token,
+                                          "password": "somebody had the old one"})
+        assert ann.get("/auth/me")[1]["signed_in"] is False
+
+    def test_a_person_can_see_which_ways_back_they_have(self, studio):
+        base, _, _ = studio
+        client = Client(base)
+        client.sign_in("ann@b.co")
+        status, payload = client.get("/me/recovery")
+        assert status == 200
+        assert payload["email"] is False and payload["admin"] is True
+
+    def test_new_codes_can_be_asked_for_and_cancel_the_old(self, studio):
+        base, _, _ = studio
+        client = Client(base)
+        _, welcome = client.post("/auth/signup", {
+            "email": "new@b.co", "display_name": "New", "password": PASSWORD,
+            "studio": "tashkent", "wants": STUDENT})
+        old = welcome["recovery_codes"][0]
+        client.sign_in("new@b.co")
+        fresh = client.post("/me/recovery-codes")[1]["codes"]
+        assert len(fresh) == 8 and old not in fresh
+        assert Client(base).post("/auth/recover", {
+            "email": "new@b.co", "code": old, "password": PASSWORD})[0] == 400
+
+    def test_signed_out_cannot_ask_for_somebody_else_s_codes(self, studio):
+        base, _, _ = studio
+        assert Client(base).post("/me/recovery-codes")[0] == 401

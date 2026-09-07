@@ -60,6 +60,16 @@ const CSS = `
 #ss-gate .ss-said.ss-good{color:var(--acc)}
 #ss-gate .ss-note{margin:16px 0 0;padding-left:11px;font-size:11px;line-height:1.65;
   color:var(--dim2);border-left:2px solid var(--line2)}
+#ss-gate .ss-codes{margin:14px 0 0;padding:14px 15px;border-radius:4px;
+  background:#05070d;border:1px solid rgba(233,180,92,.4)}
+#ss-gate .ss-codes h3{margin:0 0 4px;font-size:12px;font-weight:500;
+  color:var(--gold);letter-spacing:.02em}
+#ss-gate .ss-codes p{margin:0 0 10px;font-size:11.5px;color:var(--dim2);
+  line-height:1.6}
+#ss-gate .ss-codes ol{margin:0;padding:0;list-style:none;display:grid;
+  grid-template-columns:1fr 1fr;gap:5px 12px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;
+  color:var(--txt);letter-spacing:.04em}
 
 #ss-who-chip{flex:none;align-self:flex-start;display:flex;gap:8px;
   align-items:center;padding:5px 6px 5px 11px;border-radius:4px;
@@ -119,31 +129,141 @@ export function gate(me) {
     const host = document.createElement('div');
     host.id = 'ss-gate';
     document.body.appendChild(host);
-    let mode = 'in';
+    /* A link in the URL means the person is already halfway through something:
+     * a reset they asked for, or an address they are confirming. Landing them
+     * on the sign-in form would be asking for the password they came here
+     * because they do not have. */
+    const url = new URLSearchParams(location.search);
+    const link = url.get('reset') || '';
+    const confirming = url.get('verify') || '';
+    let mode = me.setup ? 'setup' : link ? 'redeem' : 'in';
     let wants = 'student';
+
+    if (confirming) {
+      send('auth/verify', { token: confirming }).catch(() => {});
+    }
+
+    const HEADINGS = {
+      setup: ['Set this studio up',
+              'Nobody can sign in to this database yet, so nothing on it is '
+              + 'being served. Make the first account and it becomes yours: '
+              + 'admin, coach and student at once.'],
+      in: ['Sign in',
+           'Your measurements, your progress and what your coach wrote are '
+           + 'behind this. Nobody else can see them.'],
+      up: ['Join this studio',
+           'Your name and email identify you; your phone number is what keeps '
+           + 'two people with similar names apart.'],
+      forgot: ['Forgotten password',
+               'There are three ways back in, and this studio may not have all '
+               + 'three. Start here.'],
+      code: ['Use a recovery code',
+             'One of the codes you saved when you signed up. Each works once.'],
+      redeem: ['Choose a new password',
+               'This link works once. Every session that was open will be '
+               + 'signed out, including on other devices.'],
+    };
+
+    /**
+     * The codes, on a screen of their own.
+     *
+     * Of their own because the first version redrew the form with the codes
+     * underneath it, and a redraw empties the fields it was about to read the
+     * email and password back out of -- so the button that said "sign me in"
+     * signed nobody in. A screen with one button and no inputs cannot have
+     * that class of bug.
+     */
+    const showCodes = (list, message, label, onward) => {
+      host.innerHTML = `<div class="ss-card">
+        <p class="ss-brand">Pilates · Movement analysis</p>
+        <h2>Save these somewhere first</h2>
+        <p class="ss-sub">${esc(message)}</p>
+        <div class="ss-codes">
+          <h3>Your recovery codes — the only time they are shown</h3>
+          <p>Not on this computer. Any one of them gets you back in if you
+            forget your password; each works once. An admin can also issue you
+            a link, and this studio can email one if it has been given a mail
+            server.</p>
+          <ol>${list.map((c) => `<li>${esc(c)}</li>`).join('')}</ol>
+        </div>
+        <div class="ss-go">
+          <button type="button" data-on>${esc(label)}</button>
+          <button type="button" class="ss-link" data-copy>Copy them</button>
+        </div>
+        <p class="ss-said"></p>
+      </div>`;
+      const said = host.querySelector('.ss-said');
+      host.querySelector('[data-copy]').addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(list.join('\n'));
+          said.className = 'ss-said ss-good';
+          said.textContent = 'Copied.';
+        } catch {
+          said.className = 'ss-said';
+          said.textContent = 'This browser would not let the page copy them — '
+                           + 'select them and copy by hand.';
+        }
+      });
+      const button = host.querySelector('[data-on]');
+      if (onward) {
+        button.addEventListener('click', async () => {
+          button.disabled = true;
+          said.className = 'ss-said';
+          said.textContent = 'One moment…';
+          try {
+            await onward();
+          } catch (error) {
+            said.className = 'ss-said ss-bad';
+            said.textContent = error.message;
+            button.disabled = false;
+          }
+        });
+      } else {
+        button.disabled = true;
+      }
+    };
 
     const draw = () => {
       const studios = me.studios ?? [];
       const roles = me.roles ?? {};
+      const [title, blurb] = HEADINGS[mode];
       host.innerHTML = `<div class="ss-card">
         <p class="ss-brand">Pilates · Movement analysis</p>
-        <h2>${mode === 'in' ? 'Sign in' : 'Join this studio'}</h2>
-        <p class="ss-sub">${mode === 'in'
-          ? 'Your measurements, your progress and what your coach wrote are '
-            + 'behind this. Nobody else can see them.'
-          : 'Your name and email identify you; your phone number is what keeps '
-            + 'two people with similar names apart.'}</p>
-        ${mode === 'up' ? `
+        <h2>${esc(title)}</h2>
+        <p class="ss-sub">${esc(blurb)}</p>
+
+        ${mode === 'setup' ? `
+          <label for="ss-g-sname">Studio name</label>
+          <input id="ss-g-sname" placeholder="Tashkent Pilates">
+          <div class="ss-pair">
+            <div><label for="ss-g-city">City</label><input id="ss-g-city"></div>
+            <div><label for="ss-g-country">Country</label>
+              <input id="ss-g-country" placeholder="UZ"></div>
+          </div>` : ''}
+
+        ${mode === 'up' || mode === 'setup' ? `
           <label for="ss-g-name">Your name</label>
           <input id="ss-g-name" autocomplete="name">` : ''}
-        <label for="ss-g-email">Email</label>
-        <input id="ss-g-email" type="email" autocomplete="email">
-        <label for="ss-g-pass">Password</label>
-        <input id="ss-g-pass" type="password"
-          autocomplete="${mode === 'in' ? 'current-password' : 'new-password'}">
-        ${mode === 'up' ? `
+
+        ${mode === 'redeem' ? '' : `
+          <label for="ss-g-email">Email</label>
+          <input id="ss-g-email" type="email" autocomplete="email">`}
+
+        ${mode === 'code' ? `
+          <label for="ss-g-code">Recovery code</label>
+          <input id="ss-g-code" placeholder="abcd-efgh" autocomplete="off">` : ''}
+
+        ${mode === 'forgot' ? '' : `
+          <label for="ss-g-pass">${
+            mode === 'code' || mode === 'redeem' ? 'New password' : 'Password'}</label>
+          <input id="ss-g-pass" type="password"
+            autocomplete="${mode === 'in' ? 'current-password' : 'new-password'}">`}
+
+        ${mode === 'up' || mode === 'setup' ? `
           <label for="ss-g-phone">Phone</label>
-          <input id="ss-g-phone" placeholder="+998901234567" autocomplete="tel">
+          <input id="ss-g-phone" placeholder="+998901234567" autocomplete="tel">` : ''}
+
+        ${mode === 'up' ? `
           <label for="ss-g-studio">Studio</label>
           <select id="ss-g-studio">${studios.map((s) =>
             `<option value="${esc(s.key)}">${esc(s.name)}${
@@ -153,23 +273,38 @@ export function gate(me) {
             <button type="button" data-role="${esc(key)}"
               aria-pressed="${key === wants}">
               <b>${esc(key[0].toUpperCase() + key.slice(1))}</b>
-              <span>${esc(what)}</span></button>`).join('')}</div>
+              <span>${esc(what)}</span></button>`).join('')}</div>` : ''}
+
+        ${mode === 'up' || mode === 'setup' ? `
           <div class="ss-pair" style="margin-top:12px">
             <div><label for="ss-g-h">Height (m)</label>
               <input id="ss-g-h" inputmode="decimal" placeholder="1.76"></div>
             <div><label for="ss-g-m">Weight (kg)</label>
               <input id="ss-g-m" inputmode="decimal" placeholder="72"></div>
           </div>` : ''}
+
         <div class="ss-go">
-          <button type="button" data-do>${
-            mode === 'in' ? 'Sign in' : 'Create my account'}</button>
-          <button type="button" class="ss-link" data-swap>${
-            mode === 'in' ? 'I do not have an account' : 'I already have one'}</button>
+          <button type="button" data-do>${{
+            setup: 'Create the studio', in: 'Sign in',
+            up: 'Create my account', forgot: 'Send me a link',
+            code: 'Set a new password', redeem: 'Set a new password',
+          }[mode]}</button>
+          ${mode === 'in' ? `
+            <button type="button" class="ss-link" data-go="up">I do not have an account</button>
+            <button type="button" class="ss-link" data-go="forgot">Forgotten it</button>`
+          : mode === 'setup' ? ''
+          : `<button type="button" class="ss-link" data-go="in">Back to sign in</button>`}
+          ${mode === 'forgot'
+            ? `<button type="button" class="ss-link" data-go="code">I have a recovery code</button>`
+            : ''}
         </div>
         <p class="ss-said"></p>
         ${mode === 'up' ? `<p class="ss-note">Choosing <b>coach</b> asks the studio;
           it does not make you one. Until somebody there approves it you can see
           your own record and nobody else's.</p>` : ''}
+        ${mode === 'setup' ? `<p class="ss-note">Whoever does this first owns
+          the studio. It works once — after that everybody else signs up or is
+          invited.</p>` : ''}
       </div>`;
 
       const said = host.querySelector('.ss-said');
@@ -183,42 +318,87 @@ export function gate(me) {
           }
         });
       }
-      host.querySelector('[data-swap]').addEventListener('click', () => {
-        mode = mode === 'in' ? 'up' : 'in';
-        draw();
-      });
+      for (const jump of host.querySelectorAll('[data-go]')) {
+        jump.addEventListener('click', () => {
+          mode = jump.dataset.go;
+          draw();
+        });
+      }
 
       const go = host.querySelector('[data-do]');
+      const finish = async (email, password) => {
+        await send('auth/signin', { email, password });
+        host.remove();
+        resolve(await whoami());
+      };
+
       const submit = async () => {
         go.disabled = true;
         said.className = 'ss-said';
         said.textContent = 'One moment…';
         try {
           if (mode === 'in') {
-            await send('auth/signin',
-                       { email: value('ss-g-email'), password: value('ss-g-pass') });
-            host.remove();
-            resolve(await whoami());
+            await finish(value('ss-g-email'), value('ss-g-pass'));
             return;
           }
-          const welcome = await send('auth/signup', {
-            email: value('ss-g-email'), display_name: value('ss-g-name'),
-            password: value('ss-g-pass'), phone: value('ss-g-phone'),
-            studio: value('ss-g-studio'), wants,
-            height_m: value('ss-g-h'), mass_kg: value('ss-g-m'),
-          });
-          if (welcome.waiting) {
-            // Nothing to sign into yet, and saying so beats a login that
-            // refuses with no explanation thirty seconds later.
+          if (mode === 'forgot') {
+            const out = await send('auth/forgot', { email: value('ss-g-email') });
             said.className = 'ss-said ss-good';
-            said.textContent = welcome.message;
+            said.textContent = out.message;
             go.disabled = false;
             return;
           }
-          await send('auth/signin',
-                     { email: value('ss-g-email'), password: value('ss-g-pass') });
-          host.remove();
-          resolve(await whoami());
+          if (mode === 'code') {
+            await send('auth/recover', {
+              email: value('ss-g-email'), code: value('ss-g-code'),
+              password: value('ss-g-pass'),
+            });
+            await finish(value('ss-g-email'), value('ss-g-pass'));
+            return;
+          }
+          if (mode === 'redeem') {
+            await send('auth/reset', { token: link, password: value('ss-g-pass') });
+            // The token is spent; leaving it in the address bar means a reload
+            // lands on a screen that can only fail.
+            history.replaceState({}, '', location.pathname);
+            mode = 'in';
+            draw();
+            host.querySelector('.ss-said').className = 'ss-said ss-good';
+            host.querySelector('.ss-said').textContent =
+              'Password changed. Sign in with the new one.';
+            return;
+          }
+          // Read out before anything redraws: the screen that comes next
+          // does not have these fields on it.
+          const email = value('ss-g-email');
+          const password = value('ss-g-pass');
+
+          if (mode === 'setup') {
+            const out = await send('auth/setup', {
+              studio_name: value('ss-g-sname'), city: value('ss-g-city'),
+              country: value('ss-g-country'),
+              studio_key: value('ss-g-sname').toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)
+                || 'studio',
+              display_name: value('ss-g-name'), email,
+              password, phone: value('ss-g-phone'),
+            });
+            showCodes(out.recovery_codes, out.message,
+                      'I have saved these — sign me in',
+                      () => finish(email, password));
+            return;
+          }
+
+          const welcome = await send('auth/signup', {
+            email, display_name: value('ss-g-name'),
+            password, phone: value('ss-g-phone'),
+            studio: value('ss-g-studio'), wants,
+            height_m: value('ss-g-h'), mass_kg: value('ss-g-m'),
+          });
+          showCodes(welcome.recovery_codes, welcome.message,
+                    welcome.waiting ? 'Waiting for the studio to approve you'
+                                    : 'I have saved these — sign me in',
+                    welcome.waiting ? null : () => finish(email, password));
         } catch (error) {
           said.className = 'ss-said ss-bad';
           said.textContent = error.message;
@@ -229,7 +409,7 @@ export function gate(me) {
       for (const input of host.querySelectorAll('input')) {
         input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
       }
-      host.querySelector('#ss-g-email')?.focus();
+      host.querySelector('#ss-g-sname, #ss-g-email, #ss-g-pass')?.focus();
     };
     draw();
   });

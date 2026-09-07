@@ -233,6 +233,9 @@ async function dialog(me) {
             data-role="coach">+ coach</button>
           <button type="button" class="ss-act ss-warn" data-make="${esc(person.username)}"
             data-role="admin">+ admin</button>
+          <button type="button" class="ss-act" data-reset="${esc(person.username)}"
+            title="Issue a one-time link they use to choose their own password"
+            >reset</button>
         </div>`;
       }).join('')}`;
 
@@ -246,6 +249,19 @@ async function dialog(me) {
           await post('admin/grant', { username: make.dataset.make, role });
           tell(`Granted ${role}.`);
           drawPeople();
+        } catch (error) { tell(error.message, true); }
+      });
+    }
+    for (const reset of rows.querySelectorAll('[data-reset]')) {
+      reset.addEventListener('click', async () => {
+        /* A link, not a password. An admin who sets somebody's password knows
+         * it, and then a student's record has two people who can open it and
+         * only one who should. */
+        try {
+          const out = await post('admin/reset', { username: reset.dataset.reset });
+          await navigator.clipboard?.writeText(out.link).catch(() => {});
+          tell(`Reset link copied — hand it to them. It works once and lasts `
+             + `${out.hours} hours. Issuing another cancels it.`);
         } catch (error) { tell(error.message, true); }
       });
     }

@@ -22,18 +22,17 @@ from .onboarding import (accept_coach, approve, ask_to_coach, grant, invite,
                          pending, sign_up)
 
 
-def enforced(store) -> bool:
-    """Whether this database has accounts on it at all.
+def unclaimed(store) -> bool:
+    """Whether this database has nobody who can sign in to it yet.
 
-    The compatibility rule, and it is deliberate: a studio that has never
-    created an account keeps the behaviour it had -- the pipeline, the record,
-    the coach button, guarded by the passcode if it set one. The moment the
-    first account exists, permission is enforced everywhere, because a
-    half-enforced system is one where somebody believes they are protected and
-    is not.
+    It used to be that such a database kept its old, unguarded behaviour, and
+    that was a hole rather than a compatibility rule: the way to read every
+    health record in a studio was to find one that had not got round to making
+    an account. Nothing is served on that basis any more. An empty database
+    offers one thing -- :func:`set_up`, which makes the first admin -- and
+    everything else needs somebody to be signed in.
     """
-    return bool(store.db.execute(
-        "SELECT 1 FROM accounts LIMIT 1").fetchone())
+    return not store.db.execute("SELECT 1 FROM accounts LIMIT 1").fetchone()
 
 
 def guard_subject(store, viewer, username: str, write: bool = False) -> None:
@@ -44,8 +43,6 @@ def guard_subject(store, viewer, username: str, write: bool = False) -> None:
     actually carry the data, and a permission system that guards only its own
     new endpoints is decoration.
     """
-    if not enforced(store):
-        return
     person = _need(viewer)
     assignment = (None if person.is_self(username)
                   else store.assignment_between(person.username, username,
@@ -64,9 +61,14 @@ def guard_subject(store, viewer, username: str, write: bool = False) -> None:
 
 
 def visible_usernames(store, viewer) -> set | None:
-    """Whose recordings this viewer may see, or None for "everyone"."""
-    if not enforced(store):
-        return None
+    """Whose recordings this viewer may see, or None for "everyone".
+
+    None is only ever an admin. A record left over from before there were
+    accounts -- a ``people`` row nobody has claimed -- is therefore visible to
+    an admin and to nobody else, which is the right answer: it belongs to
+    somebody, and until an account is attached to it there is no way to know
+    whether the person asking is them.
+    """
     person = _need(viewer)
     if person.can_administer:
         return None
@@ -116,7 +118,12 @@ def me(store, viewer: Viewer | None) -> dict:
     making it a second request just to be tidy is a slower first paint.
     """
     if viewer is None:
-        return {"signed_in": False, "accounts": enforced(store),
+        # `accounts` is now always true where there is a database at all: the
+        # page has to ask somebody who they are before it draws anything of
+        # anybody's. `setup` says which screen to draw -- the first admin, or
+        # the sign-in.
+        return {"signed_in": False, "accounts": True,
+                "setup": unclaimed(store),
                 "studios": store.studios(),
                 "roles": {r: ROLES[r] for r in REQUESTABLE},
                 "parq": PARQ}
@@ -442,8 +449,178 @@ def _number(value):
         raise Refused(f"{value!r} is not a number", 400) from exc
 
 
-def register(store, payload: dict) -> dict:
+# -- getting back in --------------------------------------------------------
+
+def recovery_state(store, viewer: Viewer | None) -> dict:
+    """What ways back in this deployment and this person actually have."""
+    from . import mail
+
+    person = _need(viewer)
+    from .recovery import codes_left
+
+    return {"email": mail.available(),
+            "codes_left": codes_left(store, person.username),
+            "admin": True}
+
+
+def new_codes(store, viewer: Viewer | None) -> dict:
+    """A fresh set, shown once. The old set stops working immediately."""
+    from .recovery import issue_codes
+
+    person = _need(viewer)
+    return {"codes": issue_codes(store, person.username),
+            "note": "Keep these somewhere that is not this computer. Each one "
+                    "works once, and generating this list has just cancelled "
+                    "the previous one."}
+
+
+def forgot(store, payload: dict, base: str = "") -> dict:
+    """Start a reset, and say the same thing whichever way it goes.
+
+    Never reveals whether the address is known here. A "no such account" on
+    this endpoint is a way to find out which of a studio's students have signed
+    up, and the people most likely to be looked up that way are exactly the
+    ones this system holds health data about.
+    """
+    from . import mail
+    from .recovery import email_reset
+
+    email = payload.get("email", "")
+    account = store.account_by_email(email)
+    sent = False
+    if account is not None and account.active and mail.available():
+        try:
+            email_reset(store, account.username, base or "",
+                        studio=_studio_name(store, account.username))
+            sent = True
+        except mail.Undeliverable as exc:
+            # Logged, not shown: whether the studio's mail server is healthy is
+            # not something a stranger at the login form gets to learn.
+            store.record_audit(actor="", action="reset:undeliverable",
+                               subject=account.username, detail=str(exc)[:200])
+    return {
+        "sent": sent if mail.available() else False,
+        "email_possible": mail.available(),
+        "message": (
+            "If that address has an account here, a reset link is on its way. "
+            "It works once and expires in two hours."
+            if mail.available() else
+            "This studio does not send email. Use one of the recovery codes "
+            "you saved when you signed up, or ask an admin to issue you a "
+            "reset link."),
+    }
+
+
+def recover_with_code(store, payload: dict) -> dict:
+    """The path that needs no email server and no admin: a code on paper."""
+    from .recovery import redeem, spend_code
+
+    token = spend_code(store, payload.get("email", ""),
+                       payload.get("code", ""))
+    redeem(store, token, payload.get("password", ""))
+    return {"ok": True,
+            "message": "Password changed, and every session that was open has "
+                       "been signed out. Sign in with the new one."}
+
+
+def reset_with_token(store, payload: dict) -> dict:
+    """Redeem a link, whether it came by email or from an admin's hand."""
+    from .recovery import redeem
+
+    redeem(store, payload.get("token", ""), payload.get("password", ""))
+    return {"ok": True,
+            "message": "Password changed, and every session that was open has "
+                       "been signed out."}
+
+
+def verify_email(store, payload: dict) -> dict:
+    from .recovery import confirm_email
+
+    return {"username": confirm_email(store, payload.get("token", "")),
+            "message": "Address confirmed."}
+
+
+def admin_reset(store, viewer: Viewer | None, payload: dict,
+                base: str = "") -> dict:
+    """An admin handing somebody a way back in.
+
+    A **link**, not a new password. An admin who sets a password knows it, and
+    then a student's record has two people who can open it and only one who
+    should. The link is redeemed by the person, so the password they end up with
+    is theirs alone.
+    """
+    from . import mail
+    from .recovery import ADMIN_HOURS, issue_token, link_for
+
+    admin = _need_admin(viewer)
+    username = payload.get("username", "")
+    account = store.account(username)
+    if account is None:
+        raise Refused(f"nobody here is called {username!r}", 404)
+    token = issue_token(store, username, "reset", by=admin.username,
+                        hours=ADMIN_HOURS)
+    link = link_for(base or "", "reset", token)
+    emailed = False
+    if mail.available() and payload.get("email_it"):
+        try:
+            mail.send(account.email,
+                      f"A password reset for {_studio_name(store, username)}",
+                      f"An admin issued this reset link for you. It works once "
+                      f"and expires in {ADMIN_HOURS} hours.\n\n{link}\n")
+            emailed = True
+        except mail.Undeliverable as exc:
+            raise Refused(f"the mail server refused it: {exc}", 502) from exc
+    return {"link": link, "emailed": emailed, "hours": ADMIN_HOURS,
+            "note": "Hand this to them. It is not stored and cannot be looked "
+                    "up again; issuing another one cancels this."}
+
+
+def _studio_name(store, username: str) -> str:
+    held = store.memberships(username=username)
+    if not held:
+        return "the studio"
+    return (store.studio(held[0].studio) or {}).get("name", "the studio")
+
+
+def set_up(store, payload: dict) -> dict:
+    """The first admin, on a database that has none.
+
+    The only route in this system that works without a signed-in person, and it
+    stops working the moment it succeeds. It exists because the alternative --
+    what this used to do -- was to serve every record on an account-less
+    database to anybody who asked, which made "has not got round to making an
+    account" into a way through the door.
+    """
+    from .accounts import Account, Studio
+
+    if not unclaimed(store):
+        raise Refused("this studio already has an owner; sign in instead", 409)
+    key = (payload.get("studio_key") or "studio").strip().lower()
+    studio = Studio(key=key, name=payload.get("studio_name") or key,
+                    city=payload.get("city", ""),
+                    country=payload.get("country", ""),
+                    timezone=payload.get("timezone") or "UTC")
+    account = Account(email=payload.get("email", ""),
+                      display_name=payload.get("display_name", ""),
+                      phone=payload.get("phone", ""))
+    username = store.claim_first_admin(account, payload.get("password", ""),
+                                       studio)
+    from .recovery import issue_codes
+
+    return {"username": username, "studio": studio.key,
+            # Shown once, here, because the owner of a studio locking
+            # themselves out of it is the failure with no way back.
+            "recovery_codes": issue_codes(store, username),
+            "message": f"{studio.name} is set up. You are its admin, its coach "
+                       "and a student in it — switch with the control in the "
+                       "header."}
+
+
+def register(store, payload: dict, base: str = "") -> dict:
     """Signing up. Declares an intent; grants nothing but a student role."""
+    from . import mail
+    from .recovery import email_verification, issue_codes
+
     welcome = sign_up(
         store,
         email=payload.get("email", ""),
@@ -458,4 +635,20 @@ def register(store, payload: dict) -> dict:
             "mass_kg": _number(payload.get("mass_kg")),
         }.items() if v not in (None, "")} or None,
     )
-    return welcome.to_dict()
+    out = welcome.to_dict()
+    out["recovery_codes"] = issue_codes(store, welcome.username)
+    out["recovery_note"] = (
+        "Write these down somewhere that is not this computer. Any one of them "
+        "gets you back in if you forget your password"
+        + (", and so does a link we can email you." if mail.available()
+           else ". This studio does not send email, so these and an admin are "
+                "the two ways back."))
+    if mail.available():
+        try:
+            email_verification(store, welcome.username, base or "",
+                               studio=_studio_name(store, welcome.username))
+            out["verification_sent"] = True
+        except mail.Undeliverable:
+            # A mail server that is down must not stop somebody joining.
+            out["verification_sent"] = False
+    return out

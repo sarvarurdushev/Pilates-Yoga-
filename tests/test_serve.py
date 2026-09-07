@@ -28,19 +28,20 @@ def running(tmp_path):
     server.shutdown()
 
 
-def get(url):
-    with urllib.request.urlopen(url, timeout=10) as response:
+def get(url, headers=None):
+    request = urllib.request.Request(url, headers=headers or {})
+    with urllib.request.urlopen(request, timeout=10) as response:
         return response.status, json.loads(response.read())
 
 
-def fetch(url):
+def fetch(url, headers=None):
     """A GET that reports a refusal instead of raising it.
 
     The refusals are half of what this server is tested for, so they have to be
     readable as values rather than as exceptions in every other test.
     """
     try:
-        return get(url)
+        return get(url, headers)
     except urllib.error.HTTPError as error:
         body = error.read()
         try:
@@ -49,6 +50,35 @@ def fetch(url):
             # A route that is not there at all falls through to the static file
             # handler, which answers in HTML. The code is the answer then.
             return error.code, {}
+
+
+def owner(db, monkeypatch=None):
+    """Make the admin these tests act as, and hand back a signed-in cookie.
+
+    Every route that carries somebody's data now needs a person behind it --
+    there is no longer a state in which an account-less database serves records
+    to whoever asks. So the fixtures that used to reach straight in have to sign
+    in like a browser does.
+    """
+    from pilates import auth, passwords
+    from pilates.accounts import Studio
+    from pilates.store import Store
+
+    passwords.N = 2 ** 14           # 400 ms a hash is right in production, not here
+    with Store.open(db) as store:
+        account = _Account(email="boss@studio.test", display_name="The Owner")
+        store.claim_first_admin(account, "a decently long password",
+                                Studio(key="here", name="The Studio"))
+        session = auth.sign_in(store, "boss@studio.test",
+                               "a decently long password")
+        auth.switch(store, session.token, "here", "admin")
+    return {"Cookie": f"{auth.COOKIE}={session.token}"}
+
+
+def _Account(**kwargs):
+    from pilates.accounts import Account
+
+    return Account(**kwargs)
 
 
 def post(url, data, headers=None):
@@ -167,14 +197,15 @@ class TestTheCoachWritesFromTheBody:
         db = tmp_path / "studio.db"
         with Store.open(db) as store:
             fill(store, session="s1", date="2026-03-03")
+        signed_in = owner(db)
         server, url = serve(None, root=WEB, port=0, analyse=False, db=str(db))
         threading.Thread(target=server.serve_forever, daemon=True).start()
-        yield url.split("/index.html")[0], db
+        yield url.split("/index.html")[0], db, signed_in
         server.shutdown()
 
     def test_coach_mode_is_offered_where_there_is_a_record(self, studio):
-        base, _ = studio
-        _, payload = get(f"{base}/capabilities")
+        base, _, signed_in = studio
+        _, payload = get(f"{base}/capabilities", signed_in)
         assert payload["coach"] is True
         assert "contraindication" in payload["kinds"]
 
@@ -186,44 +217,44 @@ class TestTheCoachWritesFromTheBody:
         assert payload["coach"] is False
 
     def test_a_note_is_written_and_comes_straight_back_in_the_sheet(self, studio):
-        base, _ = studio
+        base, _, signed_in = studio
         status, payload = post(
             f"{base}/note",
             json.dumps({"username": "anna", "kind": "cue", "by": "Sam",
                         "text": "reach the heel away",
                         "structure": "rectus femoris"}).encode(),
-            {"Content-Type": "application/json"})
+            {"Content-Type": "application/json", **signed_in})
         assert status == 201
         assert payload["note"]["tier"] == "observed"
         assert payload["sheet"]["cues"][0]["text"] == "reach the heel away"
 
     def test_a_rating_with_nothing_attached_is_refused_at_the_door(self, studio):
-        base, _ = studio
+        base, _, signed_in = studio
         status, payload = post(
             f"{base}/note",
             json.dumps({"username": "anna", "kind": "assessment", "by": "Sam",
                         "text": "steadier", "rating": 4}).encode(),
-            {"Content-Type": "application/json"})
+            {"Content-Type": "application/json", **signed_in})
         assert status == 400 and "what it rates" in payload["error"]
 
     def test_a_note_about_somebody_who_is_not_enrolled_is_refused(self, studio):
-        base, _ = studio
+        base, _, signed_in = studio
         status, payload = post(
             f"{base}/note",
             json.dumps({"username": "ghost", "kind": "note", "by": "Sam",
                         "text": "hello"}).encode(),
-            {"Content-Type": "application/json"})
+            {"Content-Type": "application/json", **signed_in})
         assert status == 404 and "not enrolled" in payload["error"]
 
     def test_the_sheet_reads_in_reading_order(self, studio):
-        base, _ = studio
+        base, _, signed_in = studio
         for kind, text in (("note", "warm-up fine"),
                            ("contraindication", "left knee")):
             post(f"{base}/note",
                  json.dumps({"username": "anna", "kind": kind, "by": "Sam",
                              "text": text}).encode(),
-                 {"Content-Type": "application/json"})
-        _, sheet = get(f"{base}/sheet?user=anna")
+                 {"Content-Type": "application/json", **signed_in})
+        _, sheet = get(f"{base}/sheet?user=anna", signed_in)
         assert sheet["flags"][0]["text"] == "left knee"
         assert [n["text"] for n in sheet["recent"]] == ["warm-up fine"]
 
@@ -367,9 +398,10 @@ class TestThePasscode:
         db = tmp_path / "studio.db"
         with Store.open(db) as store:
             fill(store, session="s1", date="2026-03-03")
+        signed_in = owner(db)
         server, url = serve(None, root=WEB, port=0, analyse=True, db=str(db))
         threading.Thread(target=server.serve_forever, daemon=True).start()
-        yield url.split("/index.html")[0]
+        yield url.split("/index.html")[0], signed_in
         server.shutdown()
 
     def note(self, base, headers=None):
@@ -380,37 +412,55 @@ class TestThePasscode:
 
     def test_the_page_is_told_to_ask(self, guarded):
         """The 401 would say it anyway, one round trip later."""
-        _, payload = get(f"{guarded}/capabilities")
+        base, _ = guarded
+        _, payload = get(f"{base}/capabilities")
         assert payload["passcode"] is True
 
     def test_an_upload_without_one_is_refused(self, guarded):
-        status, payload = post(f"{guarded}/analyse", b"x" * 32)
+        base, signed_in = guarded
+        status, payload = post(f"{base}/analyse", b"x" * 32, signed_in)
         assert status == 401 and "passcode" in payload["error"]
 
     def test_a_wrong_one_is_refused(self, guarded):
-        status, _ = post(f"{guarded}/analyse", b"x" * 32,
-                         {"X-Passcode": "not it"})
+        base, signed_in = guarded
+        status, _ = post(f"{base}/analyse", b"x" * 32,
+                         {"X-Passcode": "not it", **signed_in})
         assert status == 401
 
     def test_a_note_without_one_is_refused(self, guarded):
-        status, _ = self.note(guarded)
+        base, signed_in = guarded
+        status, _ = self.note(base, signed_in)
         assert status == 401
 
     def test_the_right_one_is_let_through(self, guarded):
-        status, _ = self.note(guarded, {"X-Passcode": "open sesame"})
+        base, signed_in = guarded
+        status, _ = self.note(base, {"X-Passcode": "open sesame", **signed_in})
         assert status == 201
+
+    def test_the_passcode_is_not_a_login(self, guarded):
+        """Two locks in series, not one instead of the other. The passcode says
+        this machine may be spoken to; the session says who is speaking. A right
+        passcode with nobody signed in still reaches nothing."""
+        base, _ = guarded
+        status, payload = self.note(base, {"X-Passcode": "open sesame"})
+        assert status == 401 and "sign in" in payload["error"]
 
     def test_reading_is_never_gated(self, guarded):
         """Nothing about looking at an anatomy model changes anything, and a
         passcode in front of the page would be security theatre over a body."""
-        status, payload = get(f"{guarded}/capabilities")
+        base, signed_in = guarded
+        status, payload = get(f"{base}/capabilities")
         assert status == 200
-        with urllib.request.urlopen(f"{guarded}/index.html", timeout=10) as page:
+        with urllib.request.urlopen(f"{base}/index.html", timeout=10) as page:
             assert page.status == 200
-        assert get(f"{guarded}/sheet?user=anna")[0] == 200
+        assert get(f"{base}/sheet?user=anna", signed_in)[0] == 200
 
-    def test_an_unset_passcode_leaves_the_server_open(self, tmp_path, monkeypatch):
-        """The right default on a studio machine on its own network."""
+    def test_an_unset_passcode_takes_off_that_lock_and_only_that_one(
+            self, tmp_path, monkeypatch):
+        """The right default on a studio machine on its own network -- and it
+        was the *only* lock once, which is what got fixed. Leaving the passcode
+        unset now means the shared word is not asked for; it does not mean
+        anybody may write into somebody's record."""
         from pilates.demo import fill
         from pilates.store import Store
 
@@ -418,12 +468,14 @@ class TestThePasscode:
         db = tmp_path / "studio.db"
         with Store.open(db) as store:
             fill(store, session="s1", date="2026-03-03")
+        signed_in = owner(db)
         server, url = serve(None, root=WEB, port=0, analyse=True, db=str(db))
         threading.Thread(target=server.serve_forever, daemon=True).start()
         base = url.split("/index.html")[0]
         try:
             assert get(f"{base}/capabilities")[1]["passcode"] is False
-            assert self.note(base)[0] == 201
+            assert self.note(base)[0] == 401
+            assert self.note(base, signed_in)[0] == 201
         finally:
             server.shutdown()
 
@@ -447,37 +499,38 @@ class TestGettingBackToARecording:
         with Store.open(db) as store:
             fill(store, session="s1", date="2026-03-03")
             fill(store, session="s2", date="2026-04-04")
+        signed_in = owner(db)
         server, url = serve(None, root=WEB, port=0, analyse=True, db=str(db))
         threading.Thread(target=server.serve_forever, daemon=True).start()
-        yield url.split("/index.html")[0], db
+        yield url.split("/index.html")[0], db, signed_in
         server.shutdown()
 
     def test_everything_measured_here_is_listed(self, studio):
-        base, _ = studio
-        status, payload = get(f"{base}/recordings")
+        base, _, signed_in = studio
+        status, payload = get(f"{base}/recordings", signed_in)
         assert status == 200
         assert {r["key"] for r in payload["recordings"]} == {"s1", "s2"}
 
     def test_the_newest_is_first(self, studio):
         """The one somebody is looking for is almost always the one they just
         made."""
-        base, _ = studio
-        _, payload = get(f"{base}/recordings")
+        base, _, signed_in = studio
+        _, payload = get(f"{base}/recordings", signed_in)
         assert [r["key"] for r in payload["recordings"]] == ["s2", "s1"]
 
     def test_each_row_says_whose_it_is_and_how_much_came_out(self, studio):
-        base, _ = studio
-        _, payload = get(f"{base}/recordings")
+        base, _, signed_in = studio
+        _, payload = get(f"{base}/recordings", signed_in)
         row = payload["recordings"][0]
         assert row["username"] and row["display_name"]
         assert row["measurements"] > 0 and row["date"] == "2026-04-04"
 
     def test_one_comes_back_as_a_bundle_the_page_can_show(self, studio):
-        base, _ = studio
-        _, listing = get(f"{base}/recordings")
+        base, _, signed_in = studio
+        _, listing = get(f"{base}/recordings", signed_in)
         row = listing["recordings"][0]
         status, bundle = get(f"{base}/recording?user={row['username']}"
-                             f"&session={row['key']}")
+                             f"&session={row['key']}", signed_in)
         assert status == 200
         assert bundle["session"]["key"] == row["key"]
         assert bundle["structures"]
@@ -485,19 +538,19 @@ class TestGettingBackToARecording:
     def test_the_history_travels_with_it(self, studio):
         """Reopening the second class has to show the first one under it, or
         the list is a filing cabinet rather than a record."""
-        base, _ = studio
-        _, bundle = get(f"{base}/recording?user=anna&session=s2")
+        base, _, signed_in = studio
+        _, bundle = get(f"{base}/recording?user=anna&session=s2", signed_in)
         assert max(h["sessions"] for h in bundle["history"].values()) == 2
 
     def test_a_session_nobody_recorded_is_a_404(self, studio):
-        base, _ = studio
-        status, payload = fetch(f"{base}/recording?user=anna&session=nope")
+        base, _, signed_in = studio
+        status, payload = fetch(f"{base}/recording?user=anna&session=nope", signed_in)
         assert status == 404 and payload["error"]
 
     def test_half_a_question_is_refused_rather_than_guessed(self, studio):
-        base, _ = studio
-        assert fetch(f"{base}/recording?user=anna")[0] == 400
-        assert fetch(f"{base}/recording?session=s1")[0] == 400
+        base, _, signed_in = studio
+        assert fetch(f"{base}/recording?user=anna", signed_in)[0] == 400
+        assert fetch(f"{base}/recording?session=s1", signed_in)[0] == 400
 
     def test_a_viewer_has_no_list_to_offer(self, running):
         """Serving one exported bundle is not a record, and an empty list

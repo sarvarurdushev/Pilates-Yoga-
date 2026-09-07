@@ -119,6 +119,16 @@ class Handler(SimpleHTTPRequestHandler):
     def _token(self) -> str:
         return auth.token_from(self.headers.get("Cookie", ""))
 
+    def _base(self) -> str:
+        """Where this page lives, for a link somebody has to be able to click.
+
+        Built from the request rather than configured, so a studio that moves
+        from localhost to a domain does not have to remember to change a
+        setting -- and a reset link is useless if it points at the wrong host.
+        """
+        host = self.headers.get("X-Forwarded-Host") or self.headers.get("Host")
+        return f"{'https' if self.secure else 'http'}://{host or 'localhost'}"
+
     def _viewer(self, store):
         """The membership this request is acting as, or None."""
         if not self.db:
@@ -265,6 +275,10 @@ class Handler(SimpleHTTPRequestHandler):
         if route.path == "/admin/people" and self.db:
             self._answer(lambda store: api.everybody(store, self._viewer(store)))
             return
+        if route.path == "/me/recovery" and self.db:
+            self._answer(lambda store: api.recovery_state(
+                store, self._viewer(store)))
+            return
         if route.path == "/audit" and self.db:
             who = parse_qs(route.query).get("username", [""])[0]
             self._answer(lambda store: api.audit_log(
@@ -330,7 +344,20 @@ class Handler(SimpleHTTPRequestHandler):
     #: Where a signed-in person's role decides the answer. Each takes the
     #: store, the viewer and the parsed body.
     WRITES = {
-        "/auth/signup": lambda self, store, body: api.register(store, body),
+        "/auth/setup": lambda self, store, body: api.set_up(store, body),
+        "/auth/signup": lambda self, store, body: api.register(
+            store, body, self._base()),
+        "/auth/forgot": lambda self, store, body: api.forgot(
+            store, body, self._base()),
+        "/auth/recover": lambda self, store, body: api.recover_with_code(
+            store, body),
+        "/auth/reset": lambda self, store, body: api.reset_with_token(
+            store, body),
+        "/auth/verify": lambda self, store, body: api.verify_email(store, body),
+        "/me/recovery-codes": lambda self, store, body: api.new_codes(
+            store, self._viewer(store)),
+        "/admin/reset": lambda self, store, body: api.admin_reset(
+            store, self._viewer(store), body, self._base()),
         "/me/profile": lambda self, store, body: api.put_profile(
             store, self._viewer(store), body),
         "/me/screening": lambda self, store, body: api.put_screening(
@@ -362,7 +389,8 @@ class Handler(SimpleHTTPRequestHandler):
                 self._json({"error": str(refused)}, refused.status)
                 return
             self._answer(lambda store: work(self, store, body),
-                         201 if route.path == "/auth/signup" else 200)
+                         201 if route.path in ("/auth/signup", "/auth/setup")
+                         else 200)
             return
         if route.path == "/note":
             self._note()

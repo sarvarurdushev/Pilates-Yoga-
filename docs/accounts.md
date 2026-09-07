@@ -255,16 +255,89 @@ that changes.
 
 ---
 
+## Nothing is served without an identity
+
+There was a compatibility rule here, and it was a hole. A database that had no
+accounts on it kept its old, unguarded behaviour — the reasoning being that a
+studio which had not set accounts up should not have its existing deployment
+broken. What that actually meant is that **the way to read every health record
+in a studio was to find one that had not got round to making an account**, on
+exactly the deployments least likely to notice.
+
+So there is no such state any more:
+
+- A database with no accounts serves **nothing**. Not the recordings list, not a
+  bundle, not a coach sheet, not a note. Every one answers 401.
+- What it does offer is one route, `POST /auth/setup`, which makes the first
+  admin. It works exactly once, in a single exclusive transaction — two people
+  opening the setup page of a fresh deployment at the same moment is not
+  hypothetical, it is a URL somebody shared, and the loser of that race is
+  refused rather than quietly made a second owner.
+- The person who claims it gets all three roles, because the person setting a
+  studio up is also the person who will teach in it and be measured by it.
+- Records left over from before accounts existed — `people` rows nobody has
+  claimed — are visible to an admin and to nobody else. They belong to somebody,
+  and until an account is attached there is no way to know whether the person
+  asking is them.
+
+The passcode and the accounts are **two locks in series, not one instead of the
+other**: `PILATES_PASSCODE` says this machine may be spoken to; the session says
+who is speaking. A correct passcode with nobody signed in still reaches nothing.
+
+## Getting back in
+
+A studio locked out of its own record starts a new one, and this project's whole
+value is that the record is long. So there are three ways back, and they are
+independent on purpose — each works where another cannot.
+
+| | Needs | Good for |
+|---|---|---|
+| **Recovery codes** | nothing | a studio with no mail server, which is most of them |
+| **An emailed link** | `$PILATES_SMTP_URL` | the flow everybody expects |
+| **An admin issues a link** | an admin | somebody standing at the desk |
+
+**Recovery codes** are eight one-time codes, shown once when the account is
+made and never recoverable afterwards. Forty bits each, stored hashed like
+anything else that is shown once. Asking for a new set cancels the old one —
+"generate new codes" means the old list is lost or compromised, and leaving it
+live would make that sentence untrue.
+
+**Email is optional and honestly optional.** One environment variable, and
+`smtps://` or `smtp+starttls://` only: plain `smtp://` to anywhere but localhost
+is refused, because a reset link crossing the internet in clear text is worse
+than no reset link. Where it is unset, every path that would have used it says
+so and names the other two.
+
+**An admin issues a link, not a password.** This is the part worth being firm
+about: an admin who *sets* somebody's password knows it, and then that student's
+record has two people who can open it and only one who should. The link is
+redeemed by the person, so the password they end up with is theirs alone.
+
+Three rules hold across all three paths:
+
+1. **Every path ends in a one-time token the person redeems themselves.**
+2. **Redeeming signs every open session out**, on every device. A password is
+   reset most often because somebody believes somebody else has it, and leaving
+   that session alive answers the wrong half of the problem.
+3. **A refusal never says which half was wrong.** An unknown address and a wrong
+   code produce the same sentence; `forgot` answers identically whether or not
+   the address is known. Anything else is a way to find out which of a studio's
+   students have accounts, and those are the people this system holds health
+   data about.
+
+Email verification works the same way where mail is configured: a one-time link,
+a separate token namespace from resets, and a `verified_at` that stays empty and
+means nothing where there is no mail server.
+
 ## What this deliberately does not do yet
 
 Named so that they are decisions rather than omissions:
 
-- **No email verification and no password reset**, because both need an email
-  service and this has none. An admin can reset a password; that is the whole
-  recovery path for now, and it is written down rather than discovered.
 - **No payments, packages or bookings.** A studio management system is a
   different product; this one measures movement.
 - **No SSO.** One studio, one password.
+- **No second factor.** Recovery codes here are a way back in, not a way to
+  prove a second thing.
 - **Under-18s are flagged, not handled.** A profile whose date of birth makes
   the person a minor is marked as needing a guardian, and nothing else changes.
   Doing it properly means guardian accounts and consent by proxy.
