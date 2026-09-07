@@ -184,6 +184,129 @@ CREATE TABLE IF NOT EXISTS manifests (
     notes      TEXT NOT NULL DEFAULT ''
 );
 
+-- ---------------------------------------------------------------- people
+-- Who is who, where, and what they may see. The measurement tables above know
+-- about bodies and nothing about permission; these know about permission and
+-- nothing about bodies. They meet at one column: accounts.username is the same
+-- key the links, observations and measurements are attributed to, so one person
+-- has one history whichever role they are acting in.
+--
+-- The load-bearing decision is that ROLE LIVES ON THE MEMBERSHIP, not on the
+-- account. See docs/accounts.md; the short version is that the first real user
+-- of this system needs to be admin, coach and student at once, and a role
+-- column on the account makes that three strangers.
+CREATE TABLE IF NOT EXISTS accounts (
+    username      TEXT PRIMARY KEY REFERENCES people(username) ON DELETE CASCADE,
+    email         TEXT UNIQUE NOT NULL,
+    display_name  TEXT NOT NULL DEFAULT '',
+    phone         TEXT NOT NULL DEFAULT '',
+    password_hash TEXT NOT NULL DEFAULT '',
+    created_at    TEXT NOT NULL DEFAULT '',
+    active        INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS studios (
+    key        TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    city       TEXT NOT NULL DEFAULT '',
+    country    TEXT NOT NULL DEFAULT '',
+    timezone   TEXT NOT NULL DEFAULT 'UTC',
+    created_at TEXT NOT NULL DEFAULT ''
+);
+
+-- One person, at one studio, in one role. A person may hold several rows here
+-- and acts as one of them at a time.
+CREATE TABLE IF NOT EXISTS memberships (
+    username   TEXT NOT NULL REFERENCES accounts(username) ON DELETE CASCADE,
+    studio     TEXT NOT NULL REFERENCES studios(key) ON DELETE CASCADE,
+    role       TEXT NOT NULL,
+    state      TEXT NOT NULL DEFAULT 'pending',
+    since      TEXT NOT NULL DEFAULT '',
+    decided_by TEXT NOT NULL DEFAULT '',
+    decided_at TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (username, studio, role)
+);
+
+CREATE TABLE IF NOT EXISTS profiles (
+    username        TEXT PRIMARY KEY REFERENCES accounts(username) ON DELETE CASCADE,
+    born            TEXT NOT NULL DEFAULT '',
+    height_m        REAL,
+    mass_kg         REAL,
+    emergency_name  TEXT NOT NULL DEFAULT '',
+    emergency_phone TEXT NOT NULL DEFAULT '',
+    goals           TEXT NOT NULL DEFAULT '',
+    updated_at      TEXT NOT NULL DEFAULT ''
+);
+
+-- Health, in its own table so that it can be guarded and redacted on its own.
+-- A coach is shown flags(); nothing here is served to one whole.
+CREATE TABLE IF NOT EXISTS screenings (
+    username             TEXT PRIMARY KEY REFERENCES accounts(username) ON DELETE CASCADE,
+    answers              TEXT NOT NULL DEFAULT '{}',
+    conditions           TEXT NOT NULL DEFAULT '',
+    medications          TEXT NOT NULL DEFAULT '',
+    injuries             TEXT NOT NULL DEFAULT '',
+    pregnant             INTEGER NOT NULL DEFAULT 0,
+    cleared_by_physician INTEGER NOT NULL DEFAULT 0,
+    completed_on         TEXT NOT NULL DEFAULT '',
+    updated_at           TEXT NOT NULL DEFAULT ''
+);
+
+-- A coach and a student, and the consent that makes it real. Being in the same
+-- building is not permission; this row is.
+CREATE TABLE IF NOT EXISTS assignments (
+    coach    TEXT NOT NULL REFERENCES accounts(username) ON DELETE CASCADE,
+    student  TEXT NOT NULL REFERENCES accounts(username) ON DELETE CASCADE,
+    studio   TEXT NOT NULL REFERENCES studios(key) ON DELETE CASCADE,
+    state    TEXT NOT NULL DEFAULT 'pending',
+    scopes   TEXT NOT NULL DEFAULT '[]',
+    since    TEXT NOT NULL DEFAULT '',
+    until    TEXT NOT NULL DEFAULT '',
+    asked_by TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (coach, student, studio)
+);
+
+-- Logins. The token is stored hashed: a stolen database should not be a stolen
+-- set of live sessions.
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    token_hash TEXT PRIMARY KEY,
+    username   TEXT NOT NULL REFERENCES accounts(username) ON DELETE CASCADE,
+    studio     TEXT NOT NULL DEFAULT '',
+    role       TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT '',
+    expires_at TEXT NOT NULL DEFAULT '',
+    last_seen  TEXT NOT NULL DEFAULT ''
+);
+
+-- The safe way to create staff: the role is scoped in the same step as the
+-- invitation, rather than approved after the fact.
+CREATE TABLE IF NOT EXISTS invitations (
+    token_hash  TEXT PRIMARY KEY,
+    email       TEXT NOT NULL,
+    studio      TEXT NOT NULL REFERENCES studios(key) ON DELETE CASCADE,
+    role        TEXT NOT NULL,
+    invited_by  TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL DEFAULT '',
+    expires_at  TEXT NOT NULL DEFAULT '',
+    accepted_at TEXT NOT NULL DEFAULT ''
+);
+
+-- Who did what to whom. The only way "who saw my health record" has an answer.
+CREATE TABLE IF NOT EXISTS audit (
+    id      INTEGER PRIMARY KEY,
+    at      TEXT NOT NULL,
+    actor   TEXT NOT NULL DEFAULT '',
+    action  TEXT NOT NULL,
+    subject TEXT NOT NULL DEFAULT '',
+    studio  TEXT NOT NULL DEFAULT '',
+    detail  TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS audit_subject ON audit(subject, at);
+CREATE INDEX IF NOT EXISTS audit_actor ON audit(actor, at);
+CREATE INDEX IF NOT EXISTS memberships_studio ON memberships(studio, role, state);
+CREATE INDEX IF NOT EXISTS assignments_coach ON assignments(coach, state);
+CREATE INDEX IF NOT EXISTS assignments_student ON assignments(student, state);
+
 CREATE INDEX IF NOT EXISTS events_session ON events(session_id, track_id);
 CREATE INDEX IF NOT EXISTS measurements_session ON measurements(session_id, track_id);
 CREATE INDEX IF NOT EXISTS measurements_subject ON measurements(subject);
@@ -392,6 +515,282 @@ class Store:
              ORDER BY s.date DESC, s.key DESC
         """)
         return [dict(r) for r in rows]
+
+
+    # -- accounts, studios and roles ------------------------------------
+    #
+    # The whole of this section is one idea: a role is a row joining a person
+    # to a studio, and every question about permission is asked of that row.
+    # See docs/accounts.md.
+
+    def add_studio(self, studio: "Studio") -> None:
+        self.db.execute(
+            "INSERT OR REPLACE INTO studios (key, name, city, country, "
+            "timezone, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (studio.key, studio.name, studio.city, studio.country,
+             studio.timezone, studio.created_at))
+        self.db.commit()
+
+    def studios(self) -> list[dict]:
+        return [dict(r) for r in
+                self.db.execute("SELECT * FROM studios ORDER BY name")]
+
+    def studio(self, key: str) -> dict | None:
+        row = self.db.execute("SELECT * FROM studios WHERE key = ?",
+                              (key,)).fetchone()
+        return dict(row) if row else None
+
+    def create_account(self, account: "Account", password: str = "") -> str:
+        """Make a person who can log in.
+
+        The `people` row comes with it, unconditionally: an account and a body
+        of measurements are the same person and splitting them is how a studio
+        ends up with a student whose history belongs to nobody.
+        """
+        from .passwords import hash_password
+
+        if self.account_by_email(account.email):
+            raise ValueError(f"{account.email} already has an account")
+        self.enrol(account.username, account.display_name)
+        self.db.execute(
+            "INSERT INTO accounts (username, email, display_name, phone, "
+            "password_hash, created_at, active) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (account.username, account.email, account.display_name,
+             account.phone,
+             hash_password(password) if password else account.password_hash,
+             account.created_at, int(account.active)))
+        self.db.commit()
+        return account.username
+
+    def _account(self, row) -> "Account | None":
+        from .accounts import Account
+
+        if row is None:
+            return None
+        return Account(email=row["email"], display_name=row["display_name"],
+                       phone=row["phone"], password_hash=row["password_hash"],
+                       username=row["username"], created_at=row["created_at"],
+                       active=bool(row["active"]))
+
+    def account(self, username: str) -> "Account | None":
+        return self._account(self.db.execute(
+            "SELECT * FROM accounts WHERE username = ?", (username,)).fetchone())
+
+    def account_by_email(self, email: str) -> "Account | None":
+        from .accounts import normalise_email
+
+        return self._account(self.db.execute(
+            "SELECT * FROM accounts WHERE email = ?",
+            (normalise_email(email),)).fetchone())
+
+    def accounts(self) -> list["Account"]:
+        return [self._account(r) for r in
+                self.db.execute("SELECT * FROM accounts ORDER BY display_name")]
+
+    def set_password(self, username: str, password: str) -> None:
+        from .passwords import hash_password
+
+        self.db.execute("UPDATE accounts SET password_hash = ? WHERE username = ?",
+                        (hash_password(password), username))
+        self.db.commit()
+
+    def set_active(self, username: str, active: bool) -> None:
+        """Deactivation, which is not deletion. `forget` is still the only
+        thing that erases, and it still takes everything."""
+        self.db.execute("UPDATE accounts SET active = ? WHERE username = ?",
+                        (int(active), username))
+        if not active:
+            self.db.execute("DELETE FROM auth_sessions WHERE username = ?",
+                            (username,))
+        self.db.commit()
+
+    # -- memberships ----------------------------------------------------
+
+    def put_membership(self, membership: "Membership") -> None:
+        self.db.execute(
+            "INSERT OR REPLACE INTO memberships (username, studio, role, "
+            "state, since, decided_by, decided_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (membership.username, membership.studio, membership.role,
+             membership.state, membership.since, membership.decided_by,
+             membership.decided_at))
+        self.db.commit()
+
+    def _membership(self, row) -> "Membership":
+        from .accounts import Membership
+
+        return Membership(username=row["username"], studio=row["studio"],
+                          role=row["role"], state=row["state"],
+                          since=row["since"], decided_by=row["decided_by"],
+                          decided_at=row["decided_at"])
+
+    def memberships(self, username: str = "", studio: str = "",
+                    role: str = "", state: str = "") -> list["Membership"]:
+        where, args = [], []
+        for column, value in (("username", username), ("studio", studio),
+                              ("role", role), ("state", state)):
+            if value:
+                where.append(f"{column} = ?")
+                args.append(value)
+        sql = "SELECT * FROM memberships"
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        return [self._membership(r) for r in
+                self.db.execute(sql + " ORDER BY studio, role", args)]
+
+    def decide_membership(self, username: str, studio: str, role: str,
+                          state: str, by: str) -> None:
+        """Approve, suspend or end a role. Always by somebody, always dated."""
+        from .accounts import STATES, now
+
+        if state not in STATES:
+            raise ValueError(f"{state!r} is not one of {sorted(STATES)}")
+        cursor = self.db.execute(
+            "UPDATE memberships SET state = ?, decided_by = ?, decided_at = ? "
+            "WHERE username = ? AND studio = ? AND role = ?",
+            (state, by, now(), username, studio, role))
+        if not cursor.rowcount:
+            raise KeyError(f"{username} holds no {role} role at {studio}")
+        self.db.commit()
+        self.record_audit(actor=by, action=f"membership:{state}",
+                          subject=username, studio=studio, detail=role)
+
+    # -- profile and screening ------------------------------------------
+
+    def put_profile(self, profile: "Profile") -> None:
+        self.db.execute(
+            "INSERT OR REPLACE INTO profiles (username, born, height_m, "
+            "mass_kg, emergency_name, emergency_phone, goals, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (profile.username, profile.born, profile.height_m, profile.mass_kg,
+             profile.emergency_name, profile.emergency_phone, profile.goals,
+             profile.updated_at))
+        self.db.commit()
+
+    def profile(self, username: str) -> "Profile | None":
+        from .accounts import Profile
+
+        row = self.db.execute("SELECT * FROM profiles WHERE username = ?",
+                              (username,)).fetchone()
+        if row is None:
+            return None
+        return Profile(username=row["username"], born=row["born"],
+                       height_m=row["height_m"], mass_kg=row["mass_kg"],
+                       emergency_name=row["emergency_name"],
+                       emergency_phone=row["emergency_phone"],
+                       goals=row["goals"], updated_at=row["updated_at"])
+
+    def put_screening(self, screening: "Screening") -> None:
+        self.db.execute(
+            "INSERT OR REPLACE INTO screenings (username, answers, conditions, "
+            "medications, injuries, pregnant, cleared_by_physician, "
+            "completed_on, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (screening.username, json.dumps(screening.answers),
+             screening.conditions, screening.medications, screening.injuries,
+             int(screening.pregnant), int(screening.cleared_by_physician),
+             screening.completed_on, screening.updated_at))
+        self.db.commit()
+
+    def screening(self, username: str) -> "Screening | None":
+        from .accounts import Screening
+
+        row = self.db.execute("SELECT * FROM screenings WHERE username = ?",
+                              (username,)).fetchone()
+        if row is None:
+            return None
+        return Screening(username=row["username"],
+                         answers=json.loads(row["answers"] or "{}"),
+                         conditions=row["conditions"],
+                         medications=row["medications"],
+                         injuries=row["injuries"],
+                         pregnant=bool(row["pregnant"]),
+                         cleared_by_physician=bool(row["cleared_by_physician"]),
+                         completed_on=row["completed_on"],
+                         updated_at=row["updated_at"])
+
+    # -- assignments ----------------------------------------------------
+
+    def put_assignment(self, assignment: "Assignment") -> None:
+        self.db.execute(
+            "INSERT OR REPLACE INTO assignments (coach, student, studio, "
+            "state, scopes, since, until, asked_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (assignment.coach, assignment.student, assignment.studio,
+             assignment.state, json.dumps(list(assignment.scopes)),
+             assignment.since, assignment.until, assignment.asked_by))
+        self.db.commit()
+
+    def _assignment(self, row) -> "Assignment":
+        from .accounts import Assignment
+
+        return Assignment(coach=row["coach"], student=row["student"],
+                          studio=row["studio"], state=row["state"],
+                          scopes=tuple(json.loads(row["scopes"] or "[]")),
+                          since=row["since"], until=row["until"],
+                          asked_by=row["asked_by"])
+
+    def assignments(self, coach: str = "", student: str = "",
+                    studio: str = "", live_only: bool = False
+                    ) -> list["Assignment"]:
+        where, args = [], []
+        for column, value in (("coach", coach), ("student", student),
+                              ("studio", studio)):
+            if value:
+                where.append(f"{column} = ?")
+                args.append(value)
+        if live_only:
+            where.append("state = 'active' AND until = ''")
+        sql = "SELECT * FROM assignments"
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        return [self._assignment(r) for r in self.db.execute(sql, args)]
+
+    def assignment_between(self, coach: str, student: str,
+                           studio: str = "") -> "Assignment | None":
+        """The one row that decides whether a coach may open a record."""
+        found = self.assignments(coach=coach, student=student, studio=studio)
+        live = [a for a in found if a.live]
+        return live[0] if live else (found[0] if found else None)
+
+    def end_assignment(self, coach: str, student: str, studio: str,
+                       by: str) -> None:
+        """Consent revoked, or a coach moved on. The notes stay -- they are the
+        studio's record of care -- but no new measurement is readable."""
+        from .accounts import LEFT, today
+
+        self.db.execute(
+            "UPDATE assignments SET state = ?, until = ? "
+            "WHERE coach = ? AND student = ? AND studio = ?",
+            (LEFT, today(), coach, student, studio))
+        self.db.commit()
+        self.record_audit(actor=by, action="assignment:ended", subject=student,
+                          studio=studio, detail=coach)
+
+    # -- the audit log --------------------------------------------------
+
+    def record_audit(self, actor: str, action: str, subject: str = "",
+                     studio: str = "", detail: str = "") -> None:
+        from .accounts import now
+
+        self.db.execute(
+            "INSERT INTO audit (at, actor, action, subject, studio, detail) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (now(), actor, action, subject, studio, detail))
+        self.db.commit()
+
+    def audit(self, subject: str = "", actor: str = "",
+              limit: int = 200) -> list[dict]:
+        where, args = [], []
+        if subject:
+            where.append("subject = ?")
+            args.append(subject)
+        if actor:
+            where.append("actor = ?")
+            args.append(actor)
+        sql = "SELECT * FROM audit"
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        args.append(int(limit))
+        return [dict(r) for r in
+                self.db.execute(sql + " ORDER BY at DESC, id DESC LIMIT ?", args)]
 
     # -- identity -------------------------------------------------------
     def put_link(self, link: Link, signature: Signature | None = None) -> None:

@@ -47,7 +47,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import capacity
+from . import api, auth, capacity
 from .analysis_jobs import MAX_UPLOAD_BYTES, Jobs
 from .observations import KINDS
 
@@ -86,6 +86,10 @@ class Handler(SimpleHTTPRequestHandler):
     #: claims nothing more than that.
     passcode: str = ""
 
+    #: Failed sign-ins, remembered in memory across requests. A rate limiter
+    #: rather than a record: a restart clearing it is correct.
+    attempts = auth.Attempts()
+
     def _allowed(self) -> bool:
         """Whether this request may change something."""
         import hmac
@@ -94,6 +98,71 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         given = self.headers.get(PASSCODE_HEADER, "")
         return hmac.compare_digest(given, self.passcode)
+
+    # -- who is asking ----------------------------------------------------
+
+    @property
+    def secure(self) -> bool:
+        """Whether this request arrived over HTTPS.
+
+        Render and every other platform terminates TLS in front of the process,
+        so the socket here is plain either way and the header is the only
+        evidence. localhost counts as secure to browsers, which is what lets a
+        studio develop against the same cookie rules it will deploy under.
+        """
+        forwarded = self.headers.get("X-Forwarded-Proto", "").split(",")[0].strip()
+        if forwarded:
+            return forwarded == "https"
+        host = (self.headers.get("Host") or "").split(":")[0]
+        return host in ("localhost", "127.0.0.1", "::1")
+
+    def _token(self) -> str:
+        return auth.token_from(self.headers.get("Cookie", ""))
+
+    def _viewer(self, store):
+        """The membership this request is acting as, or None."""
+        if not self.db:
+            return None
+        return auth.viewer_for(store, self._token())
+
+    def _payload(self, limit: int = 64 * 1024) -> dict:
+        length = int(self.headers.get("Content-Length") or 0)
+        if not 0 < length <= limit:
+            raise api.Refused("nothing in the request", 400)
+        try:
+            body = json.loads(self.rfile.read(length))
+        except ValueError as exc:
+            raise api.Refused("that was not JSON", 400) from exc
+        if not isinstance(body, dict):
+            raise api.Refused("that was not an object", 400)
+        return body
+
+    def _json_with_cookie(self, payload: dict, cookie: str) -> None:
+        """The only place a Set-Cookie is written. A cookie set by accident is
+        the whole security model gone, so there is exactly one door."""
+        body = json.dumps(payload).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Set-Cookie", cookie)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _answer(self, work, status: int = 200) -> None:
+        """Run one API call and turn its refusal into an honest status.
+
+        Every route below is written as if it will succeed; the refusals are
+        raised where the rule is, next to the reason, rather than checked twice
+        at the edge and once again in the middle.
+        """
+        try:
+            with self._store() as store:
+                self._json(work(store), status)
+        except api.Refused as refused:
+            self._json({"error": str(refused)}, refused.status)
+        except (ValueError, KeyError) as exc:
+            self._json({"error": str(exc)}, 400)
 
     def _store(self):
         """A short-lived store for one request.
@@ -162,16 +231,58 @@ class Handler(SimpleHTTPRequestHandler):
             if not who:
                 self._json({"error": "which person?"}, 400)
                 return
-            with self._store() as store:
-                self._json(store.coach_sheet(who).to_dict())
+            def sheet(store, who=who):
+                api.guard_subject(store, self._viewer(store), who)
+                return store.coach_sheet(who).to_dict()
+
+            self._answer(sheet)
             return
+        # -- accounts ---------------------------------------------------
+        if route.path == "/auth/me":
+            if not self.db:
+                self._json({"signed_in": False, "accounts": False,
+                            "studios": []})
+                return
+            self._answer(lambda store: api.me(store, self._viewer(store)))
+            return
+        if route.path == "/studios" and self.db:
+            self._answer(lambda store: {"studios": store.studios()})
+            return
+        if route.path == "/directory" and self.db:
+            self._answer(lambda store: api.directory(store, self._viewer(store)))
+            return
+        if route.path == "/roster" and self.db:
+            self._answer(lambda store: api.roster(store, self._viewer(store)))
+            return
+        if route.path == "/student" and self.db:
+            who = parse_qs(route.query).get("username", [""])[0]
+            self._answer(lambda store: api.student_record(
+                store, self._viewer(store), who))
+            return
+        if route.path == "/admin/pending" and self.db:
+            self._answer(lambda store: api.waiting(store, self._viewer(store)))
+            return
+        if route.path == "/admin/people" and self.db:
+            self._answer(lambda store: api.everybody(store, self._viewer(store)))
+            return
+        if route.path == "/audit" and self.db:
+            who = parse_qs(route.query).get("username", [""])[0]
+            self._answer(lambda store: api.audit_log(
+                store, self._viewer(store), who))
+            return
+
         if route.path == "/recordings" and self.db:
             # Everything on record here, newest first. Without this a finished
             # analysis had exactly one place it could ever appear -- the dialog
             # that was watching the job -- and closing that dialog threw the
             # result away with nowhere to get it back from.
-            with self._store() as store:
-                self._json({"recordings": store.recordings()})
+            def recordings(store):
+                names = api.visible_usernames(store, self._viewer(store))
+                return {"recordings": [r for r in store.recordings()
+                                       if names is None
+                                       or r.get("username") in names]}
+
+            self._answer(recordings)
             return
         if route.path == "/recording" and self.db:
             # One of them, built into a bundle the page can put on the body.
@@ -183,23 +294,29 @@ class Handler(SimpleHTTPRequestHandler):
             if not who or not key:
                 self._json({"error": "which person, and which session?"}, 400)
                 return
-            with self._store() as store:
+
+            def one(store, who=who, key=key):
+                api.guard_subject(store, self._viewer(store), who)
                 try:
                     bundle = build(store, who, key, include_poses=False)
                 except (ValueError, KeyError) as exc:
-                    self._json({"error": str(exc)}, 404)
-                    return
-            problems = validate(bundle)
-            if problems:
-                # The same refusal the viewer makes, made here instead, so the
-                # reason travels rather than a blank body.
-                self._json({"error": "; ".join(problems)}, 409)
-                return
-            self._json(bundle)
+                    raise api.Refused(str(exc), 404) from exc
+                problems = validate(bundle)
+                if problems:
+                    # The same refusal the viewer makes, made here instead, so
+                    # the reason travels rather than a blank body.
+                    raise api.Refused("; ".join(problems), 409)
+                return bundle
+
+            self._answer(one)
             return
         if route.path == "/people" and self.db:
-            with self._store() as store:
-                self._json({"people": [dict(p) for p in store.people()]})
+            def people(store):
+                names = api.visible_usernames(store, self._viewer(store))
+                return {"people": [dict(p) for p in store.people()
+                                   if names is None or p["username"] in names]}
+
+            self._answer(people)
             return
         if route.path.startswith("/job/") and self.jobs is not None:
             job = self.jobs.get(route.path[len("/job/"):])
@@ -210,8 +327,43 @@ class Handler(SimpleHTTPRequestHandler):
             return
         super().do_GET()
 
+    #: Where a signed-in person's role decides the answer. Each takes the
+    #: store, the viewer and the parsed body.
+    WRITES = {
+        "/auth/signup": lambda self, store, body: api.register(store, body),
+        "/me/profile": lambda self, store, body: api.put_profile(
+            store, self._viewer(store), body),
+        "/me/screening": lambda self, store, body: api.put_screening(
+            store, self._viewer(store), body),
+        "/roster/add": lambda self, store, body: api.add_student(
+            store, self._viewer(store), body),
+        "/roster/answer": lambda self, store, body: api.answer_request(
+            store, self._viewer(store), body),
+        "/roster/end": lambda self, store, body: api.end_assignment(
+            store, self._viewer(store), body),
+        "/admin/decide": lambda self, store, body: api.decide(
+            store, self._viewer(store), body),
+        "/admin/grant": lambda self, store, body: api.give_role(
+            store, self._viewer(store), body),
+        "/admin/invite": lambda self, store, body: api.make_invitation(
+            store, self._viewer(store), body),
+    }
+
     def do_POST(self):  # noqa: N802
         route = urlparse(self.path)
+        if route.path in ("/auth/signin", "/auth/signout", "/auth/switch"):
+            self._session_route(route.path)
+            return
+        if route.path in self.WRITES and self.db:
+            work = self.WRITES[route.path]
+            try:
+                body = self._payload()
+            except api.Refused as refused:
+                self._json({"error": str(refused)}, refused.status)
+                return
+            self._answer(lambda store: work(self, store, body),
+                         201 if route.path == "/auth/signup" else 200)
+            return
         if route.path == "/note":
             self._note()
             return
@@ -242,6 +394,60 @@ class Handler(SimpleHTTPRequestHandler):
         job = self.jobs.submit(data, self.headers.get("X-Filename", "clip.mp4"),
                                options)
         self._json(job.public(), 202)
+
+    def _session_route(self, path: str) -> None:
+        """Sign in, out, or change which role you are acting as.
+
+        Separate from the table above because these three are the only routes
+        that set a cookie, and a cookie set by accident is the whole security
+        model gone.
+        """
+        if not self.db:
+            self._json({"error": "this server keeps no accounts"}, 404)
+            return
+        try:
+            body = self._payload() if path != "/auth/signout" else {}
+        except api.Refused as refused:
+            self._json({"error": str(refused)}, refused.status)
+            return
+
+        with self._store() as store:
+            if path == "/auth/signout":
+                auth.sign_out(store, self._token())
+                self._json_with_cookie({"signed_in": False},
+                                       auth.clear_header(self.secure))
+                return
+
+            if path == "/auth/switch":
+                try:
+                    viewer = auth.switch(store, self._token(),
+                                         body.get("studio", ""),
+                                         body.get("role", ""))
+                except ValueError as exc:
+                    self._json({"error": str(exc)}, 403)
+                    return
+                self._json({"acting": {"username": viewer.username,
+                                       "studio": viewer.studio,
+                                       "role": viewer.role}})
+                return
+
+            auth.sweep(store)
+            try:
+                session = auth.sign_in(
+                    store, body.get("email", ""), body.get("password", ""),
+                    attempts=self.attempts,
+                    source=self.client_address[0] if self.client_address else "")
+            except auth.TooManyTries as exc:
+                self._json({"error": str(exc)}, 429)
+                return
+            except ValueError as exc:
+                self._json({"error": str(exc)}, 401)
+                return
+            _, header = auth.cookie_header(session, self.secure)
+            self._json_with_cookie({"signed_in": True,
+                                    "acting": {"username": session.username,
+                                               "studio": session.studio,
+                                               "role": session.role}}, header)
 
     def _note(self) -> None:
         """One coach observation, written from the body itself.
@@ -285,14 +491,19 @@ class Handler(SimpleHTTPRequestHandler):
             # so they reach the page as they are.
             self._json({"error": str(exc)}, 400)
             return
-        with self._store() as store:
+        def write(store):
             if observation.username not in {p["username"] for p in store.people()}:
-                self._json({"error": f"{observation.username} is not enrolled"}, 404)
-                return
-            note_id = store.observe(observation)
-            sheet = store.coach_sheet(observation.username).to_dict()
-        self._json({"id": note_id, "note": observation.to_dict(),
-                    "sheet": sheet}, 201)
+                raise api.Refused(f"{observation.username} is not enrolled", 404)
+            # A note is written *about* somebody, so it is guarded as a write:
+            # a coach with no live assignment cannot put words in a student's
+            # record any more than they can read the measurements in it.
+            api.guard_subject(store, self._viewer(store), observation.username,
+                              write=True)
+            return {"id": store.observe(observation),
+                    "note": observation.to_dict(),
+                    "sheet": store.coach_sheet(observation.username).to_dict()}
+
+        self._answer(write, 201)
 
     def log_message(self, *args):
         """Quiet. The interesting output is the URL, printed once."""

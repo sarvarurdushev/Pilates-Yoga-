@@ -1,0 +1,298 @@
+/**
+ * The admin's console: roles, people, and the log of who saw what.
+ *
+ * Small on purpose. An admin here does four things -- decide who is a coach,
+ * grant a role, invite somebody, and read the audit log -- and each is a
+ * deliberate act with a line in the log afterwards. The research on how role
+ * systems fail is blunt about the alternative: opaque roles and a settings page
+ * lead to somebody handing out admin "to be safe" and quietly creating a hole.
+ *
+ * So: no custom roles, no permission matrix to edit, three names that mean what
+ * they say. What an admin gets that nobody else does is *everything*, and the
+ * price of that is that every read is written down.
+ */
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g,
+  (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const CSS = `
+#ss-admin-open{flex:none;align-self:flex-start;display:inline-flex;
+  align-items:center;padding:7px 14px;border-radius:4px;cursor:pointer;
+  font:inherit;font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;
+  white-space:nowrap;background:rgba(226,104,95,.12);
+  border:1px solid rgba(226,104,95,.45);color:var(--txt)}
+#ss-admin-open:hover{background:rgba(226,104,95,.2)}
+#ss-admin-open em{font-style:normal;color:#e2685f;font-weight:600}
+#ss-admin-open b{margin-left:7px;font-weight:600;color:#e2685f}
+#ss-admin{position:fixed;inset:0;z-index:130;display:flex;align-items:center;
+  justify-content:center;background:rgba(2,5,10,.8);backdrop-filter:blur(3px)}
+#ss-admin .ss-box{width:min(760px,95vw);max-height:88vh;display:flex;
+  flex-direction:column;border-radius:6px;padding:22px 24px;
+  border:1px solid var(--line2);
+  background:linear-gradient(200deg,rgba(10,17,28,.98),rgba(5,9,16,.99));
+  box-shadow:0 40px 120px rgba(0,0,0,.6)}
+#ss-admin h2{margin:0 0 4px;font-size:17px;font-weight:500;color:var(--txt)}
+#ss-admin .ss-sub{margin:0 0 14px;font-size:12px;color:var(--dim2);line-height:1.6}
+#ss-admin .ss-tabs{display:flex;gap:8px;margin:0 0 14px}
+#ss-admin .ss-tabs button{flex:1;padding:8px 0;border-radius:3px;font:inherit;
+  font-size:12.5px;cursor:pointer;border:1px solid var(--line);
+  background:var(--glass);color:var(--dim)}
+#ss-admin .ss-tabs button[aria-selected=true]{border-color:var(--acc);
+  color:var(--txt);background:rgba(90,169,230,.12)}
+#ss-admin .ss-rows{overflow:auto;flex:1;min-height:100px}
+#ss-admin .ss-row{display:flex;gap:12px;align-items:center;padding:11px 13px;
+  margin:0 0 6px;border-radius:4px;background:var(--glass);
+  border:1px solid var(--line)}
+#ss-admin .ss-row.ss-wants{border-color:rgba(233,180,92,.5);
+  background:rgba(233,180,92,.07)}
+#ss-admin .ss-row .ss-main{flex:1;min-width:0}
+#ss-admin .ss-row b{display:block;font-weight:500;font-size:13px;color:var(--txt)}
+#ss-admin .ss-row .ss-meta{display:block;color:var(--dim2);font-size:11px;
+  margin-top:3px;word-break:break-word}
+#ss-admin .ss-row .ss-tag{font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  padding:2px 7px;border-radius:3px;border:1px solid var(--line2);
+  color:var(--dim)}
+#ss-admin .ss-row .ss-tag.admin{border-color:rgba(226,104,95,.5);color:#e2685f}
+#ss-admin .ss-row .ss-tag.coach{border-color:rgba(233,180,92,.5);color:var(--gold)}
+#ss-admin button.ss-act{padding:5px 11px;border-radius:3px;font:inherit;
+  font-size:11.5px;cursor:pointer;border:1px solid var(--line2);
+  background:var(--glass);color:var(--txt);white-space:nowrap}
+#ss-admin button.ss-act:hover{border-color:var(--acc)}
+#ss-admin button.ss-act.ss-warn:hover{border-color:#e2685f;color:#e2685f}
+#ss-admin .ss-none{font-size:12.5px;color:var(--dim2);line-height:1.75;margin:0}
+#ss-admin .ss-go{display:flex;gap:10px;align-items:center;margin-top:14px}
+#ss-admin .ss-go button{padding:9px 16px;border-radius:3px;font:inherit;
+  font-size:13px;cursor:pointer;border:1px solid var(--line2);
+  background:var(--glass);color:var(--txt)}
+#ss-admin .ss-said{margin-left:auto;font-size:11.5px;color:var(--dim2);
+  text-align:right;max-width:60%}
+#ss-admin .ss-said.ss-bad{color:var(--gold)}
+#ss-admin .ss-log{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:11px;line-height:1.8;color:var(--dim)}
+#ss-admin .ss-log b{color:var(--txt);font-weight:500}
+#ss-admin .ss-invite{display:flex;gap:8px;margin:0 0 12px}
+#ss-admin .ss-invite input,#ss-admin .ss-invite select{padding:8px 10px;
+  border-radius:3px;font:inherit;font-size:13px;background:var(--glass);
+  border:1px solid var(--line);color:var(--txt)}
+#ss-admin .ss-invite input{flex:1}
+/* Flex arithmetic that has to be spelled out. Without flex:none on the
+   controls, a long email in the middle column is squeezed to one character
+   wide and prints itself vertically -- which is exactly what happened. */
+#ss-admin .ss-row .ss-main,#ss-admin .who .ss-main{flex:1 1 auto;min-width:200px;overflow:hidden}
+#ss-admin .ss-row .ss-meta,#ss-admin .who .ss-meta{overflow-wrap:anywhere}
+#ss-admin .ss-row .ss-tag,#ss-admin .ss-row button,#ss-admin .who button,#ss-admin .who .ss-n{flex:none}
+
+`;
+
+const get = async (path) => {
+  const response = await fetch(path, { credentials: 'same-origin' });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || response.statusText);
+  return payload;
+};
+
+const post = async (path, body) => {
+  const response = await fetch(path, {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body ?? {}),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || response.statusText);
+  return payload;
+};
+
+export function mount(me) {
+  if (!me?.can?.administer) return null;
+  const style = document.createElement('style');
+  style.textContent = CSS;
+  document.head.appendChild(style);
+
+  const button = document.createElement('button');
+  button.id = 'ss-admin-open';
+  button.type = 'button';
+  button.innerHTML = '<em>Studio</em>';
+  button.title = 'Roles, people and the audit log';
+  button.addEventListener('click', () => dialog(me));
+  refreshBadge(button);
+
+  const bar = document.getElementById('topbar');
+  const chips = document.getElementById('discBar');
+  if (bar && chips) bar.insertBefore(button, chips);
+  else document.body.appendChild(button);
+  return button;
+}
+
+/** A count on the button, because a request nobody sees is a person waiting. */
+async function refreshBadge(button) {
+  try {
+    const { pending } = await get('admin/pending');
+    button.innerHTML = '<em>Studio</em>'
+      + (pending.length ? `<b>${pending.length}</b>` : '');
+  } catch { /* not an admin any more, or offline */ }
+}
+
+async function dialog(me) {
+  const host = document.createElement('div');
+  host.id = 'ss-admin';
+  host.innerHTML = `<div class="ss-box">
+    <h2>Studio</h2>
+    <p class="ss-sub">Roles are granted here and nowhere else. Every grant, every
+      read of somebody's record, and every sign-in is in the log.</p>
+    <div class="ss-tabs" role="tablist">
+      <button type="button" data-tab="waiting" aria-selected="true">Waiting</button>
+      <button type="button" data-tab="people" aria-selected="false">People</button>
+      <button type="button" data-tab="log" aria-selected="false">Log</button>
+    </div>
+    <div class="ss-rows">Reading…</div>
+    <div class="ss-go"><button type="button" data-close>Close</button>
+      <span class="ss-said"></span></div>
+  </div>`;
+  document.body.appendChild(host);
+  const shut = () => host.remove();
+  host.querySelector('[data-close]').addEventListener('click', shut);
+  host.addEventListener('click', (e) => { if (e.target === host) shut(); });
+
+  const rows = host.querySelector('.ss-rows');
+  const said = host.querySelector('.ss-said');
+  let tab = 'waiting';
+
+  const tell = (text, bad = false) => {
+    said.className = bad ? 'ss-said ss-bad' : 'ss-said';
+    said.textContent = text;
+  };
+
+  const drawWaiting = async () => {
+    const { pending } = await get('admin/pending');
+    rows.innerHTML = pending.length ? pending.map((row) => `
+      <div class="ss-row ss-wants">
+        <span class="ss-main"><b>${esc(row.display_name)}</b>
+          <span class="ss-meta">${esc(row.email)}${
+            row.phone ? ` · ${esc(row.phone)}` : ''} · asked ${esc(row.since)}</span>
+        </span>
+        <span class="ss-tag ${esc(ss-row.role)}">wants ${esc(row.role)}</span>
+        <button type="button" class="ss-act" data-yes="${esc(row.username)}"
+          data-role="${esc(row.role)}">Approve</button>
+        <button type="button" class="ss-act ss-warn" data-no="${esc(row.username)}"
+          data-role="${esc(row.role)}">Refuse</button>
+      </div>`).join('')
+      : `<p class="ss-none">Nothing waiting. When somebody signs up asking to
+         coach, they appear here and can see nothing but their own record until
+         you decide.</p>`;
+
+    for (const yes of rows.querySelectorAll('[data-yes]')) {
+      yes.addEventListener('click', async () => {
+        try {
+          await post('admin/decide', { username: yes.dataset.yes,
+                                       role: yes.dataset.role, state: 'active' });
+          tell('Approved.');
+          drawWaiting();
+        } catch (error) { tell(error.message, true); }
+      });
+    }
+    for (const no of rows.querySelectorAll('[data-no]')) {
+      no.addEventListener('click', async () => {
+        try {
+          await post('admin/decide', { username: no.dataset.no,
+                                       role: no.dataset.role, state: 'left' });
+          tell('Refused. Their own record still works.');
+          drawWaiting();
+        } catch (error) { tell(error.message, true); }
+      });
+    }
+  };
+
+  const drawPeople = async () => {
+    const { people, studios } = await get('admin/people');
+    const options = (studios ?? []).map((s) =>
+      `<option value="${esc(s.key)}">${esc(s.name)}</option>`).join('');
+    rows.innerHTML = `
+      <div class="ss-invite">
+        <input data-invite-email placeholder="Invite an email…">
+        <select data-invite-role>
+          <option value="coach">as coach</option>
+          <option value="student">as student</option>
+          <option value="admin">as admin</option>
+        </select>
+        <select data-invite-studio>${options}</select>
+        <button type="button" class="ss-act" data-invite>Invite</button>
+      </div>
+      ${people.map((person) => {
+        const roles = (person.memberships ?? [])
+          .filter((m) => m.state === 'active')
+          .map((m) => `<span class="ss-tag ${esc(m.role)}">${esc(m.role)}</span>`)
+          .join(' ');
+        const facts = [person.age && `${person.age}`, person.phone,
+                       (person.screening?.flags ?? []).join(', ')]
+          .filter(Boolean).join(' · ');
+        return `<div class="ss-row">
+          <span class="ss-main"><b>${esc(person.display_name)}</b>
+            <span class="ss-meta">${esc(person.email ?? '')}${
+              facts ? ` · ${esc(facts)}` : ''}</span></span>
+          ${roles}
+          <button type="button" class="ss-act" data-make="${esc(person.username)}"
+            data-role="coach">+ coach</button>
+          <button type="button" class="ss-act ss-warn" data-make="${esc(person.username)}"
+            data-role="admin">+ admin</button>
+        </div>`;
+      }).join('')}`;
+
+    for (const make of rows.querySelectorAll('[data-make]')) {
+      make.addEventListener('click', async () => {
+        const role = make.dataset.role;
+        if (role === 'admin' && !window.confirm(
+            'An admin can read every health record in this studio and grant '
+          + 'that power to anybody else. Give it to this person?')) return;
+        try {
+          await post('admin/grant', { username: make.dataset.make, role });
+          tell(`Granted ${role}.`);
+          drawPeople();
+        } catch (error) { tell(error.message, true); }
+      });
+    }
+    rows.querySelector('[data-invite]')?.addEventListener('click', async () => {
+      const email = rows.querySelector('[data-invite-email]').value.trim();
+      const role = rows.querySelector('[data-invite-role]').value;
+      const studio = rows.querySelector('[data-invite-studio]').value;
+      try {
+        const { token } = await post('admin/invite', { email, role, studio });
+        const link = `${location.origin}${location.pathname}?invite=${token}`;
+        await navigator.clipboard?.writeText(link).catch(() => {});
+        tell('Invitation link copied. It is not stored and cannot be looked '
+           + 'up again.');
+      } catch (error) { tell(error.message, true); }
+    });
+  };
+
+  const drawLog = async () => {
+    const { events } = await get('audit');
+    rows.innerHTML = events.length
+      ? `<div class="ss-log">${events.map((e) => `
+          <div><b>${esc(e.at.replace('T', ' ').replace('+00:00', ''))}</b>
+          ${esc(e.actor || '—')} → <b>${esc(e.action)}</b>
+          ${e.subject ? esc(e.subject) : ''}
+          ${e.detail ? `(${esc(e.detail)})` : ''}</div>`).join('')}</div>`
+      : `<p class="ss-none">Nothing logged yet.</p>`;
+  };
+
+  const draw = async () => {
+    rows.innerHTML = 'Reading…';
+    try {
+      if (tab === 'waiting') await drawWaiting();
+      else if (tab === 'people') await drawPeople();
+      else await drawLog();
+    } catch (error) {
+      rows.innerHTML = `<p class="ss-none">${esc(error.message)}</p>`;
+    }
+  };
+
+  for (const button of host.querySelectorAll('.ss-tabs button')) {
+    button.addEventListener('click', () => {
+      tab = button.dataset.tab;
+      for (const other of host.querySelectorAll('.ss-tabs button')) {
+        other.setAttribute('aria-selected', String(other === button));
+      }
+      draw();
+    });
+  }
+  draw();
+}

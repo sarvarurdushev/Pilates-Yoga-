@@ -31,6 +31,9 @@ import { attachLab, showReading } from './lab.js';
 import { capabilities, mount as mountRecorder } from './record.js';
 import { mount as mountCoach } from './coach.js';
 import { mount as mountRecordings } from './recordings.js';
+import { chip, gate, whoami } from './account.js';
+import { mount as mountRoster, requests } from './roster.js';
+import { mount as mountAdmin } from './admin.js';
 
 const BANNER_CSS = `
 #sessbar{position:fixed;left:0;right:0;top:0;z-index:60;display:flex;gap:14px;
@@ -267,6 +270,42 @@ export async function install(bundle) {
  */
 let served = null;
 
+/**
+ * Who is signed in, and therefore which room this is.
+ *
+ * Null on a deployment with no accounts at all, which is the old behaviour and
+ * stays supported: a studio serving its own machine on its own network has one
+ * person in the building and does not need a login to know who they are.
+ */
+let identity = null;
+
+/**
+ * Draw the controls this person's role has, and only those.
+ *
+ * The switcher does not add items to a menu -- it changes the room. Everything
+ * mounted here is torn down and rebuilt when the role changes, because a coach
+ * button left over from the last role is exactly the confusion this whole layer
+ * exists to prevent.
+ */
+function room(me) {
+  for (const id of ['ss-who-chip', 'ss-roster-open', 'ss-admin-open']) {
+    document.getElementById(id)?.remove();
+  }
+  if (!me?.signed_in) return;
+  chip(me, async () => {
+    // Rebuild against the membership actually recorded on the session, not
+    // against what the dropdown said: the server checks the switch and is the
+    // only thing that decides whether it happened.
+    identity = await whoami();
+    room(identity);
+  });
+  mountRoster(me, install);
+  mountAdmin(me);
+  // A coach asking to work with you is a question, and a question that sits in
+  // a menu is one nobody answers.
+  requests(me, async () => { identity = await whoami(); room(identity); });
+}
+
 async function boot() {
   /* The recorder is mounted first, before any session and whatever the server
    * turns out to be: "where do I start recording" must have an answer on an
@@ -275,6 +314,15 @@ async function boot() {
    * most people will see first. Hiding the button there answered the question
    * with silence. */
   served = await capabilities();
+
+  /* Who is looking, before anything of anybody's is drawn. A studio with
+   * accounts gets a gate; one without keeps working exactly as it did. */
+  identity = await whoami();
+  if (identity?.accounts && !identity.signed_in) {
+    identity = await gate(identity);
+  }
+  room(identity);
+
   mountRecorder(nw, install, served);
   /* And a way back into what has already been measured. Without it a finished
    * analysis could only ever appear in the dialog that was watching the job,

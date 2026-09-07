@@ -2129,6 +2129,137 @@ def _round(value: float | None) -> float | None:
     return None if value is None else round(value, 1)
 
 
+# ------------------------------------------------------------------ people
+
+def cmd_studio(args) -> int:
+    """Make a place. Everything else is scoped to one of these."""
+    from .accounts import Studio
+    from .store import Store
+
+    with Store.open(args.db) as store:
+        if args.list:
+            rows = store.studios()
+            if not rows:
+                print("no studios yet. `pilates studio <key> --name \"...\"`")
+                return 0
+            for row in rows:
+                where = ", ".join(x for x in (row["city"], row["country"]) if x)
+                people = len({m.username for m in store.memberships(studio=row["key"])})
+                print(f"  {row['key']:<16} {row['name']}"
+                      + (f" — {where}" if where else "")
+                      + f"  ({people} people)")
+            return 0
+        if not args.key:
+            print("which studio? `pilates studio <key> --name \"...\"` "
+                  "or `pilates studio --list`", file=sys.stderr)
+            return 2
+        store.add_studio(Studio(key=args.key, name=args.name or args.key,
+                                city=args.city or "", country=args.country or "",
+                                timezone=args.timezone or "UTC"))
+        print(f"{args.key} is a studio now.")
+    return 0
+
+
+def cmd_account(args) -> int:
+    """Create a person, or give one a role.
+
+    The first admin is made here and nowhere else. There is no way to become an
+    admin from a web form, which is the point: an admin can read every health
+    record in the building.
+    """
+    import getpass
+
+    from .accounts import ADMIN, Account, ROLES, Studio
+    from .onboarding import grant
+    from .store import Store
+
+    with Store.open(args.db) as store:
+        if args.list:
+            for account in store.accounts():
+                roles = ", ".join(
+                    f"{m.role}@{m.studio}"
+                    + ("" if m.state == "active" else f" ({m.state})")
+                    for m in store.memberships(username=account.username))
+                print(f"  {account.email:<34} {account.display_name:<22} "
+                      f"{roles or 'no roles'}")
+            return 0
+
+        if not args.email:
+            print("which person? `pilates account <email> --name ... --role ...`",
+                  file=sys.stderr)
+            return 2
+
+        existing = store.account_by_email(args.email)
+        if existing is None:
+            if not args.name:
+                print("a new account needs --name", file=sys.stderr)
+                return 2
+            password = args.password or getpass.getpass(
+                f"password for {args.email}: ")
+            try:
+                username = store.create_account(
+                    Account(email=args.email, display_name=args.name,
+                            phone=args.phone or ""), password=password)
+            except ValueError as exc:
+                print(str(exc), file=sys.stderr)
+                return 1
+            print(f"{args.email} now has an account.")
+        else:
+            username = existing.username
+            if args.password:
+                store.set_password(username, args.password)
+                print(f"password set for {args.email}.")
+
+        for role in args.role or []:
+            if role not in ROLES:
+                print(f"{role!r} is not one of {sorted(ROLES)}", file=sys.stderr)
+                return 2
+            if not args.studio:
+                print("a role needs --studio", file=sys.stderr)
+                return 2
+            if store.studio(args.studio) is None:
+                print(f"there is no studio called {args.studio!r}. "
+                      f"`pilates studio {args.studio} --name \"...\"` first",
+                      file=sys.stderr)
+                return 1
+            grant(store, username, args.studio, role, by=args.by)
+            print(f"  {role} at {args.studio}")
+    return 0
+
+
+def cmd_roles(args) -> int:
+    """Show, approve or refuse what people have asked for."""
+    from .accounts import ACTIVE, SUSPENDED
+    from .onboarding import approve, pending
+    from .store import Store
+
+    with Store.open(args.db) as store:
+        if args.approve:
+            username, _, rest = args.approve.partition("@")
+            studio, _, role = rest.partition(":")
+            if not (studio and role):
+                print("use --approve <username>@<studio>:<role>", file=sys.stderr)
+                return 2
+            try:
+                approve(store, username, studio, role, by=args.by)
+            except KeyError as exc:
+                print(str(exc), file=sys.stderr)
+                return 1
+            print(f"{username} is a {role} at {studio}.")
+            return 0
+        waiting = pending(store, studio=args.studio or "")
+        if not waiting:
+            print("nothing waiting.")
+            return 0
+        print("waiting for a decision:")
+        for row in waiting:
+            print(f"  {row['display_name']} <{row['email']}> "
+                  f"wants {row['role']} at {row['studio']}")
+            print(f"    pilates roles --approve "
+                  f"{row['username']}@{row['studio']}:{row['role']} --by you")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pilates", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -2431,6 +2562,39 @@ def main(argv: list[str] | None = None) -> int:
     sh.add_argument("username")
     sh.add_argument("--db", default="studio.db")
     sh.set_defaults(func=cmd_sheet)
+
+    st = sub.add_parser("studio", help="a place; everything is scoped to one")
+    st.add_argument("key", nargs="?", help="short name, letters and digits")
+    st.add_argument("--name", help="what it is called")
+    st.add_argument("--city")
+    st.add_argument("--country")
+    st.add_argument("--timezone")
+    st.add_argument("--list", action="store_true", help="show them all")
+    st.add_argument("--db", default="studio.db")
+    st.set_defaults(func=cmd_studio)
+
+    ac = sub.add_parser("account",
+                        help="create a person, or give one a role. The first "
+                             "admin is made here and nowhere else")
+    ac.add_argument("email", nargs="?")
+    ac.add_argument("--name", help="what they are called")
+    ac.add_argument("--phone", help="E.164, like +998901234567")
+    ac.add_argument("--password", help="asked for on the terminal if omitted")
+    ac.add_argument("--role", action="append",
+                    help="admin, coach or student; repeatable")
+    ac.add_argument("--studio", help="which studio the role is at")
+    ac.add_argument("--by", default="command line",
+                    help="who is granting it; recorded in the audit log")
+    ac.add_argument("--list", action="store_true")
+    ac.add_argument("--db", default="studio.db")
+    ac.set_defaults(func=cmd_account)
+
+    rl = sub.add_parser("roles", help="what people have asked to be")
+    rl.add_argument("--studio")
+    rl.add_argument("--approve", metavar="USER@STUDIO:ROLE")
+    rl.add_argument("--by", default="command line")
+    rl.add_argument("--db", default="studio.db")
+    rl.set_defaults(func=cmd_roles)
 
     br = sub.add_parser("bridge",
                         help="check every measurement-to-structure link")

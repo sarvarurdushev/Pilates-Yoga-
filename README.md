@@ -1171,6 +1171,88 @@ they are about.
 Where a class produced too few checks to score, the line has a gap and the panel
 says why. A score that swings on one measurement is not a score.
 
+## Who is who: accounts, roles and consent
+
+The measurement half of this system knows about bodies and nothing about
+permission. This half decides who may look. It is designed in full in
+[`docs/accounts.md`](docs/accounts.md); the four things worth knowing here are
+the ones that shaped everything else.
+
+### The role is on the membership, not on the person
+
+`accounts.role = 'coach'` is the instinct and it breaks on the first real case,
+which happened to be this studio's first case: one person who has to be admin,
+coach *and* student. With a role column that is three logins, three passwords
+and a set of measurements belonging to a stranger. With the role on the
+membership it is **one account with three memberships**, a switcher in the
+header, and one body of work seen from three sides.
+
+```
+account ──< membership >── studio
+              └── role: admin | coach | student
+```
+
+It also handles the case that arrives next and would otherwise be a rewrite: a
+coach at one studio who takes classes as a student at another.
+
+### Signing up declares an intent; it grants nothing
+
+A role dropdown on a public form is the most common privilege-escalation hole in
+systems this shape — type "coach", press the button, start reading strangers'
+health data. So a signup writes a *pending* membership and stops. A student is
+approved on the spot, because a pending student and an approved student can both
+see exactly one record and it is their own. A coach waits for an admin. **Admin
+is not on the form at all**: it is granted by an existing admin, and the first
+one is made from the command line.
+
+### Being in the same building is not permission
+
+The naive rule — *a coach sees the students at their studio* — leaks the first
+time a studio has two coaches, and health data is the worst thing to leak. So a
+coach sees a **directory** (names, nothing else), adds somebody from it, and
+that is a *request*. The student accepting is what creates the consent, it is
+dated and revocable, and it is what a read is checked against:
+
+| Who | Sees |
+|---|---|
+| The person themselves | everything held about them |
+| An admin | everything, and every read is logged |
+| A coach, with a live assignment | name, age, height, weight, **screening flags**, contact — and the measurements |
+| A coach, without one | a name |
+
+"Screening flags" is the load-bearing distinction. A coach is told *left knee,
+no deep flexion* and *cleared by a doctor*. They are never shown the diagnosis,
+the medication list or the date of birth. That is the difference between what a
+class needs and what a doctor keeps.
+
+### Every read of a health record is written down
+
+`who, whom, when, in which role`. A student can read the log for their own
+record — which is the only thing that makes "we protect your data" checkable
+rather than a sentence in a policy.
+
+### Getting started
+
+```bash
+pilates studio tashkent --name "Tashkent Pilates" --city Tashkent --country UZ
+pilates account you@example.com --name "Your Name" --phone "+998901234567" \
+    --role admin --role coach --role student --studio tashkent
+pilates roles                       # what people have asked to be
+pilates roles --approve someone@tashkent:coach --by you
+```
+
+Passwords are scrypt at the current OWASP cost (`n=2**17, r=8, p=1`), which is
+about 400 ms and 128 MB per attempt — deliberately expensive, serialised so a
+login flood cannot exhaust a small container's memory, and lowerable through
+`$PILATES_SCRYPT_N` for a demonstration box where four seconds a login is worse
+than the risk. Session tokens are stored hashed; the cookie is `HttpOnly`,
+`SameSite=Strict`, and `Secure` with the `__Host-` prefix over HTTPS.
+
+**A database with no accounts on it keeps the behaviour it had.** The moment the
+first account exists, permission is enforced on every route including the ones
+that predate it — a half-enforced system is one where somebody believes they are
+protected and is not.
+
 ## The body, on one page
 
 The 2D half, for the reader with no WebGL and for the printed take-home.
