@@ -202,6 +202,34 @@ A student can have more than one coach. A coach has many students. Both are
 scoped to a studio, and the assignment carries dates, so *"who was coaching them
 in March"* is answerable a year later.
 
+### Managing locations as an admin
+
+Everything else in the console works inside the studio the admin happens to be
+acting in. Moving somebody is by definition about a different one, so the
+**Studios** tab is the only place that reaches across all of them:
+
+- **Add location.** Name, city, country. The person who creates it becomes its
+  admin in the same act — a location nobody can administer is not a location,
+  it is a dead row, and creating one and then discovering you cannot open it is
+  the kind of half-finished feature this project keeps trying not to ship.
+- **Put somebody in a location.** Anybody, into any studio, in any role, with
+  an optional *and leave the old one*. Without that box they hold both, which
+  is a real case — a coach who teaches at two sites — rather than an error.
+- **Give one coach every student at a location.** A studio with one instructor
+  is the common case and should not be twenty presses. It skips the ones
+  already on that roster rather than duplicating them.
+
+Two small things that are deliberate. The location list opens on the studio you
+are acting in, because a list that opens on whichever name sorts first points
+at the wrong place and only tells you afterwards. And every confirmation reads
+in names — *"Bae Soo-jin is now a student at Busan Pilates"*, never
+`bae_soojin_example_com is a student at busan-pilates`. A username is a database
+key that happens to be legible, and showing it makes a working feature look
+broken.
+
+The counts on each row — students, coaches, *acting here* — are the answer to
+"did that do anything", which is the question every one of these buttons raises.
+
 ---
 
 ## What each role actually sees on screen
@@ -209,25 +237,96 @@ in March"* is answerable a year later.
 The same body, the same measurements, three different rooms.
 
 **Student.** Their body, their numbers, their progress, and what their coach
-wrote — in plain language, no jargon column. One question answered: *am I
-getting better, and what should I do next?* No roster, no directory, no other
-person anywhere in the interface.
+wrote — in plain language, no jargon column, including every evaluation under
+**My feedback**. One question answered: *am I getting better, and what should I
+do next?* No roster, no directory, no other person anywhere in the interface,
+except the standing **Who sees my record** panel.
 
 **Coach.** Opens on the roster, not on a body: who is coming, who has a flag to
 read before class, who has a goal past its review date. Picking a student opens
 the body with that person's measurements on it and the writing tools live — the
-click-a-muscle-and-write-a-cue flow that already exists. Plus the things the
-research says instructors actually track: contraindications, cues in the
-student's own words, modifications and why, springs and props, one to three live
-goals with review dates, and progress across the class as a group.
+click-a-muscle-and-write-a-cue flow, with no toggle in front of it — plus
+**Evaluate** in the header for the five principles at the end of the class. And
+the things the research says instructors actually track: contraindications, cues
+in the student's own words, modifications and why, springs and props, one to
+three live goals with review dates, and progress across the class as a group.
+*How a coach gives feedback*, below, is the whole of it.
 
-**Admin.** Everything above, plus the machinery: studios, people, pending role
-requests, invitations, assignments, the audit log, and the erase button. Admin
-is the only place a role changes hands.
+**Admin.** Everything above, plus the machinery: **Waiting** (role requests),
+**People** (searchable, filtered by role, flagged first), **Studios** (add a
+location, move anybody into any location in any role, give one coach a whole
+location) and **Log** (the audit trail). Admin is the only place a role changes
+hands.
 
 A person with three memberships gets a switcher, and the interface changes
 completely when they use it. That is the point — not a menu that grows, a room
 that changes.
+
+---
+
+## How a coach gives feedback
+
+There are two surfaces, and the split is not arbitrary — it is the difference
+between prose about one moment and the same judgement made every time.
+
+**A note, about one structure.** Click a muscle on the body and the box is
+under it: kind (cue, modification, contraindication, goal…), the words, and an
+optional rating that has to say *what* it rates — a bare "4" is exactly the
+thing this project exists not to produce. The note sits with the measurements
+because that is where it will be read.
+
+There is no toggle in front of it. There used to be: "coach mode", a switch at
+the bottom of the screen, and the result was a coach looking at their own
+student's muscle with no way to say anything about it and no clue the switch
+existed. If you are this person's coach, the box is there. If you are not, it
+is not, and no switch changes that.
+
+**An evaluation, about the class.** The `Evaluate` button in the header opens
+five axes, scored 1–5, the same five every time.
+
+### The five axes are not invented here
+
+They are the **STOTT PILATES Five Basic Principles**, which is what
+contemporary instructor training is built on and what an instructor is already
+watching for, in this order, on every repetition:
+
+| | Watching for |
+|---|---|
+| **Breathing** | Three-dimensional rib expansion, in synch with the deep abdominals and pelvic floor. |
+| **Pelvic placement** | Neutral or imprint, held on purpose rather than by gripping. |
+| **Rib cage placement** | Ribs staying knitted as the arms move, rather than flaring into extension. |
+| **Scapular movement** | Organised on the rib cage and still free to move. |
+| **Head and cervical** | The neck continuing the curve of the spine. |
+
+A studio that scores anything else has to invent a vocabulary. A studio that
+scores these is writing down the lesson it just taught.
+
+Three consequences, and they are the design:
+
+1. **The axes are fixed and closed.** A coach who can add their own axis ends
+   up with fifteen, each used twice, and nothing that can be charted.
+2. **Every score has an anchor.** 1 is *"not there yet, needs hands-on cueing
+   every repetition"*; 5 is *"holds it under load, under fatigue, and in new
+   movements"*. Two coaches at the same studio have to mean the same thing by
+   a 3 or the line is not worth drawing.
+3. **Every score carries a note, and the note is the valuable half.** *"3 — rib
+   cage flares on the second half of every roll-down"* is worth more than the 3.
+
+A skipped axis is a **gap in the line, not a zero** — the difference between
+*not looked at* and *bad* is the whole reason for scoring anything. The average
+is shown only when all five were scored; a mean of the two somebody happened to
+fill in is not comparable with a mean of five.
+
+Alongside the five, the four fields a studio actually re-reads: **what we did**,
+**springs, box, props**, **the cue that worked** (their words where possible),
+and **the plan for next time**. Plus how the class went — light, steady, hard —
+which is not the average of the five and is not computed as one: a session can
+be technically poor and exactly the right session for somebody who came in
+exhausted.
+
+The student sees the same panel under **My feedback**, with the scoring form
+replaced by the progress lines. Nothing a coach writes about them is hidden
+from them.
 
 ---
 

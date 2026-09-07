@@ -784,3 +784,261 @@ class TestSeedingFromTheAdminConsole:
         found = park.get("/roster")[1]["students"]
         assert {s["display_name"] for s in found} == {
             "Kim Min-ji", "Lee Joon-ho", "Choi Seo-yeon"}
+
+
+class TestScoringAClass:
+    """The five principles, over HTTP, guarded like everything else."""
+
+    def _coach_with_ann(self, base, names):
+        coach = Client(base)
+        coach.sign_in("coach@b.co")
+        coach.post("/roster/add", {"student": names["ann"]})
+        return coach
+
+    def test_the_form_carries_the_rubric(self, studio):
+        """So what a 3 means is one definition in one file, not a number two
+        coaches guess at."""
+        base, names, _ = studio
+        coach = self._coach_with_ann(base, names)
+        status, form = coach.get(f"/evaluation?username={names['ann']}")
+        assert status == 200
+        assert set(form["principles"]) == {"breathing", "pelvic", "ribcage",
+                                           "scapular", "cervical"}
+        assert set(form["anchors"]) == {"1", "2", "3", "4", "5"}
+        assert form["may_write"] is True
+
+    def test_scoring_a_class_and_reading_it_back(self, studio):
+        base, names, _ = studio
+        coach = self._coach_with_ann(base, names)
+        status, out = coach.post("/evaluate", {
+            "username": names["ann"],
+            "scores": {"breathing": 4, "pelvic": 3, "ribcage": 2,
+                       "scapular": 4, "cervical": 4},
+            "notes": {"ribcage": "flares on the roll-down"},
+            "did": "Footwork, hundred", "settings": "two reds and a blue",
+            "cue": "reach the heel away", "plan": "wall roll-downs"})
+        assert status == 200
+        assert out["evaluation"]["average"] == 3.4
+        assert out["evaluation"]["weakest"] == "Rib cage placement"
+        assert out["focus"] == "ribcage"
+
+    def test_the_line_grows_with_each_class(self, studio):
+        base, names, _ = studio
+        coach = self._coach_with_ann(base, names)
+        for value in (2, 3, 4):
+            coach.post("/evaluate", {"username": names["ann"],
+                                     "scores": {"ribcage": value}})
+        _, form = coach.get(f"/evaluation?username={names['ann']}")
+        assert [p["value"] for p in form["lines"]["ribcage"]["points"]] == [2, 3, 4]
+        assert form["lines"]["ribcage"]["moved"] == 2
+
+    def test_it_is_signed_by_the_coach_without_being_asked(self, studio):
+        """A name typed into every note is a name that stops being typed."""
+        base, names, _ = studio
+        coach = self._coach_with_ann(base, names)
+        _, out = coach.post("/evaluate", {"username": names["ann"],
+                                          "scores": {"breathing": 4}})
+        assert out["evaluation"]["by"] == "A Coach"
+
+    def test_a_coach_cannot_score_somebody_who_is_not_theirs(self, studio):
+        base, names, _ = studio
+        coach = Client(base)
+        coach.sign_in("coach@b.co")
+        status, payload = coach.post("/evaluate", {"username": names["ann"],
+                                                   "scores": {"breathing": 4}})
+        assert status == 403 and "coach" in payload["error"]
+
+    def test_a_student_cannot_score_themselves(self, studio):
+        """An evaluation's whole authority is that a coach made it."""
+        base, names, _ = studio
+        ann = Client(base)
+        ann.sign_in("ann@b.co")
+        assert ann.post("/evaluate", {"username": names["ann"],
+                                      "scores": {"breathing": 5}})[0] == 403
+
+    def test_a_student_can_read_their_own(self, studio):
+        """What a coach thought of your rib cage is something you are owed."""
+        base, names, _ = studio
+        coach = self._coach_with_ann(base, names)
+        coach.post("/evaluate", {"username": names["ann"],
+                                 "scores": {"ribcage": 2},
+                                 "plan": "wall roll-downs"})
+        ann = Client(base)
+        ann.sign_in("ann@b.co")
+        status, mine = ann.get("/me/evaluations")
+        assert status == 200 and mine["evaluations"] == 1
+        assert mine["latest"]["plan"] == "wall roll-downs"
+
+    def test_a_student_cannot_read_another_student_s(self, studio):
+        base, names, _ = studio
+        ann = Client(base)
+        ann.sign_in("ann@b.co")
+        assert ann.get(f"/evaluation?username={names['ben']}")[0] == 403
+
+    def test_an_invented_axis_is_refused_at_the_door(self, studio):
+        base, names, _ = studio
+        coach = self._coach_with_ann(base, names)
+        status, payload = coach.post("/evaluate", {"username": names["ann"],
+                                                   "scores": {"vibes": 4}})
+        assert status == 400 and "five principles" in payload["error"]
+
+    def test_it_is_in_the_audit_log(self, studio):
+        base, names, _ = studio
+        coach = self._coach_with_ann(base, names)
+        coach.post("/evaluate", {"username": names["ann"],
+                                 "scores": {"ribcage": 2}})
+        boss = Client(base)
+        boss.sign_in("boss@b.co")
+        boss.post("/auth/switch", {"studio": "gangnam", "role": ADMIN})
+        events = boss.get(f"/audit?username={names['ann']}")[1]["events"]
+        assert any(e["action"] == "evaluated" for e in events)
+
+
+class TestRunningMoreThanOneLocation:
+    """What an owner of two studios needs on day one and could not do."""
+
+    def _admin(self, base):
+        client = Client(base)
+        client.sign_in("boss@b.co")
+        client.post("/auth/switch", {"studio": "gangnam", "role": ADMIN})
+        return client
+
+    def test_the_studios_list_counts_who_is_in_each(self, studio):
+        base, _, _ = studio
+        status, payload = self._admin(base).get("/admin/studios")
+        assert status == 200
+        gangnam = next(s for s in payload["studios"] if s["key"] == "gangnam")
+        # Three students: Ann, Ben, and the owner, who holds a student role at
+        # her own studio -- which is the whole point of role-per-membership.
+        assert gangnam["students"] == 3 and gangnam["coaches"] >= 2
+        assert gangnam["mine"] is True
+
+    def test_making_one_makes_you_its_admin_in_the_same_act(self, studio):
+        """A studio nobody can administer is one somebody has to be given by
+        hand afterwards, and that step is the one everybody forgets."""
+        base, _, _ = studio
+        admin = self._admin(base)
+        status, out = admin.post("/admin/studio",
+                                 {"name": "Songdo Pilates", "city": "Incheon",
+                                  "country": "KR"})
+        assert status == 200 and out["created"] is True
+        assert out["studio"]["key"] == "songdo-pilates"
+        assert admin.post("/auth/switch", {"studio": "songdo-pilates",
+                                           "role": ADMIN})[0] == 200
+
+    def test_a_name_becomes_a_usable_key(self, studio):
+        base, _, _ = studio
+        _, out = self._admin(base).post("/admin/studio",
+                                        {"name": "Bundang  Yoga & Pilates!"})
+        assert out["studio"]["key"] == "bundang-yoga-pilates"
+
+    def test_moving_somebody_to_another_location(self, studio):
+        base, names, db = studio
+        admin = self._admin(base)
+        status, out = admin.post("/admin/move", {"username": names["ann"],
+                                                 "role": STUDENT,
+                                                 "studio": "hongdae"})
+        assert status == 200 and out["studio"] == "hongdae"
+        with Store.open(db) as store:
+            held = {m.studio for m in store.memberships(username=names["ann"],
+                                                        role=STUDENT)}
+        assert held == {"gangnam", "hongdae"}
+
+    def test_holding_two_at_once_is_a_real_case_not_an_error(self, studio):
+        """A coach who teaches at two sites."""
+        base, names, _ = studio
+        admin = self._admin(base)
+        out = admin.post("/admin/move", {"username": names["coach"],
+                                         "role": COACH,
+                                         "studio": "hongdae"})[1]
+        assert out["left"] == []
+
+    def test_leaving_the_old_one_when_asked(self, studio):
+        base, names, db = studio
+        admin = self._admin(base)
+        out = admin.post("/admin/move", {"username": names["ann"],
+                                         "role": STUDENT, "studio": "hongdae",
+                                         "leave": True})[1]
+        assert out["left"] == ["gangnam"]
+        with Store.open(db) as store:
+            live = {m.studio for m in store.memberships(username=names["ann"],
+                                                        role=STUDENT)
+                    if m.state == "active"}
+        assert live == {"hongdae"}
+
+    def test_a_studio_that_does_not_exist_is_refused(self, studio):
+        base, names, _ = studio
+        assert self._admin(base).post(
+            "/admin/move", {"username": names["ann"], "role": STUDENT,
+                            "studio": "atlantis"})[0] == 404
+
+    def test_giving_one_coach_every_student_at_a_location(self, studio):
+        """A studio with one instructor is the common case and should not be
+        twenty presses."""
+        base, names, _ = studio
+        admin = self._admin(base)
+        status, out = admin.post("/admin/assign-all",
+                                 {"coach": names["coach"], "studio": "gangnam"})
+        assert status == 200
+        # Everybody holding a student role at that studio, which includes the
+        # owner: she trains there too, and pretending otherwise would mean
+        # deciding on her behalf which of her roles is the real one.
+        assert set(out["added"]) == {names["ann"], names["ben"], names["boss"]}
+        coach = Client(base)
+        coach.sign_in("coach@b.co")
+        assert len(coach.get("/roster")[1]["students"]) == 3
+
+    def test_assigning_all_twice_does_not_duplicate(self, studio):
+        base, names, _ = studio
+        admin = self._admin(base)
+        admin.post("/admin/assign-all", {"coach": names["coach"]})
+        again = admin.post("/admin/assign-all", {"coach": names["coach"]})[1]
+        assert again["added"] == []
+
+    def test_the_result_reads_in_names_not_database_keys(self, studio):
+        """An admin who moves somebody should not be told about
+        ``ann_a_co is a student at hongdae``. That is a working feature
+        reporting itself in a way that looks broken."""
+        base, names, _ = studio
+        out = self._admin(base).post("/admin/move",
+                                     {"username": names["ann"],
+                                      "role": STUDENT,
+                                      "studio": "hongdae"})[1]
+        assert names["ann"] not in out["message"]
+        assert "Ann" in out["message"]
+        # And the location by its name, not its key either.
+        assert "hongdae" not in out["message"]
+
+    def test_a_location_with_nobody_in_it_says_so(self, studio):
+        """Zero students added and zero students there are different facts, and
+        a bare ``0`` cannot tell an admin which one happened."""
+        base, names, _ = studio
+        admin = self._admin(base)
+        admin.post("/admin/studio", {"name": "Empty Place"})
+        admin.post("/admin/move", {"username": names["coach"], "role": COACH,
+                                   "studio": "empty-place"})
+        out = admin.post("/admin/assign-all",
+                         {"coach": names["coach"], "studio": "empty-place"})[1]
+        assert out["added"] == [] and out["students"] == 0
+        assert "no students" in out["message"].lower()
+
+    def test_already_having_everybody_is_not_the_same_as_an_empty_studio(
+            self, studio):
+        base, names, _ = studio
+        admin = self._admin(base)
+        admin.post("/admin/assign-all",
+                   {"coach": names["coach"], "studio": "gangnam"})
+        out = admin.post("/admin/assign-all",
+                         {"coach": names["coach"], "studio": "gangnam"})[1]
+        assert out["added"] == [] and out["students"] > 0
+        assert "already has every student" in out["message"]
+
+    def test_only_an_admin_can_do_any_of_it(self, studio):
+        base, names, _ = studio
+        coach = Client(base)
+        coach.sign_in("coach@b.co")
+        assert coach.get("/admin/studios")[0] == 403
+        assert coach.post("/admin/studio", {"name": "Mine"})[0] == 403
+        assert coach.post("/admin/move", {"username": names["ann"],
+                                          "studio": "hongdae"})[0] == 403
+        assert coach.post("/admin/assign-all", {"coach": names["coach"]})[0] == 403

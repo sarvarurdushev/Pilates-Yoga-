@@ -76,6 +76,8 @@ const CSS = `
   border-radius:3px;font:inherit;font-size:13px;background:var(--glass);
   border:1px solid var(--line);color:var(--txt)}
 #ss-admin .ss-invite input{flex:1}
+#ss-admin .ss-invite select{flex:0 1 auto;max-width:180px}
+#ss-admin .ss-invite input[type=checkbox]{flex:none}
 #ss-admin .ss-tools{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 11px;
   align-items:center}
 #ss-admin input.ss-find{flex:1 1 180px;min-width:140px;padding:8px 10px;
@@ -197,6 +199,7 @@ async function dialog(me) {
     <div class="ss-tabs" role="tablist">
       <button type="button" data-tab="waiting" aria-selected="true">Waiting</button>
       <button type="button" data-tab="people" aria-selected="false">People</button>
+      <button type="button" data-tab="studios" aria-selected="false">Studios</button>
       <button type="button" data-tab="log" aria-selected="false">Log</button>
     </div>
     <div class="ss-rows">Reading…</div>
@@ -375,6 +378,126 @@ async function dialog(me) {
     });
   };
 
+  /**
+   * Locations, which an owner of two of them needs on day one.
+   *
+   * Everything else in this console works inside the studio the admin happens
+   * to be acting in. Moving somebody is by definition about a different one, so
+   * this is the only tab that reaches across.
+   */
+  const drawStudios = async () => {
+    const [{ studios, acting }, { people }] = await Promise.all([
+      get('admin/studios'), get('admin/people'),
+    ]);
+    const everybody = people.map((p) =>
+      `<option value="${esc(p.username)}">${esc(p.display_name)}</option>`).join('');
+    /* The studio you are acting in is preselected. Without it the list opens
+     * on whichever location sorts first, so "assign all" and "move" quietly
+     * point at the wrong place and the admin only finds out from the result. */
+    const places = studios.map((s) =>
+      `<option value="${esc(s.key)}"${s.key === acting ? ' selected' : ''}>${
+        esc(s.name)}</option>`).join('');
+    /* Only coaches who actually teach where you are assigning. Offering every
+     * coach in the company means picking one who works somewhere else and
+     * being told nothing happened. */
+    const coachesHere = people.filter((p) => (p.memberships ?? [])
+      .some((m) => m.role === 'coach' && m.state === 'active'
+                   && m.studio === acting));
+    const coaches = coachesHere.map((p) =>
+      `<option value="${esc(p.username)}">${esc(p.display_name)}</option>`).join('');
+
+    rows.innerHTML = `
+      <div class="ss-invite">
+        <input data-new-name placeholder="New location name…">
+        <input data-new-city placeholder="City" style="flex:0 1 120px">
+        <input data-new-country placeholder="KR" style="flex:0 1 70px">
+        <button type="button" class="ss-act" data-new-studio>Add location</button>
+      </div>
+      <div class="ss-invite">
+        <span class="ss-fill">Put somebody in a location</span>
+        <select data-move-who>${everybody}</select>
+        <select data-move-role>
+          <option value="student">as student</option>
+          <option value="coach">as coach</option>
+          <option value="admin">as admin</option>
+        </select>
+        <select data-move-where>${places}</select>
+        <label style="display:flex;gap:5px;align-items:center;font-size:11px;
+                      color:var(--dim2);white-space:nowrap">
+          <input type="checkbox" data-move-leave style="width:auto;margin:0">
+          and leave the old one</label>
+        <button type="button" class="ss-act" data-move>Move</button>
+      </div>
+      ${coaches ? `<div class="ss-invite">
+        <span class="ss-fill">Give one coach every student at a location</span>
+        <select data-all-coach>${coaches}</select>
+        <select data-all-studio>${places}</select>
+        <button type="button" class="ss-act" data-assign-all>Assign all</button>
+      </div>` : ''}
+      ${studios.map((s) => `<div class="ss-row">
+        <span class="ss-main"><b>${esc(s.name)}</b>
+          <span class="ss-meta">${esc(s.key)}${
+            s.city ? ` · ${esc(s.city)}` : ''}${
+            s.country ? `, ${esc(s.country)}` : ''} · ${esc(s.timezone)}</span></span>
+        <span class="ss-tag">${s.students} student${s.students === 1 ? '' : 's'}</span>
+        <span class="ss-tag">${s.coaches} coach${s.coaches === 1 ? '' : 'es'}</span>
+        ${s.key === acting ? '<span class="ss-tag ss-role-admin">acting here</span>'
+          : s.mine ? '<span class="ss-tag">yours</span>' : ''}
+      </div>`).join('')}`;
+
+    rows.querySelector('[data-new-studio]')?.addEventListener('click', async () => {
+      const name = rows.querySelector('[data-new-name]').value.trim();
+      if (!name) { tell('The location needs a name.', true); return; }
+      try {
+        const out = await post('admin/studio', {
+          name, city: rows.querySelector('[data-new-city]').value.trim(),
+          country: rows.querySelector('[data-new-country]').value.trim(),
+        });
+        tell(`${out.studio.name} added. You are its admin — switch to it in the `
+           + 'header to work there.');
+        drawStudios();
+      } catch (error) { tell(error.message, true); }
+    });
+
+    rows.querySelector('[data-move]')?.addEventListener('click', async () => {
+      try {
+        const out = await post('admin/move', {
+          username: rows.querySelector('[data-move-who]').value,
+          role: rows.querySelector('[data-move-role]').value,
+          studio: rows.querySelector('[data-move-where]').value,
+          leave: rows.querySelector('[data-move-leave]').checked,
+        });
+        tell(out.message);
+        drawStudios();
+      } catch (error) { tell(error.message, true); }
+    });
+
+    /* Change the location and the coach list follows it. The pair has to stay
+     * consistent or the button assigns a coach to a studio they do not teach
+     * at, which the server correctly turns into "nobody was added". */
+    const coachesAt = (key) => people.filter((p) => (p.memberships ?? [])
+      .some((m) => m.role === 'coach' && m.state === 'active' && m.studio === key));
+    rows.querySelector('[data-all-studio]')?.addEventListener('change', (event) => {
+      const list = rows.querySelector('[data-all-coach]');
+      const here = coachesAt(event.target.value);
+      list.innerHTML = here.length
+        ? here.map((p) => `<option value="${esc(p.username)}">${
+            esc(p.display_name)}</option>`).join('')
+        : '<option value="">no coach works there yet</option>';
+    });
+
+    rows.querySelector('[data-assign-all]')?.addEventListener('click', async () => {
+      const who = rows.querySelector('[data-all-coach]').value;
+      if (!who) { tell('Give that location a coach first.', true); return; }
+      try {
+        const out = await post('admin/assign-all', {
+          coach: who, studio: rows.querySelector('[data-all-studio]').value,
+        });
+        tell(out.message);
+      } catch (error) { tell(error.message, true); }
+    });
+  };
+
   const drawLog = async () => {
     const { events } = await get('audit');
     rows.innerHTML = events.length
@@ -391,6 +514,7 @@ async function dialog(me) {
     try {
       if (tab === 'waiting') await drawWaiting();
       else if (tab === 'people') await drawPeople();
+      else if (tab === 'studios') await drawStudios();
       else await drawLog();
     } catch (error) {
       rows.innerHTML = `<p class="ss-none">${esc(error.message)}</p>`;

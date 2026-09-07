@@ -1175,7 +1175,7 @@ says why. A score that swings on one measurement is not a score.
 
 The measurement half of this system knows about bodies and nothing about
 permission. This half decides who may look. It is designed in full in
-[`docs/accounts.md`](docs/accounts.md); the four things worth knowing here are
+[`docs/accounts.md`](docs/accounts.md); the five things worth knowing here are
 the ones that shaped everything else.
 
 ### The role is on the membership, not on the person
@@ -1235,6 +1235,40 @@ checked against:
 no deep flexion* and *cleared by a doctor*. They are never shown the diagnosis,
 the medication list or the date of birth. That is the difference between what a
 class needs and what a doctor keeps.
+
+### Feedback is written on the axes the instructor already teaches
+
+A coach has two ways to say something, and the split is the difference between
+prose about one moment and the same judgement made every time.
+
+Clicking a muscle puts a note box under it — kind, the words, an optional rating
+that has to name *what* it rates. There is no toggle in front of it any more.
+There used to be a "coach mode" switch at the bottom of the screen, and the
+result was a coach looking at their own student's muscle with no way to say
+anything about it and no clue the switch existed.
+
+**Evaluate** scores the class on five axes, and the five are not invented here.
+They are the **STOTT PILATES Five Basic Principles** — breathing, pelvic
+placement, rib cage placement, scapular movement and stabilisation, head and
+cervical placement — which is what contemporary instructor training is built on
+and what an instructor is already watching for, in that order, on every
+repetition. A studio that scores anything else has to invent a vocabulary; a
+studio that scores these is writing down the lesson it just taught.
+
+Three things follow, and they are the design:
+
+- **Fixed and closed.** A coach who can add their own axis ends up with fifteen,
+  each used twice, and nothing that can be charted.
+- **Anchored.** 1 is *"needs hands-on cueing every repetition"*, 5 is *"holds it
+  under load, under fatigue, and in new movements"*. Two coaches have to mean
+  the same thing by a 3 or the line is not worth drawing.
+- **A skipped axis is a gap, not a zero.** The difference between *not looked
+  at* and *bad* is the whole reason for scoring anything, and the average is
+  shown only when all five were scored.
+
+Alongside the five sit the four fields a studio actually re-reads: what we did,
+springs and props, the cue that worked, and the plan for next time. The student
+sees all of it under **My feedback**.
 
 ### Every read of a health record is written down
 

@@ -34,6 +34,7 @@ import { mount as mountRecordings } from './recordings.js';
 import { chip, gate, whoami } from './account.js';
 import { coaches as mountMyCoaches, mount as mountRoster } from './roster.js';
 import { mount as mountAdmin } from './admin.js';
+import { mount as mountEvaluate } from './evaluate.js';
 
 const BANNER_CSS = `
 #sessbar{position:fixed;left:0;right:0;top:0;z-index:60;display:flex;gap:14px;
@@ -246,14 +247,22 @@ export async function install(bundle) {
    * to write into. A viewer showing an exported bundle has none, and there the
    * button says that instead of offering a form that cannot save. */
   const coach = await mountCoach(session, nw, () => {
-    // Re-render the panel so the form appears and disappears with the mode.
+    // Re-render the panel so the sheet's contents follow the toggle.
     for (const el of document.querySelectorAll('.ss-panel, .ss-said, .ss-write')) {
       el.remove();
     }
-  }, served);
+  }, served, identity);
+
+  /* Scoring the class, on the body of whoever is loaded. A coach gets the
+   * rubric; the student whose body it is gets the same panel with the scoring
+   * half removed, because what a coach thought of your rib cage is something
+   * you are owed rather than something kept from you. */
+  document.getElementById('ss-eval-open')?.remove();
+  if (identity?.signed_in) mountEvaluate(identity, session.person.username);
 
   // For the render harness and for anybody poking at it in a console.
   globalThis.__session = { session, lit, coach };
+  globalThis.__nw = nw;
   console.info(`[session] ${session.person.username}: ${lit.lit.length} structures lit, `
              + `${session.ranked().length} groups measured, `
              + `${session.brainRegions().length} brain regions with claims`);
@@ -289,7 +298,7 @@ let identity = null;
  */
 function room(me) {
   for (const id of ['ss-who-chip', 'ss-roster-open', 'ss-admin-open',
-                    'ss-mine-open']) {
+                    'ss-mine-open', 'ss-eval-open']) {
     document.getElementById(id)?.remove();
   }
   if (!me?.signed_in) return;
@@ -304,7 +313,15 @@ function room(me) {
   mountAdmin(me);
   // The student's control over their own record, always present rather than a
   // prompt that arrives once at a moment nobody is thinking about it.
-  if (!me.can?.coach) mountMyCoaches(me);
+  if (!me.can?.coach) {
+    mountMyCoaches(me);
+    /* And what their coach scored, on the same terms: in the header, before any
+     * session is loaded. It used to appear only once a recording had been
+     * opened, so a student who had been evaluated but never analysed -- which
+     * is most students in their first month -- had no way to reach the feedback
+     * written about them at all. */
+    mountEvaluate(me, me.acting?.username ?? '');
+  }
 }
 
 async function boot() {

@@ -275,6 +275,18 @@ class Handler(SimpleHTTPRequestHandler):
         if route.path == "/admin/people" and self.db:
             self._answer(lambda store: api.everybody(store, self._viewer(store)))
             return
+        if route.path == "/evaluation" and self.db:
+            who = parse_qs(route.query).get("username", [""])[0]
+            self._answer(lambda store: api.evaluation_form(
+                store, self._viewer(store), who))
+            return
+        if route.path == "/me/evaluations" and self.db:
+            self._answer(lambda store: api.my_evaluations(
+                store, self._viewer(store)))
+            return
+        if route.path == "/admin/studios" and self.db:
+            self._answer(lambda store: api.studios(store, self._viewer(store)))
+            return
         if route.path == "/me/coaches" and self.db:
             self._answer(lambda store: api.my_coaches(
                 store, self._viewer(store)))
@@ -379,6 +391,14 @@ class Handler(SimpleHTTPRequestHandler):
         "/admin/invite": lambda self, store, body: api.make_invitation(
             store, self._viewer(store), body),
         "/admin/seed": lambda self, store, body: api.seed_studio(
+            store, self._viewer(store), body),
+        "/admin/studio": lambda self, store, body: api.put_studio(
+            store, self._viewer(store), body),
+        "/admin/move": lambda self, store, body: api.move_person(
+            store, self._viewer(store), body),
+        "/admin/assign-all": lambda self, store, body: api.assign_everybody(
+            store, self._viewer(store), body),
+        "/evaluate": lambda self, store, body: api.evaluate(
             store, self._viewer(store), body),
     }
 

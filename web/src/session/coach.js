@@ -112,7 +112,11 @@ const ORDER = ['cue', 'modification', 'assessment', 'contraindication',
                'setting', 'goal', 'subjective', 'note'];
 
 let state = {
-  on: false, user: '', by: '', sheet: null, kinds: {}, session: '',
+  // `canWrite` replaced a `coaching` toggle: the question is not whether
+  // somebody flipped a switch, it is whether this person is theirs to write
+  // about -- which the server already knows and now says.
+  canWrite: false, on: false, user: '', by: '', sheet: null, kinds: {},
+  session: '',
   // What the server said it can do, kept so a save knows whether to send a
   // passcode with it.
   capable: null,
@@ -197,7 +201,12 @@ async function loadSheet(user) {
  * what it rates -- a bare "4" is the thing this project exists not to produce.
  */
 export function writer(structureName, fma, record) {
-  if (!state.on) return '';
+  /* No toggle. It used to need "coach mode" switched on at the bottom of the
+   * screen before this appeared, and the result was a coach looking at their
+   * own student's muscle with no way to say anything about it and no clue that
+   * a hidden switch existed. If you are this person's coach, the box is here.
+   */
+  if (!state.canWrite) return '';
   const options = ORDER.filter((k) => state.kinds[k])
     .map((k) => `<option value="${k}">${esc(k)} — ${esc(state.kinds[k])}</option>`)
     .join('');
@@ -353,7 +362,27 @@ function offline(session) {
  * bundle, which has no database behind it -- it opens one paragraph saying so.
  * Notes are still never *offered* into nowhere: nothing writable is drawn.
  */
-export async function mount(session, nw, onChange, known) {
+/**
+ * Whether the signed-in person may write about the body on screen.
+ *
+ * Asked of the server rather than guessed from the role: a coach may write
+ * about their own students and nobody else's, and that is a fact the page does
+ * not hold. One request, at load.
+ */
+async function mayWrite(username, me) {
+  if (!username) return false;
+  if (me?.acting?.username === username) return false;   // your own record
+  if (!me?.can?.coach) return false;
+  try {
+    const response = await fetch(
+      `student?username=${encodeURIComponent(username)}`,
+      { credentials: 'same-origin' });
+    if (!response.ok) return false;
+    return !!(await response.json()).may_write;
+  } catch { return false; }
+}
+
+export async function mount(session, nw, onChange, known, me) {
   const capable = known !== undefined ? known : await (async () => {
     try {
       const response = await fetch('capabilities');
@@ -371,10 +400,18 @@ export async function mount(session, nw, onChange, known) {
   style.textContent = CSS;
   document.head.appendChild(style);
 
+  /* Who is writing, taken from the account rather than asked for. The first
+   * version put up a window.prompt on every new browser session, which is a
+   * dialog nobody reads and a name nobody spells the same way twice. */
+  state.by = me?.account?.display_name || me?.acting?.username || '';
+  state.canWrite = await mayWrite(state.user, me);
+
   const bar = document.createElement('div');
   bar.id = 'ss-coach-bar';
   bar.innerHTML = `<button type="button" aria-pressed="false" data-toggle>
-    <em>Coach</em><span>Write notes on the body</span></button>`;
+    <em>${state.canWrite ? 'Notes' : 'Sheet'}</em><span>${
+      state.canWrite ? 'What to read before this class'
+                     : 'What the coach wrote'}</span></button>`;
   document.body.appendChild(bar);
 
   const host = document.createElement('div');
@@ -387,13 +424,6 @@ export async function mount(session, nw, onChange, known) {
     bar.querySelector('[data-toggle]').setAttribute('aria-pressed', String(state.on));
     host.hidden = !state.on;
     if (state.on) {
-      // Asked for once, remembered for the window. A name typed into every note
-      // is a name that stops being typed.
-      state.by = state.by || (window.prompt(
-        'Who is writing these notes? Recorded with every one.') || '').trim();
-      if (!state.by) { state.on = false; host.hidden = true;
-        bar.querySelector('[data-toggle]').setAttribute('aria-pressed', 'false');
-        return; }
       state.sheet = state.sheet ?? await loadSheet(state.user);
       renderSheet(host);
     }

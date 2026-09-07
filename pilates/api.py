@@ -333,6 +333,241 @@ def end_assignment(store, viewer: Viewer | None, payload: dict) -> dict:
                        "by them."}
 
 
+# -- what the coach scores --------------------------------------------------
+
+def evaluation_form(store, viewer: Viewer | None, username: str) -> dict:
+    """The rubric, plus everything already scored for this person.
+
+    The rubric travels with the form rather than being hard-coded in the page,
+    so the five axes, what to watch for on each, and what a 3 means are one
+    definition in one file.
+    """
+    from .evaluation import ANCHORS, EFFORT, PRINCIPLES, summary
+
+    person = _need(viewer)
+    who = username or person.username
+    guard_subject(store, person, who)
+    account = store.account(who)
+    return {
+        "student": who,
+        "display_name": account.display_name if account else who,
+        "principles": PRINCIPLES,
+        "anchors": ANCHORS,
+        "effort": EFFORT,
+        "may_write": may_write_about(
+            person, who,
+            None if person.is_self(who)
+            else store.assignment_between(person.username, who, person.studio)),
+        **summary(store.evaluations(who)),
+    }
+
+
+def evaluate(store, viewer: Viewer | None, payload: dict) -> dict:
+    """Score a class on the five principles.
+
+    A coach's act, like any observation: it says who made it and when, and it
+    never appears as though a camera produced it.
+    """
+    from .evaluation import Evaluation
+
+    person = _need_coach(viewer)
+    who = payload.get("username", "")
+    guard_subject(store, person, who, write=True)
+    account = store.account(person.username)
+    evaluation = Evaluation(
+        username=who,
+        by=payload.get("by") or (account.display_name if account
+                                 else person.username),
+        scores=payload.get("scores") or {},
+        notes=payload.get("notes") or {},
+        did=payload.get("did", ""), settings=payload.get("settings", ""),
+        cue=payload.get("cue", ""), plan=payload.get("plan", ""),
+        effort=payload.get("effort") or "steady",
+        session=payload.get("session", ""))
+    evaluation.id = store.evaluate(evaluation)
+    store.record_audit(actor=person.username, action="evaluated", subject=who,
+                       studio=person.studio,
+                       detail=f"weakest: {evaluation.weakest}")
+    return {"evaluation": evaluation.to_dict(),
+            **summary_of(store, who)}
+
+
+def summary_of(store, who: str) -> dict:
+    from .evaluation import summary
+
+    return summary(store.evaluations(who))
+
+
+def my_evaluations(store, viewer: Viewer | None) -> dict:
+    """A student's own scores, in the words that were written about them."""
+    from .evaluation import PRINCIPLES, summary
+
+    person = _need(viewer)
+    return {"principles": PRINCIPLES, **summary(store.evaluations(person.username))}
+
+
+# -- studios, for an admin who has more than one ----------------------------
+
+def studios(store, viewer: Viewer | None) -> dict:
+    """Every studio, with how many people are in it and who runs it."""
+    admin = _need_admin(viewer)
+    rows = []
+    for studio in store.studios():
+        held = store.memberships(studio=studio["key"])
+        rows.append({**studio,
+                     "people": len({m.username for m in held
+                                    if m.state == ACTIVE}),
+                     "coaches": len({m.username for m in held
+                                     if m.role == COACH and m.state == ACTIVE}),
+                     "students": len({m.username for m in held
+                                      if m.role == STUDENT and m.state == ACTIVE}),
+                     "mine": any(m.username == admin.username
+                                 and m.role == ADMIN and m.state == ACTIVE
+                                 for m in held)})
+    return {"studios": rows, "acting": admin.studio}
+
+
+def put_studio(store, viewer: Viewer | None, payload: dict) -> dict:
+    """Make a location, or change one.
+
+    An admin who makes a studio is made its admin in the same act, because a
+    studio nobody can administer is a studio somebody has to be given by hand
+    afterwards -- and that step is the one everybody forgets.
+    """
+    from .accounts import Membership, Studio, now
+
+    admin = _need_admin(viewer)
+    key = (payload.get("key") or payload.get("name") or "").strip().lower()
+    key = "-".join(part for part in
+                   "".join(c if c.isalnum() else "-" for c in key).split("-")
+                   if part)[:40]
+    if not key:
+        raise Refused("a studio needs a name", 400)
+    existing = store.studio(key)
+    studio = Studio(key=key, name=payload.get("name") or key,
+                    city=payload.get("city", ""),
+                    country=payload.get("country", ""),
+                    timezone=payload.get("timezone") or "UTC",
+                    created_at=(existing or {}).get("created_at") or now())
+    store.add_studio(studio)
+    if not existing:
+        store.put_membership(Membership(username=admin.username,
+                                        studio=key, role=ADMIN, state=ACTIVE,
+                                        decided_by=admin.username,
+                                        decided_at=now()))
+    store.record_audit(actor=admin.username,
+                       action="studio:updated" if existing else "studio:created",
+                       studio=key, detail=studio.name)
+    return {"studio": studio.to_dict(), "created": not existing}
+
+
+def _person_name(store, username: str) -> str:
+    """The name a person would recognise, falling back to the username.
+
+    Every message an admin reads should say "Bae Soo-jin", not
+    "bae_soojin_example_com". The username is a database key that happens to be
+    legible, and showing it makes a working feature look broken.
+    """
+    account = store.account(username)
+    return account.display_name if account and account.display_name else username
+
+
+def _place_name(store, key: str) -> str:
+    """The name of a studio, from its key.
+
+    Not to be confused with ``_studio_name`` further down, which answers a
+    different question -- *which* studio somebody belongs to. Naming them alike
+    once meant the second definition silently shadowed this one and every
+    location in an admin's confirmation came out as "the studio".
+    """
+    studio = store.studio(key)
+    return (studio.get("name") if isinstance(studio, dict) else None) or key
+
+
+def move_person(store, viewer: Viewer | None, payload: dict) -> dict:
+    """Put somebody into a studio, in a role, from anywhere.
+
+    The thing an owner of two locations needs on day one and could not do:
+    every other route works inside the studio the admin happens to be acting
+    in, and moving somebody is by definition about a different one.
+
+    ``leave`` ends the role at the old studio; without it they hold both, which
+    is a real case -- a coach who teaches at two sites -- rather than an error.
+    """
+    from .accounts import LEFT, Membership, now
+
+    admin = _need_admin(viewer)
+    username = payload.get("username", "")
+    role = payload.get("role") or STUDENT
+    to = payload.get("studio", "")
+    if role not in ROLES:
+        raise Refused(f"{role!r} is not one of {sorted(ROLES)}", 400)
+    if store.account(username) is None:
+        raise Refused(f"nobody here is called {username!r}", 404)
+    if store.studio(to) is None:
+        raise Refused(f"there is no studio called {to!r}", 404)
+
+    store.put_membership(Membership(username=username, studio=to, role=role,
+                                    state=ACTIVE, decided_by=admin.username,
+                                    decided_at=now()))
+    left = []
+    if payload.get("leave"):
+        for membership in store.memberships(username=username, role=role):
+            if membership.studio != to and membership.state == ACTIVE:
+                store.decide_membership(username, membership.studio, role,
+                                        LEFT, by=admin.username)
+                left.append(membership.studio)
+    store.record_audit(actor=admin.username, action=f"moved:{role}",
+                       subject=username, studio=to,
+                       detail=f"left {', '.join(left)}" if left else "added")
+    who = _person_name(store, username)
+    where = _place_name(store, to)
+    gone = ", ".join(_place_name(store, k) for k in left)
+    return {"username": username, "studio": to, "role": role, "left": left,
+            "display_name": who, "studio_name": where,
+            "message": f"{who} is now a {role} at {where}"
+                       + (f", no longer at {gone}" if left else "")}
+
+
+def assign_everybody(store, viewer: Viewer | None, payload: dict) -> dict:
+    """Give one coach every student at a studio, in one act.
+
+    A studio with one instructor is the common case and it should not be twenty
+    presses. Skips the ones already on that roster rather than duplicating them.
+    """
+    admin = _need_admin(viewer)
+    coach = payload.get("coach", "")
+    studio = payload.get("studio") or admin.studio
+    if store.account(coach) is None:
+        raise Refused(f"nobody here is called {coach!r}", 404)
+    live = {a.student for a in store.assignments(coach=coach, studio=studio)
+            if a.live}
+    students = [m.username for m in
+                store.memberships(studio=studio, role=STUDENT, state=ACTIVE)
+                if m.username != coach]
+    added = []
+    for student in students:
+        if student in live:
+            continue
+        assign(store, coach, student, studio, by=admin.username)
+        added.append(student)
+    name = _person_name(store, coach)
+    where = _place_name(store, studio)
+    if added:
+        message = (f"{len(added)} student{'' if len(added) == 1 else 's'} added "
+                   f"to {name}'s roster at {where}.")
+    elif not students:
+        # A zero that means "there was nobody here", which is not the same as
+        # "it did not work" -- and an admin staring at a bare 0 cannot tell the
+        # difference.
+        message = f"There are no students at {where} yet, so nobody was added."
+    else:
+        message = f"{name} already has every student at {where}."
+    return {"coach": coach, "studio": studio, "added": added,
+            "students": len(students), "display_name": name,
+            "studio_name": where, "message": message}
+
+
 def my_coaches(store, viewer: Viewer | None) -> dict:
     """Who can open my record, and since when.
 

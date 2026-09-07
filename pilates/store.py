@@ -296,6 +296,27 @@ CREATE TABLE IF NOT EXISTS invitations (
     accepted_at TEXT NOT NULL DEFAULT ''
 );
 
+-- What a coach scored after a class, on the five principles instructor
+-- training is built on. Kept apart from observations because they are
+-- different jobs: a note is prose about one moment, an evaluation is the same
+-- five judgements every time so that the third can be compared with the first.
+CREATE TABLE IF NOT EXISTS evaluations (
+    id       INTEGER PRIMARY KEY,
+    username TEXT NOT NULL REFERENCES people(username) ON DELETE CASCADE,
+    by       TEXT NOT NULL,
+    scores   TEXT NOT NULL DEFAULT '{}',
+    notes    TEXT NOT NULL DEFAULT '{}',
+    did      TEXT NOT NULL DEFAULT '',
+    settings TEXT NOT NULL DEFAULT '',
+    cue      TEXT NOT NULL DEFAULT '',
+    plan     TEXT NOT NULL DEFAULT '',
+    effort   TEXT NOT NULL DEFAULT 'steady',
+    session  TEXT NOT NULL DEFAULT '',
+    made_on  TEXT NOT NULL DEFAULT '',
+    made_at  TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS evaluations_person ON evaluations(username, made_on);
+
 -- One-time links: a password reset, or an email verification. Hashed, for the
 -- same reason a session token is: the server needs to recognise one it is
 -- shown, never to reproduce it, and a stolen database should not be a stolen
@@ -861,6 +882,41 @@ class Store:
         self.db.commit()
         self.record_audit(actor=by, action="assignment:ended", subject=student,
                           studio=studio, detail=coach)
+
+    # -- evaluations ----------------------------------------------------
+
+    def evaluate(self, evaluation) -> int:
+        """Score one class. Returns the row id."""
+        cursor = self.db.execute(
+            "INSERT INTO evaluations (username, by, scores, notes, did, "
+            "settings, cue, plan, effort, session, made_on, made_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (evaluation.username, evaluation.by, json.dumps(evaluation.scores),
+             json.dumps(evaluation.notes), evaluation.did, evaluation.settings,
+             evaluation.cue, evaluation.plan, evaluation.effort,
+             evaluation.session, evaluation.made_on, evaluation.made_at))
+        self.db.commit()
+        return int(cursor.lastrowid)
+
+    def evaluations(self, username: str = "", limit: int = 400) -> list:
+        from .evaluation import Evaluation
+
+        sql = "SELECT * FROM evaluations"
+        args: list = []
+        if username:
+            sql += " WHERE username = ?"
+            args.append(username)
+        args.append(int(limit))
+        return [Evaluation(username=row["username"], by=row["by"],
+                           scores=json.loads(row["scores"] or "{}"),
+                           notes=json.loads(row["notes"] or "{}"),
+                           did=row["did"], settings=row["settings"],
+                           cue=row["cue"], plan=row["plan"],
+                           effort=row["effort"], session=row["session"],
+                           made_on=row["made_on"], made_at=row["made_at"],
+                           id=row["id"])
+                for row in self.db.execute(
+                    sql + " ORDER BY made_on, made_at LIMIT ?", args)]
 
     # -- the audit log --------------------------------------------------
 
