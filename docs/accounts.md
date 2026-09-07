@@ -347,6 +347,14 @@ switched off.
 The student sees the same, under **My notes**. Nothing written about them is
 hidden from them.
 
+### One place to write, and one only
+
+Selecting a muscle used to put a *second* note form in the explore panel as
+well, in a different shape, asking for the same thing — so the same muscle had
+two boxes. The explore panel is read-only now; writing about a structure happens
+in the one panel that owns it. The bar at the bottom is **Before class**, which
+is the pre-class sheet and not a third place to write.
+
 ### Two controls that stay out of the way
 
 The explore panel **folds** to a strip labelled *Show panel* — the coach's
@@ -480,6 +488,26 @@ means nothing where there is no mail server.
 a permission system cannot be judged with one account in it. A coach with no
 students never shows the roster; a roster with nobody unscreened never shows the
 red row; an inbox with nothing waiting never shows what approving looks like.
+
+It also writes **twelve weeks of coach readings** — around 300 of them, across
+nine students — because the question a studio actually asks is not *does the box
+open* but *what does this look like after a term*. A fixture with one reading in
+it cannot answer that.
+
+Those readings are written as arcs rather than as random verdicts, because the
+only question anybody asks of a history is *is this getting better*, and a
+scatter cannot answer it. Kim Min-ji's psoas runs
+`problem problem problem watch watch watch watch fine watch fine fine fine` over
+twelve weeks. Han Do-yun's sciatic nerve gets worse before it gets better and
+carries a real referral in week six, because **a fixture where everybody
+improves cannot show a coach what a problem looks like six weeks in**. Yang
+Do-won's shoulder difference stays `worth watching` for all twelve weeks and is
+noted as structural rather than a fault — the case where the right answer is to
+leave it alone.
+
+The prose is written some weeks and not others, because a coach with ninety
+seconds between classes writes a sentence sometimes, and a fixture where every
+week has a paragraph is a fixture flattering the interface.
 
 What it deliberately contains, one per thing somebody has to be able to see:
 

@@ -277,8 +277,21 @@ def roster(store, viewer: Viewer | None) -> dict:
         # two clicks inside it. A reading nobody sees on the way into the class
         # is a reading that changes nothing about the class.
         read = store.structure_evals(assignment.student)
-        flagged = [f"{one.structure}: {one.flagged[0]}"
-                   for one in reversed(read) if one.flagged][:2]
+        # Two *different* findings, newest first. Taking the last two rows
+        # gives the same check twice, because a coach who flags a shoulder in
+        # week eleven usually flagged it in week ten as well -- and a roster
+        # that says the same thing twice has told you one thing.
+        flagged, said = [], set()
+        for one in reversed(read):
+            for line in one.flagged:
+                key = (one.structure, line.split(" — ")[0])
+                if key in said:
+                    continue
+                said.add(key)
+                flagged.append(f"{one.structure}: {line}")
+            if len(flagged) >= 2:
+                break
+        flagged = flagged[:2]
         seen["readings"] = len(read)
         seen["focus"] = flagged[0] if flagged else ""
         seen["also"] = flagged[1] if len(flagged) > 1 else ""

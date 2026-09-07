@@ -22,7 +22,7 @@
 import { CHART_CSS, bar, chip, group, showValue, spark, stat, verdictChip,
          wireCharts } from './charts.js';
 import { MEASURED, RESEARCH } from './session.js';
-import { saidAbout, wireWriter, writer } from './coach.js';
+import { saidAbout } from './coach.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g,
   (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -200,18 +200,19 @@ export function attachPanel(session, nw, hooks = {}) {
     /* What the coach said about this structure sits with the measurements, in
      * its own treatment: it is a fourth kind of claim, and it carries who said
      * it and when because that is the whole of its authority. */
+    /* Reading only. Writing about a structure happens in the one panel that
+     * owns it -- selecting a muscle used to put a second, different note form
+     * in here as well, so the same muscle had two boxes asking for the same
+     * thing in two different shapes. */
     const name = record?.name?.en ?? '';
     (anchor ?? detail).insertAdjacentHTML(
-      'afterend',
-      html + saidAbout(name) + writer(name, (record?.fma ?? [])[0] ?? '') + button);
+      'afterend', html + saidAbout(name) + button);
     writing = false;
 
     hooks.onProse?.(carried, id, record);
     /* The structure is selected; the box to say something about it opens now,
-     * without a toggle and without a second click. A coach looking at a muscle
-     * with no way to write about it was the original complaint. */
+     * without a toggle and without a second click. */
     hooks.onStructure?.(record, id);
-    wireWriter(detail);
     wireCharts(detail);
     drawViews(detail, nw);
     detail.querySelector('.ss-tolab')

@@ -77,26 +77,6 @@ const CSS = `
 
 /* Writing one. In the panel, under whatever structure is selected, because the
    structure is the subject and clicking away to a form loses it. */
-.ss-write{margin:10px 0 0;border-top:1px solid var(--line);padding-top:11px}
-.ss-write h4{margin:0 0 8px;font-size:9.5px;letter-spacing:.13em;
-  text-transform:uppercase;color:var(--gold);font-weight:400}
-.ss-write select,.ss-write textarea,.ss-write input{width:100%;font:inherit;
-  font-size:12.5px;padding:7px 9px;border-radius:3px;background:var(--glass);
-  border:1px solid var(--line);color:var(--txt);margin:0 0 7px}
-.ss-write textarea{min-height:66px;resize:vertical;line-height:1.5}
-.ss-write select:focus,.ss-write textarea:focus,.ss-write input:focus{outline:0;
-  border-color:var(--acc)}
-.ss-write .rate{display:flex;gap:5px;margin:0 0 7px}
-.ss-write .rate button{flex:1;padding:6px 0;border-radius:3px;font-size:12px;
-  border:1px solid var(--line);background:var(--glass);color:var(--dim);
-  cursor:pointer}
-.ss-write .rate button[aria-pressed=true]{border-color:var(--acc);
-  color:var(--txt);background:rgba(90,169,230,.15)}
-.ss-write .go{display:flex;gap:8px;align-items:center}
-.ss-write .go button{padding:8px 14px;border-radius:3px;font-size:12.5px;
-  border:1px solid var(--acc);background:var(--acc);color:#04121f;cursor:pointer}
-.ss-write .go span{font-size:11px;color:var(--dim2)}
-.ss-write .bad{color:var(--gold)}
 .ss-said{margin:12px 0 0}
 .ss-said h4{margin:0 0 7px;font-size:9.5px;letter-spacing:.13em;
   text-transform:uppercase;color:var(--dim2);font-weight:400}
@@ -192,41 +172,6 @@ async function loadSheet(user) {
 
 /* ------------------------------------------------------------------ writing */
 
-/**
- * The form, rendered under whatever structure is selected.
- *
- * The structure is the subject, so the form lives beside it rather than behind
- * a button that loses it. Kind first, because it decides where the note will be
- * read back; then the words; then a rating, which is optional and has to say
- * what it rates -- a bare "4" is the thing this project exists not to produce.
- */
-export function writer(structureName, fma, record) {
-  /* No toggle. It used to need "coach mode" switched on at the bottom of the
-   * screen before this appeared, and the result was a coach looking at their
-   * own student's muscle with no way to say anything about it and no clue that
-   * a hidden switch existed. If you are this person's coach, the box is here.
-   */
-  if (!state.canWrite) return '';
-  const options = ORDER.filter((k) => state.kinds[k])
-    .map((k) => `<option value="${k}">${esc(k)} — ${esc(state.kinds[k])}</option>`)
-    .join('');
-  const subject = structureName
-    ? `about <b>${esc(structureName)}</b>` : 'about the whole person';
-  return `<div class="ss-write" data-structure="${esc(structureName ?? '')}"
-       data-fma="${esc(fma ?? '')}">
-    <h4>Write a note — ${subject}</h4>
-    <select data-kind>${options}</select>
-    <textarea data-text placeholder="What would make the next class better? Their words if you have them."></textarea>
-    <input data-rates placeholder="Rate what? e.g. control through the hips (optional)">
-    <div class="rate" role="group" aria-label="rating out of five">
-      ${[1, 2, 3, 4, 5].map((n) =>
-        `<button type="button" data-rating="${n}" aria-pressed="false">${n}</button>`).join('')}
-    </div>
-    <input data-review placeholder="Review on (optional, e.g. 2026-10-01)">
-    <div class="go"><button type="button" data-save>Save note</button>
-      <span data-said></span></div>
-  </div>`;
-}
 
 /** Notes already written about this structure, shown with the measurements. */
 export function saidAbout(structureName) {
@@ -239,73 +184,6 @@ export function saidAbout(structureName) {
         : ''}</span></div>`).join('')}</div>`;
 }
 
-/** Wire a rendered form. Called by the panel after each render. */
-export function wireWriter(root, onSaved) {
-  const form = root.querySelector('.ss-write');
-  if (!form || form.dataset.wired) return;
-  form.dataset.wired = '1';
-  let rating = null;
-  for (const button of form.querySelectorAll('[data-rating]')) {
-    button.addEventListener('click', () => {
-      rating = rating === +button.dataset.rating ? null : +button.dataset.rating;
-      for (const other of form.querySelectorAll('[data-rating]')) {
-        other.setAttribute('aria-pressed',
-                           String(rating === +other.dataset.rating));
-      }
-    });
-  }
-  const said = form.querySelector('[data-said]');
-  form.querySelector('[data-save]').addEventListener('click', async () => {
-    const payload = {
-      username: state.user, by: state.by, session: state.session,
-      kind: form.querySelector('[data-kind]').value,
-      text: form.querySelector('[data-text]').value,
-      rates: form.querySelector('[data-rates]').value,
-      review_on: form.querySelector('[data-review]').value,
-      structure: form.dataset.structure, fma: form.dataset.fma,
-      rating,
-    };
-    said.className = '';
-    said.textContent = 'Saving…';
-    try {
-      let response;
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const word = passcode(state.capable, attempt > 0);
-        response = await fetch('note', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json',
-                     ...(word ? { 'X-Passcode': word } : {}) },
-          body: JSON.stringify(payload),
-        });
-        if (response.status !== 401) break;
-      }
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error || response.statusText);
-      state.sheet = body.sheet;
-      const host = document.getElementById('ss-sheet');
-      if (host) renderSheet(host);
-      /* Refresh the notes about this structure in place, rather than tearing
-       * the panel down and rebuilding it: a re-render destroys the form, and
-       * with it the confirmation that the note was saved -- so the coach sees
-       * an empty box and no idea whether it worked. */
-      const previous = form.parentElement.querySelector('.ss-said');
-      const fresh = saidAbout(form.dataset.structure);
-      if (previous) previous.outerHTML = fresh;
-      else if (fresh) form.insertAdjacentHTML('beforebegin', fresh);
-      form.querySelector('[data-text]').value = '';
-      form.querySelector('[data-rates]').value = '';
-      for (const other of form.querySelectorAll('[data-rating]')) {
-        other.setAttribute('aria-pressed', 'false');
-      }
-      rating = null;
-      said.textContent = 'Saved.';
-      onSaved?.(body.note);
-    } catch (error) {
-      said.className = 'bad';
-      said.textContent = error.message;
-    }
-  });
-}
 
 /* ------------------------------------------------------------------- mount */
 
@@ -325,7 +203,7 @@ function offline(session) {
   bar.id = 'ss-coach-bar';
   bar.className = 'ss-off';
   bar.innerHTML = `<button type="button" aria-pressed="false" data-toggle>
-    <em>Coach</em><span>Notes — how to turn them on</span></button>`;
+    <em>Before class</em><span>Reading only in this viewer</span></button>`;
   document.body.appendChild(bar);
 
   const host = document.createElement('div');
@@ -409,8 +287,8 @@ export async function mount(session, nw, onChange, known, me) {
   const bar = document.createElement('div');
   bar.id = 'ss-coach-bar';
   bar.innerHTML = `<button type="button" aria-pressed="false" data-toggle>
-    <em>${state.canWrite ? 'Notes' : 'Sheet'}</em><span>${
-      state.canWrite ? 'What to read before this class'
+    <em>Before class</em><span>${
+      state.canWrite ? 'Flags, goals and the last few classes'
                      : 'What the coach wrote'}</span></button>`;
   document.body.appendChild(bar);
 

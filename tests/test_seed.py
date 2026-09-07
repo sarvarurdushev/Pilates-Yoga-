@@ -263,3 +263,78 @@ class TestOneHashForSixteenPeople:
 
         assert auth.sign_in(sown, "kim.minji@example.com", seed.PASSWORD)
         assert auth.sign_in(sown, "park.minseok@example.com", seed.PASSWORD)
+
+
+class TestATermOfCoaching:
+    """The fixture exists to answer one question: what does this look like once
+    a coach has actually been using it, rather than after one press?"""
+
+    def _handle(self, sown, handle):
+        return next(u for p, u in sown.made["people"] if p.handle == handle)
+
+    def test_twelve_weeks_of_readings_are_written(self, sown):
+        assert sown.made["readings"] > 200
+
+    def test_one_student_has_a_run_long_enough_to_read(self, sown):
+        from pilates.structure_eval import history
+
+        rows = sown.structure_evals(self._handle(sown, "kim.minji"),
+                                    "Psoas major")
+        past = history(rows)
+        assert past["count"] == seed.WEEKS
+        run = past["runs"]["how much work it's doing"]
+        assert len(run) == seed.WEEKS
+
+    def test_the_arc_actually_goes_somewhere(self, sown):
+        """A scatter of verdicts cannot answer "is this getting better", which
+        is the only question a coach asks of a history."""
+        rows = sorted(sown.structure_evals(self._handle(sown, "kim.minji"),
+                                           "Psoas major"),
+                      key=lambda e: e.made_on)
+        first = rows[0].checks[0]["verdict"]
+        last = rows[-1].checks[0]["verdict"]
+        assert first == "problem" and last == "fine"
+
+    def test_not_everybody_gets_better(self, sown):
+        """A fixture where everybody improves cannot show a coach what a
+        problem looks like six weeks in."""
+        rows = sown.structure_evals(self._handle(sown, "han.doyun"))
+        assert any(one.urgent for one in rows)
+
+    def test_only_a_nerve_is_ever_urgent_in_the_fixture(self, sown):
+        for _, username in sown.made["people"]:
+            for one in sown.structure_evals(username):
+                if one.urgent:
+                    assert one.kind == "nerve"
+
+    def test_a_reading_is_attributed_to_the_coach_who_has_them(self, sown):
+        """Not to "the studio", and not to the student themselves."""
+        rows = sown.structure_evals(self._handle(sown, "kim.minji"))
+        assert {one.by for one in rows} == {"Park Min-seok"}
+
+    def test_prose_is_written_sometimes_rather_than_every_week(self, sown):
+        """A coach with ninety seconds between classes writes prose sometimes.
+        Every single week would be a fixture flattering the interface."""
+        rows = sown.structure_evals(self._handle(sown, "kim.minji"))
+        with_prose = [one for one in rows if one.note]
+        assert 0 < len(with_prose) < len(rows)
+
+    def test_the_week_s_prose_is_not_repeated_onto_every_structure(self, sown):
+        rows = sown.structure_evals(self._handle(sown, "kim.minji"))
+        by_day: dict = {}
+        for one in rows:
+            if one.note:
+                by_day.setdefault(one.made_on, []).append(one.note)
+        assert all(len(notes) == 1 for notes in by_day.values())
+
+    def test_the_dates_read_like_a_term_not_one_afternoon(self, sown):
+        rows = sown.structure_evals(self._handle(sown, "kim.minji"))
+        assert len({one.made_on for one in rows}) >= seed.WEEKS - 1
+
+    def test_every_check_label_is_something_a_coach_would_say(self, sown):
+        """No enum leaked into the fixture: these are the coach's own words."""
+        for _, username in sown.made["people"]:
+            for one in sown.structure_evals(username):
+                for check in one.checks:
+                    assert " " in check["label"], check["label"]
+                    assert check["label"] == check["label"].lower()

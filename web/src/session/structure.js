@@ -117,7 +117,7 @@ body.ss-folded #ss-struct{right:14px}
   color:var(--dim);margin:0 0 3px;line-height:1.4}
 #ss-struct .sx-run em{font-style:normal;color:var(--txt);flex:1;min-width:0}
 #ss-struct .sx-dots{display:flex;gap:3px;flex:none}
-#ss-struct .sx-dots span{width:7px;height:7px;border-radius:50%;
+#ss-struct .sx-dots span{width:6px;height:6px;border-radius:50%;
   background:rgba(90,169,230,.35);display:block}
 #ss-struct .sx-dots span.watch{background:var(--gold)}
 #ss-struct .sx-dots span.problem{background:#e2685f}
@@ -255,20 +255,24 @@ function runs(form) {
   const rows = Object.entries(form.history?.runs ?? {});
   if (!rows.length && !form.history?.count) return '';
   const lines = rows.map(([label, points]) => {
-    const dots = points.slice(-6).map((p) =>
+    /* A term's worth. Six showed half an arc, which is exactly the length at
+     * which "is this getting better" stops being answerable. */
+    const dots = points.slice(-14).map((p) =>
       `<span class="${p.verdict === 'fine' ? '' : p.verdict}"
         title="${esc(p.date)}: ${esc(p.verdict)}${
         p.note ? ` — ${esc(p.note)}` : ''}"></span>`).join('');
+    const last = points[points.length - 1];
     return `<p class="sx-run"><em>${esc(label)}</em>
-      <span class="sx-dots">${dots}</span></p>`;
+      <span class="sx-dots">${dots}</span>
+      <span style="flex:none;color:var(--dim2)">${esc(last.verdict)}</span></p>`;
   }).join('');
-  const last = form.history.latest;
+  const latest = form.history.latest;
   return `<div class="sx-past">
     <h5>Written about this before — ${form.history.count} time${
       form.history.count === 1 ? '' : 's'}, since ${esc(form.history.first_on)}</h5>
-    ${lines}${last?.note
-      ? `<p class="sx-run" style="margin-top:6px"><em>“${esc(last.note)}”
-          — ${esc(last.by)}, ${esc(last.made_on)}</em></p>` : ''}</div>`;
+    ${lines}${latest?.note
+      ? `<p class="sx-run" style="margin-top:6px"><em>“${esc(latest.note)}”
+          — ${esc(latest.by)}, ${esc(latest.made_on)}</em></p>` : ''}</div>`;
 }
 
 function draw(host, form, ctx) {

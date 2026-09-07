@@ -935,7 +935,12 @@ class Store:
                               session=row["session"], made_on=row["made_on"],
                               made_at=row["made_at"], id=row["id"])
                 for row in self.db.execute(
-                    sql + " ORDER BY made_on, made_at LIMIT ?", args)]
+                    # `id` breaks the tie. Timestamps are second-precision, so
+                    # two readings written in the same second -- which is what
+                    # happens when a coach saves a muscle and then the bone
+                    # under it -- came back in whatever order SQLite felt like,
+                    # and "the most recent one" was then a coin toss.
+                    sql + " ORDER BY made_on, made_at, id LIMIT ?", args)]
 
     # -- the audit log --------------------------------------------------
 

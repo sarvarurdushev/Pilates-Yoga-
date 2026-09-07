@@ -167,11 +167,15 @@ function student(row) {
                  row.mass_kg ? `${row.mass_kg} kg` : ''].filter(Boolean).join(' · ');
   /* What to work on, on the way into the class rather than two clicks inside
    * it. An evaluation nobody reads before the class changes nothing about the
-   * class, and "never scored" is a thing to see rather than an absence. */
-  const work = row.evaluations
-    ? `<i class="ss-focus">work on ${esc(row.focus || 'the five')}</i>`
-      + (row.plan ? `<i class="ss-plan">${esc(row.plan)}</i>` : '')
-    : '<i class="ss-cold">never scored</i>';
+   * class, and "nothing written yet" is a thing to see rather than an
+   * absence. */
+  const work = row.readings
+    ? (row.focus ? `<i class="ss-focus">${esc(row.focus)}</i>` : '')
+      + (row.also ? `<i class="ss-focus">${esc(row.also)}</i>` : '')
+      + (!row.focus ? `<i class="ss-plan">${row.readings} reading${
+          row.readings === 1 ? '' : 's'}, nothing flagged</i>` : '')
+      + (row.note ? `<i class="ss-plan">${esc(row.note)}</i>` : '')
+    : '<i class="ss-cold">nothing written yet</i>';
   return `<button type="button" class="ss-who${row.urgent ? ' ss-urgent' : ''}"
       data-open="${esc(row.username)}"
       data-name="${esc((row.display_name || '').toLowerCase())}">

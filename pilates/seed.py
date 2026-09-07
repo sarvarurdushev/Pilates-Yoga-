@@ -261,7 +261,7 @@ def sow(store, password: str = PASSWORD, classes: bool = True,
     holds both.
     """
     made = {"studios": [], "people": [], "assignments": 0, "notes": 0,
-            "sessions": 0, "into": into}
+            "sessions": 0, "readings": 0, "into": into}
 
     if into:
         if store.studio(into) is None:
@@ -338,10 +338,244 @@ def sow(store, password: str = PASSWORD, classes: bool = True,
             made_on=str(date.today() - timedelta(days=14))))
         made["notes"] += 1
 
+    made["readings"] = _write_readings(store, handles, into)
+
     store.record_audit(actor="seed", action="seed:sown",
                        detail=f"{len(made['people'])} people, "
-                              f"{len(made['studios'])} studios")
+                              f"{len(made['studios'])} studios, "
+                              f"{made['readings']} readings")
     return made
+
+
+#: Twelve weeks of readings, so a studio can see what this looks like once a
+#: coach has actually been using it rather than after one press.
+#:
+#: Written as an arc rather than as random noise, because the whole question a
+#: coach asks of the history is *"is this getting better"* and a scatter of
+#: verdicts cannot answer it. Each entry is:
+#:
+#:     (structure, kind, check, [verdict per class, oldest first], note)
+#:
+#: A blank verdict means that class the coach looked and did not commit -- which
+#: happens, and a fixture where every check is answered every week is a fixture
+#: that flatters the interface.
+ARCS = {
+    "kim.minji": [
+        ("Psoas major", "muscle", "how much work it's doing",
+         ["problem", "problem", "problem", "watch", "watch", "watch",
+          "watch", "fine", "watch", "fine", "fine", "fine"],
+         "taking the whole teaser; abdominals barely in it"),
+        ("Psoas major", "muscle", "does it let go between reps",
+         ["problem", "problem", "watch", "watch", "watch", "",
+          "watch", "watch", "fine", "fine", "fine", "fine"],
+         "still gripping at the bottom of the roll-down"),
+        ("Rectus abdominis", "muscle", "when it comes in",
+         ["watch", "watch", "watch", "fine", "fine", "fine",
+          "fine", "fine", "fine", "fine", "fine", "fine"],
+         "late — the hip flexors start it"),
+        ("Sacrum", "bone", "does it stay there under load",
+         ["problem", "watch", "watch", "watch", "fine", "watch",
+          "fine", "fine", "fine", "fine", "fine", "fine"],
+         "tips under as soon as the springs go on"),
+        ("Latissimus dorsi", "muscle", "left against right",
+         ["", "watch", "watch", "watch", "watch", "watch",
+          "watch", "watch", "watch", "fine", "watch", "watch"],
+         "right side always does more; old knee, she pushes off it"),
+    ],
+    "lee.joonho": [
+        ("Trapezius", "muscle", "does the shoulder shrug",
+         ["problem", "problem", "problem", "problem", "watch", "watch",
+          "problem", "watch", "watch", "watch", "fine", "watch"],
+         "up round the ears the moment the arms load"),
+        ("Serratus anterior", "muscle", "how much work it's doing",
+         ["problem", "problem", "watch", "watch", "watch", "watch",
+          "fine", "watch", "fine", "fine", "fine", "fine"],
+         "not much — the traps are covering for it"),
+        ("Scapula", "bone", "where it sits at the start",
+         ["watch", "watch", "watch", "fine", "fine", "watch",
+          "fine", "fine", "fine", "fine", "fine", "fine"],
+         "winging off the ribs in quadruped"),
+        ("Cervical vertebra", "bone", "against the segment above and below",
+         ["watch", "watch", "fine", "fine", "watch", "fine",
+          "fine", "fine", "fine", "fine", "fine", "fine"],
+         "chin pokes as soon as he concentrates"),
+    ],
+    "choi.seoyeon": [
+        ("Gluteus medius", "muscle", "left against right",
+         ["problem", "problem", "watch", "watch", "watch", "watch",
+          "watch", "fine", "watch", "fine", "fine", "fine"],
+         "left one is not showing up at all in side-lying"),
+        ("Tensor fasciae latae", "muscle", "what took over instead",
+         ["problem", "watch", "watch", "watch", "fine", "watch",
+          "fine", "fine", "fine", "fine", "fine", "fine"],
+         "doing the whole abduction; hip flexes to get the leg up"),
+        ("Femur", "bone", "where the control goes",
+         ["watch", "watch", "watch", "watch", "watch", "fine",
+          "fine", "watch", "fine", "fine", "fine", "fine"],
+         "knee falls in at the bottom of the squat, never at the top"),
+    ],
+    "han.doyun": [
+        # The one where it does not go well. A fixture in which everybody
+        # improves is a fixture that cannot show a coach what a problem
+        # looks like six weeks in.
+        ("Sciatic nerve", "nerve", "what they reported",
+         ["", "", "watch", "watch", "watch", "problem",
+          "problem", "watch", "watch", "watch", "fine", "fine"],
+         "pins and needles down the back of the left thigh"),
+        ("Sciatic nerve", "nerve", "how long it lasted",
+         ["", "", "fine", "watch", "watch", "problem",
+          "problem", "watch", "fine", "fine", "fine", "fine"],
+         "still there when he left — sent him to get it looked at"),
+        ("Lumbar vertebra", "bone", "does it stay there under load",
+         ["watch", "watch", "problem", "problem", "problem", "problem",
+          "watch", "watch", "watch", "fine", "fine", "fine"],
+         "hinges at one segment rather than articulating"),
+        ("Erector spinae", "muscle", "does it let go between reps",
+         ["problem", "problem", "problem", "watch", "watch", "watch",
+          "watch", "watch", "fine", "fine", "fine", "fine"],
+         "braced solid the whole class"),
+    ],
+    "jung.haeun": [
+        ("Transversus abdominis", "muscle", "how much work it's doing",
+         ["watch", "watch", "watch", "fine", "fine", "fine",
+          "fine", "fine", "fine", "fine", "fine", "fine"],
+         "there, but she over-grips and the breath stops"),
+        ("Diaphragm", "muscle", "does it hold through the set",
+         ["problem", "watch", "watch", "watch", "fine", "fine",
+          "watch", "fine", "fine", "fine", "fine", "fine"],
+         "breath-holding through the whole forward phase"),
+        ("Pelvis", "bone", "where it sits at the start",
+         ["watch", "fine", "fine", "watch", "fine", "fine",
+          "fine", "fine", "fine", "fine", "fine", "fine"], ""),
+    ],
+    "shin.yerin": [
+        ("Rhomboid major", "muscle", "how much work it's doing",
+         ["watch", "watch", "watch", "watch", "watch", "watch",
+          "fine", "watch", "fine", "fine", "watch", "fine"],
+         "quiet; the upper traps take it"),
+        ("Thoracic vertebra", "bone", "how much range",
+         ["problem", "problem", "watch", "watch", "watch", "watch",
+          "watch", "watch", "fine", "watch", "fine", "fine"],
+         "moves as a block from T4 down"),
+    ],
+    "moon.jaehyun": [
+        ("Hamstring", "muscle", "how much range",
+         ["problem", "problem", "problem", "watch", "watch", "watch",
+          "watch", "watch", "watch", "fine", "fine", "watch"],
+         "the range genuinely is not there yet"),
+        ("Gastrocnemius", "muscle", "does it let go between reps",
+         ["watch", "watch", "watch", "fine", "fine", "fine",
+          "fine", "fine", "fine", "fine", "fine", "fine"],
+         "toes gripping the footbar"),
+    ],
+    "song.arin": [
+        ("Gluteus maximus", "muscle", "when it comes in",
+         ["problem", "problem", "watch", "watch", "watch", "fine",
+          "watch", "fine", "fine", "fine", "fine", "fine"],
+         "late — hamstrings start every bridge"),
+        ("Rectus femoris", "muscle", "does it let go between reps",
+         ["watch", "watch", "watch", "watch", "fine", "fine",
+          "fine", "fine", "fine", "fine", "fine", "fine"], ""),
+    ],
+    "yang.dowon": [
+        ("Deltoid", "muscle", "left against right",
+         ["watch", "watch", "watch", "watch", "watch", "watch",
+          "watch", "watch", "watch", "watch", "watch", "watch"],
+         "right always higher; he has never noticed"),
+        ("Humerus", "bone", "where it sits at the start",
+         ["watch", "fine", "watch", "fine", "fine", "fine",
+          "fine", "fine", "fine", "fine", "fine", "fine"], ""),
+    ],
+}
+
+#: What the coach wrote in the free box, roughly every third class. Not every
+#: week: a coach with ninety seconds between classes writes prose sometimes.
+PROSE = {
+    "kim.minji": [
+        (11, "Best teaser she has done. Did not need the hands-on cue once."),
+        (8, "Dropped to two reds and everything got more even. Keep it there."),
+        (5, "Wall roll-downs before the mat work are doing it — third week in a row."),
+        (2, "Everything upstream of the pelvis is fine; it is all the psoas."),
+        (0, "First proper look. Teaser is all hip flexor, no abdominal at all."),
+    ],
+    "lee.joonho": [
+        (10, "Shoulders stayed down through the whole arm series for the first time."),
+        (6, "Tried the imagery cue instead of anatomy and it landed immediately."),
+        (3, "Hands-on at the lower ribs works where words do not."),
+        (0, "Traps do everything. Serratus needs to be taught before anything loaded."),
+    ],
+    "han.doyun": [
+        (10, "Cleared by his GP, back to full range. Watch it for a month."),
+        (6, "Symptom outlasted the class again — stopped and sent him off. "
+            "Nothing loaded until somebody qualified has looked."),
+        (5, "Second week of pins and needles. Modified everything in flexion."),
+        (2, "Mentioned tingling after class. Nothing during. Watching it."),
+    ],
+    "choi.seoyeon": [
+        (9, "Left glute finally firing without the cue."),
+        (4, "Single-leg work rather than cueing it in bilateral — better."),
+        (0, "TFL doing the whole job. Everything else follows from that."),
+    ],
+    "jung.haeun": [
+        (7, "Stopped over-gripping once we stopped talking about the core."),
+        (1, "Holds her breath the moment she concentrates."),
+    ],
+    "shin.yerin": [(8, "Thoracic is opening. Rhomboids still quiet.")],
+    "moon.jaehyun": [(6, "Range is coming, slowly. Not forcing it.")],
+    "song.arin": [(7, "Glutes are leading the bridge now.")],
+    "yang.dowon": [(4, "The shoulder difference is structural, not a fault. "
+                       "Leaving it alone and noting it.")],
+}
+
+#: How many weeks of readings the fixture writes. Twelve because the question
+#: this fixture exists to answer is what it looks like after a term of classes,
+#: and twelve weeks is a term.
+WEEKS = 12
+
+
+def _write_readings(store, handles, into: str = "") -> int:
+    """Twelve weeks of a coach actually using the thing.
+
+    Written by whichever coach has that student on their roster, on a weekly
+    cadence ending last week, so the dates read like a term rather than like a
+    fixture written in one afternoon.
+    """
+    from .structure_eval import StructureEval
+
+    coach_of = {student: coach for coach, students in ROSTERS.items()
+                for student in students}
+    names = {p.handle: p.name for p in PEOPLE}
+    written = 0
+    for handle, arcs in ARCS.items():
+        if handle not in handles:
+            continue
+        coach = coach_of.get(handle)
+        by = names.get(coach, "The studio")
+        prose = dict(PROSE.get(handle, []))
+        for week in range(WEEKS):
+            when = date.today() - timedelta(weeks=WEEKS - week)
+            checks_by_structure: dict = {}
+            for structure, kind, check, verdicts, note in arcs:
+                verdict = verdicts[week] if week < len(verdicts) else ""
+                if not verdict:
+                    continue
+                key = (structure, kind)
+                checks_by_structure.setdefault(key, []).append({
+                    "label": check, "verdict": verdict,
+                    # The note explains the finding, so it belongs on the
+                    # classes where there is one -- not on the weeks it is fine.
+                    "note": note if verdict != "fine" else ""})
+            # The week's prose goes on one structure, not repeated onto every
+            # one the coach happened to look at that day.
+            said = prose.get(week, "")
+            for (structure, kind), checks in checks_by_structure.items():
+                store.evaluate_structure(StructureEval(
+                    username=handles[handle], by=by, structure=structure,
+                    kind=kind, note=said, checks=checks, made_on=str(when),
+                    made_at=f"{when}T09:00:00+00:00"))
+                said = ""
+                written += 1
+    return written
 
 
 def _record_classes(store, people) -> int:

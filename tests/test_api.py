@@ -622,6 +622,25 @@ class TestTheRosterSaysWhatToReadFirst:
         assert row["readings"] == 1
         assert row["note"] == "wall roll-downs before the mat work"
 
+    def test_the_two_lines_are_two_different_findings(self, studio):
+        """A coach who flags a shoulder in week eleven flagged it in week ten
+        as well. A roster saying the same thing twice has told you one thing."""
+        base, names, _ = studio
+        coach, _ = self._assign(base, names)
+        for _ in range(3):
+            coach.post("/evaluate-structure", {
+                "username": names["ann"], "structure": "trapezius",
+                "kind": "muscle",
+                "checks": [{"label": "does the shoulder shrug",
+                            "verdict": "watch"}]})
+        coach.post("/evaluate-structure", {
+            "username": names["ann"], "structure": "psoas major",
+            "kind": "muscle",
+            "checks": [{"label": "how much work", "verdict": "problem"}]})
+        row = coach.get("/roster")[1]["students"][0]
+        assert row["focus"] != row["also"]
+        assert "psoas major" in row["focus"] and "trapezius" in row["also"]
+
     def test_nothing_written_is_a_thing_to_see_not_an_absence(self, studio):
         base, names, _ = studio
         coach, _ = self._assign(base, names)
