@@ -43,13 +43,44 @@ const browser = await chromium.launch({
 });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 
+/* Requests the page makes knowing they may not be there.
+ *
+ * Served as a folder -- which is most of what this application is for -- there
+ * is no Python half, so `/capabilities` and `/auth/me` 404 and the page handles
+ * it: the Record button explains how to start the other half instead of offering
+ * an analysis nothing can run, and the account chrome stays away. A browser asks
+ * for a favicon whatever anyone does.
+ *
+ * Counting those as failures made this test fail on correct behaviour, every
+ * run, which is how a test stops being read -- and it was hiding a real one
+ * underneath: the demo chip ran off the side of a phone screen. Anything else
+ * that 404s is a broken import or a missing asset and still fails the run.
+ */
+const EXPECTED_404 = ['/capabilities', '/auth/me', '/favicon.ico'];
 const errors = [], warnings = [];
+/* A console message says "Failed to load resource: ... 404" without naming the
+ * URL, so the URL comes from the response event instead and the console line is
+ * matched against what that saw. */
+const seen404 = new Set();
+const watch = (p, tag) => {
+  p.on('response', r => { if (r.status() === 404) seen404.add(new URL(r.url()).pathname); });
+  p.on('requestfailed', r => errors.push(`${tag}request failed: ${r.url()} ${r.failure()?.errorText}`));
+};
+const consoleError = (text, tag) => {
+  if (/404/.test(text)) {
+    const unexpected = [...seen404].filter(p => !EXPECTED_404.includes(p));
+    if (!unexpected.length) return;
+    errors.push(`${tag}404: ${unexpected.join(', ')}`);
+    return;
+  }
+  errors.push(`${tag}${text}`);
+};
 page.on('console', m => {
-  if (m.type() === 'error') errors.push(m.text());
+  if (m.type() === 'error') consoleError(m.text(), '');
   if (m.type() === 'warning') warnings.push(m.text());
 });
+watch(page, '');
 page.on('pageerror', e => errors.push(`pageerror: ${e.message}`));
-page.on('requestfailed', r => errors.push(`request failed: ${r.url()} ${r.failure()?.errorText}`));
 
 const shot = async (name) => {
   // caret/animations disabled and a long timeout: the default screenshot path waits on
@@ -1415,7 +1446,8 @@ await page.evaluate(async () => { (await import('/src/main.js')).setGroup(null);
  * *be* 390, and nothing may hang off the edge of it. */
 const phone = await browser.newPage({ viewport: { width: 390, height: 844 },
                                       deviceScaleFactor: 2, isMobile: true, hasTouch: true });
-phone.on('console', m => { if (m.type() === 'error') errors.push(`phone: ${m.text()}`); });
+phone.on('console', m => { if (m.type() === 'error') consoleError(m.text(), 'phone: '); });
+watch(phone, 'phone: ');
 // generous: this is a second WebGL context on a software rasteriser
 phone.setDefaultNavigationTimeout(180000);
 await phone.goto(`http://127.0.0.1:${port}/index.html`);

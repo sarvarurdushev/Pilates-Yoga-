@@ -55,12 +55,24 @@ const BANNER_CSS = `
 #sessbar .sample{color:var(--gold);letter-spacing:.11em;text-transform:uppercase;
   font-size:9px;border:1px solid rgba(233,180,92,.4);border-radius:3px;
   padding:1px 6px}
-#demochip{position:fixed;left:308px;bottom:22px;z-index:60;display:flex;gap:10px;
-  align-items:center;padding:9px 14px;border-radius:4px;cursor:pointer;
-  background:rgba(233,180,92,.10);border:1px solid rgba(233,180,92,.45);
-  color:var(--txt);font-size:12px;letter-spacing:.02em}
+/* The left offset clears the console on a desktop; the right one is what keeps
+   the chip on a phone. Pinned at 308px with nothing bounding its right edge, a sentence
+   naming the session ran off a 390px screen -- 82px of room for about 300px of
+   text -- and took the tap target with it, so the one control offering a reader
+   the demo could not be reached on the device most of them open this on. */
+#demochip{position:fixed;left:12px;right:12px;bottom:22px;z-index:60;
+  display:flex;gap:10px;align-items:center;padding:9px 14px;border-radius:4px;
+  cursor:pointer;background:rgba(233,180,92,.10);
+  border:1px solid rgba(233,180,92,.45);
+  color:var(--txt);font-size:12px;letter-spacing:.02em;text-align:left}
+/* Wide enough for the console to sit beside it: clear the console, and shrink
+   back to the width of the sentence rather than stretching across the stage. */
+@media (min-width: 900px){#demochip{left:308px;right:auto;width:max-content}}
+/* So the session name is what gets clipped when there is no room for it, rather
+   than the chip growing past the edge of the screen to fit. */
+#demochip span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #demochip:hover{background:rgba(233,180,92,.17)}
-#demochip em{font-style:normal;color:var(--gold);font-size:9.5px;
+#demochip em{font-style:normal;color:var(--gold);font-size:9.5px;flex:none;
   letter-spacing:.12em;text-transform:uppercase}
 /* Everything the application positions under its own header is measured from
    --barh, and its top bar is fixed at zero. So the session bar takes the top
