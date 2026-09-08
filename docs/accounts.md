@@ -308,6 +308,52 @@ A bone is asked about placement, stacking, load, and any joint angle the camera
 measured there. A nerve is not scored on performance at all — it records what
 was reported, how long it lasted, and the decision: carry on, modify, or refer.
 
+### In words a person can act on
+
+The first version of the per-structure form quoted the atlas's clinical register
+straight — *"adduction and medial rotation of the humerus; clavicular head
+flexes, sternocostal head extends from flexion"*. Correct, unreadable, and a
+question nobody can read is a question answered badly. Every muscle in the atlas
+carries a second register written for a person rather than a clinician, and that
+is what leads now. The clinical wording is one press away, under *In clinical
+terms*, for the coach who wants it.
+
+**Every anatomy word is a button.** Pressing *deltoid* gives one plain sentence
+about what it is — *"the cap of the shoulder, in three parts…"* — and a **Show
+me on the body** button that lights it up in front of you. A question that says
+"is the deltoid taking over" is only answerable by somebody who knows where the
+deltoid is; everybody else reads a word they cannot check, and a form full of
+those gets filled in badly.
+
+The words live in the explanation and never in the title, because the title is
+the button that folds the question open, and a button inside a button is not
+valid HTML — the parser closes the outer one, which silently truncated every
+title at its first anatomy word.
+
+66 of the 430 structures have a plain description written; all 430 can be
+located. Where only the second exists the popover says so rather than inventing
+a sentence: *"nobody has written this one up yet — but it is on the body, and
+pressing below will light it up"* is true and useful; a paraphrase of a Latin
+name is not.
+
+### One question at a time
+
+Six expanded cards of equal weight is a wall, and a wall is a thing you skim
+rather than answer. The questions are folded to one line each — the question and
+its score — and one opens at a time. Answering one folds it and opens the next
+unanswered one, because a coach with ninety seconds should not also be doing the
+scrolling.
+
+Above them, one line saying where to start: the lowest thing scored last time,
+named. It only ever points at a question that is actually on the form — a
+history written before these axes existed carries labels that are not on it any
+more, and *"start with X"* where X is nowhere on the screen is worse than no
+advice at all.
+
+The pre-class sheet got the same treatment: **Read this first** carries only
+what is still open, every structure name pressable, and the things that used to
+be a problem and are now fine fold away behind one line.
+
 ### Scored 0–10, because a chart needs a number
 
 A verdict cannot be drawn as a line, and the chart is the point. Each axis is

@@ -1,46 +1,60 @@
 /**
- * What to ask about *this* structure, derived from *this* structure's anatomy.
+ * What to ask about *this* structure, in words a person can act on.
  *
- * The mistake made twice before was a fixed list of questions: first five for
- * every class, then five per kind of structure. Both guessed, and both were
- * wrong almost everywhere, because the semimembranosus and the transversus
- * abdominis do not fail in the same way and asking them the same question
- * produces an answer about neither.
+ * Two things this file is trying to get right at once, and they pull against
+ * each other.
  *
- * Nothing here is invented. Every axis is built from a fact the atlas already
- * holds about that one structure:
+ * **The questions must be specific to the structure.** Three earlier versions
+ * asked every muscle the same thing and were therefore wrong about almost all
+ * of them. So every question is still built from a fact the atlas holds about
+ * this one structure: what it does, which muscles the atlas names as covering
+ * for it, which has to let go for it to work, where it should be felt, its
+ * documented failure mode, and whatever the camera measured here.
  *
- * | Axis        | Comes from                                                |
- * |-------------|-----------------------------------------------------------|
- * | its job     | `actions` -- what this muscle is for, in its own words     |
- * | cover       | `synergists` -- who specifically takes over when it does not |
- * | release     | `antagonists` -- who has to let go for it to work          |
- * | what it feels like | `feels` -- where the student should notice it       |
- * | the known one | `dysfunction` -- the documented failure mode, for the 25 muscles that have one |
- * | against the number | the quantity the camera measured at this structure |
+ * **But the words must be readable.** The first version of this quoted the
+ * clinical register straight out of the atlas -- *"adduction and medial
+ * rotation of the humerus; clavicular head flexes, sternocostal head extends
+ * from flexion"* -- which is correct, and unreadable, and a question nobody can
+ * read is a question answered badly. Every muscle in the atlas carries a second
+ * register written for a person rather than a clinician, and that is what leads
+ * now. The clinical wording is still there, one press away, for the coach who
+ * wants it.
  *
- * So the psoas is asked about hip flexion and about whether the rectus femoris
- * is covering; the multifidus is asked about segmental stiffness and about the
- * erector spinae. Different muscles, different questions, and the difference
- * comes from the anatomy rather than from an opinion in this file.
+ * Every anatomy word in a question's explanation is wrapped so it can be
+ * pressed: see `glossary.js`. A question that says "is the deltoid taking over"
+ * is only answerable by somebody who knows where the deltoid is, and pressing
+ * the word lights it up on the body in front of them.
  *
- * **Every axis is scored 0-10.** That is what makes it chartable, which is the
- * whole point of scoring it at all -- a verdict cannot be drawn as a line. The
- * scale is anchored per axis so that the number means something: 0 and 10 are
- * both written out, in the structure's own terms, wherever the atlas gives
- * enough to write them.
+ * The words live in the explanation and never in the title, because the title
+ * is a button that folds the question open -- and a button inside a button is
+ * not valid HTML. The parser closes the outer one, which silently truncated
+ * every title at its first anatomy word.
  */
+import { term } from './glossary.js';
 
-/** 0 to 10, and both ends named. A number nobody can anchor is a number. */
+/** 0 to 10, and both ends named in words somebody can picture. */
 export const SCALE = 10;
 
 const first = (list, n = 2) => (Array.isArray(list) ? list.slice(0, n) : []);
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : '');
 
+/** The first sentence of a plain description. The rest is background. */
+const oneLine = (text, least = 70) => {
+  const clean = String(text ?? '').trim();
+  if (!clean) return '';
+  /* Sentences, until there is enough to be an explanation. "The chest muscle."
+   * is a true first sentence and a useless answer to "what is this for". */
+  let out = '';
+  for (const part of clean.split(/(?<=\.)\s+/)) {
+    out = out ? `${out} ${part}` : part;
+    if (out.length >= least) break;
+  }
+  return out;
+};
+
 /**
- * @param {object} record   the registry entry: kind, name, muscle, fma
- * @param {object} [context] {measured: {value, unit, from}, joints: [...]}
- * @returns {{axes: array, why: string}}
+ * @param {object} record   registry entry: kind, name, muscle, fma
+ * @param {object} [context] {measured, joints, registry}
  */
 export function axesFor(record, context = {}) {
   const kind = record?.kind ?? '';
@@ -54,73 +68,74 @@ export function axesFor(record, context = {}) {
 
 function forMuscle(record, context) {
   const m = record.muscle;
-  const name = record?.name?.en ?? '';
+  const name = record?.name?.en ?? 'this muscle';
   const axes = [];
 
-  const actions = m?.actions?.en ?? '';
-  if (actions) {
+  if (m) {
     axes.push({
-      key: 'job', label: 'Its own job',
-      ask: cap(actions) + '.',
-      low: 'not contributing to it at all',
-      high: 'doing all of it, cleanly, every rep',
+      key: 'job', title: 'Is it doing its own job?',
+      /* The plain register. What this muscle is for, in the atlas's own words
+       * for a person -- not the Latin. */
+      plain: oneLine(m.en?.does) || `What ${name} is for.`,
+      clinical: m.actions?.en ?? '',
+      low: 'not helping at all', high: 'doing all of it, every rep',
     });
   }
 
-  /* Named substitution. "Is something covering for it" is a useless question;
-   * "is the gluteus maximus covering for it" is one a coach can answer by
-   * looking, and the atlas already knows which muscles those are. */
+  /* Named substitution. "Is something covering for it" cannot be answered;
+   * "is the deltoid covering for it" can, by looking -- and the atlas already
+   * knows which muscles those are for this one. */
   for (const other of first(m?.synergists, 2)) {
     axes.push({
-      key: `cover:${other}`, label: `${cap(other)} covering`,
-      ask: `Is ${other} doing this muscle's share as well as its own?`,
-      low: 'it has taken over completely',
-      high: 'each doing its own part',
+      key: `cover:${other}`, title: `Is the ${other} taking over?`,
+      plain: `The ${term(other)} helps with the same movement. When this muscle is `
+           + 'quiet, that one does the work instead — and the exercise stops '
+           + 'training what it was meant to.',
+      low: 'it is doing everything', high: 'each doing its own share',
+      terms: [other],
     });
   }
 
   const anta = first(m?.antagonists, 1)[0];
   if (anta) {
     axes.push({
-      key: `release:${anta}`, label: `${cap(anta)} releasing`,
-      ask: `${cap(anta)} has to let go for this to work. Does it?`,
-      low: 'held on throughout — nothing can move',
-      high: 'lets go cleanly every rep',
+      key: `release:${anta}`, title: `Does the ${anta} let go?`,
+      plain: `The ${term(anta)} pulls the opposite way. It has to relax for this `
+           + 'muscle to move anything. If both hold on at once, nothing moves '
+           + 'and everything grips.',
+      low: 'never lets go', high: 'lets go cleanly every rep',
+      terms: [anta],
     });
   }
 
   const feels = m?.en?.feels ?? '';
   if (feels) {
     axes.push({
-      key: 'feel', label: 'Where they feel it',
-      ask: feels,
+      key: 'feel', title: 'Do they feel it in the right place?',
+      plain: feels,
       low: 'feels it somewhere else entirely',
       high: 'finds it there without being told',
     });
   }
 
-  /* The documented failure mode, for the muscles that have one. Quoted rather
-   * than paraphrased, so a coach can see what is being claimed and on whose
-   * authority -- the same rule the rest of this application follows. */
   const known = m?.dysfunction?.en ?? '';
   if (known) {
     axes.push({
-      key: 'known', label: 'The documented one',
-      ask: known,
-      low: 'exactly as described',
-      high: 'no sign of it',
+      key: 'known', title: 'The thing this muscle is known for',
+      plain: oneLine(known),
+      clinical: known,
+      low: 'exactly as described', high: 'no sign of it',
       cited: true,
     });
   }
 
   const measured = context.measured;
-  if (measured) {
+  if (measured && measured.value != null) {
     axes.push({
-      key: 'matches', label: 'Against the number',
-      ask: `The camera measured ${measured.value} ${measured.unit} here this `
-         + 'class. Does what you saw agree with it?',
-      low: 'the number and the movement disagree completely',
-      high: 'the number is telling the truth about what I saw',
+      key: 'matches', title: 'Does the number match what you saw?',
+      plain: `The camera measured ${measured.value} ${measured.unit} here this `
+           + 'class. You watched the same movement. Do the two agree?',
+      low: 'they disagree completely', high: 'the number is telling the truth',
       bridge: true,
     });
   }
@@ -128,11 +143,11 @@ function forMuscle(record, context) {
   return {
     axes,
     why: m
-      ? `Asked of ${name} specifically: its own actions, the muscles the atlas `
-        + 'names as its synergists and antagonists, and what the camera '
-        + 'measured here.'
-      : 'The atlas has no entry for this one, so there is nothing specific to '
-        + 'ask. Write what you saw.',
+      ? `These questions are about ${name} and nothing else — its own job, the `
+        + 'muscles the atlas names as helping it or opposing it, and what the '
+        + 'camera measured here. Any underlined word can be pressed.'
+      : 'Nothing has been written up about this one, so there is nothing '
+        + 'specific to ask. Write what you saw.',
   };
 }
 
@@ -142,84 +157,78 @@ function forBone(record, context) {
   const name = record?.name?.en ?? 'this bone';
   const joints = context.joints ?? [];
   const axes = [{
-    key: 'place', label: 'Where it sits',
-    ask: `Position of ${name} at the start of the movement, and whether it `
-       + 'stays there once load goes on.',
-    low: 'never in position, and drifts further under load',
-    high: 'in position and holds it under everything',
+    key: 'place', title: 'Does it start in the right place?',
+    plain: `Where ${name} sits before the movement begins. Everything after `
+         + 'this depends on it.',
+    low: 'never in position', high: 'in position every time',
   }, {
-    key: 'stack', label: 'Against its neighbours',
-    ask: 'A bone is only ever in a relationship. Does the movement pass '
-       + 'through it, or hinge at it?',
-    low: 'the whole movement hinges here',
-    high: 'shares the movement evenly with the segments either side',
+    key: 'hold', title: 'Does it stay there under load?',
+    plain: 'The usual finding is not a bad starting position — it is a good '
+         + 'one that comes apart once the spring or the body weight goes on.',
+    low: 'goes as soon as there is any load', high: 'holds through everything',
+  }, {
+    key: 'stack', title: 'Does the movement pass through it, or stop at it?',
+    plain: 'A bone is only ever in a relationship with the ones above and '
+         + 'below. When one segment does the work of several, that is where '
+         + 'things get sore.',
+    low: 'the whole movement hinges right here',
+    high: 'shares it evenly with its neighbours',
   }];
 
-  /* One axis per joint the camera actually measured an angle at. The joint is
-   * where a bone's behaviour becomes visible, and naming the measured angle
-   * puts the coach's judgement beside the instrument's. */
+  /* One question per joint the camera actually measured. The joint is where a
+   * bone's behaviour becomes visible, and naming the measured angle puts the
+   * coach's judgement beside the instrument's. */
   for (const joint of joints.slice(0, 2)) {
+    if (typeof joint?.value !== 'number') continue;
+    const label = String(joint.name ?? '').replace(/_/g, ' ');
     axes.push({
       key: `joint:${joint.name}`,
-      label: `${cap(joint.name.replace(/_/g, ' '))}`,
-      ask: `The camera measured ${joint.value.toFixed(1)}° here this class. `
-         + 'How much of that range was controlled?',
-      low: 'range is there but nothing controls it',
-      high: 'every degree of it under control',
+      title: `How much of the ${label} movement is controlled?`,
+      plain: `The camera measured ${joint.value.toFixed(1)}° here this class. `
+           + 'Range is not the question — control through it is.',
+      low: 'the range is there but nothing controls it',
+      high: 'every bit of it under control',
       bridge: true,
     });
   }
 
-  axes.push({
-    key: 'load', label: 'Under load',
-    ask: 'What happens when the spring, the lever or the body weight goes on.',
-    low: 'gives way, or they guard it',
-    high: 'takes it without changing anything',
-  });
-
-  return { axes, why: `Asked of ${name}: placement, its relationship to the `
-                    + 'segments either side, and any joint angle the camera '
-                    + 'measured here.' };
+  return { axes, why: `These are about ${name}: where it starts, whether it `
+                    + 'stays there, how it works with the segments either side, '
+                    + 'and any angle the camera measured here.' };
 }
 
 /* ------------------------------------------------------------------- nerve */
 
 function forNerve(record, context) {
   const name = record?.name?.en ?? 'this nerve';
-  const roots = record?.muscle?.innervation?.roots ?? [];
-  /* A nerve is not scored on performance. It is scored on how much it is
-   * bothering the person, which is the only quantity a coach is in a position
-   * to judge -- and the axis exists so the answer can be charted rather than
-   * to invite a diagnosis. The decision is the point. */
   return {
     axes: [{
-      key: 'symptom', label: 'How much it bothered them',
-      ask: `Anything they reported in the area ${name} supplies${
-        roots.length ? ` (${roots.join(', ')})` : ''} — tingling, numbness, `
-        + 'burning, weakness. Their words, not a conclusion.',
-      low: 'nothing at all today',
-      high: 'the thing that ended the class',
+      key: 'symptom', title: 'Did they feel anything in this area?',
+      plain: `Tingling, numbness, burning, pins and needles, or weakness — `
+           + `anywhere ${name} reaches. Their words, not a conclusion.`,
+      low: 'nothing at all today', high: 'it is what ended the class',
       inverted: true,
     }, {
-      key: 'lasted', label: 'How long it lasted',
-      ask: 'Cleared within about ten minutes of stopping is generally '
-         + 'unremarkable. Persisting, spreading, or happening away from class '
-         + 'is not.',
-      low: 'gone within seconds of changing position',
-      high: 'still there when they left, or they get it away from class',
+      key: 'lasted', title: 'How long did it last?',
+      plain: 'Gone within ten minutes of stopping is usually nothing. Still '
+           + 'there when they left, spreading, or happening away from class '
+           + 'is not, and is not yours to manage.',
+      low: 'gone the moment they moved',
+      high: 'still there when they left, or they get it at home',
       inverted: true,
     }],
     decision: {
-      key: 'action', label: 'What you did',
+      key: 'action', title: 'What did you do?',
+      plain: 'The decision matters more than the score.',
       options: [
         ['carried', 'carried on'],
-        ['modified', 'modified the exercise'],
+        ['modified', 'changed the exercise'],
         ['stopped', 'stopped the exercise'],
-        ['referred', 'told them to get it looked at'],
+        ['referred', 'told them to get it checked'],
       ],
     },
-    why: 'A nerve is not scored on performance. This records what they '
-       + 'reported, how long it lasted, and what you decided — carry on, '
-       + 'modify, or refer. It is a symptom record, not a diagnosis.',
+    why: 'A nerve is not scored on how well it works — nothing here measures '
+       + 'that. This is a record of what they reported, how long it lasted, '
+       + 'and what you decided. It is not a diagnosis.',
   };
 }

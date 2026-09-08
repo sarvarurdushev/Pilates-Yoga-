@@ -29,6 +29,8 @@
  */
 import { passcode } from './record.js';
 
+import { GLOSSARY_CSS, term, wireTerms } from './glossary.js';
+
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g,
   (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -60,6 +62,12 @@ const CSS = `
   background:linear-gradient(200deg,rgba(9,15,25,.95),rgba(5,9,16,.97))}
 #ss-sheet h3{margin:0 0 3px;font-size:14px;font-weight:500;color:var(--txt)}
 #ss-sheet .who{margin:0 0 12px;font-size:10.5px;color:var(--dim2)}
+#ss-sheet .settled{margin:14px 0 0}
+#ss-sheet .settled summary{cursor:pointer;list-style:none;font-size:10px;
+  letter-spacing:.11em;text-transform:uppercase;color:var(--dim2)}
+#ss-sheet .settled summary::-webkit-details-marker{display:none}
+#ss-sheet .settled summary:hover{color:var(--txt)}
+#ss-sheet .settled[open] summary{margin-bottom:8px}
 #ss-sheet h4{margin:13px 0 6px;font-size:9.5px;letter-spacing:.13em;
   text-transform:uppercase;color:var(--dim2);font-weight:400}
 #ss-sheet h4:first-of-type{margin-top:0}
@@ -97,6 +105,9 @@ let state = {
   // about -- which the server already knows and now says.
   canWrite: false, on: false, user: '', by: '', sheet: null, kinds: {},
   session: '',
+  // For the glossary: what the names in the sheet resolve to, and how to light
+  // one up on the body.
+  registry: null, select: null,
   // What the server said it can do, kept so a save knows whether to send a
   // passcode with it.
   capable: null,
@@ -152,7 +163,7 @@ function renderSheet(host) {
   const fixed = s.fixed_readings ?? [];
   const reading = (r) => `<div class="${
       r.verdict === 'problem' ? 'flag' : 'item'}">
-    <b>${esc(r.structure)} — ${esc(r.check)}</b>
+    <b>${term(r.structure)} — ${esc(r.check)}</b>
     <span class="meta">${esc(r.verdict === 'problem' ? 'a problem'
                                                      : 'worth watching')}${
       r.streak > 1 ? ` · ${r.streak} classes running` : ''} · ${esc(r.by)} · ${
@@ -162,12 +173,14 @@ function renderSheet(host) {
   host.innerHTML = `
     <h3>${esc(s.display_name || s.username)}</h3>
     <p class="who">What to read before the next class</p>
-    ${open.length ? `<h4>Still open — from what you wrote</h4>${
+    ${open.length ? `<h4>Read this first</h4>${
       open.map(reading).join('')}` : ''}
-    ${fixed.length ? `<h4>Settled since</h4>${fixed.map((r) =>
-      `<div class="item"><b>${esc(r.structure)} — ${esc(r.check)}</b>
-        <span class="meta">fine now · ${esc(r.seen)} readings · last ${
-          esc(r.last_on)}</span></div>`).join('')}` : ''}
+    ${fixed.length ? `<details class="settled"><summary>${fixed.length} thing${
+      fixed.length === 1 ? '' : 's'} that used to be a problem and now
+      ${fixed.length === 1 ? 'is' : 'are'} fine</summary>${fixed.map((r) =>
+      `<div class="item"><b>${term(r.structure)} — ${esc(r.check)}</b>
+        <span class="meta">${esc(r.seen)} readings · last ${
+          esc(r.last_on)}</span></div>`).join('')}</details>` : ''}
     ${block('Before you start', s.flags, (n) =>
       `<div class="flag">${esc(n.text)}
         <span class="meta">${esc(n.about)} · ${esc(n.by)} · ${esc(n.made_on)}</span>
@@ -183,6 +196,11 @@ function renderSheet(host) {
       && !open.length && !fixed.length
       ? '<p class="none">Nothing written down yet. Choose a muscle, a bone or a '
       + 'nerve on the body and write the first reading.</p>' : ''}`;
+
+  /* Every structure named here is a button: press it to read what it is in
+   * plain words and light it up on the body. A sheet full of Latin nobody can
+   * place is a sheet nobody reads twice. */
+  wireTerms(host, state.registry, (id) => state.select?.(id));
 }
 
 async function loadSheet(user) {
@@ -219,7 +237,7 @@ export function saidAbout(structureName) {
  */
 function offline(session) {
   const style = document.createElement('style');
-  style.textContent = CSS;
+  style.textContent = CSS + GLOSSARY_CSS;
   document.head.appendChild(style);
 
   const bar = document.createElement('div');
@@ -296,9 +314,11 @@ export async function mount(session, nw, onChange, known, me) {
   state.kinds = capable.kinds ?? {};
   state.user = session.person.username;
   state.session = session.key ?? '';
+  state.registry = session.registry ?? null;
+  state.select = (id) => nw?.selectStructure?.(id);
 
   const style = document.createElement('style');
-  style.textContent = CSS;
+  style.textContent = CSS + GLOSSARY_CSS;
   document.head.appendChild(style);
 
   /* Who is writing, taken from the account rather than asked for. The first
@@ -322,6 +342,10 @@ export async function mount(session, nw, onChange, known, me) {
 
   bar.querySelector('[data-toggle]').addEventListener('click', async () => {
     state.on = !state.on;
+    /* One thing in that column at a time. The sheet and the reading panel sit
+     * in the same place, and stacking them made the sheet look like it had
+     * grown a second heading out of the panel behind it. */
+    if (state.on) document.querySelector('#ss-struct [data-shut]')?.click();
     bar.querySelector('[data-toggle]').setAttribute('aria-pressed', String(state.on));
     host.hidden = !state.on;
     if (state.on) {

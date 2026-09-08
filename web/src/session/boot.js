@@ -254,14 +254,24 @@ export async function install(bundle) {
      * 51.5 Nm" rather than asking the same thing about every muscle. */
     onStructure: (record) => {
       const about = session.about(record?.id);
+      /* Only a *measured* entry carries a number. A nerve or a bone resolves
+       * to an entry of a different tier whose `value` is undefined, and asking
+       * it for a number crashed the whole panel. */
       const entry = about?.entry;
+      const measured = entry && typeof entry.value === 'number' ? entry : null;
       showStructure(record, identity, session.person.username,
                     session.key ?? '', {
-                      measured: entry
-                        ? { value: entry.value.toFixed(1), unit: entry.unit,
-                            from: entry.from }
+                      measured: measured
+                        ? { value: measured.value.toFixed(1),
+                            unit: measured.unit, from: measured.from }
                         : null,
-                      joints: entry ? session.jointsOf(entry.from) : [],
+                      joints: (measured
+                        ? session.jointsOf(measured.from) : [])
+                        .filter((j) => typeof j.value === 'number'),
+                      /* So every anatomy word in a question can be pressed,
+                       * looked up, and lit on the body in front of them. */
+                      registry: session.registry,
+                      select: (id) => nw.selectStructure(id),
                     });
     },
     /* What the coach wrote about this structure, for the lane under the

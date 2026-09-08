@@ -17,6 +17,7 @@
  */
 import { SCALE, axesFor } from './axes.js';
 import { scoreLines } from './charts.js';
+import { GLOSSARY_CSS, explain, shutTerm, wireTerms } from './glossary.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g,
   (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -106,8 +107,39 @@ body.ss-folded #ss-struct{right:14px}
 #ss-struct .sx-verdicts button[data-v=problem][aria-pressed=true]{
   border-color:#e2685f;background:rgba(226,104,95,.16)}
 #ss-struct .sx-check textarea{min-height:34px;margin-top:6px;font-size:11.5px}
-#ss-struct .sx-ask{display:block;font-size:10.5px;color:var(--dim2);
-  line-height:1.5;margin:4px 0 7px}
+#ss-struct .sx-ask{display:block;font-size:11.5px;color:var(--dim);
+  line-height:1.6;margin:6px 0 9px}
+/* One question open at a time. Six expanded cards is a wall, and a wall is a
+   thing you skim rather than answer. */
+#ss-struct .sx-q{margin:0 0 5px;border-radius:3px;border:1px solid var(--line);
+  background:var(--glass);overflow:hidden}
+#ss-struct .sx-q.sx-on{border-color:var(--acc)}
+#ss-struct .sx-qhead{width:100%;display:flex;gap:8px;align-items:center;
+  padding:10px 11px;font:inherit;font-size:12.5px;text-align:left;
+  background:transparent;border:0;color:var(--txt);cursor:pointer;
+  line-height:1.35}
+#ss-struct .sx-qhead:hover{background:rgba(90,169,230,.06)}
+#ss-struct .sx-qhead .sx-qt{flex:1;min-width:0}
+#ss-struct .sx-qhead .sx-qs{flex:none;font-size:11px;color:var(--dim2);
+  font-variant-numeric:tabular-nums}
+#ss-struct .sx-qhead .sx-qs.sx-set{color:var(--acc);font-weight:600}
+#ss-struct .sx-qhead .sx-caret{flex:none;color:var(--dim2);font-size:10px}
+#ss-struct .sx-qbody{padding:0 11px 11px;display:none}
+#ss-struct .sx-q.sx-on .sx-qbody{display:block}
+#ss-struct .sx-focus{margin:0 0 11px;padding:10px 12px;border-radius:3px;
+  border:1px solid rgba(90,169,230,.4);background:rgba(90,169,230,.07);
+  font-size:12px;line-height:1.55;color:var(--txt)}
+#ss-struct .sx-focus b{color:var(--acc);font-weight:600}
+#ss-struct .sx-focus span{display:block;font-size:10.5px;color:var(--dim2);
+  margin-top:3px}
+#ss-struct .sx-clin{margin:8px 0 0;font-size:10.5px;color:var(--dim2);
+  line-height:1.5}
+#ss-struct .sx-clin summary{cursor:pointer;color:var(--dim2);font-size:10px;
+  letter-spacing:.1em;text-transform:uppercase;list-style:none}
+#ss-struct .sx-clin summary::-webkit-details-marker{display:none}
+#ss-struct .sx-clin summary:hover{color:var(--txt)}
+#ss-struct .sx-clin p{margin:6px 0 0;font-size:11px;line-height:1.55}
+#ss-struct .sx-done{font-size:10.5px;color:var(--dim2);margin:10px 0 0}
 #ss-struct .sx-cited{border-left:2px solid var(--line2);padding-left:7px}
 #ss-struct .sx-bridge{border-color:rgba(90,169,230,.4)}
 #ss-struct .sx-scale{display:flex;gap:2px;margin:6px 0 0}
@@ -165,7 +197,7 @@ function styles() {
   if (styled) return;
   styled = true;
   const tag = document.createElement('style');
-  tag.textContent = CSS;
+  tag.textContent = CSS + GLOSSARY_CSS;
   document.head.appendChild(tag);
 }
 
@@ -263,6 +295,11 @@ export function foldable() {
 /* ------------------------------------------------------------- the panel */
 
 let open = null;
+/* The structure the coach closed by hand. The panel is re-offered on every
+ * repaint of the detail column, so without this a close lasted until the next
+ * mutation and then the panel came back on its own -- and, because opening it
+ * closes the pre-class sheet, took the sheet with it. */
+let dismissed = null;
 
 /** Open the reading for one structure. Called on every selection. */
 export async function show(record, me, username, session = '', context = {}) {
@@ -270,11 +307,17 @@ export async function show(record, me, username, session = '', context = {}) {
   const name = record?.name?.en ?? record?.key ?? '';
   const kind = record?.kind ?? '';
   if (!name || !username) return;
+  if (dismissed === name) return;
+  dismissed = null;
 
   const already = document.getElementById('ss-struct');
   if (already && open === name) return;
   already?.remove();
   open = name;
+  /* The pre-class sheet shares this column. Selecting a structure means the
+   * reading is what the coach wants there now. */
+  const bar = document.querySelector('#ss-coach-bar [data-toggle]');
+  if (bar?.getAttribute('aria-pressed') === 'true') bar.click();
 
   const host = document.createElement('div');
   host.id = 'ss-struct';
@@ -285,7 +328,12 @@ export async function show(record, me, username, session = '', context = {}) {
     </div><div class="sx-body"></div>`;
   document.body.appendChild(host);
 
-  const shut = () => { host.remove(); open = null; };
+  const shut = () => {
+    host.remove();
+    dismissed = name;   // stay shut until they pick something else
+    open = null;
+    shutTerm();
+  };
   host.querySelector('[data-shut]').addEventListener('click', shut);
 
   let form;
@@ -322,7 +370,13 @@ function draw(host, form, ctx) {
   head.querySelector('.sx-kind').textContent = form.kind_label || form.kind;
   head.insertAdjacentHTML('beforeend',
     `<p class="sx-who">${esc(form.display_name)}</p>`
-    + (form.note ? `<p class="sx-note">${esc(form.note)}</p>` : ''));
+    + (form.note ? `<p class="sx-note">${esc(form.note)}</p>` : '')
+    /* What this one is, in plain words, before any question about it. */
+    + `<p class="sx-note" data-what></p>`);
+  const what = explain(ctx.record?.key ?? '', ctx.context?.registry);
+  const whatEl = head.querySelector('[data-what]');
+  if (what.plain) whatEl.textContent = what.plain;
+  else whatEl.remove();
 
   const body = host.querySelector('.sx-body');
 
@@ -331,6 +385,11 @@ function draw(host, form, ctx) {
    * coach wrote here on purpose. The redaction happened at the server -- there
    * is no branch here that could leak by being got wrong. */
   if (form.mine) {
+    /* The same courtesy for the student: the structure names on their own
+     * chart are pressable, so "pectoralis major" can become "the chest muscle,
+     * here it is". */
+    const wire = () => wireTerms(body, ctx.context?.registry,
+                                 (id) => ctx.context?.select?.(id));
     body.innerHTML = form.history?.count
       ? scoreLines(form.history, {
           title: `Your coach's readings — ${form.history.count} since ${
@@ -342,6 +401,7 @@ function draw(host, form, ctx) {
             <p class="sx-run"><em>${esc(one.text)}</em></p></div>`).join('')
       : '<p class="sx-none">Nothing has been written about this part of you '
         + 'yet.</p>';
+    wire();
     return;
   }
 
@@ -359,29 +419,68 @@ function draw(host, form, ctx) {
   const derived = axesFor(ctx.record, ctx.context ?? {});
   const scored = {};
 
-  const axisRow = (axis) => `<div class="sx-check sx-axis${
-      axis.cited ? ' sx-cited' : ''}${axis.bridge ? ' sx-bridge' : ''}"
-      data-axis="${esc(axis.key)}" data-label="${esc(axis.label)}">
-    <div class="sx-top"><b class="sx-label" style="font-weight:500"
-      >${esc(axis.label)}</b></div>
-    <span class="sx-ask">${esc(axis.ask)}</span>
-    <div class="sx-scale" role="group" aria-label="${esc(axis.label)}, 0 to ${SCALE}">
-      ${Array.from({ length: SCALE + 1 }, (_, n) =>
-        `<button type="button" data-score="${n}" aria-pressed="false">${n}</button>`
-      ).join('')}
-    </div>
-    <p class="sx-ends"><span>0 — ${esc(axis.low)}</span>
-      <span>${SCALE} — ${esc(axis.high)}</span></p>
-    <textarea data-cnote placeholder="…because? (yours, not theirs)"></textarea>
-  </div>`;
+  /* One question, folded shut. The title carries the anatomy words as buttons,
+   * so it is deliberately not escaped -- axes.js built it. */
+  const axisRow = (axis, n) => {
+    const bare = axis.title.replace(/<[^>]+>/g, '');
+    return `<div class="sx-q" data-axis="${esc(axis.key)}"
+        data-label="${esc(bare)}">
+      <button type="button" class="sx-qhead" data-open aria-expanded="false">
+        <span class="sx-qt">${axis.title}</span>
+        <span class="sx-qs" data-shown>—</span>
+        <span class="sx-caret">▾</span>
+      </button>
+      <div class="sx-qbody">
+        <span class="sx-ask">${axis.plain}</span>
+        <div class="sx-scale" role="group" aria-label="${esc(bare)}, 0 to ${SCALE}">
+          ${Array.from({ length: SCALE + 1 }, (_, v) =>
+            `<button type="button" data-score="${v}" aria-pressed="false">${v}</button>`
+          ).join('')}
+        </div>
+        <p class="sx-ends"><span>0 — ${esc(axis.low)}</span>
+          <span>${SCALE} — ${esc(axis.high)}</span></p>
+        <textarea data-cnote placeholder="…because? (yours, not theirs)"></textarea>
+        ${axis.clinical ? `<details class="sx-clin"><summary>In clinical terms</summary>
+          <p>${esc(axis.clinical)}</p></details>` : ''}
+      </div>
+    </div>`;
+  };
 
-  body.innerHTML = runs(form)
-    + (derived.why ? `<p class="sx-why">${esc(derived.why)}</p>` : '')
+  /* Where to start. The lowest thing scored last time, named, at the top --
+   * because six questions of equal weight is six questions you skim. */
+  const lines = form.history?.lines ?? {};
+  const asked = new Set(derived.axes.map((a) => a.key));
+  /* Only point at a question that is actually below. A history written before
+   * these axes existed carries labels that are not on this form any more, and
+   * "start with X" where X is nowhere on the screen is worse than no advice. */
+  const worst = Object.entries(lines)
+    .filter(([key, l]) => l.latest != null && asked.has(key))
+    .sort((a, b) => a[1].latest - b[1].latest)[0];
+  const seen = form.history?.count
+    ? `<span>${form.history.count} reading${form.history.count === 1 ? '' : 's'}
+        since ${esc(form.history.first_on)}.</span>` : '';
+  const focus = worst
+    ? `<p class="sx-focus">Start with <b>${esc(worst[1].label)}</b> — it was
+        ${worst[1].latest} out of ${SCALE} last time, the lowest here.
+        ${seen}</p>`
+    : form.history?.count
+      ? `<p class="sx-focus">Answer whatever you watched. Nothing is required.
+          ${seen}</p>`
+      : `<p class="sx-focus">First time on this one.
+          <span>Answer what you watched. Everything is optional.</span></p>`;
+
+  body.innerHTML = focus
     + derived.axes.map(axisRow).join('')
-    + (derived.decision ? `<label>${esc(derived.decision.label)}</label>
-        <div class="sx-opts" data-decision>${derived.decision.options.map(
-          ([value, text]) => `<button type="button" data-pick="${esc(value)}"
-            aria-pressed="false">${esc(text)}</button>`).join('')}</div>` : '')
+    + (derived.decision ? `<div class="sx-q sx-on" data-decision-row>
+        <button type="button" class="sx-qhead" data-open aria-expanded="true">
+          <span class="sx-qt">${esc(derived.decision.title)}</span></button>
+        <div class="sx-qbody">
+          <span class="sx-ask">${esc(derived.decision.plain ?? '')}</span>
+          <div class="sx-opts" data-decision>${derived.decision.options.map(
+            ([value, text]) => `<button type="button" data-pick="${esc(value)}"
+              aria-pressed="false">${esc(text)}</button>`).join('')}</div>
+        </div></div>` : '')
+    + (derived.why ? `<p class="sx-done">${esc(derived.why)}</p>` : '')
     + `<label style="margin-top:15px">Anything else you noticed</label>
        <textarea data-free
          placeholder="Yours. The student never sees this."></textarea>
@@ -395,6 +494,7 @@ function draw(host, form, ctx) {
          ).join('')}</div>
        <div data-checks></div>
        <button type="button" class="sx-add" data-add>+ add a check of your own</button>
+       ${form.history?.count ? runs(form) : ''}
        <div class="sx-shared">
          <label>A line for ${esc(form.display_name.split(' ')[0] || 'them')}</label>
          <p>The only thing on this reading they will read. The scores reach
@@ -403,8 +503,20 @@ function draw(host, form, ctx) {
            placeholder="e.g. hip flexors are letting go more than last month"></textarea>
        </div>`;
 
+  const fold = (row, open) => {
+    row.classList.toggle('sx-on', open);
+    row.querySelector('[data-open]').setAttribute('aria-expanded', String(open));
+    row.querySelector('.sx-caret').textContent = open ? '▴' : '▾';
+  };
   for (const row of body.querySelectorAll('[data-axis]')) {
     const key = row.dataset.axis;
+    row.querySelector('[data-open]').addEventListener('click', () => {
+      const open = !row.classList.contains('sx-on');
+      for (const other of body.querySelectorAll('[data-axis]')) {
+        if (other !== row) fold(other, false);
+      }
+      fold(row, open);
+    });
     for (const button of row.querySelectorAll('[data-score]')) {
       button.addEventListener('click', () => {
         const value = Number(button.dataset.score);
@@ -415,9 +527,32 @@ function draw(host, form, ctx) {
           other.setAttribute('aria-pressed',
                              String(Number(other.dataset.score) === now));
         }
+        const shown = row.querySelector('[data-shown]');
+        shown.textContent = now === null ? '—' : `${now}/${SCALE}`;
+        shown.classList.toggle('sx-set', now !== null);
+        /* Answered, so get out of the way and open the next unanswered one.
+         * A coach with ninety seconds should not also be doing the scrolling. */
+        if (now !== null) {
+          const rows = [...body.querySelectorAll('[data-axis]')];
+          const next = rows.slice(rows.indexOf(row) + 1)
+            .find((r) => !scored[r.dataset.axis]);
+          fold(row, false);
+          if (next) fold(next, true);
+        }
       });
     }
   }
+  /* Open the one the focus line points at, or the first. */
+  const rows = [...body.querySelectorAll('[data-axis]')];
+  const start = worst
+    ? rows.find((r) => (lines[r.dataset.axis]?.latest) === worst[1].latest)
+    : null;
+  if (rows.length) fold(start ?? rows[0], true);
+
+  /* Every anatomy word in a question is a button. */
+  wireTerms(body, ctx.context?.registry, (id) => {
+    ctx.context?.select?.(id);
+  });
   for (const button of body.querySelectorAll('[data-decision] [data-pick]')) {
     button.addEventListener('click', () => {
       for (const other of body.querySelectorAll('[data-decision] [data-pick]')) {
@@ -525,6 +660,7 @@ function draw(host, form, ctx) {
 export function reset() {
   document.getElementById('ss-struct')?.remove();
   open = null;
+  dismissed = null;
   forget('');
 }
 
