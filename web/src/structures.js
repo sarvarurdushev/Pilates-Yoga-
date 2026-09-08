@@ -38,6 +38,69 @@ function shade(hex, k) {
   return `#${hexOf(mix(r, 240))}${hexOf(mix(g, 214))}${hexOf(mix(b, 200))}`;
 }
 
+/**
+ * 'ascending part of trapezius' -> 'trapezius', or null if it is not a part.
+ *
+ * The build keeps the named parts of six muscles as separate structures, because
+ * upper and lower trapezius pull in opposite directions and are two different
+ * instructions -- see SPLIT_PARTS in scripts/build_body.py. This is the other
+ * half of that: the whole muscle has to keep answering to its own name.
+ */
+const PART_OF = /^.*?\b(?:part|head|belly|portion)\s+of\s+(.+)$/i;
+export const wholeMuscle = name => PART_OF.exec(String(name ?? ''))?.[1]?.trim() ?? null;
+
+/**
+ * Register 'trapezius' over its three parts.
+ *
+ * Thirty-six exercises name one of these six muscles, and six written entries are
+ * keyed by the whole name. Splitting the meshes without this would have left every
+ * one of them resolving to nothing -- which does not throw, it just silently stops
+ * highlighting, and that is the exact failure `content.test.mjs` exists to catch.
+ *
+ * The aggregate is a real registry entry with a `parts` list and no mesh of its
+ * own. Anything that lights or selects follows `parts`; anything that reads a
+ * name, a colour or a description gets the same answer it always did. Its
+ * centroid is the mean of its parts, so a camera asked to fly to `trapezius`
+ * still has somewhere to go.
+ */
+function addAggregates(byId, byName) {
+  const parts = new Map();
+  for (const rec of byId.values()) {
+    const whole = wholeMuscle(rec.key);
+    if (!whole) continue;
+    if (!parts.has(whole)) parts.set(whole, []);
+    parts.get(whole).push(rec);
+  }
+  for (const [whole, members] of parts) {
+    // A name the build still emits as one mesh is not an aggregate.
+    if (byName.has(whole) || members.length < 2) continue;
+    const muscle = MUSCLE_INFO[whole] ?? null;
+    const mean = axis => members.reduce((n, r) => n + (r.centroid?.[axis] ?? 0), 0) / members.length;
+    const rec = {
+      /* Negative, and deliberately outside the id space the build allocates.
+       * An aggregate has no geometry, so an id that could collide with a mesh
+       * is an id that will one day paint one. */
+      id: -members[0].id,
+      key: whole,
+      name: muscle ? { en: muscle.en.name, ko: muscle.ko.name }
+                   : { en: titleCase(whole), ko: titleCase(whole) },
+      color: members[0].color,
+      layer: members[0].layer,
+      kind: members[0].kind,
+      interior: false,
+      fma: members.flatMap(r => r.fma ?? []),
+      sides: [...new Set(members.flatMap(r => r.sides ?? []))].sort(),
+      tris: members.reduce((n, r) => n + (r.tris ?? 0), 0),
+      centroid: [mean(0), mean(1), mean(2)],
+      muscle,
+      /** The structures this name stands for. Present only on an aggregate. */
+      parts: members.map(r => r.id).sort((a, b) => a - b),
+    };
+    byId.set(rec.id, rec);
+    byName.set(whole, rec);
+  }
+}
+
 let REG = null;
 
 /**
@@ -103,6 +166,7 @@ export function buildRegistry(generated, { brain = true } = {}) {
     byName.set(s.name, rec);
   }
 
+  addAggregates(byId, byName);
   REG = { byId, byName, meta: generated };
   return REG;
 }
@@ -116,6 +180,23 @@ export const get = id => REG?.byId.get(+id) ?? null;
 export const getByName = name => REG?.byName.get(name) ?? null;
 export const nameOf = (id, lang) => REG?.byId.get(+id)?.name[lang] ?? '';
 export const has = id => !!REG?.byId.has(+id);
+
+/**
+ * The ids a name or id actually draws: itself, or an aggregate's parts.
+ *
+ * Everything that lights, selects or measures goes through here, so that the
+ * six split muscles behave like one thing where a reader names one and like
+ * three where the picture has to show them.
+ */
+export function drawnIds(idOrName) {
+  const rec = typeof idOrName === 'string'
+    ? REG?.byName.get(idOrName) : REG?.byId.get(+idOrName);
+  if (!rec) return [];
+  return rec.parts ? [...rec.parts] : [rec.id];
+}
+
+/** Whether this id stands for several structures rather than a mesh of its own. */
+export const isAggregate = id => !!REG?.byId.get(+id)?.parts;
 
 /** Ids in a layer. */
 export function idsInLayer(layer) {

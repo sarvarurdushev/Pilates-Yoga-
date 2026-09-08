@@ -256,12 +256,15 @@ possible diff.
    interspinales, the intertransversarii and the levatores costarum are in, with
    full bilingual entries; *Back muscles* went from 24 members to 31.
 
-   Still outstanding: splitting trapezius, deltoid, pectoralis major, triceps,
-   biceps femoris and gastrocnemius into their named parts. Those are in 3.0 too,
-   collapsed by the `_SUBDIV` rule rather than dropped, so it is the same kind of
-   change — but riskier than it looks, because the exercise library names
-   `trapezius` for five entries and would stop resolving unless a whole-muscle
-   name falls back to its parts.
+   The splits are done too, and from 3.0 as well: trapezius, deltoid and
+   pectoralis major in three parts each, the triceps in three heads, biceps
+   femoris and gastrocnemius in two. They were collapsed by the `_SUBDIV` rule
+   rather than dropped. Thirty-six exercises name one of those six by its whole
+   name, so `structures.js` registers each whole muscle as an aggregate over its
+   parts — negative id, no mesh — and everything that lights or selects goes
+   through `drawnIds()`. An exercise naming `trapezius` now lights all three
+   parts rather than one merged belly. 430 structures to 449; all sixteen parts
+   have full bilingual entries.
 7. **A validator for our own geometry**, in the spirit of `validate-atlas.mjs`:
    every structure resolvable, every FMA id well-formed, every group non-empty,
    counts asserted.

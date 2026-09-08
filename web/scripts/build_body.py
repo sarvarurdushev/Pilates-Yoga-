@@ -131,6 +131,34 @@ KEEP_SETS = {
     'FMA74078': 'set of left levatores costarum breves',
 }
 
+# Muscles kept as their named parts rather than collapsed into one belly.
+#
+# `_SUBDIV` below folds 'ascending part of trapezius' into 'trapezius', and for most
+# of this ontology that is right: the subdivisions of a muscle share an origin, an
+# insertion and a nerve, so they are one structure with one description.
+#
+# For these six they do not, and the difference is the whole instruction. Upper
+# trapezius elevates the shoulder girdle and lower trapezius depresses it -- they
+# are antagonists inside one muscle -- and a studio that says *let the top of your
+# shoulders go and find the bottom of the trapezius* is asking for two things a
+# single mesh cannot show, cannot light separately during an exercise, and cannot
+# be evaluated separately by a coach.
+#
+# **The whole muscle does not disappear.** `structures.js` registers each name here
+# as an aggregate over its parts, so the thirty-six library entries that name
+# `trapezius` or `gastrocnemius` still resolve, and light every part rather than
+# one merged shape -- which is more nearly right than what they did before.
+SPLIT_PARTS = {
+    # the three parts pull in three directions
+    'trapezius',
+    'deltoid',
+    'pectoralis major',
+    # heads differing in origin, and in which joint they cross
+    'triceps brachii',
+    'biceps femoris',
+    'gastrocnemius',
+}
+
 _SET_PREFIX = re.compile(r'^set\s+of\s+', re.I)
 _SIDE = re.compile(r'\b(?:left|right)\b\s*', re.I)
 # 'ascending part of', 'long head of', 'anterior belly of' — subdivisions of one named muscle
@@ -148,8 +176,12 @@ def base_name(name):
     left foot' has to become 'skeleton of foot', not 'foot'.
     """
     n = _SIDE.sub('', name.strip().lower())
-    n = _SUBDIV.sub('', n)
-    return re.sub(r'\s+', ' ', n).strip()
+    whole = _SUBDIV.sub('', n)
+    # A subdivision of one of the six muscles that are cued in parts keeps its own
+    # name; everything else folds into the muscle it belongs to. See SPLIT_PARTS.
+    if whole != n and whole.strip() in SPLIT_PARTS:
+        return re.sub(r'\s+', ' ', n).strip()
+    return re.sub(r'\s+', ' ', whole).strip()
 
 
 def side_of(name):
@@ -202,7 +234,14 @@ def partition(ar, names, kids):
         sysname = min(g['systems'], key=SYSTEM_PRIORITY.index)
         layer = LAYER_OF_SYSTEM[sysname]
         if layer == 'muscles':
-            layer = 'muscles_superficial' if base in SUPERFICIAL else 'muscles_deep'
+            # A part is as superficial as the muscle it belongs to. Testing the
+            # part's own name against SUPERFICIAL sent all sixteen of them deep,
+            # which took trapezius, deltoid, pectoralis major, the triceps, the
+            # hamstring and the calf out of the layer the app opens on -- most of
+            # what you see on a body, absent from the default view.
+            whole = _SUBDIV.sub('', base).strip()
+            visible = base in SUPERFICIAL or whole in SUPERFICIAL
+            layer = 'muscles_superficial' if visible else 'muscles_deep'
         out[base] = {'system': sysname, 'layer': layer, 'parts': g['parts']}
     return out
 

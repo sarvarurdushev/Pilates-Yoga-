@@ -178,8 +178,13 @@ test('every muscle carries innervation with nerve root levels', () => {
       assert.ok(m[lang]?.does && m[lang]?.sci, `${name}: missing register in ${lang}`);
       assert.ok(m.origin?.[lang] && m.insertion?.[lang], `${name}: missing attachment in ${lang}`);
     }
-    // `Musculi` is the plural, and correct for the groups: rotatores, the intercostals
-    assert.ok(/^Musculus |^Musculi /.test(m.latin ?? '') || m.latin === 'Diaphragma',
+    /* `Musculi` is the plural, and correct for the groups: rotatores, the
+     * intercostals, the interspinales. `Pars` is correct for a named part of one
+     * muscle -- Terminologia Anatomica lists the three parts of trapezius as
+     * *Pars descendens*, *Pars transversa* and *Pars ascendens*, not as three
+     * muscles -- and this rule predated there being any parts to name. `Caput`
+     * is the same thing for a head: *Caput longum musculi tricipitis brachii*. */
+    assert.ok(/^Musculus |^Musculi |^Pars |^Caput /.test(m.latin ?? '') || m.latin === 'Diaphragma',
       `${name}: Latin name should follow Terminologia Anatomica`);
   }
 });

@@ -13,7 +13,8 @@ import { RegionPalette } from './regionPalette.js';
 import { loadDeepStructures, INTERIOR_IDS, tintStructure } from './deepStructures.js';
 import { REGION_INFO } from './regionData.js';
 import { brainPlacement, BRAIN_TO_BODY, FRAME } from './frame.js';
-import { buildRegistry, registry, get, nameOf, LAYER_ORDER, vertebra } from './structures.js';
+import { buildRegistry, registry, get, nameOf, LAYER_ORDER, vertebra,
+         drawnIds, isAggregate } from './structures.js';
 import { buildGroups, groups, groupOf, groupsOf } from './content/groups.js';
 import { PointerTap, slopFor } from './pointerTap.js';
 import { activeBody, layerUrl } from './bodies.js';
@@ -2656,6 +2657,14 @@ function deriveHome() {
 
 /* --------------------------------------------------------------- selection */
 export function selectStructure(id, { auto = false } = {}) {
+  /* A whole muscle that is drawn as parts has no mesh of its own. Selecting it
+   * means selecting what it stands for -- the nearest part to the camera, so
+   * the panel and the picture agree about what is lit -- rather than an id
+   * nothing will ever paint. */
+  if (id != null && isAggregate(id)) {
+    const parts = drawnIds(id);
+    id = parts.find(p => app.centroids[p]) ?? parts[0] ?? null;
+  }
   app.selected = id;
   /* Whether the reader chose this or the application chose it for them.
    *
@@ -3399,10 +3408,15 @@ export async function setExercise(key) {
     await setLayer('muscles_deep', true);
     for (const role of ['prime', 'synergists', 'stabilisers']) {
       for (const [name] of ex.muscles[role]) {
-        const r = registry().byName.get(name);
-        if (!r) { console.warn(`exercise ${key} names an unknown muscle: ${name}`); continue; }
-        activation.set(r.id, role);
-        palette.setActivation(r.id, ROLE_LEVEL[role]);
+        /* `drawnIds` rather than one record, because six muscles are kept as
+         * their named parts: an entry naming `trapezius` lights all three of
+         * them, which is nearer the truth than lighting one merged belly was. */
+        const ids = drawnIds(name);
+        if (!ids.length) { console.warn(`exercise ${key} names an unknown muscle: ${name}`); continue; }
+        for (const id of ids) {
+          activation.set(id, role);
+          palette.setActivation(id, ROLE_LEVEL[role]);
+        }
       }
     }
     /* And the brain. An exercise carries its own brain claims, each naming the structures it

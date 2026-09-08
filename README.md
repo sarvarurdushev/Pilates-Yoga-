@@ -1411,7 +1411,33 @@ a time*, or *breathe into the back of the ribs*. `KEEP_SETS` in
 `scripts/build_body.py` is the allowlist that keeps them, and it is an editorial
 claim held to account by `tests/test_atlas_ids.py`.
 
-Adding them also exposed a trap in the file they are written to. Two builds share
+### Upper and lower trapezius are different instructions
+
+Six muscles are now kept as their named parts rather than as one belly:
+trapezius, deltoid and pectoralis major in three each, the triceps in three
+heads, biceps femoris and gastrocnemius in two. The build had been folding
+*ascending part of trapezius* into *trapezius*, which is right for most of this
+ontology — subdivisions usually share an origin, an insertion and a nerve — and
+wrong for these. Upper trapezius elevates the shoulder girdle and lower
+trapezius depresses it. They are antagonists inside one muscle, and a studio
+that says *let the top of your shoulders go and find the bottom of the
+trapezius* is asking for two things one mesh cannot show, cannot light
+separately, and cannot be evaluated separately by a coach.
+
+**The whole muscle keeps answering to its own name.** Thirty-six exercises name
+one of these six, and six written entries are keyed by the whole name; splitting
+without that would have left every one of them resolving to nothing — which does
+not throw, it silently stops highlighting. `structures.js` registers each whole
+muscle as an aggregate over its parts, with a negative id so it can never
+collide with a mesh, and `drawnIds()` is what anything that lights or selects
+goes through. So the Swan still names `trapezius`, and now lights all three
+parts, which is nearer the truth than lighting one merged shape was.
+
+All sixteen parts carry their own entry — Latin in Terminologia Anatomica form
+(*Pars descendens musculi trapezii*, *Caput longum musculi tricipitis brachii*),
+both languages, both registers, attachments, innervation and root levels.
+
+Adding all of this also exposed a trap in the file they are written to. Two builds share
 `structures.json`: this one owns the skeleton, muscles and organs, and
 `build_nervous.py` owns the nervous layer and needs Blender and a 306 MB
 Z-Anatomy file to run. Rewriting the file deleted the twenty nerves and the

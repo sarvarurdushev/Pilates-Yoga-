@@ -157,6 +157,66 @@ class TestTheCuration:
             assert required in chosen, f"the curation no longer offers {required!r}"
 
 
+class TestTheTableMatchesTheAtlasItWasBuiltFrom:
+    """Group membership is a list of *ids*, and ids move when the atlas rebuilds.
+
+    Splitting six muscles renumbered two hundred structures. `groups.json` was
+    not regenerated, so every id in it still resolved -- to a different
+    structure. The intercostal group came back holding extensor carpi radialis
+    brevis and gluteus minimus, and the only thing that noticed was a Korean
+    register test three files away, by luck.
+
+    So this checks the join directly: a group named after a muscle family has to
+    contain members whose names say so. It is cheap, it needs nothing fetched,
+    and it fails the moment the two files drift apart.
+    """
+
+    FAMILIES = {
+        "FMA13354": "intercostal",
+        "FMA77177": "iliocostalis",
+        "FMA77178": "longissimus",
+        "FMA22823": "semispinalis",
+        "FMA77180": "splenius",
+        "FMA23081": "rotator",
+        "FMA64922": "glute",
+        "FMA19083": "obturator",
+        "FMA64829": "scalen",
+        "FMA22428": "vastus",
+        "FMA45157": "semi",
+        "FMA13400": "serratus posterior",
+    }
+
+    def test_a_family_group_holds_members_of_that_family(self, groups, structures):
+        name_of = {s["id"]: s["name"].lower() for s in structures}
+        home = {}
+        for g in groups["groups"]:
+            for cid in [g["id"], *(a["id"] for a in g["aliases"])]:
+                home[cid] = g
+        for fma, word in self.FAMILIES.items():
+            g = home.get(fma)
+            assert g, f"{fma} is no longer a group"
+            names = [name_of[m] for m in g["members"]]
+            assert any(word in n for n in names), (
+                f"{g['name']} ({fma}) holds {names[:4]} -- no member is a "
+                f"{word!r}, so groups.json and structures.json have drifted")
+
+    def test_the_split_muscles_land_in_their_own_groups(self, groups, structures):
+        """Six muscles are now their named parts. A group that used to hold the
+        whole muscle should hold the parts, not an id that moved on."""
+        name_of = {s["id"]: s["name"].lower() for s in structures}
+        found = set()
+        for g in groups["groups"]:
+            for m in g["members"]:
+                n = name_of[m]
+                for whole in ("trapezius", "deltoid", "pectoralis major",
+                              "triceps brachii", "biceps femoris", "gastrocnemius"):
+                    if whole in n:
+                        found.add(whole)
+        assert found == {"trapezius", "deltoid", "pectoralis major",
+                         "triceps brachii", "biceps femoris", "gastrocnemius"}, (
+            f"only {sorted(found)} reach a group")
+
+
 @pytest.mark.skipif(not (BPDATA / "isa_inclusion_relation_list.txt").exists(),
                     reason="BodyParts3D tables not fetched -- see scripts/fetch_bodyparts3d.sh")
 def test_the_table_is_exactly_what_the_ontology_says(groups, structures):

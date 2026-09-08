@@ -6,7 +6,7 @@ import { EXERCISE_BRAIN, TIERS, claimsForRegion } from './content/evidence.js';
 import { MOVEMENT_PATHWAY } from './content/pathways.js';
 import { MOTION, BREATH, phaseAt } from './content/motion.js';
 import { RAMP_STOPS } from './musclePaths.js';
-import { registry, get, LAYER_ORDER } from './structures.js';
+import { registry, get, LAYER_ORDER, drawnIds } from './structures.js';
 import { GROUP_REGIONS, groups as groupTable } from './content/groups.js';
 import { BODY_FRAME, BRAIN_TO_BODY } from './frame.js';
 import { activeBody, BODIES, templateDisclaimer, bodyHref, availableBodies } from './bodies.js';
@@ -690,9 +690,13 @@ export function mountUI(ctx) {
      * not what any of them is doing. Naming it "prime mover" would be a claim the
      * ontology never made. The group itself is named in `groupBlock` below. */
     const roleLabel = { prime: T('primeMovers'), synergists: T('synergistsEx'), stabilisers: T('stabilisers') };
+    /* A synergist named as a whole muscle links to whichever part the picture
+     * can actually show, so a chip is never a button that selects nothing. */
     const linkList = (arr) => (arr ?? []).map(n => {
       const s = registry().byName.get(n);
-      return s ? `<button class="mini" data-id="${s.id}">${esc(s.name[app.lang])}</button>` : '';
+      if (!s) return '';
+      const id = s.parts ? drawnIds(n)[0] : s.id;
+      return `<button class="mini" data-id="${id}">${esc(s.name[app.lang])}</button>`;
     }).join('');
     return `<div class="detail">
       <div class="dko">${esc(m.latin)}</div>
