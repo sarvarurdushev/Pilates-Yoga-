@@ -289,10 +289,30 @@ test('the generated structure table is internally consistent', () => {
 });
 
 test('the build records where the meshes came from', () => {
-  // CC BY-SA is attribution-required; the attribution has to survive into the app
+  /* Attribution-required, so the attribution has to survive into the app -- the
+   * About panel reads these three fields and nothing else.
+   *
+   * This used to assert CC BY-SA, because the release-3.0 OBJ files carry a
+   * legacy CC BY-SA 2.1 Japan notice. The licensor's own licence page offers
+   * the database under CC BY 4.0 and specifies the sentence it wants quoted;
+   * ATTRIBUTION.md records both. So the assertion is now on the wording the
+   * licensor asks for rather than on a licence family. */
   assert.match(generated.attribution, /BodyParts3D/);
-  assert.match(generated.licence, /CC BY-SA/);
-  assert.ok(generated.source.length > 10);
+  assert.match(generated.attribution, /The Database Center for Life Science/);
+  assert.match(generated.attribution, /CC Attribution 4\.0 International/);
+  assert.equal(generated.licence, 'CC BY 4.0');
+  assert.match(generated.source, /release 3\.0 \(20110915\)/);
+});
+
+test('the nervous layer keeps its own share-alike', () => {
+  /* The one real copyleft in the building. It is a different source under a
+   * different licence, and relaxing the body's licence must not quietly relax
+   * this one with it. */
+  const nervous = generated.sources?.nervous;
+  assert.ok(nervous, 'the nervous layer has no source record');
+  assert.equal(nervous.licence, 'CC BY-SA 4.0');
+  assert.match(nervous.attribution, /Z-Anatomy/);
+  assert.match(nervous.attribution, /CC BY-SA 4\.0/);
 });
 
 test('every structure lands inside a standing body', () => {

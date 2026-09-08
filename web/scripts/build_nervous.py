@@ -14,7 +14,8 @@ Runs *after* scripts/build_body.py, because it continues that script's id alloca
 appends to the same table. It refuses to run if the table is missing.
 
 Z-Anatomy, by Gauthier Kervyn and Marcin Zielinski, licensed CC BY-SA 4.0.
-Derived in turn from BodyParts3D (CC BY-SA 2.1 JP), which is why the two register so well.
+Derived in turn from BodyParts3D, which is why the two register so well. Z-Anatomy's own
+CC BY-SA 4.0 is what binds this layer, and it is a real share-alike -- see ATTRIBUTION.md.
 Requires `pip install bpy`.
 """
 import sys, os, re, json
@@ -29,7 +30,7 @@ BLEND = os.path.join(ROOT, 'bpdata', 'zanatomy', 'Z-Anatomy', 'Startup.blend')
 TABLE = os.path.join(ROOT, 'src', 'generated', 'structures.json')
 
 ATTRIBUTION = ('Z-Anatomy by Gauthier Kervyn and Marcin Zielinski, licensed CC BY-SA 4.0, '
-               'derived from BodyParts3D (CC BY-SA 2.1 JP)')
+               'derived from BodyParts3D')
 
 # Bones present in both models, used to fit Z-Anatomy -> body frame. Keyed by the name this
 # project's build emits; the value is the Z-Anatomy object name without laterality.

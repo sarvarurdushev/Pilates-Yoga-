@@ -1314,6 +1314,86 @@ await page.evaluate(async () => { (await import('/src/main.js')).setXray(0.85); 
 await page.waitForTimeout(15000);
 await shot('08-xray');
 
+/* Finding a structure, and lighting a group.
+ *
+ * Both are DOM features over the whole registry, and both fail the way every feature in this
+ * file has failed at least once: silently. A search that matches nothing looks exactly like a
+ * search box nobody typed into, and a group chip that lights no muscles looks exactly like a
+ * body with the muscle layer off.
+ *
+ * The group case checks the three things `setGroup` promises: the members are activated, the
+ * layers they live in were turned on, and the camera moved. The third is the one that would
+ * otherwise go unnoticed -- a group selected behind the reader is a group nobody sees. */
+await page.evaluate(async () => {
+  const m = await import('/src/main.js');
+  await m.setGroup(null);
+  m.setExercise(null);
+  for (const l of ['muscles_superficial', 'muscles_deep', 'skeleton'])
+    await m.setLayer(l, true);
+  await m.setLayer('brain', false);
+  m.selectStructure(null);
+});
+await page.click('#tabExplore');
+await page.waitForTimeout(500);
+
+const found = await page.evaluate(async () => {
+  const q = document.getElementById('anatQ');
+  if (!q) return { missing: true };
+  const type = (text) => {
+    q.value = text;
+    q.oninput();
+    return document.querySelectorAll('#panelBody .swatch').length;
+  };
+  const out = { missing: false, blank: document.querySelectorAll('#panelBody .swatch').length };
+  // a muscle with a written entry, a bone with none, the Korean, and an FMA id
+  out.muscle = type('semitendinosus');
+  out.bone = type('lumbar vertebra');
+  out.korean = type('넙다리');
+  out.fma = type('FMA13377');
+  out.nothing = type('qqqqzz');
+  document.getElementById('anatQ').value = '';
+  document.getElementById('anatQ').oninput();
+  return out;
+});
+console.log('anatomy search:', JSON.stringify(found));
+if (found.missing) errors.push('the Explore tab has no structure search');
+else {
+  if (!found.blank) errors.push('Explore lists no structures with an empty search');
+  for (const [what, n] of [['a muscle', found.muscle], ['a bone', found.bone],
+                           ['Korean', found.korean], ['an FMA id', found.fma]])
+    if (!n) errors.push(`the structure search finds nothing for ${what}`);
+  if (found.nothing) errors.push('the structure search matches nonsense');
+}
+
+const grouped = await page.evaluate(async () => {
+  const chips = [...document.querySelectorAll('#panelBody [data-group]')];
+  if (!chips.length) return { missing: true };
+  const m = await import('/src/main.js');
+  const s = await import('/src/structures.js');
+  const hamstrings = chips.find(c => c.dataset.group === 'FMA45157') ?? chips[0];
+  const from = m.frameStats().frames;
+  await m.setGroup(hamstrings.dataset.group);
+  await new Promise(r => setTimeout(r, 2500));
+  const lit = [];
+  for (const [id] of s.registry().byId) if (m.activationOf(id)) lit.push(s.nameOf(id, 'en'));
+  const group = m.anatomyGroups().find(g => g.fma === hamstrings.dataset.group);
+  return { missing: false, chips: chips.length, chose: group.name.en,
+           members: group.members.length, lit,
+           layersOn: group.layers.every(l => m.app.layers[l].on),
+           drew: m.frameStats().frames > from };
+});
+console.log('groups:', JSON.stringify(grouped));
+if (grouped.missing) errors.push('the Explore tab offers no anatomical groups');
+else {
+  if (grouped.lit.length !== grouped.members)
+    errors.push(`choosing "${grouped.chose}" lit ${grouped.lit.length} of ${grouped.members} members`);
+  if (!grouped.layersOn)
+    errors.push(`choosing "${grouped.chose}" left one of its layers off, so it lit nothing visible`);
+  if (!grouped.drew) errors.push('choosing a group did not redraw');
+}
+await shot('12-group');
+await page.evaluate(async () => { (await import('/src/main.js')).setGroup(null); });
+
 /* And does it work on a phone?
  *
  * Every screenshot this project has been reported against came from one, and nothing here

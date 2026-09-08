@@ -1374,6 +1374,64 @@ every open session out on every device, and no refusal ever says which half was
 wrong — an unknown address and a wrong code produce the same sentence, because
 anything else tells a stranger which of a studio's students have accounts.
 
+## Naming a group, not a mesh
+
+Every structure in the atlas is selectable one at a time, and that is the wrong
+granularity for most of what a coach says out loud. "Let the hamstrings go", "the
+deep neck flexors are asleep", "breathe into the back of the ribs" — none of
+those is a mesh, and until now none of them was a thing the application could
+point at.
+
+They did not have to be invented. BodyParts3D ships the Foundational Model of
+Anatomy's own hierarchy alongside the meshes: an IS-A tree and a PART-OF tree,
+both parent-FMA to child-FMA. Every structure here already carries the FMA
+identifiers it arrived with — which is the reason for keying by FMA rather than
+by an id invented here — so the hierarchy joins straight onto the atlas with
+nothing hand-drawn in between.
+
+```bash
+web/scripts/fetch_bodyparts3d.sh          # the tables, into web/bpdata/
+python3 web/scripts/build_groups.py       # -> web/src/generated/groups.json
+```
+
+```
+252 groups, 2320 memberships, 2 the commonest size
+```
+
+**Nothing in that file was typed.** Membership is the transitive closure of the
+published trees over this atlas's own ids, and `tests/test_groups.py` re-derives
+the whole table and fails if any of it ever moved. What *is* editorial is which
+groups a studio is offered — the generator emits `irregular bone` and `left ring
+finger` alongside `pelvic diaphragm`, because the ontology classifies bones by
+shape and fingers by name and both are true. The 77 that a Pilates or yoga class
+actually uses are chosen in `web/src/content/groups.js`, in a list somebody can
+read and argue with, with the Korean written out.
+
+Choosing one lights every member at a single level, turns on the layers they live
+in, names them on the picture, and frames the whole set. Every member is lit
+equally, deliberately: an exercise grades its muscles because it has
+evidence-marked roles to grade them by, and a group has none — a gradient there
+would be a number this repository does not hold, drawn in the shape of one it
+does.
+
+The same table works in the other direction. A selected structure lists the sets
+it belongs to, most specific first, which earns its place hardest on the 152
+bones that have no written entry: *fourth lumbar vertebra* used to be a name over
+an apology, and is now a name with the lumbar spine, the vertebrae and the disks
+one press away.
+
+Alongside it, Explore now opens on a search box. It used to list the 91 muscles
+with a written entry plus the 21 brain regions — 112 of the 451 selectable
+things — so a bone was reachable only by finding it on the body and clicking it. The box matches
+English, Korean, Latin and FMA id across every structure and every group.
+
+`docs/atlas-audit.md` is the full read of this atlas against
+[Human Atlas](https://github.com/ashemag/human-atlas), including the finding that
+decided the shape of this work: that atlas has no rectus abdominis, no internal
+oblique, no transversus abdominis, no quadratus lumborum, no multifidus and no
+latissimus dorsi, and 81 of the 190 exercises here name at least one of them.
+`ATTRIBUTION.md` is every source, its licence, and what was changed.
+
 ## The body, on one page
 
 The 2D half, for the reader with no WebGL and for the printed take-home.

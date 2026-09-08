@@ -840,6 +840,37 @@ button.analrow:hover{background:rgba(146,178,222,.06)}
 #panelBody h3 em{font-style:normal;margin-left:7px;font-size:10px;color:var(--dim2);
  font-weight:400;letter-spacing:.06em}
 
+/* Finding a structure. Four hundred and thirty names and seventy-four groups, so the box
+ * sits above everything the tab can offer and is the first thing under the selection. */
+.findrow{display:flex;align-items:center;gap:8px;margin:2px 0 12px}
+.findrow input{flex:1;min-width:0;background:var(--glass);border:1px solid var(--line);
+ border-radius:4px;padding:8px 11px;color:var(--txt);font-size:13px;font-family:inherit}
+.findrow input:focus{outline:0;border-color:var(--acc)}
+.small-number{color:var(--dim2);font-size:11px;white-space:nowrap;
+ font-variant-numeric:tabular-nums}
+.note.small{font-size:11px;margin:-4px 0 10px}
+
+/* Groups: the sets a class is cued in. Wider and warmer than a facet chip, because these
+ * are anatomy rather than a filter — pressing one lights eleven muscles on the body. */
+.gregion{margin:12px 0 5px;font-size:10px;letter-spacing:.13em;text-transform:uppercase;
+ color:var(--dim2);font-weight:400}
+.gchips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
+.gchip{background:var(--glass);border:1px solid var(--line);border-radius:3px;
+ padding:4px 9px;color:var(--dim);font-size:11.5px;display:flex;align-items:center;gap:6px;
+ text-align:left}
+.gchip:hover{border-color:var(--line2);color:var(--txt)}
+.gchip.on,.gchip[aria-pressed="true"]{background:rgba(255,196,132,.13);
+ border-color:rgba(255,196,132,.5);color:#f3e2cd}
+.gchip em{font-style:normal;opacity:.6;font-size:10px;font-variant-numeric:tabular-nums}
+.groupon{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 10px;
+ padding:7px 9px;background:rgba(255,196,132,.07);
+ border-left:2px solid rgba(255,196,132,.5);font-size:11.5px;color:var(--dim)}
+.groupon b{color:var(--txt);font-weight:500}
+/* On a selected structure: which named sets it belongs to, most specific first. */
+.groupsof{margin:0 0 12px;display:flex;flex-wrap:wrap;align-items:center;gap:5px}
+.groupsof h4{margin:0 4px 0 0;font-size:10px;letter-spacing:.13em;text-transform:uppercase;
+ color:var(--dim2);font-weight:400}
+
 /* the region network — see connectome.js */
 .connplot{position:relative;border:1px solid var(--line);
  border-left:1px solid rgba(255,196,132,.35);background:rgba(8,13,23,.4);line-height:0}

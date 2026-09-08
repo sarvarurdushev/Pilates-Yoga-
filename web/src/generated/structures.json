@@ -1,7 +1,7 @@
 {
- "source": "BodyParts3D 3.0 (20110915), 99% reduction",
- "attribution": "BodyParts3D, (c) The Database Center for Life Science licensed under CC Attribution-Share Alike 2.1 Japan",
- "licence": "CC BY-SA 2.1 JP",
+ "source": "BodyParts3D/Anatomography, release 3.0 (20110915), 99% reduction",
+ "attribution": "BodyParts3D, (c) The Database Center for Life Science licensed under CC Attribution 4.0 International",
+ "licence": "CC BY 4.0",
  "idBase": 100,
  "frame": {
   "center": [
@@ -12,6 +12,25 @@
   "scale": 0.0006041461949211242,
   "heightMm": 1655.2285,
   "note": "archive mm -> canonical: X=x, Y=z, Z=-y, then (p-center)*scale"
+ },
+ "sources": {
+  "nervous": {
+   "attribution": "Z-Anatomy by Gauthier Kervyn and Marcin Zielinski, licensed CC BY-SA 4.0, derived from BodyParts3D",
+   "licence": "CC BY-SA 4.0",
+   "registration": {
+    "bones": [
+     "clavicle",
+     "femur",
+     "hip bone",
+     "humerus",
+     "sacrum",
+     "scapula",
+     "talus",
+     "tibia"
+    ],
+    "residual_mm": 7.12
+   }
+  }
  },
  "structures": [
   {
@@ -12949,24 +12968,5 @@
    },
    "source": "z-anatomy"
   }
- ],
- "sources": {
-  "nervous": {
-   "attribution": "Z-Anatomy by Gauthier Kervyn and Marcin Zielinski, licensed CC BY-SA 4.0, derived from BodyParts3D (CC BY-SA 2.1 JP)",
-   "licence": "CC BY-SA 4.0",
-   "registration": {
-    "bones": [
-     "clavicle",
-     "femur",
-     "hip bone",
-     "humerus",
-     "sacrum",
-     "scapula",
-     "talus",
-     "tibia"
-    ],
-    "residual_mm": 7.12
-   }
-  }
- }
+ ]
 }

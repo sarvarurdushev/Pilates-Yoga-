@@ -6,19 +6,52 @@ the measurement that watches a class, and the body that shows what it found.
 
 ## What is upstream and what is ours
 
-Everything here except `src/session/` is upstream, copied verbatim. Our
-integration is **additive**: the session layer imports the application's own
-exported API (`selectStructure`, `renderStructureInto`, `flyTo`, `palette`,
-`registry`) and writes into the DOM the application has already rendered. It
-does not fork any upstream file.
+Most of this directory is upstream, copied verbatim. The session layer under
+`src/session/` is **additive**: it imports the application's own exported API
+(`selectStructure`, `renderStructureInto`, `flyTo`, `palette`, `registry`) and
+writes into the DOM the application has already rendered, forking nothing.
 
-The one exception is a single `<script type="module">` line at the end of
-`index.html`, which loads the session layer. That is the whole patch. Anything
-else that looks like an upstream change is a bug.
+Keeping as much as possible that way is the point: a fork of eighteen thousand
+lines that has to be hand-merged every time the anatomy side fixes something is
+a fork that stops being merged after about two months, and then the two halves
+quietly diverge.
 
-Keeping it that way is the point: a fork of eighteen thousand lines that has to
-be hand-merged every time the anatomy side fixes something is a fork that stops
-being merged after about two months, and then the two halves quietly diverge.
+### The patch set
+
+Everything this repository has changed or added on the anatomy side is listed
+here. Anything **not** on this list that differs from upstream is a bug.
+
+**Ours, new files:**
+
+| file | what |
+|---|---|
+| `src/session/` | the whole session layer — measurement, coach, roster, account |
+| `src/content/groups.js` | which anatomical groups are offered, and their Korean |
+| `src/generated/groups.json` | group membership, derived — see the script below |
+| `src/pointerTap.js` | tap-versus-gesture, ported from Human Atlas under MIT |
+| `scripts/build_groups.py` | closes the FMA hierarchy over this atlas's own ids |
+| `test/pointer.test.mjs` | the gestures that used to select a muscle by accident |
+
+**Upstream files this repository edits:**
+
+| file | why |
+|---|---|
+| `index.html` | one `<script type="module">` for the session layer; CSS for the search box and group chips |
+| `src/main.js` | load the group table; `setGroup` / `flyToGroup`; picking through `PointerTap` |
+| `src/ui.js` | Explore rebuilt around a search over every structure, and the groups |
+| `src/bodies.js` | the group asset, and the corrected BodyParts3D licence |
+| `src/content/strings.js` | the strings the above needs, en + ko |
+| `src/generated/structures.json` | the corrected licence fields (metadata only, no geometry) |
+| `src/content/exercises.js`, `src/content/library/` | the Pilates and yoga library |
+| `scripts/bp3d.py`, `scripts/build_body.py`, `scripts/build_nervous.py`, `scripts/fetch_bodyparts3d.sh` | the same licence correction, at the source |
+
+The licence corrections are the same change made in six places because the
+string is repeated in six places; `ATTRIBUTION.md` at the repository root says
+what changed and why. The rest is the group and search work described in
+`docs/atlas-audit.md`.
+
+**This repository owns the mapping table.** Nothing here is merged back
+upstream, and upstream is not expected to carry any of it.
 
 ## Running it
 

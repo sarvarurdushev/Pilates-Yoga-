@@ -2,9 +2,11 @@
 # Fetches the BodyParts3D source archive into bpdata/ (gitignored).
 #
 # BodyParts3D, (c) The Database Center for Life Science, licensed under
-# CC Attribution-Share Alike 2.1 Japan. https://dbarchive.biosciencedbc.jp/en/bodyparts3d/
-# Release 3.0 (20110915). The 99% polygon-reduction set is used: the 95% set is 547 MB and
-# every part is decimated again by the build anyway, so the extra detail is thrown away.
+# CC Attribution 4.0 International. https://dbarchive.biosciencedbc.jp/en/bodyparts3d/
+# Release 3.0 (20110915) for the geometry. The 99% polygon-reduction set is used: the 95%
+# set is 547 MB and every part is decimated again by the build anyway, so the extra detail
+# is thrown away. The concept tables come from LATEST, which is release 4.0 -- they are
+# FMA-to-FMA and so join onto the 3.0 meshes unchanged. See ATTRIBUTION.md.
 set -euo pipefail
 
 BASE="https://dbarchive.biosciencedbc.jp/data/bodyparts3d/20110915"
@@ -22,6 +24,15 @@ get() {
 get "$BASE/parts_list_e.txt"          "$DIR/parts_list_e.txt"
 get "$BASE/conventional_part_of.txt"  "$DIR/conventional_part_of.txt"
 get "$BASE/BodyParts3D_3.0_obj_99.zip" "$DIR/obj99.zip"
+
+# The 4.0 concept hierarchy, for scripts/build_groups.py. Six small text files, no meshes:
+# the IS-A and PART-OF trees are parent-FMA to child-FMA, so they close over the ids the
+# 3.0 meshes already carry without a single 4.0 mesh being downloaded or used.
+LATEST="https://dbarchive.biosciencedbc.jp/data/bodyparts3d/LATEST"
+for f in isa_parts_list_e.txt isa_inclusion_relation_list.txt isa_element_parts.txt \
+         partof_parts_list_e.txt partof_inclusion_relation_list.txt partof_element_parts.txt; do
+  get "$LATEST/$f" "$DIR/$f"
+done
 
 echo
 echo "bpdata/ ready:"

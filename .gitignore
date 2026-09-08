@@ -13,3 +13,10 @@ venv/
 *.jsonl
 probe_frame.jpg
 out/
+
+# Fetched BodyParts3D source tables and archives -- see web/scripts/fetch_bodyparts3d.sh
+web/bpdata/
+
+# Node modules and render output under web/ -- installed by npm ci, never committed
+web/node_modules/
+web/.render/

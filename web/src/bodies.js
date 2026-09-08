@@ -49,14 +49,29 @@ export const BODIES = {
     },
     source: 'BodyParts3D/Anatomography, release 3.0 (20110915)',
     sourceUrl: 'https://dbarchive.biosciencedbc.jp/en/bodyparts3d/',
-    licence: 'CC BY-SA 2.1 Japan',
-    attribution: 'BodyParts3D, © The Database Center for Life Science, licensed under CC Attribution-Share Alike 2.1 Japan',
+    /* The archive's own OBJ files carry a legacy CC BY-SA 2.1 Japan notice and
+     * this said so for a long time. The licensor's licence page now offers the
+     * database under CC Attribution 4.0 International and specifies the exact
+     * sentence it wants quoted, which is what `attribution` is. ATTRIBUTION.md
+     * records the older notice rather than deleting it, because "the licence
+     * got less restrictive" is the kind of claim that should be checkable. */
+    licence: 'CC BY 4.0',
+    attribution: 'BodyParts3D, © The Database Center for Life Science licensed under CC Attribution 4.0 International',
+    licenceUrl: 'https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html',
     citation: 'Mitsuhashi N et al., BodyParts3D: 3D structure database for anatomical concepts. Nucleic Acids Res. 2009;37(Database issue):D782-5.',
     /* The peripheral nervous system comes from a second source, which is derived from the
      * first — so it is the same man, and a body that is not him cannot borrow it. */
     nervousSource: 'Z-Anatomy by Gauthier Kervyn and Marcin Zielinski, CC BY-SA 4.0, derived from BodyParts3D',
+    /* The one share-alike in the building, and it is real: the nerve meshes are
+     * Z-Anatomy's, and anything redistributed from them carries CC BY-SA 4.0
+     * whatever the rest of the atlas is under. */
+    nervousLicence: 'CC BY-SA 4.0',
     assets: {
       structures: 'src/generated/structures.json',
+      /* Derived from the FMA hierarchy the meshes already carry — see
+       * scripts/build_groups.py. A body without one is a body whose structures
+       * are selectable only one at a time, which is how this atlas began. */
+      groups: 'src/generated/groups.json',
       rig: 'src/generated/rig.json',
       musclePaths: 'src/generated/muscle_paths.json',
       models: 'models',

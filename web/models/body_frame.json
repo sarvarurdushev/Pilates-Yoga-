@@ -1,6 +1,6 @@
 {
   "source": "BodyParts3D 3.0 (20110915), 99% reduction",
-  "attribution": "BodyParts3D, (c) The Database Center for Life Science licensed under CC Attribution-Share Alike 2.1 Japan",
+  "attribution": "BodyParts3D, (c) The Database Center for Life Science licensed under CC Attribution 4.0 International",
   "note": "archive mm -> canonical: X=x, Y=z, Z=-y, then (p-center)*scale",
   "center": [
     1.7804999999999964,

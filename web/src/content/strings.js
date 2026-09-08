@@ -426,6 +426,24 @@ export const UI = {
   seeInside:    { en: 'See inside', ko: '내부 보기' },
   seeInsideOff: { en: 'Solid', ko: '불투명' },
 
+  /* finding a structure — four hundred and thirty of them, of which the browse
+   * lists could reach a hundred and sixteen */
+  findAnat:     { en: 'Find a structure', ko: '구조 찾기' },
+  findHint:     { en: 'Muscle, bone, nerve, organ or group',
+                  ko: '근육, 뼈, 신경, 장기, 근육군' },
+  findNone:     { en: 'Nothing here matches that.', ko: '일치하는 항목이 없습니다.' },
+  findCount:    { en: 'shown', ko: '표시' },
+  findMore:     { en: 'Keep typing to narrow this down.',
+                  ko: '더 입력하면 범위가 좁아집니다.' },
+  groups:       { en: 'Groups', ko: '근육군' },
+  groupsHint:   { en: 'The sets a class is actually cued in. Membership comes from the anatomy ontology, not from a list typed here.',
+                  ko: '수업에서 실제로 사용하는 묶음입니다. 구성은 해부학 온톨로지에서 가져온 것이며 직접 작성한 목록이 아닙니다.' },
+  groupOn:      { en: 'showing', ko: '표시 중' },
+  groupClear:   { en: 'Clear group', ko: '근육군 해제' },
+  groupOf:      { en: 'Part of', ko: '소속' },
+  groupMembers: { en: 'structures', ko: '개 구조' },
+  groupFormal:  { en: 'Ontology name', ko: '온톨로지 명칭' },
+
   /* the library browser — two hundred entries need finding, not scrolling */
   searchEx:     { en: 'Search exercises', ko: '운동 검색' },
   searchHint:   { en: 'Name, Sanskrit, family or muscle', ko: '이름, 산스크리트, 계열, 근육' },

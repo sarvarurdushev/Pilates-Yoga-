@@ -5,9 +5,17 @@ comes out of this archive, and every structure keeps the FMA id it arrived with,
 what makes the ids traceable to a standard ontology instead of invented here.
 
 Source: BodyParts3D/Anatomography, release 3.0 (20110915), polygon reduction 99%.
-        The Database Center for Life Science, licensed CC Attribution-Share Alike 2.1 Japan.
+        The Database Center for Life Science.
         https://dbarchive.biosciencedbc.jp/en/bodyparts3d/
         Mitsuhashi N et al., Nucleic Acids Res. 2009;37(Database issue):D782-5.
+
+Licence: the OBJ files in the release-3.0 archive carry a legacy notice reading
+CC Attribution-Share Alike 2.1 Japan, and this project quoted that for a long
+time. It is out of date. The licensor's own licence page now offers the database
+under CC Attribution 4.0 International and gives the exact wording it wants
+quoted, which is what ATTRIBUTION is set to below. See ATTRIBUTION.md at the
+repository root for the whole of it, including why the older notice is recorded
+rather than deleted.
 
 Run scripts/fetch_bodyparts3d.sh first; it puts everything under bpdata/.
 """
@@ -18,8 +26,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(os.path.dirname(HERE), 'bpdata')
 ZIP  = os.path.join(DATA, 'obj99.zip')
 
+#: The licensor's required wording, quoted from their licence page rather than
+#: paraphrased -- CC BY asks for attribution "in the manner specified", and they
+#: specify this sentence.
 ATTRIBUTION = ('BodyParts3D, (c) The Database Center for Life Science '
-               'licensed under CC Attribution-Share Alike 2.1 Japan')
+               'licensed under CC Attribution 4.0 International')
+#: Which archive these meshes actually came out of. Kept beside the licence
+#: because "CC BY 4.0" alone does not say what was downloaded or when.
+RELEASE = 'BodyParts3D/Anatomography, release 3.0 (20110915), 99% reduction'
 
 # roots of the containment tree, by FMA id
 SYSTEMS = {

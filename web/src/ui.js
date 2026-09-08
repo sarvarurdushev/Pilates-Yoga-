@@ -6,7 +6,8 @@ import { EXERCISE_BRAIN, TIERS, claimsForRegion } from './content/evidence.js';
 import { MOVEMENT_PATHWAY } from './content/pathways.js';
 import { MOTION, BREATH, phaseAt } from './content/motion.js';
 import { RAMP_STOPS } from './musclePaths.js';
-import { registry, get, documented, LAYER_ORDER } from './structures.js';
+import { registry, get, LAYER_ORDER } from './structures.js';
+import { GROUP_REGIONS, groups as groupTable } from './content/groups.js';
 import { BODY_FRAME, BRAIN_TO_BODY } from './frame.js';
 import { activeBody, BODIES, templateDisclaimer, bodyHref, availableBodies } from './bodies.js';
 import { openReport } from './report.js';
@@ -29,6 +30,7 @@ export function mountUI(ctx) {
           selectStructure, setLang, setAtlas, setXray, setCutaway, setClip, setLabels,
           setRotate, setRegister, setInstruction, setLayer, setLayerOpacity, setView,
           resetView, setExercise, setPathway, activationOf,
+          setGroup, anatomyGroups, groupsForStructure,
           poseFromClip, setPlaying, setShowPaths, setShowMeshes, liveActivationOf,
           musclePathReport, setLabelKind, clearLabelKinds } = ctx;
 
@@ -382,6 +384,15 @@ export function mountUI(ctx) {
           `${b.name[app.lang]} — ${b.source} · ${b.licence}. ${b.subject[app.lang]}`) },
       { title: T('pathSchematic'), lines: [T('pathSchematicBody')] },
     ];
+    /* The groups carry their own provenance because they came from a different
+     * table of the same database than the meshes did — the 4.0 concept
+     * hierarchy over 3.0 geometry — and a reader entitled to ask "where did
+     * `the hamstrings` come from" should not have to infer it. */
+    const gmeta = anatomyGroups?.().length ? groupTable().meta : null;
+    if (gmeta) out.splice(1, 0, {
+      title: `${T('groups')} — ${anatomyGroups().length}`,
+      lines: [gmeta.attribution, `${gmeta.source} · ${gmeta.licence}`, gmeta.note].filter(Boolean),
+    });
     return out.filter(g => g.lines.length);
   }
 
@@ -430,17 +441,125 @@ export function mountUI(ctx) {
    * then the network, then the systems, then the names as a two-column grid of colour swatches
    * where a colour is the thing you are actually matching against the picture.
    */
+  /**
+   * What the reader typed into the structure search, kept across re-renders.
+   *
+   * Outside `exploreTab` for the same reason `lib.q` is outside the library:
+   * the panel is rebuilt from scratch on every keystroke, so anything held
+   * inside the render function is a box that empties itself as you type.
+   */
+  const find = { q: '' };
+
+  /** Everything a search term could match on one structure, lowercased once. */
+  const HAY = new WeakMap();
+  function haystack(r) {
+    let h = HAY.get(r);
+    if (h === undefined) {
+      h = [r.name.en, r.name.ko, r.key, r.muscle?.latin,
+           ...(r.fma ?? [])].filter(Boolean).join(' ').toLowerCase();
+      HAY.set(r, h);
+    }
+    return h;
+  }
+
+  const KIND_ORDER = [['muscle', 'kindMuscle'], ['bone', 'kindBone'], ['nerve', 'kindNerve'],
+                      ['organ', 'kindOrgan'], ['brain', 'kindBrain']];
+
+  /**
+   * Explore: find it, or browse to it.
+   *
+   * The list used to be `documented()` — the ninety-one muscles with a written
+   * entry, plus the brain regions. Everything else in the atlas, which is a
+   * hundred and fifty-two bones, seventy organs and twenty nerves, was reachable
+   * only by finding it on the body and clicking it. That is a fine way to meet a
+   * structure and a hopeless way to look one up, and it is why the search box
+   * comes first: four hundred and thirty structures and seventy-four groups, in
+   * both languages, matched on name, Latin, and FMA id.
+   *
+   * With nothing typed it browses instead — the groups a class is cued in, then
+   * every structure by kind — because a reader who does not yet know the name of
+   * the thing they are looking for cannot search for it.
+   */
   function exploreTab() {
-    const groups = [['brain', documented('brain')], ['muscle', documented('muscle')]]
+    const q = find.q.trim().toLowerCase();
+    const all = [...registry().byId.values()];
+    const gs = anatomyGroups?.() ?? [];
+
+    if (q) {
+      const hitGroups = gs.filter(g =>
+        `${g.name.en} ${g.name.ko} ${g.formal} ${g.fma}`.toLowerCase().includes(q));
+      const hits = all.filter(r => haystack(r).includes(q));
+      /* Shortest name first. Searching "rectus" should offer `rectus femoris`
+       * before `rectus capitis posterior minor`, and length is the cheap proxy
+       * for "less qualified, so more likely the one meant". */
+      hits.sort((a, b) => a.name[app.lang].length - b.name[app.lang].length
+                       || a.name[app.lang].localeCompare(b.name[app.lang]));
+      const byKind = KIND_ORDER
+        .map(([kind, str]) => [str, hits.filter(r => r.kind === kind)])
+        .filter(([, list]) => list.length);
+      return `
+        ${detailBlock()}
+        ${findBox(hits.length + hitGroups.length)}
+        ${hitGroups.length ? `<h3>${T('groups')}<em>${hitGroups.length}</em></h3>
+          <div class="gchips">${hitGroups.map(groupChip).join('')}</div>` : ''}
+        ${byKind.map(([str, list]) => `
+          <h3>${T(str)}<em>${list.length}</em></h3>
+          <div class="swatches">${list.slice(0, 60).map(swatch).join('')}</div>
+          ${list.length > 60 ? `<p class="note small">${T('findMore')}</p>` : ''}`).join('')}
+        ${hits.length + hitGroups.length ? '' : `<p class="note">${T('findNone')}</p>`}`;
+    }
+
+    const byKind = KIND_ORDER
+      .map(([kind, str]) => [str, all.filter(r => r.kind === kind)
+        .sort((a, b) => a.name[app.lang].localeCompare(b.name[app.lang]))])
       .filter(([, list]) => list.length);
     return `
       ${detailBlock()}
+      ${findBox(null)}
       ${connBlock()}
       ${labelFilter()}
-      ${groups.map(([kind, list]) => `
-        <h3>${T(kind === 'brain' ? 'brain' : 'kindMuscle')}<em>${list.length}</em></h3>
+      ${groupsSection(gs)}
+      ${byKind.map(([str, list]) => `
+        <h3>${T(str)}<em>${list.length}</em></h3>
         <div class="swatches">${list.map(swatch).join('')}</div>`).join('')}
       <p class="note">${T('exploreBody')}</p>`;
+  }
+
+  function findBox(count) {
+    return `<div class="findrow">
+      <input id="anatQ" type="search" value="${esc(find.q)}"
+             placeholder="${esc(T('findHint'))}" aria-label="${esc(T('findAnat'))}">
+      ${count == null ? '' : `<span class="small-number">${count} ${T('findCount')}</span>`}
+    </div>`;
+  }
+
+  const groupChip = g => `<button class="gchip${app.group === g.fma ? ' on' : ''}"
+      data-group="${esc(g.fma)}" title="${esc(g.formal)}"
+      aria-pressed="${app.group === g.fma}">${esc(g.name[app.lang])}
+      <em>${g.members.length}</em></button>`;
+
+  /**
+   * The groups, in the sections a class works through.
+   *
+   * Shown above the four hundred individual names on purpose: "the hamstrings"
+   * is what a coach says, and offering it before `semimembranosus` is offering
+   * the reader the level they are already thinking at.
+   */
+  function groupsSection(gs) {
+    if (!gs.length) return '';
+    const on = app.group ? (gs.find(g => g.fma === app.group) ?? null) : null;
+    return `
+      <h3>${T('groups')}<em>${gs.length}</em></h3>
+      <p class="note small">${T('groupsHint')}</p>
+      ${on ? `<div class="groupon">${T('groupOn')}: <b>${esc(on.name[app.lang])}</b>
+        <span class="small-number">${on.members.length} ${T('groupMembers')}</span>
+        <button class="mini" id="groupClear">${T('groupClear')}</button></div>` : ''}
+      ${GROUP_REGIONS.map(region => {
+        const list = gs.filter(g => g.region === region.id);
+        if (!list.length) return '';
+        return `<h4 class="gregion">${esc(region[app.lang] ?? region.en)}</h4>
+          <div class="gchips">${list.map(groupChip).join('')}</div>`;
+      }).join('')}`;
   }
   /* A colour block and a name. The block is the point: it is what a reader matches against the
    * structure they are looking at on the picture, and at this size a row of them reads as a
@@ -497,8 +616,30 @@ export function mountUI(ctx) {
     return `<div class="detail">
       <div class="dname"><span class="dot" style="background:${r.color}"></span>${esc(r.name[app.lang])}</div>
       <div class="dwhere">${T(r.layer)}${r.fma ? ` · ${T('fmaId')} ${r.fma.slice(0, 3).join(', ')}` : ''}</div>
+      ${groupBlock(r)}
       <div class="empty small"><h2>${T('noContent')}</h2><p>${T('noContentBody')}</p></div>
     </div>`;
+  }
+
+  /**
+   * Which named sets this structure belongs to.
+   *
+   * It earns its place hardest on the structures with no written entry — most of
+   * the hundred and fifty-two bones. "Fourth lumbar vertebra" used to be a name
+   * over an apology; it is now a name, and the lumbar spine, the vertebrae and
+   * the disks it sits between, each of them one press away.
+   *
+   * Most specific first, and capped: `sacrum` is in seven of these and the last
+   * three are `wall of abdomen`-shaped groups that tell a reader nothing they
+   * could not see.
+   */
+  function groupBlock(r) {
+    const gs = (groupsForStructure?.(r.id) ?? []).slice(0, 4);
+    if (!gs.length) return '';
+    return `<div class="groupsof"><h4>${T('groupOf')}</h4>${gs.map(g =>
+      `<button class="gchip${app.group === g.fma ? ' on' : ''}" data-group="${esc(g.fma)}"
+               title="${esc(g.formal)}">${esc(g.name[app.lang])}
+        <em>${g.members.length}</em></button>`).join('')}</div>`;
   }
 
   const plain = () => app.register !== 'clinical';
@@ -507,6 +648,10 @@ export function mountUI(ctx) {
   function muscleDetail(r) {
     const m = r.muscle, t = m[app.lang];
     const role = activationOf(r.id);
+    /* `group` is a fourth value on the same channel and it deliberately has no
+     * label here: a group says these structures are the ones being talked about,
+     * not what any of them is doing. Naming it "prime mover" would be a claim the
+     * ontology never made. The group itself is named in `groupBlock` below. */
     const roleLabel = { prime: T('primeMovers'), synergists: T('synergistsEx'), stabilisers: T('stabilisers') };
     const linkList = (arr) => (arr ?? []).map(n => {
       const s = registry().byName.get(n);
@@ -516,7 +661,8 @@ export function mountUI(ctx) {
       <div class="dko">${esc(m.latin)}</div>
       <div class="dname"><span class="dot" style="background:${r.color}"></span>${esc(t.name)}</div>
       <div class="dwhere">${T(r.layer)} · ${T('fmaId')} ${r.fma.length}${r.sides.includes('L') && r.sides.includes('R') ? ' · L+R' : ''}</div>
-      ${role ? `<div class="rolechip" style="border-color:${r.color}">${roleLabel[role]}</div>` : ''}
+      ${role && roleLabel[role] ? `<div class="rolechip" style="border-color:${r.color}">${roleLabel[role]}</div>` : ''}
+      ${groupBlock(r)}
       ${plain() ? `<div class="blk"><h4>${T('does')}</h4><p>${esc(t.does)}</p></div>` : ''}
       ${plain() && t.feels ? `<div class="blk feels"><h4>${T('feels')}</h4><p>${esc(t.feels)}</p></div>` : ''}
       ${clinical() ? `<div class="blk sci"><h4>${T('sci')}</h4><p>${esc(t.sci)}</p></div>` : ''}
@@ -925,6 +1071,25 @@ export function mountUI(ctx) {
       b.onclick = () => selectStructure(+b.dataset.id);
     for (const b of $('panelBody').querySelectorAll('[data-ex]'))
       b.onclick = () => { setExercise(b.dataset.ex); renderPanel(); };
+    const aq = $('anatQ');
+    if (aq) {
+      /* Same caret dance as the library search below, and for the same reason:
+       * the panel is rebuilt from scratch on every keystroke, so without this
+       * the cursor jumps to the end after the first letter. */
+      aq.oninput = () => {
+        find.q = aq.value; const at = aq.selectionStart; renderPanel();
+        const n = $('anatQ'); if (n) { n.focus(); n.setSelectionRange(at, at); }
+      };
+    }
+    for (const b of $('panelBody').querySelectorAll('[data-group]'))
+      b.onclick = async () => {
+        // pressing the group that is already showing turns it off, so a chip is
+        // a toggle rather than a one-way door
+        await setGroup(app.group === b.dataset.group ? null : b.dataset.group);
+        renderPanel(); syncControls();
+      };
+    const gclear = $('groupClear');
+    if (gclear) gclear.onclick = async () => { await setGroup(null); renderPanel(); syncControls(); };
     const q = $('libQ');
     if (q) {
       // re-render on input, then put the caret back — the panel is rebuilt from scratch

@@ -14,6 +14,8 @@ import { loadDeepStructures, INTERIOR_IDS, tintStructure } from './deepStructure
 import { REGION_INFO } from './regionData.js';
 import { brainPlacement, BRAIN_TO_BODY, FRAME } from './frame.js';
 import { buildRegistry, registry, get, nameOf, LAYER_ORDER, vertebra } from './structures.js';
+import { buildGroups, groups, groupOf, groupsOf } from './content/groups.js';
+import { PointerTap, slopFor } from './pointerTap.js';
 import { activeBody, layerUrl } from './bodies.js';
 import { EXERCISE, ROLE_LEVEL } from './content/exercises.js';
 import { MOVEMENT_PATHWAY } from './content/pathways.js';
@@ -41,6 +43,11 @@ export const app = {
   skinning: true,            // muscles deform with the rig rather than riding one bone
   instructionOn: true,       // §13.5 — anatomy-and-evidence-only mode turns this off
   exercise: null,
+  /* The anatomical group on screen, by FMA concept id, or null. A group and an
+   * exercise are two answers to the same question — "which muscles are we
+   * talking about" — and they share the palette's activation channel, so
+   * choosing either clears the other. See `setGroup`. */
+  group: null,
   // §9: the clip, where the scrubber is, and whether it is running
   t: 0, playing: false, hasMotion: false, showPaths: false, showMeshes: true,
   pathway: null,
@@ -1661,8 +1668,9 @@ function labelVisible(id) {
   if (app.labelKinds.size && !app.labelKinds.has(r.kind)) return false;
   if (!app.layers[r.layer]?.on) return false;
   if (r.interior && app.xray === 0) return false;
-  // during an exercise the muscles in the movement are the point of the picture
-  if (app.exercise) return activation.has(id);
+  // during an exercise the muscles in the movement are the point of the picture,
+  // and a chosen group is the same request said a different way
+  if (app.exercise || app.group) return activation.has(id);
   return true;
 }
 
@@ -1986,7 +1994,6 @@ export function captureStage(scale = 2) {
 
 /* ------------------------------------------------------------------ picking */
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
-let downAt = null;
 
 /**
  * Everything a ray could hit, as meshes rather than as groups.
@@ -2047,9 +2054,14 @@ function pick(ev) {
 export const pickAt = (clientX, clientY) => pick({ clientX, clientY });
 
 
-canvas.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; nudgeIdle(); });
+const tap = new PointerTap();
+canvas.addEventListener('pointerdown', e => {
+  tap.down(e.pointerId, e.clientX, e.clientY, slopFor(e.pointerType));
+  nudgeIdle();
+});
+canvas.addEventListener('pointercancel', e => tap.cancel(e.pointerId));
 canvas.addEventListener('pointerup', e => {
-  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
+  if (!tap.up(e.pointerId, e.clientX, e.clientY)) return;
   /* A cell first, then whatever surface is behind it.
    *
    * The probe could be hovered and not clicked, so a reader who found a cell and wanted to
@@ -2062,7 +2074,12 @@ canvas.addEventListener('pointerup', e => {
   selectStructure(pick(e));
 });
 canvas.addEventListener('pointermove', e => {
-  if (downAt && (e.buttons & 1)) return;
+  tap.move(e.pointerId, e.clientX, e.clientY);
+  if (e.buttons & 1) return;
+  /* Hover picking is a mouse affordance and costs a raycast through four hundred
+   * meshes. A finger already down is orbiting or pinching, and running it then
+   * spent the frame budget deciding what was under a gesture nobody was aiming. */
+  if (tap.pointers) return;
   const id = pick(e);
   if (id !== app.hover) { app.hover = id; syncLayers(); }
   canvas.style.cursor = id != null ? 'pointer' : 'grab';
@@ -3303,6 +3320,7 @@ export async function setExercise(key) {
   // no exercise instead, which is a state the rest of this function already handles.
   if (key && !EXERCISE[key]) { console.warn(`no exercise "${key}"`); key = null; }
   app.exercise = key;
+  app.group = null;               // one owner of the activation channel at a time
   activation.clear();
   palette.clearActivation();
   brainMarked = [];               // no exercise means nothing marked, including on the brain
@@ -3366,6 +3384,91 @@ export async function setExercise(key) {
 }
 
 export const activationOf = id => activation.get(id) ?? null;
+
+/**
+ * Show an anatomical group: the hamstrings, the pelvic floor, the lumbar spine.
+ *
+ * A group is a set of structures the ontology already had a name for, and this
+ * lights all of them at once. It uses the same channel an exercise uses, for
+ * the reason given on `app.group`: the two are alternative answers to "which
+ * muscles are we talking about", and two sets lit at the same level with
+ * different meanings is a picture nobody can read.
+ *
+ * **Everything in the group is lit at the same level, deliberately.** An
+ * exercise grades its muscles because it has roles to grade them by, each with
+ * an evidence marker on it. A group has no roles — the ontology says these
+ * eleven structures are the pelvic girdle's muscles, not that any of them
+ * matters more — so a gradient here would be a number this repository does not
+ * have, drawn in the shape of one it does.
+ *
+ * The layers the members live in are turned on first. A group lit under a layer
+ * that is off is a statement nobody can see, and it was the first thing that
+ * went wrong: choosing the deep spinal muscles from a default view lit fourteen
+ * meshes inside a layer that had never been loaded.
+ */
+export async function setGroup(fma) {
+  const g = fma ? groupOf(fma) : null;
+  if (fma && !g) { console.warn(`no anatomical group "${fma}"`); fma = null; }
+  app.group = g ? fma : null;
+  app.exercise = null;
+  activation.clear();
+  palette.clearActivation();
+  if (!g) { for (const m of materials) m.userData.sync?.(); syncLayers(); ui.relabel(); return; }
+  for (const layer of g.layers) {
+    if (!hasLayer(layer)) continue;
+    app.layers[layer].on = true;
+    await loadLayer(layer);
+  }
+  for (const id of g.members) {
+    activation.set(id, 'group');
+    palette.setActivation(id, GROUP_LEVEL);
+  }
+  for (const m of materials) m.userData.sync?.();
+  syncLayers();
+  flyToGroup(g.members);
+  ui.relabel();
+}
+
+/** Every group the loaded atlas offers, for the panel. */
+export const anatomyGroups = () => groups().list;
+/** The groups a structure belongs to, most specific first. */
+export const groupsForStructure = groupsOf;
+
+/* One level for every member — see `setGroup`. Sits between an exercise's
+ * synergist and its prime mover so a group reads as emphatic without looking
+ * like a measured maximum. */
+const GROUP_LEVEL = 0.8;
+
+/**
+ * Frame a whole group rather than one structure.
+ *
+ * `flyTo` solves against one structure's own extent, and running it over a set
+ * would fly to whichever member happened to be last. This gathers every
+ * member's posed extent into one cloud and hands that to the same fit, so the
+ * distance comes from the group's real size: the pelvic floor fills the frame
+ * and the whole leg does not.
+ */
+export function flyToGroup(ids, immediate = false) {
+  FLIGHT_BY = 'flyToGroup';
+  const pts = [];
+  for (const id of ids) {
+    const side = posedSide(id);
+    const c = side?.centre ?? app.centroids[id];
+    if (!c) continue;
+    if (side?.points?.length >= 4) { pts.push(...side.points); continue; }
+    const radius = Math.max(0.02, app.radii[id] ?? 0.04);
+    for (const axis of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]])
+      pts.push(c.clone().addScaledVector(new THREE.Vector3(...axis), radius));
+  }
+  if (pts.length < 4) return;
+  /* A group is almost always bilateral, so its cloud straddles the midline and
+   * a direction derived from its centre points nowhere. The standing left
+   * lateral vantage is the one that shows a spine, a pelvic floor and a set of
+   * ribs alike. */
+  const dir = LEFT_VIEW.clone();
+  const { target, distance } = frameFor(pts, dir, FLESH, 0.06);
+  flyToPose(target.clone().addScaledVector(dir, distance), target, immediate);
+}
 
 /**
  * Mark the brain regions this exercise's own claims are about.
@@ -3557,6 +3660,7 @@ const ui = mountUI({
   selectStructure, setLang, setAtlas, setXray, setCutaway, setClip, setLabels,
   setRotate, setRegister, setInstruction, setLayer, setLayerOpacity, setView, resetView,
   setExercise, setPathway, captureStage, activationOf, flyTo,
+  setGroup, anatomyGroups, groupsForStructure,
   poseFromClip, setPlaying, setShowPaths, setShowMeshes, liveActivationOf, musclePathReport,
   frameRig, setLabelKind, clearLabelKinds,
   // a getter, not the value: the panel mounts before the rig has finished loading
@@ -3569,9 +3673,15 @@ Promise.all([
   body.assets.rig ? fetch(body.assets.rig).then(r => r.json()).catch(() => null) : null,
   body.motion === false ? null
     : fetch(body.assets.musclePaths).then(r => r.json()).catch(() => null),
+  /* Groups are a convenience, not a dependency: an atlas with no group table is
+   * the atlas this was before it had one, so a missing file costs the group
+   * chips and nothing else. */
+  body.assets.groups
+    ? fetch(body.assets.groups).then(r => r.json()).catch(() => null) : null,
 ])
-  .then(async ([gen, rigData, pathData]) => {
+  .then(async ([gen, rigData, pathData, groupData]) => {
     buildRegistry(gen, { brain: hasLayer('brain') });
+    if (groupData) buildGroups(groupData, registry().byId, LAYER_ORDER);
     REG_READY = true;
     resetView(true);
     paintPalette();

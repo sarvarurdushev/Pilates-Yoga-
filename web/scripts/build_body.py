@@ -21,7 +21,7 @@ Rules inherited from the brain build and not up for renegotiation:
   * region ids come from a generated table, never hand-maintained
 
 BodyParts3D, (c) The Database Center for Life Science, licensed under
-CC Attribution-Share Alike 2.1 Japan.
+CC Attribution 4.0 International. See ATTRIBUTION.md.
 """
 import sys, os, re, json, argparse, collections
 import numpy as np
@@ -273,7 +273,10 @@ def main():
     doc = {
         'source': frame['source'],
         'attribution': frame['attribution'],
-        'licence': 'CC BY-SA 2.1 JP',
+        # The release-3.0 archive carries an older CC BY-SA 2.1 JP notice inside
+        # its OBJ files. The licensor now offers the database under CC BY 4.0;
+        # ATTRIBUTION.md records both and why the newer one is quoted.
+        'licence': 'CC BY 4.0',
         'idBase': ID_BASE,
         'frame': {'center': frame['center'], 'scale': frame['scale'],
                   'heightMm': frame['height_mm'], 'note': frame['note']},
