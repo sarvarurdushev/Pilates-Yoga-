@@ -18,6 +18,196 @@
 
 export const MUSCLE_ATLAS = {
 
+  /* ------------------------------------------- the segmental muscles of the spine
+   *
+   * The muscles a studio is cueing when it says *articulate one vertebra at a time*
+   * or *breathe into the back of the ribs*, and the ones this atlas had no mesh for
+   * until the build stopped discarding them -- see KEEP_SETS in scripts/build_body.py.
+   *
+   * They share a problem that is worth stating once here rather than in nine
+   * `does` paragraphs: none of them is strong enough to matter as a mover. Their
+   * cross-section is tiny and their lever arm is a centimetre. What they have
+   * instead is muscle-spindle density several times that of the big erectors,
+   * which is why the literature treats them as proprioceptive organs that happen
+   * to contract -- they report where each vertebra is far more than they decide
+   * it. A cue aimed at them is a cue about awareness, not about effort, and an
+   * atlas that describes them as extensors and stops has said the less useful
+   * half.
+   *
+   * Every one of them exists in the source ontology only as a set: there is no
+   * *third lumbar interspinalis*, there is one mesh for all of them. So the
+   * structure here is the set, and `sides` is M where the source models both
+   * sides in one mesh.
+   */
+
+  'interspinales lumborum': {
+    latin: 'Musculi interspinales lumborum',
+    en: { name: 'Interspinales lumborum',
+          does: 'Short paired muscles bridging one lumbar spinous process to the next, one pair per joint. They straighten the lower back a single segment at a time — but they are small, and their real work is telling you where each vertebra is, which is what makes a slow articulated roll-down possible at all.',
+          sci: 'Segmental extensors spanning adjacent lumbar spinous processes. Minimal moment-generating capacity; high muscle-spindle density implicates them in segmental proprioception and fine positional control rather than gross extension.' },
+    ko: { name: '요극간근',
+          does: '허리뼈 가시돌기 사이를 하나씩 잇는 짧은 근육으로, 관절마다 한 쌍씩 있습니다. 허리를 한 분절씩 폅니다. 다만 크기가 작아 실제 역할은 각 척추뼈의 위치를 알려주는 것이며, 천천히 한 마디씩 굴리는 롤다운이 가능한 이유가 바로 이것입니다.',
+          sci: '인접한 요추 가시돌기를 잇는 분절 신전근. 발생 모멘트는 미미하며, 높은 근방추 밀도로 보아 분절 고유감각과 미세한 위치 조절에 관여합니다.' },
+    origin: { en: 'Superior surface of a lumbar spinous process', ko: '요추 가시돌기 위면' },
+    insertion: { en: 'Inferior surface of the spinous process above', ko: '위쪽 척추뼈 가시돌기 아래면' },
+    innervation: { nerves: { en: 'Medial branches of the posterior rami of the lumbar spinal nerves',
+                             ko: '요신경 후지 내측분지' },
+                   roots: ['L1', 'L2', 'L3', 'L4', 'L5'] },
+    actions: { en: 'Segmental extension of the lumbar spine; proprioceptive feedback on vertebral position',
+               ko: '요추의 분절 신전, 척추뼈 위치에 대한 고유감각 되먹임' },
+    synergists: ['multifidus', 'lumbar rotator', 'spinalis thoracis', 'longissimus thoracis'],
+    antagonists: ['rectus abdominis', 'psoas major'],
+  },
+
+  'interspinales thoracis': {
+    latin: 'Musculi interspinales thoracis',
+    en: { name: 'Interspinales thoracis',
+          does: 'The same short segmental muscles between the spinous processes of the mid-back. They are the least developed of the three regions — the thoracic spine is braced by the ribs and has less need of them — and in many people several levels are absent entirely.',
+          sci: 'Segmental extensors between adjacent thoracic spinous processes. Least developed of the three regional groups and frequently absent at multiple levels; the costal cage supplies much of the segmental stability they provide elsewhere.' },
+    ko: { name: '흉극간근',
+          does: '등뼈 가시돌기 사이를 잇는 같은 형태의 분절 근육입니다. 세 부위 중 가장 덜 발달했으며 — 등뼈는 갈비뼈가 지지하므로 필요가 적습니다 — 여러 분절이 아예 없는 사람도 많습니다.',
+          sci: '인접한 흉추 가시돌기 사이의 분절 신전근. 세 부위 중 가장 덜 발달했고 여러 분절에서 결손이 흔합니다. 흉곽이 분절 안정성의 상당 부분을 대신합니다.' },
+    origin: { en: 'Superior surface of a thoracic spinous process', ko: '흉추 가시돌기 위면' },
+    insertion: { en: 'Inferior surface of the spinous process above', ko: '위쪽 척추뼈 가시돌기 아래면' },
+    innervation: { nerves: { en: 'Medial branches of the posterior rami of the thoracic spinal nerves',
+                             ko: '흉신경 후지 내측분지' },
+                   roots: ['T1', 'T2', 'T11', 'T12'] },
+    actions: { en: 'Segmental extension of the thoracic spine', ko: '흉추의 분절 신전' },
+    synergists: ['semispinalis thoracis', 'spinalis thoracis', 'thoracic rotator', 'multifidus'],
+    antagonists: ['rectus abdominis', 'external oblique'],
+  },
+
+  'interspinales cervicis': {
+    latin: 'Musculi interspinales cervicis',
+    en: { name: 'Interspinales cervicis',
+          does: 'The best developed of the three, running between the split spinous processes of the neck. The neck carries a head on a narrow column with no ribs to brace it, so it needs the most positional information of any part of the spine — and this is where most of it comes from.',
+          sci: 'Segmental extensors between adjacent cervical bifid spinous processes, the most developed of the regional groups. Spindle densities among the highest recorded in human skeletal muscle, consistent with a dominant proprioceptive role in cervical postural control.' },
+    ko: { name: '경극간근',
+          does: '세 부위 중 가장 잘 발달했으며, 목뼈의 갈라진 가시돌기 사이를 지납니다. 목은 갈비뼈의 지지 없이 좁은 기둥 위에 머리를 얹고 있어 척추 중 가장 많은 위치 정보를 필요로 하며, 그 대부분이 여기에서 나옵니다.',
+          sci: '인접한 경추 이분 가시돌기 사이의 분절 신전근으로 세 부위 중 가장 발달했습니다. 근방추 밀도가 인체 골격근 중 최고 수준으로, 경부 자세 조절에서 고유감각 역할이 지배적임을 시사합니다.' },
+    origin: { en: 'Superior surface of a cervical spinous process', ko: '경추 가시돌기 위면' },
+    insertion: { en: 'Inferior surface of the spinous process above', ko: '위쪽 척추뼈 가시돌기 아래면' },
+    innervation: { nerves: { en: 'Medial branches of the posterior rami of the cervical spinal nerves',
+                             ko: '경신경 후지 내측분지' },
+                   roots: ['C2', 'C3', 'C4', 'C5', 'C6', 'C7'] },
+    actions: { en: 'Segmental extension of the cervical spine; proprioceptive feedback for head position',
+               ko: '경추의 분절 신전, 머리 위치에 대한 고유감각 되먹임' },
+    synergists: ['semispinalis cervicis', 'spinalis cervicis', 'rectus capitis posterior major', 'multifidus'],
+    antagonists: ['longus colli', 'longus capitis', 'sternocleidomastoid'],
+  },
+
+  'anterior cervical intertransversarii': {
+    latin: 'Musculi intertransversarii anteriores cervicis',
+    en: { name: 'Anterior cervical intertransversarii',
+          does: 'Small muscles between the front parts of neighbouring neck transverse processes. Being in front of the axis of the joint they bend the neck sideways, and unlike almost every other deep spinal muscle they are supplied by the front branches of the spinal nerves — which is a clue to the segment they belong to.',
+          sci: 'Span the anterior tubercles of adjacent cervical transverse processes. Lateral flexion of the cervical spine; innervated by the anterior rami, distinguishing them from the posterior set and from the rest of the deep dorsal group.' },
+    ko: { name: '전경횡돌기간근',
+          does: '이웃한 목뼈 가로돌기의 앞쪽을 잇는 작은 근육입니다. 관절 축의 앞에 있어 목을 옆으로 굽히며, 다른 깊은 척추 근육과 달리 척수신경 앞가지의 지배를 받습니다. 어느 분절에 속하는지를 알려주는 단서입니다.',
+          sci: '인접 경추 가로돌기 앞결절 사이를 지납니다. 경추의 측면 굴곡을 담당하며, 앞가지의 지배를 받아 후방군 및 심부 배측근군과 구별됩니다.' },
+    origin: { en: 'Anterior tubercle of a cervical transverse process', ko: '경추 가로돌기 앞결절' },
+    insertion: { en: 'Anterior tubercle of the transverse process above', ko: '위쪽 가로돌기 앞결절' },
+    innervation: { nerves: { en: 'Anterior rami of the cervical spinal nerves', ko: '경신경 앞가지' },
+                   roots: ['C2', 'C3', 'C4', 'C5', 'C6', 'C7'] },
+    actions: { en: 'Lateral flexion of the cervical spine; segmental stabilisation', ko: '경추의 측면 굴곡, 분절 안정화' },
+    synergists: ['scalenus anterior', 'longus colli', 'sternocleidomastoid'],
+    antagonists: ['posterior cervical intertransversarii'],
+  },
+
+  'posterior cervical intertransversarii': {
+    latin: 'Musculi intertransversarii posteriores cervicis',
+    en: { name: 'Posterior cervical intertransversarii',
+          does: 'The same idea behind the joint axis rather than in front of it: short muscles between the back parts of adjacent neck transverse processes, bending the neck sideways and reporting how far it has gone.',
+          sci: 'Span the posterior tubercles of adjacent cervical transverse processes. Lateral flexion with a segmental proprioceptive role; supplied by the posterior rami, unlike the anterior set.' },
+    ko: { name: '후경횡돌기간근',
+          does: '관절 축의 앞이 아니라 뒤에서 같은 일을 합니다. 이웃한 목뼈 가로돌기 뒤쪽을 잇는 짧은 근육으로, 목을 옆으로 굽히고 얼마나 굽었는지를 알려줍니다.',
+          sci: '인접 경추 가로돌기 뒤결절 사이를 지납니다. 측면 굴곡과 분절 고유감각 역할을 하며, 전방군과 달리 뒤가지의 지배를 받습니다.' },
+    origin: { en: 'Posterior tubercle of a cervical transverse process', ko: '경추 가로돌기 뒤결절' },
+    insertion: { en: 'Posterior tubercle of the transverse process above', ko: '위쪽 가로돌기 뒤결절' },
+    innervation: { nerves: { en: 'Posterior rami of the cervical spinal nerves', ko: '경신경 뒤가지' },
+                   roots: ['C2', 'C3', 'C4', 'C5', 'C6', 'C7'] },
+    actions: { en: 'Lateral flexion of the cervical spine; segmental stabilisation', ko: '경추의 측면 굴곡, 분절 안정화' },
+    synergists: ['semispinalis cervicis', 'splenius cervicis', 'longissimus cervicis'],
+    antagonists: ['anterior cervical intertransversarii'],
+  },
+
+  'lateral lumbar intertransversarius muscles': {
+    latin: 'Musculi intertransversarii laterales lumborum',
+    en: { name: 'Lateral lumbar intertransversarii',
+          does: 'Between the sideways-pointing processes of the lumbar vertebrae, on the outer side. They bend the lower back sideways a segment at a time. In side-lying work they are part of what keeps the waist from collapsing toward the mat.',
+          sci: 'Span adjacent lumbar transverse processes laterally. Segmental lateral flexion and stabilisation of the lumbar spine; supplied by the anterior rami, which places them with the ventral musculature despite their dorsal position.' },
+    ko: { name: '외측요횡돌기간근',
+          does: '허리뼈 가로돌기 사이의 바깥쪽에 있습니다. 허리를 한 분절씩 옆으로 굽힙니다. 옆으로 누워 하는 동작에서 허리가 매트 쪽으로 무너지지 않게 잡아주는 근육의 하나입니다.',
+          sci: '인접 요추 가로돌기 사이 외측을 지납니다. 요추의 분절 측면 굴곡과 안정화를 담당하며, 위치는 등쪽이지만 앞가지의 지배를 받아 배측 근육군에 속합니다.' },
+    origin: { en: 'Transverse process of a lumbar vertebra', ko: '요추 가로돌기' },
+    insertion: { en: 'Transverse process of the vertebra above', ko: '위쪽 척추뼈 가로돌기' },
+    innervation: { nerves: { en: 'Anterior rami of the lumbar spinal nerves', ko: '요신경 앞가지' },
+                   roots: ['L1', 'L2', 'L3', 'L4'] },
+    actions: { en: 'Segmental lateral flexion of the lumbar spine', ko: '요추의 분절 측면 굴곡' },
+    synergists: ['quadratus lumborum', 'internal oblique', 'external oblique', 'iliocostalis lumborum'],
+    antagonists: ['medial lumbar intertransversarius muscles'],
+  },
+
+  'medial lumbar intertransversarius muscles': {
+    latin: 'Musculi intertransversarii mediales lumborum',
+    en: { name: 'Medial lumbar intertransversarii',
+          does: 'The inner pair, running between the accessory and mamillary processes rather than the tips. They sit deep against the vertebral arch, where movement is smallest and position matters most.',
+          sci: 'Span the accessory process of one lumbar vertebra to the mamillary process of the one above, medial to the lateral set. Segmental stabilisation with a proprioceptive role; supplied by the medial branches of the posterior rami.' },
+    ko: { name: '내측요횡돌기간근',
+          does: '가로돌기 끝이 아니라 부돌기와 유두돌기 사이를 지나는 안쪽 짝입니다. 척추뼈 활 가까이 깊게 자리하며, 그곳은 움직임이 가장 작고 위치 정보가 가장 중요한 곳입니다.',
+          sci: '한 요추의 부돌기에서 위쪽 척추뼈 유두돌기까지, 외측군보다 안쪽을 지납니다. 분절 안정화와 고유감각 역할을 하며 후지 내측분지의 지배를 받습니다.' },
+    origin: { en: 'Accessory process of a lumbar vertebra', ko: '요추 부돌기' },
+    insertion: { en: 'Mamillary process of the vertebra above', ko: '위쪽 척추뼈 유두돌기' },
+    innervation: { nerves: { en: 'Medial branches of the posterior rami of the lumbar spinal nerves',
+                             ko: '요신경 후지 내측분지' },
+                   roots: ['L1', 'L2', 'L3', 'L4'] },
+    actions: { en: 'Segmental stabilisation of the lumbar spine; proprioceptive feedback',
+               ko: '요추의 분절 안정화, 고유감각 되먹임' },
+    synergists: ['multifidus', 'lumbar rotator', 'interspinales lumborum'],
+    antagonists: ['lateral lumbar intertransversarius muscles'],
+  },
+
+  'levatores costarum longi': {
+    latin: 'Musculi levatores costarum longi',
+    en: { name: 'Levatores costarum longi',
+          does: 'Fan-shaped muscles running down and outward from a vertebra to the second rib below, skipping one. They lift the ribs, which is one of the things breathing in actually consists of — a lateral breathing cue is asking, among other things, for these.',
+          sci: 'Arise from the transverse processes of the lower thoracic vertebrae and descend obliquely across one rib to insert on the second rib below. Elevate the ribs in inspiration; contribute to ipsilateral lateral flexion and contralateral rotation of the trunk.' },
+    ko: { name: '장늑골거근',
+          does: '척추뼈에서 아래 바깥쪽으로 부채꼴로 뻗어, 갈비뼈 하나를 건너뛰고 두 번째 갈비뼈에 붙습니다. 갈비뼈를 들어 올리며, 이것이 들숨을 이루는 요소의 하나입니다. 측방 호흡 큐는 무엇보다 이 근육을 요구합니다.',
+          sci: '하부 흉추 가로돌기에서 기시하여 갈비뼈 하나를 건너 두 번째 갈비뼈에 정지합니다. 흡기 시 갈비뼈를 거상하며, 동측 측면 굴곡과 반대측 회전에 기여합니다.' },
+    origin: { en: 'Transverse processes of the seventh cervical and upper eleven thoracic vertebrae',
+              ko: '제7경추 및 상위 11개 흉추 가로돌기' },
+    insertion: { en: 'Outer surface of the second rib below, between the tubercle and the angle',
+                 ko: '두 번째 아래 갈비뼈 바깥면, 결절과 각 사이' },
+    innervation: { nerves: { en: 'Lateral branches of the posterior rami of the thoracic spinal nerves',
+                             ko: '흉신경 후지 외측분지' },
+                   roots: ['C8', 'T1', 'T11'] },
+    actions: { en: 'Rib elevation in inspiration; lateral flexion toward the same side and rotation to the other',
+               ko: '흡기 시 늑골 거상, 동측 측면 굴곡 및 반대측 회전' },
+    synergists: ['external intercostal muscle', 'diaphragm', 'scalenus posterior', 'serratus posterior superior'],
+    antagonists: ['internal intercostal muscle', 'transversus thoracis'],
+  },
+
+  'levatores costarum breves': {
+    latin: 'Musculi levatores costarum breves',
+    en: { name: 'Levatores costarum breves',
+          does: 'The short version, reaching only as far as the next rib down. Twelve pairs, one per level, and together with the long ones they are the reason the back of the ribcage can widen on an inhale rather than only the front.',
+          sci: 'Arise from the transverse processes of C7 and T1–T11 and insert on the rib immediately below, between the tubercle and the angle. Rib elevation in inspiration with segmental lateral flexion and contralateral rotation.' },
+    ko: { name: '단늑골거근',
+          does: '바로 아래 갈비뼈까지만 닿는 짧은 형태입니다. 분절마다 하나씩 열두 쌍이 있으며, 장늑골거근과 함께 들숨에서 앞쪽만이 아니라 갈비뼈 뒤쪽까지 넓어질 수 있는 이유가 됩니다.',
+          sci: '제7경추와 제1–11흉추 가로돌기에서 기시하여 바로 아래 갈비뼈의 결절과 각 사이에 정지합니다. 흡기 시 늑골을 거상하며 분절 측면 굴곡과 반대측 회전을 동반합니다.' },
+    origin: { en: 'Transverse processes of the seventh cervical and upper eleven thoracic vertebrae',
+              ko: '제7경추 및 상위 11개 흉추 가로돌기' },
+    insertion: { en: 'Outer surface of the rib immediately below, between the tubercle and the angle',
+                 ko: '바로 아래 갈비뼈 바깥면, 결절과 각 사이' },
+    innervation: { nerves: { en: 'Lateral branches of the posterior rami of the thoracic spinal nerves',
+                             ko: '흉신경 후지 외측분지' },
+                   roots: ['C8', 'T1', 'T11'] },
+    actions: { en: 'Rib elevation in inspiration; segmental lateral flexion and contralateral rotation',
+               ko: '흡기 시 늑골 거상, 분절 측면 굴곡 및 반대측 회전' },
+    synergists: ['external intercostal muscle', 'levatores costarum longi', 'diaphragm'],
+    antagonists: ['internal intercostal muscle', 'transversus thoracis'],
+  },
+
   /* ------------------------------------------------------------------ hip and thigh */
 
   'semimembranosus': {

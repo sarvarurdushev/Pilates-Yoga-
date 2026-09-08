@@ -1394,6 +1394,34 @@ web/scripts/fetch_bodyparts3d.sh          # the tables, into web/bpdata/
 python3 web/scripts/build_groups.py       # -> web/src/generated/groups.json
 ```
 
+### The nine muscles the build was throwing away
+
+The same tables turned up something else. Nine of the deep segmental muscles of
+the spine — the interspinales, the intertransversarii, the levatores costarum —
+were absent from this atlas, and the reason was not that BodyParts3D lacks them.
+It is that they exist in the ontology **only as sets**: there is no *third lumbar
+interspinalis*, there is one mesh called *set of interspinales lumborum*. The
+build skips anything called "set of …", which is right about the forty-six
+containers it was written for — set of ribs, set of fingers, set of hairs, whose
+members this atlas already carries one by one — and wrong about these eleven,
+where the set *is* the structure.
+
+They are exactly what a studio is cueing when it says *articulate one vertebra at
+a time*, or *breathe into the back of the ribs*. `KEEP_SETS` in
+`scripts/build_body.py` is the allowlist that keeps them, and it is an editorial
+claim held to account by `tests/test_atlas_ids.py`.
+
+Adding them also exposed a trap in the file they are written to. Two builds share
+`structures.json`: this one owns the skeleton, muscles and organs, and
+`build_nervous.py` owns the nervous layer and needs Blender and a 306 MB
+Z-Anatomy file to run. Rewriting the file deleted the twenty nerves and the
+Z-Anatomy attribution with them — a licence obligation — and the body's ids grew
+into the range the nerves already held, ids that are baked into `nervous.glb` as
+a per-vertex attribute and cannot move. Nine muscles and nine nerves would have
+shared a region: same colour, same name in the panel, coach evaluations written
+about the wrong part of the body. The build merges and allocates around reserved
+ids now, and the test suite asserts both.
+
 ```
 252 groups, 2320 memberships, 2 the commonest size
 ```

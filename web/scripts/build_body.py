@@ -97,6 +97,41 @@ SKIP = re.compile(r'''
     tarsal\ plate|lacrimal|conjunctiv
 ''', re.I | re.X)
 
+# The "set of ..." rule above drops containers -- set of ribs, set of fingers, set of
+# hairs -- whose members this atlas already carries one by one. For eleven muscles it
+# was dropping the structure itself.
+#
+# The deep segmental muscles of the spine do not exist in this ontology as individual
+# bellies. There is no "third lumbar interspinalis"; there is one mesh called *set of
+# interspinales lumborum*, and if that is skipped the muscle is simply not in the atlas.
+# Which is what happened: the interspinales, the intertransversarii and the levatores
+# costarum were absent, and those are exactly what a Pilates studio is cueing when it
+# says articulate one vertebra at a time, or breathe into the back of the ribs.
+#
+# Kept as an allowlist rather than by loosening the pattern, because the pattern is right
+# about the other forty-six. An id in here is an editorial claim that this set *is* a
+# structure rather than a bag of them, and `test_stabilisers.py` holds it to that: every
+# one must be in the archive, must be absent as individual members, and must land inside
+# the body.
+KEEP_SETS = {
+    # segmental extensors, one pair per vertebral joint
+    'FMA71307': 'set of interspinales lumborum',
+    'FMA71308': 'set of interspinales thoracis',
+    'FMA71309': 'set of interspinales cervicis',
+    # segmental lateral stabilisers
+    'FMA71442': 'set of anterior cervical intertransversarii',
+    'FMA71443': 'set of posterior cervical intertransversarii',
+    'FMA71444': 'set of lateral lumbar intertransversarius muscles',
+    'FMA76775': 'set of medial lumbar intertransversarius muscles',
+    # rib elevators -- the muscles behind a lateral breathing cue. Sided in the source,
+    # so `base_name` folds each pair into one structure with a left and a right.
+    'FMA74075': 'set of right levatores costarum longi',
+    'FMA74076': 'set of left levatores costarum longi',
+    'FMA74077': 'set of right levatores costarum breves',
+    'FMA74078': 'set of left levatores costarum breves',
+}
+
+_SET_PREFIX = re.compile(r'^set\s+of\s+', re.I)
 _SIDE = re.compile(r'\b(?:left|right)\b\s*', re.I)
 # 'ascending part of', 'long head of', 'anterior belly of' — subdivisions of one named muscle
 _SUBDIV = re.compile(r'^.*?\b(?:part|head|belly|portion)\s+of\s+', re.I)
@@ -150,7 +185,12 @@ def partition(ar, names, kids):
         if not systems or (fma in dropped and not systems):
             continue
         base = base_name(nm)
-        if SKIP.search(base):
+        if fma in KEEP_SETS:
+            # 'set of interspinales lumborum' -> 'interspinales lumborum'. The plural is
+            # the anatomical name; "set of" is the ontology's way of saying there is no
+            # singular, and it reads as filing rather than as anatomy on a label.
+            base = _SET_PREFIX.sub('', base)
+        elif SKIP.search(base):
             continue
         sysname = min(systems, key=SYSTEM_PRIORITY.index)
         g = groups.setdefault(base, {'systems': set(), 'parts': []})
@@ -241,11 +281,38 @@ def build_layer(layer, ar, parts_by_base, frame, alloc, verbose=True):
     return table, size
 
 
+def existing_document(path):
+    """What is already in structures.json, for the layers this build does not own.
+
+    `structures.json` is written by two builds. This one owns the skeleton, the
+    muscles and the organs; `build_nervous.py` owns the nervous layer, and it
+    needs Blender and a 306 MB Z-Anatomy file to run, so it is not re-run
+    casually. Overwriting the file therefore deletes a layer that cannot be
+    cheaply rebuilt -- which is exactly what happened the first time nine
+    muscles were added: the twenty nerves vanished, and the Z-Anatomy
+    attribution with them, which is a licence obligation rather than a
+    convenience.
+
+    Worse, and quieter: the ids of those nerves are baked into `nervous.glb` as
+    a per-vertex attribute. They cannot be renumbered without rebuilding that
+    file, so this build has to allocate *around* them rather than through them.
+    """
+    if not os.path.exists(path):
+        return {}, [], set()
+    with open(path, encoding='utf-8') as f:
+        doc = json.load(f)
+    keep = [s for s in doc.get('structures', []) if s.get('layer') not in LAYERS]
+    return doc, keep, {s['id'] for s in keep}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--layer', choices=sorted(LAYERS), action='append')
     args = ap.parse_args()
     layers = args.layer or list(LAYERS)
+
+    out_path = os.path.join(OUT_GEN, 'structures.json')
+    previous, keep, reserved = existing_document(out_path)
 
     frame = json.load(open(os.path.join(OUT_MODELS, 'body_frame.json')))
     ar = bp3d.Archive()
@@ -259,7 +326,14 @@ def main():
 
     def alloc(base):
         if base not in assigned:
-            assigned[base] = ID_BASE + len(order)
+            nid = ID_BASE + len(order)
+            # Step over anything a layer this build does not own already holds.
+            # Those ids live in that layer's GLB as a vertex attribute and cannot
+            # move; this one can.
+            while nid in reserved:
+                order.append(None)
+                nid = ID_BASE + len(order)
+            assigned[base] = nid
             order.append(base)
         return assigned[base]
 
@@ -280,12 +354,19 @@ def main():
         'idBase': ID_BASE,
         'frame': {'center': frame['center'], 'scale': frame['scale'],
                   'heightMm': frame['height_mm'], 'note': frame['note']},
-        'structures': sorted(table, key=lambda r: r['id']),
+        'structures': sorted(table + keep, key=lambda r: r['id']),
     }
-    path = os.path.join(OUT_GEN, 'structures.json')
-    json.dump(doc, open(path, 'w'), indent=1)
+    # Whatever the other build recorded about where its meshes came from. It is a
+    # licence obligation, not a nicety: the nervous layer is Z-Anatomy under
+    # CC BY-SA 4.0 and the attribution has to survive a rebuild of the body.
+    if previous.get('sources'):
+        doc['sources'] = previous['sources']
+    json.dump(doc, open(out_path, 'w'), indent=1, ensure_ascii=False)
+    with open(out_path, 'a', encoding='utf-8') as f:
+        f.write('\n')
+    kept = f' + {len(keep)} kept from other layers' if keep else ''
     print(f'\ntotal {total/1e6:.2f} MB across {len(layers)} layers, '
-          f'{len(table)} structures -> {os.path.relpath(path, ROOT)}')
+          f'{len(table)} structures{kept} -> {os.path.relpath(out_path, ROOT)}')
 
 
 if __name__ == '__main__':

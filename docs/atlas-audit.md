@@ -242,10 +242,26 @@ possible diff.
    `Content-Encoding: gzip` and a long `Cache-Control` for `models/`, keeping
    `no-cache` for source. 25.8 MB → 15.0 MB on first load, near zero after.
    Server-side only.
-6. **Backfill the 13 Pilates-relevant structures** from BodyParts3D 4.0 —
-   segmental stabilisers, rib elevators, pelvic floor — and split trapezius,
-   deltoid, pectoralis major, triceps, biceps femoris, gastrocnemius into their
-   named parts. Requires re-running the mesh build against the 4.0 archive.
+6. ~~**Backfill the 13 Pilates-relevant structures from BodyParts3D 4.0**~~ —
+   **done, and this audit was wrong about where they were.** Nine of them are in
+   release 3.0, the archive this atlas already builds from, and were being
+   discarded by the build's own rules rather than missing from the source. The
+   `^set of` skip is right about the forty-six containers it was written for —
+   set of ribs, set of fingers, set of hairs, whose members the atlas already
+   carries one by one — and wrong about eleven muscles that exist in the ontology
+   *only* as a set. There is no "third lumbar interspinalis"; there is one mesh
+   called *set of interspinales lumborum*, and skipping it removed the muscle
+   from the body. So no 4.0 geometry was needed, no second archive entered the
+   pipeline, and the atlas still has one source and one release. The
+   interspinales, the intertransversarii and the levatores costarum are in, with
+   full bilingual entries; *Back muscles* went from 24 members to 31.
+
+   Still outstanding: splitting trapezius, deltoid, pectoralis major, triceps,
+   biceps femoris and gastrocnemius into their named parts. Those are in 3.0 too,
+   collapsed by the `_SUBDIV` rule rather than dropped, so it is the same kind of
+   change — but riskier than it looks, because the exercise library names
+   `trapezius` for five entries and would stop resolving unless a whole-muscle
+   name falls back to its parts.
 7. **A validator for our own geometry**, in the spirit of `validate-atlas.mjs`:
    every structure resolvable, every FMA id well-formed, every group non-empty,
    counts asserted.
@@ -486,12 +502,24 @@ In the order they are worth doing.
    the palette texture that make this possible are already there; what is missing
    is a per-structure state texture for visibility so the merge does not have to
    be undone to hide anything. Largest remaining win, largest diff.
-2. **Backfill the 13 Pilates-relevant structures** BodyParts3D 4.0 has and this
-   atlas does not — levatores costarum, the interspinales, the intertransversarii,
-   spinalis, the superficial perineal muscle — and split trapezius, deltoid,
-   pectoralis major, triceps, biceps femoris, gastrocnemius and longus colli into
-   the named parts 4.0 models separately. Upper and lower trapezius are different
-   cues and right now they are one mesh.
+2. ~~**Backfill the Pilates-relevant structures from 4.0**~~ — **done, and the
+   audit was wrong about where they were.** Nine of them are in release 3.0, the
+   archive this atlas already builds from, and were being discarded by the
+   build's own rules: the `^set of` skip is right about the forty-six containers
+   it was written for (set of ribs, set of hairs) and wrong about eleven muscles
+   that exist in the ontology *only* as a set. There is no "third lumbar
+   interspinalis"; there is one mesh called *set of interspinales lumborum*, and
+   skipping it removed the muscle. No 4.0 geometry was needed, so the atlas still
+   has one source and one release. The interspinales, the intertransversarii and
+   the levatores costarum are now in, with full bilingual entries; *Back muscles*
+   went from 24 members to 31.
+
+   Still outstanding from this item: splitting trapezius, deltoid, pectoralis
+   major, triceps, biceps femoris and gastrocnemius into their named parts. Those
+   are in 3.0 too, collapsed by the `_SUBDIV` rule rather than dropped — and the
+   split is riskier than it looks, because the exercise library names `trapezius`
+   for five entries and would stop resolving unless a whole-muscle name falls
+   back to its parts.
 3. **A validator for the geometry**, in the spirit of `validate-atlas.mjs`: every
    structure resolvable, every FMA id well-formed, triangle counts asserted. The
    group table has one; the meshes do not.
