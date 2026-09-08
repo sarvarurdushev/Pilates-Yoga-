@@ -1415,7 +1415,15 @@ const grouped = await page.evaluate(async () => {
   const m = await import('/src/main.js');
   const s = await import('/src/structures.js');
   const hamstrings = chips.find(c => c.dataset.group === 'FMA45157') ?? chips[0];
-  const from = m.frameStats().frames;
+  /* Where the camera was, not how many frames went by.
+   *
+   * This counted frames first, and on a software rasteriser running at half a
+   * frame a second that is a coin toss: the same assertion passed one run and
+   * failed the next with nothing different about the code. What the check is
+   * actually for is "choosing a group reached the picture", and the camera
+   * target is that, deterministically -- `setGroup` frames the whole member set,
+   * so the target has to move from wherever it was. */
+  const was = m.cameraState().t;
   await m.setGroup(hamstrings.dataset.group);
   await new Promise(r => setTimeout(r, 2500));
   const lit = [];
@@ -1424,7 +1432,8 @@ const grouped = await page.evaluate(async () => {
   return { missing: false, chips: chips.length, chose: group.name.en,
            members: group.members.length, lit,
            layersOn: group.layers.every(l => m.app.layers[l].on),
-           drew: m.frameStats().frames > from };
+           was, now: m.cameraState().t,
+           framed: m.cameraState().t.some((v, i) => Math.abs(v - was[i]) > 0.01) };
 });
 console.log('groups:', JSON.stringify(grouped));
 if (grouped.missing) errors.push('the Explore tab offers no anatomical groups');
@@ -1433,7 +1442,9 @@ else {
     errors.push(`choosing "${grouped.chose}" lit ${grouped.lit.length} of ${grouped.members} members`);
   if (!grouped.layersOn)
     errors.push(`choosing "${grouped.chose}" left one of its layers off, so it lit nothing visible`);
-  if (!grouped.drew) errors.push('choosing a group did not redraw');
+  if (!grouped.framed)
+    errors.push(`choosing "${grouped.chose}" did not move the camera onto it: ` +
+                `target ${JSON.stringify(grouped.was)} -> ${JSON.stringify(grouped.now)}`);
 }
 await shot('12-group');
 await page.evaluate(async () => { (await import('/src/main.js')).setGroup(null); });

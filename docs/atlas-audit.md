@@ -506,3 +506,23 @@ In the order they are worth doing.
 7. **Exercise-to-group mapping.** The library names muscles individually; several
    entries name every member of a group, and saying "the adductors" once would be
    both shorter and truer to the cue.
+8. **Korean covers a quarter of the atlas.** Building the search made this
+   measurable for the first time, and it is worse than it looked:
+
+   | | with Korean | total |
+   |---|---|---|
+   | brain regions | 21 | 21 |
+   | muscles | 91 | 188 |
+   | bones | **0** | 152 |
+   | organs | **0** | 70 |
+   | nerves | **0** | 20 |
+   | | **112** | **451** |
+
+   Korean exists exactly where somebody wrote a long-form entry, and nowhere
+   else. Every bone, organ and nerve falls back to its English name — so in
+   Korean mode a label reads `Fourth lumbar vertebra`, and a coach searching
+   요추 gets nothing. For a studio in South Korea that is the largest remaining
+   content gap in the application, and it is not a translation problem: the
+   Korean terms for the vertebrae, the ribs and the named nerves are standard
+   and short, and BodyParts3D publishes a Japanese name per FMA id that would
+   at least identify which structure each one is.
