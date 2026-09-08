@@ -30,7 +30,14 @@ const server = createServer(async (req, res) => {
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const port = server.address().port;
 
+/* $CHROMIUM points at a browser binary already on the machine.
+ *
+ * Playwright resolves its browser by a build number pinned to the npm package, so a CI image
+ * that ships one build and a package.json that asks for another fails at launch with
+ * "Executable doesn't exist" -- for a test that would have run perfectly against the browser
+ * sitting on disk. Unset, this behaves exactly as before. */
 const browser = await chromium.launch({
+  ...(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {}),
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
          '--disable-gpu-sandbox', '--no-sandbox'],
 });
