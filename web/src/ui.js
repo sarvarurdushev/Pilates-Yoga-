@@ -6,7 +6,7 @@ import { EXERCISE_BRAIN, TIERS, claimsForRegion } from './content/evidence.js';
 import { MOVEMENT_PATHWAY } from './content/pathways.js';
 import { MOTION, BREATH, phaseAt } from './content/motion.js';
 import { RAMP_STOPS } from './musclePaths.js';
-import { registry, get, LAYER_ORDER, drawnIds } from './structures.js';
+import { registry, get, LAYER_ORDER, drawnIds, searchText } from './structures.js';
 import { GROUP_REGIONS, groups as groupTable } from './content/groups.js';
 import { BODY_FRAME, BRAIN_TO_BODY } from './frame.js';
 import { activeBody, BODIES, templateDisclaimer, bodyHref, availableBodies } from './bodies.js';
@@ -458,27 +458,16 @@ export function mountUI(ctx) {
    */
   const find = { q: '' };
 
-  /**
-   * Everything a search term could match on one structure, lowercased once.
+  /* What a search term matches on one structure now lives in structures.js as
+   * `searchText`, so content.test.mjs can search the atlas without a browser.
    *
-   * Named for what it searches, not for what it is. Called `haystack` it was the
-   * second function of that name in this file -- the exercise library has one
-   * further down -- and two function declarations in one scope do not collide,
-   * they shadow: the later won, every call here handed a registry record to a
-   * function expecting an exercise key, and searching threw on the first
-   * keystroke. `tests/test_browser_sources.py` now fails on a duplicate name
-   * rather than leaving it to be found by typing.
+   * It was called `haystack` here, and was the second function of that name in
+   * this file -- the exercise library has one further down. Two function
+   * declarations in one scope do not collide, they shadow: the later won, every
+   * call here handed a registry record to a function expecting an exercise key,
+   * and searching threw on the first keystroke. `tests/test_browser_sources.py`
+   * now fails on a duplicate name rather than leaving it to be found by typing.
    */
-  const STRUCTURE_TEXT = new WeakMap();
-  function structureText(r) {
-    let h = STRUCTURE_TEXT.get(r);
-    if (h === undefined) {
-      h = [r.name.en, r.name.ko, r.key, r.muscle?.latin,
-           ...(r.fma ?? [])].filter(Boolean).join(' ').toLowerCase();
-      STRUCTURE_TEXT.set(r, h);
-    }
-    return h;
-  }
 
   const KIND_ORDER = [['muscle', 'kindMuscle'], ['bone', 'kindBone'], ['nerve', 'kindNerve'],
                       ['organ', 'kindOrgan'], ['brain', 'kindBrain']];
@@ -506,7 +495,7 @@ export function mountUI(ctx) {
     if (q) {
       const hitGroups = gs.filter(g =>
         `${g.name.en} ${g.name.ko} ${g.formal} ${g.fma}`.toLowerCase().includes(q));
-      const hits = all.filter(r => structureText(r).includes(q));
+      const hits = all.filter(r => searchText(r).includes(q));
       /* Shortest name first. Searching "rectus" should offer `rectus femoris`
        * before `rectus capitis posterior minor`, and length is the cheap proxy
        * for "less qualified, so more likely the one meant". */

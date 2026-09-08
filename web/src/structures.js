@@ -12,6 +12,7 @@
  */
 import { REGION_INFO } from './regionData.js';
 import { MUSCLE_INFO } from './content/muscles.js';
+import { KO_NAME } from './content/koreanNames.js';
 import { INTERIOR_IDS } from './deepStructures.js';
 
 /** Layer names, in the order they stack from the outside in. */
@@ -83,7 +84,7 @@ function addAggregates(byId, byName) {
       id: -members[0].id,
       key: whole,
       name: muscle ? { en: muscle.en.name, ko: muscle.ko.name }
-                   : { en: titleCase(whole), ko: titleCase(whole) },
+                   : { en: titleCase(whole), ko: KO_NAME[whole] ?? titleCase(whole) },
       color: members[0].color,
       layer: members[0].layer,
       kind: members[0].kind,
@@ -147,8 +148,12 @@ export function buildRegistry(generated, { brain = true } = {}) {
     const rec = {
       id: s.id,
       key: s.name,
+      /* Korean falls back to KO_NAME rather than to the English name. The
+       * fallback used to be `titleCase` for both languages, which put an English
+       * label on every bone, organ and nerve and — because the search box indexes
+       * `name.ko` — made 요추 match nothing at all. */
       name: muscle ? { en: muscle.en.name, ko: muscle.ko.name }
-                   : { en: titleCase(s.name), ko: titleCase(s.name) },
+                   : { en: titleCase(s.name), ko: KO_NAME[s.name] ?? titleCase(s.name) },
       // spread across the layer's range so two adjacent muscles are never the same colour
       color: shade(LAYER_COLOR[s.layer] ?? '#9aa3b8', 0.12 + 0.55 * ((k * 7) % 1)),
       layer: s.layer,
@@ -237,4 +242,24 @@ export function vertebra(level) {
 
 function titleCase(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
+ * Everything a search term could match on one structure, lowercased once.
+ *
+ * It lives here rather than in the panel that uses it because what is searchable
+ * is a property of the registry, not of the UI, and because a test can reach it
+ * here without a browser. The Korean half of it was dead weight until KO_NAME
+ * existed: `name.ko` was a copy of `name.en` for three hundred and thirty-nine
+ * structures, so this join was searching the same English string twice.
+ */
+const SEARCH_TEXT = new WeakMap();
+export function searchText(rec) {
+  let h = SEARCH_TEXT.get(rec);
+  if (h === undefined) {
+    h = [rec.name.en, rec.name.ko, rec.key, rec.muscle?.latin,
+         ...(rec.fma ?? [])].filter(Boolean).join(' ').toLowerCase();
+    SEARCH_TEXT.set(rec, h);
+  }
+  return h;
 }

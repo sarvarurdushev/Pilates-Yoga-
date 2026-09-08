@@ -1394,6 +1394,15 @@ const found = await page.evaluate(async () => {
   out.bone = type('lumbar vertebra');
   out.korean = type('대퇴');
   out.fma = type('FMA13377');
+  /* The three kinds that had no Korean name at all until KO_NAME: every bone,
+   * every organ and every nerve fell back to `titleCase(name)` for both
+   * languages, so each of these four returned zero while its English spelling
+   * returned the structure. They are the difference the table makes, measured
+   * where a coach would notice it. */
+  out.koBone = type('요추');
+  out.koDisc = type('추간판');
+  out.koOrgan = type('방광');
+  out.koNerve = type('요골신경');
   out.nothing = type('qqqqzz');
   document.getElementById('anatQ').value = '';
   document.getElementById('anatQ').oninput();
@@ -1406,6 +1415,14 @@ else {
   for (const [what, n] of [['a muscle', found.muscle], ['a bone', found.bone],
                            ['Korean', found.korean], ['an FMA id', found.fma]])
     if (!n) errors.push(`the structure search finds nothing for ${what}`);
+  /* Counted, not merely non-zero: 요추 has to reach the five lumbar vertebrae
+   * and the discs named after them, not just one lucky match. */
+  for (const [what, n, least] of [['요추 (bones)', found.koBone, 10],
+                                  ['추간판 (discs)', found.koDisc, 23],
+                                  ['방광 (an organ)', found.koOrgan, 1],
+                                  ['요골신경 (a nerve)', found.koNerve, 1]])
+    if (n < least)
+      errors.push(`searching ${what} offers ${n} structures, expected at least ${least}`);
   if (found.nothing) errors.push('the structure search matches nonsense');
 }
 

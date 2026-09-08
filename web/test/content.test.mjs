@@ -8,7 +8,8 @@ import { MUSCLE_INFO } from '../src/content/muscles.js';
 import { UI, DISCLAIMERS } from '../src/content/strings.js';
 import { HELP } from '../src/content/help.js';
 import { REGION_INFO } from '../src/regionData.js';
-import { buildRegistry, vertebra, LAYER_ORDER } from '../src/structures.js';
+import { buildRegistry, vertebra, LAYER_ORDER, searchText } from '../src/structures.js';
+import { KO_NAME } from '../src/content/koreanNames.js';
 import { buildGroups, groups, GROUP_REGIONS } from '../src/content/groups.js';
 
 /**
@@ -602,4 +603,97 @@ test('no group is offered in English where the atlas has Korean', () => {
     assert.match(g.name.ko, /[가-힣]/, `${g.fma} ${g.name.en} has no Hangul`);
     assert.notEqual(g.name.ko, g.name.en, `${g.fma} falls back to English in Korean`);
   }
+});
+
+/* ----------------------------------------------------------- Korean coverage
+ *
+ * The studio teaches in Korean, and until KO_NAME existed only a hundred and
+ * twelve of the four hundred and seventy records had a Korean name. The rest
+ * fell back to `titleCase(name)` for *both* languages, which put an English word
+ * on the label and — because the search box indexes `name.ko` — meant that
+ * typing 요추 matched nothing while typing "lumbar" matched five vertebrae.
+ */
+
+test('every structure in the atlas has a Korean name', () => {
+  const english = [];
+  for (const rec of REG.byId.values()) {
+    if (!/[가-힣]/.test(rec.name.ko) || rec.name.ko === rec.name.en)
+      english.push(`${rec.layer}: ${rec.name.en}`);
+  }
+  assert.deepEqual(english, [],
+    `${english.length} structures still read in English in the Korean UI`);
+});
+
+test('no two structures answer to the same Korean name', () => {
+  /* Hangul drops the Chinese characters that separated 寛骨 from 顴骨 and 腓骨
+   * from 鼻骨, so distinct structures can collide into one name. A collision is
+   * not cosmetic: the search box matches on substrings, and two structures with
+   * one name are two rows a coach cannot tell apart. */
+  const byKo = new Map();
+  for (const rec of REG.byId.values()) {
+    const hit = byKo.get(rec.name.ko);
+    assert.equal(hit, undefined,
+      `${rec.name.ko} is both ${hit?.name.en} and ${rec.name.en}`);
+    byKo.set(rec.name.ko, rec);
+  }
+});
+
+test('the Korean name table covers what has no written entry, and nothing else', () => {
+  /* A key here that MUSCLE_INFO also has would be a second Korean name for one
+   * muscle, and which one wins would depend on the order of two `??`. A key here
+   * that no structure has is a name for something the build does not emit —
+   * dead the moment a rebuild renames it. */
+  for (const key of Object.keys(KO_NAME)) {
+    assert.equal(MUSCLE_INFO[key], undefined,
+      `${key} has a written entry, so KO_NAME must not name it a second time`);
+    assert.ok(REG.byName.has(key), `KO_NAME names ${key}, which the atlas does not have`);
+  }
+  const uncovered = [...REG.byName.keys()]
+    .filter(k => !k.startsWith('brain:') && !MUSCLE_INFO[k] && !KO_NAME[k]
+                 && !REG.byName.get(k).parts);
+  assert.deepEqual(uncovered, [], 'structures with neither a written entry nor a Korean name');
+});
+
+test('a muscle names its nerve the way the nerve names itself', () => {
+  /* The twenty nerves in the nervous layer are selectable structures with names
+   * of their own. A muscle whose innervation reads 노신경 next to a nerve called
+   * 요골신경 is the same nerve twice under two names — correct Korean both times,
+   * and unusable, because a coach cannot tell that they are one thing. */
+  const nerveKo = new Map();
+  for (const rec of REG.byId.values())
+    if (rec.kind === 'nerve') nerveKo.set(rec.name.en.toLowerCase(), rec.name.ko);
+  let checked = 0;
+  for (const [key, m] of Object.entries(MUSCLE_INFO)) {
+    const en = m.innervation?.nerves?.en?.toLowerCase();
+    const want = en && nerveKo.get(en);
+    if (!want) continue;
+    checked++;
+    assert.equal(m.innervation.nerves.ko, want,
+      `${key} calls ${m.innervation.nerves.en} "${m.innervation.nerves.ko}", ` +
+      `but the nerve itself is called "${want}"`);
+  }
+  assert.ok(checked >= 20, `only ${checked} muscles name one of the drawn nerves outright`);
+});
+
+test('a Korean search term finds the structures it names', () => {
+  /* The point of all of the above, stated as the thing a coach actually does.
+   * `searchText` is what the Explore box filters on, so this is that search. */
+  const find = q => [...REG.byId.values()]
+    .filter(r => searchText(r).includes(q.toLowerCase()));
+  const cases = [
+    ['요추', 5, r => r.kind === 'bone'],          // five lumbar vertebrae
+    ['늑골', 12, r => r.kind === 'bone'],         // twelve ribs
+    ['추간판', 23, r => r.kind === 'bone'],       // every disc the build emits
+    ['요골신경', 1, r => r.kind === 'nerve'],     // the radial nerve itself
+    ['대퇴골', 1, r => r.kind === 'bone'],
+    ['방광', 1, r => r.kind === 'organ'],
+    ['횡격막', 1, r => r.kind === 'muscle'],
+  ];
+  for (const [q, least, isKind] of cases) {
+    const hits = find(q).filter(isKind);
+    assert.ok(hits.length >= least,
+      `searching ${q} found ${hits.length} of the expected ${least}`);
+  }
+  assert.equal(find('요추').filter(r => r.kind === 'bone')
+    .some(r => r.name.ko === '제5요추'), true, 'searching 요추 does not offer L5');
 });
