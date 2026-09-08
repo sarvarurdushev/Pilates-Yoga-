@@ -396,6 +396,14 @@ p{margin:0 0 10px}
 .blk{margin:0 0 13px}
 .blk p{font-size:13px}
 .blk.sci p{color:var(--dim);font-size:12.5px}
+/* A system overview, marked as one. The rule down the left is the same device
+ * the reference blocks use, in a cooler colour, so it never reads as something
+ * measured about this structure. */
+.blk.overview{background:rgba(90,169,230,.06);border-left:2px solid rgba(90,169,230,.4);
+ padding:9px 11px}
+.blk.overview h4{margin:0 0 5px;font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;
+ color:var(--dim2);font-weight:400}
+.blk.overview p{color:var(--dim);font-size:12.5px;margin:0}
 .blk.feels p{color:#cfd8e6;font-style:italic}
 .blk.warn{background:rgba(233,161,59,.07);border-left:2px solid rgba(233,161,59,.5);
  border-radius:0 6px 6px 0;padding:8px 11px}
@@ -1029,6 +1037,11 @@ details.groups>summary em{font-style:normal;font-size:10px;color:var(--dim2);
         <input id="atlas" type="range" min="0" max="1" step="0.01" value="0"></div>
       <div class="crow"><label id="xrayLab"></label>
         <input id="xray" type="range" min="0" max="1" step="0.01" value="0"></div>
+      <!-- Taking the body apart. Beside x-ray on purpose: they answer the same
+           question -- what is behind this -- in the two ways there are. -->
+      <div class="crow"><label id="explodeLab"></label>
+        <input id="explode" type="range" min="0" max="1" step="0.01" value="0"></div>
+      <p class="chelp" id="explodeHelp" hidden></p>
       <!-- Two ways of drawing the cortex. Like the scan, it means nothing without the brain. -->
       <div class="crow" id="lookRow" style="display:none"><label id="lookLab"></label>
         <div class="seg"><button id="lookTissue" aria-pressed="true"></button>

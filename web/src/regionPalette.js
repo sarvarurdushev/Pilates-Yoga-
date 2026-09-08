@@ -34,6 +34,28 @@ export class RegionPalette {
   }
 
   _alloc(size) {
+    /* A second texture, sampled in the *vertex* shader, holding where each
+     * structure moves to when the body is taken apart. It lives here rather
+     * than in its own class because it is the same per-region indexing, the
+     * same growth rule and the same upload, and two objects that must always
+     * be the same size are one object.
+     *
+     * RGB is a displacement in body coordinates; A is unused. Float, like the
+     * colours, because a quantised displacement makes structures jitter as the
+     * slider moves. */
+    const offsets = new Float32Array(size * 4);
+    if (this.offsets) offsets.set(this.offsets.subarray(0, Math.min(this.offsets.length, offsets.length)));
+    this.offsets = offsets;
+    const oldOffset = this.offsetTexture;
+    this.offsetTexture = new THREE.DataTexture(offsets, size, 1, THREE.RGBAFormat,
+                                               THREE.FloatType);
+    this.offsetTexture.magFilter = THREE.NearestFilter;
+    this.offsetTexture.minFilter = THREE.NearestFilter;
+    this.offsetTexture.generateMipmaps = false;
+    this.offsetTexture.colorSpace = THREE.NoColorSpace;
+    this.offsetTexture.needsUpdate = true;
+    if (oldOffset) oldOffset.dispose();
+
     const data = new Float32Array(size * 4);
     // every texel starts unmapped, so an id with no content entry is grey rather than black
     const { r, g, b } = this._default;
@@ -103,11 +125,31 @@ export class RegionPalette {
     return this;
   }
 
+  /** Where this structure sits when the body is fully taken apart. */
+  setOffset(id, x, y, z) {
+    this._fit(id);
+    this.offsets[id*4] = x; this.offsets[id*4+1] = y; this.offsets[id*4+2] = z;
+    this._offsetDirty = true;
+    return this;
+  }
+
+  getOffset(id, target = new THREE.Vector3()) {
+    if (id >= this.size || id < 0) return target.set(0, 0, 0);
+    return target.set(this.offsets[id*4], this.offsets[id*4+1], this.offsets[id*4+2]);
+  }
+
+  clearOffsets() {
+    this.offsets.fill(0);
+    this._offsetDirty = true;
+    return this;
+  }
+
   /** Push pending writes to the GPU. Cheap and idempotent; call once per frame at most. */
   upload() {
     if (this._dirty) { this.texture.needsUpdate = true; this._dirty = false; }
+    if (this._offsetDirty) { this.offsetTexture.needsUpdate = true; this._offsetDirty = false; }
     return this.texture;
   }
 
-  dispose() { this.texture.dispose(); }
+  dispose() { this.texture.dispose(); this.offsetTexture.dispose(); }
 }

@@ -242,3 +242,43 @@ export const HELP = {
 };
 
 export const HELP_KEYS = Object.keys(HELP);
+
+/**
+ * What a structure is, when nobody has written up that particular one.
+ *
+ * Three hundred and thirty-nine of the four hundred and fifty-one selectable
+ * things here had no entry, and what they showed instead was an apology: *no
+ * written entry for this structure yet*. That is honest and it is useless. A
+ * reader who has just clicked the fourth lumbar vertebra does not need to be
+ * told that nobody wrote about it; they need to know what a vertebra is and
+ * what this one sits between.
+ *
+ * So the fallback describes the **kind**, not the structure, and says so on
+ * screen. It is a system overview and it is labelled as one, in the same breath
+ * as the name, because the difference between "this is what a nerve is" and
+ * "this is what *this* nerve does" is exactly the difference this whole project
+ * exists to keep visible. Nothing here is a claim about the individual
+ * structure, and nothing here is generated: it is six paragraphs, written once.
+ *
+ * What makes it useful rather than filler is what sits next to it — the named
+ * groups this structure belongs to, which *are* specific to it and come from
+ * the anatomy ontology rather than from prose.
+ */
+export const KIND_OVERVIEW = {
+  muscle: {
+    en: 'A skeletal muscle moves the body by pulling on what it is attached to. It can only pull, never push, which is why almost every movement needs a muscle on the other side of the joint to reverse it. Working through its tendons it moves joints, holds posture against gravity, and produces most of the body’s heat.',
+    ko: '골격근은 부착된 곳을 당겨서 몸을 움직입니다. 밀 수는 없고 당길 수만 있기 때문에, 거의 모든 움직임에는 관절 반대편에서 되돌려주는 근육이 필요합니다. 힘줄을 통해 관절을 움직이고, 중력에 맞서 자세를 유지하며, 체열의 대부분을 만듭니다.',
+  },
+  bone: {
+    en: 'A bone is the part of the body that does not deform under load. It gives muscles something to pull against, protects what is behind it, and meets its neighbours at joints that decide which directions are available. Its interior stores minerals and makes blood cells.',
+    ko: '뼈는 하중을 받아도 변형되지 않는 부분입니다. 근육이 당길 수 있는 지지대가 되고, 뒤쪽 구조를 보호하며, 이웃 뼈와 관절에서 만나 어느 방향으로 움직일 수 있는지를 결정합니다. 내부에서는 무기질을 저장하고 혈구를 만듭니다.',
+  },
+  nerve: {
+    en: 'A nerve carries signals, in both directions: the instruction to contract on the way out, and position, load and pain on the way back. A muscle with no supply cannot be trained, however healthy the muscle is — which is why the nerve that reaches a muscle matters as much as the muscle.',
+    ko: '신경은 신호를 양방향으로 전달합니다. 나갈 때는 수축하라는 명령을, 돌아올 때는 위치와 부하와 통증을 전달합니다. 신경 지배가 없는 근육은 아무리 건강해도 훈련할 수 없습니다. 근육에 도달하는 신경이 근육 자체만큼 중요한 이유입니다.',
+  },
+  organ: {
+    en: 'An organ is tissue organised to do one job. These are here for orientation rather than for training: they say what a muscle is in front of, what a movement compresses, and where the breath actually goes.',
+    ko: '장기는 하나의 기능을 위해 조직된 구조입니다. 여기에서는 훈련 대상이 아니라 위치 파악을 위한 것입니다. 어떤 근육이 무엇 앞에 있는지, 어떤 움직임이 무엇을 압박하는지, 호흡이 실제로 어디로 가는지를 알려줍니다.',
+  },
+};

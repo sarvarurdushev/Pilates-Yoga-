@@ -1,5 +1,5 @@
 import { UI, DISCLAIMERS } from './content/strings.js';
-import { HELP } from './content/help.js';
+import { HELP, KIND_OVERVIEW } from './content/help.js';
 import { EXERCISE, EXERCISE_KEYS, DISCIPLINES, APPARATUS, ROLE_EVIDENCE } from './content/exercises.js';
 import { FAMILY, PROP } from './content/library/vocabulary.js';
 import { EXERCISE_BRAIN, TIERS, claimsForRegion } from './content/evidence.js';
@@ -30,7 +30,7 @@ export function mountUI(ctx) {
           selectStructure, setLang, setAtlas, setXray, setCutaway, setClip, setLabels,
           setRotate, setRegister, setInstruction, setLayer, setLayerOpacity, setView,
           resetView, setExercise, setPathway, activationOf,
-          setGroup, anatomyGroups, groupsForStructure, setIsolate, isolated,
+          setGroup, anatomyGroups, groupsForStructure, setIsolate, isolated, setExplode,
           poseFromClip, setPlaying, setShowPaths, setShowMeshes, liveActivationOf,
           musclePathReport, setLabelKind, clearLabelKinds } = ctx;
 
@@ -113,6 +113,14 @@ export function mountUI(ctx) {
       $(id).textContent = T(k);
     $('atlasLab').textContent = T('atlasSlider');
     $('xrayLab').textContent = T('xray');
+    /* Named by where the slider is, not by what it does: "Take apart 40%" says
+     * less than "Separated". The endpoints are the label. */
+    $('explodeLab').textContent = app.explode > 0.01
+      ? `${T('explode')} — ${Math.round(app.explode * 100)}%` : T('explode');
+    const eh = $('explodeHelp');
+    if (eh) { eh.textContent = T('explodeHelp'); eh.hidden = app.explode <= 0.01; }
+    const ex = $('explode');
+    if (ex && document.activeElement !== ex) ex.value = String(app.explode);
     $('scanLab').textContent = T('scan');
     /* Name and result on every plane button: "Axial" alone was the word the reader did not
      * know, and "top | bottom" beside the picture of the cut is the half that answers it. */
@@ -635,10 +643,14 @@ export function mountUI(ctx) {
     if (!r) return '';
     if (r.kind === 'brain') return brainDetail(r);
     if (r.muscle) return muscleDetail(r);
+    const overview = KIND_OVERVIEW[r.kind]?.[app.lang] ?? '';
     return `<div class="detail">
       <div class="dname"><span class="dot" style="background:${r.color}"></span>${esc(r.name[app.lang])}</div>
       <div class="dwhere">${T(r.layer)}${r.fma ? ` · ${T('fmaId')} ${r.fma.slice(0, 3).join(', ')}` : ''}</div>
       ${groupBlock(r)}
+      ${overview ? `<div class="blk overview">
+        <h4>${T('systemNote')}</h4>
+        <p>${esc(overview)}</p></div>` : ''}
       <div class="empty small"><h2>${T('noContent')}</h2><p>${T('noContentBody')}</p></div>
     </div>`;
   }
@@ -1209,6 +1221,7 @@ export function mountUI(ctx) {
   $('labBtn').onclick = () => setLab(!app.labOpen);
   $('reset').onclick = resetView;
   $('atlas').oninput = e => setAtlas(+e.target.value);
+  $('explode').oninput = e => { setExplode(+e.target.value); syncControls(); };
   $('xray').oninput  = e => setXray(+e.target.value);
   $('clip').oninput  = e => setClip(+e.target.value);
   /* The scan. `Off` is a plane like the others rather than a separate toggle, because the

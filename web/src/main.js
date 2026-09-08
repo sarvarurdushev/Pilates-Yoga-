@@ -56,6 +56,8 @@ export const app = {
    * -- which is why the reader reaching for it on a slow machine is rewarded
    * rather than punished. */
   isolate: null,
+  /** How far apart the body is pulled, 0 to 1. See `setExplode`. */
+  explode: 0, explodeReady: false,
   // §9: the clip, where the scrubber is, and whether it is running
   t: 0, playing: false, hasMotion: false, showPaths: false, showMeshes: true,
   pathway: null,
@@ -1318,7 +1320,13 @@ export function syncLayers() {
     .some(n => app.layers[n]?.on && layers[n].loaded);
   // an automatic selection is not a request to see inside — see `selectStructure`
   const chosen = app.selected != null && !app.autoSelected ? app.selected : null;
-  const seeingInside = app.xray > 0.12 || chosen != null;
+  /* The shell cannot come apart with the body: it is a derived envelope with no
+   * region attribute, so the vertex shader has nothing to look its displacement
+   * up by and it stays exactly where it was while everything else moves out
+   * around it. Left on, it reads as a dark mass sitting in the middle of a body
+   * that has just been opened, which is the opposite of what opening it was
+   * for. */
+  const seeingInside = app.xray > 0.12 || chosen != null || app.explode > 0.01;
   const showShell = shell.loaded && covering && !seeingInside;
   for (const o of shell.meshes) o.visible = showShell;
   shell.group.visible = showShell;
@@ -2086,7 +2094,11 @@ function shown(o) {
   return true;
 }
 
+/** Above this the projection and the geometry have parted company — see `setExplode`. */
+const PICK_LIMIT = 0.02;
+
 function pick(ev) {
+  if (app.explode > PICK_LIMIT) return null;
   const r = canvas.getBoundingClientRect();
   ndc.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
   ndc.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
@@ -3514,6 +3526,74 @@ export async function setIsolate(ids) {
   else resetView();
 }
 
+/* ------------------------------------------------------------- taking it apart
+ *
+ * A body is four hundred structures packed into the shape of a person, and most
+ * of them are behind another one. X-ray answers that by making what is in front
+ * translucent; this answers it by moving what is in front out of the way, which
+ * is the better answer for "how many layers deep does this go" and the worse one
+ * for "where exactly is it".
+ *
+ * **Radially, from the spine.** Every structure moves along the line from the
+ * body's own vertical axis, at its own height, out through where it already is
+ * -- so the ribs open like a cage, the two sides separate, and the deep spinal
+ * muscles are left standing on the midline with nothing over them. A grid, which
+ * is the other way to do this, sorts by nothing anatomical and turns an atlas
+ * into a parts catalogue.
+ *
+ * Computed once, from the centroids the geometry index already measured, and
+ * uploaded as a texture the vertex shader reads. Moving the slider costs one
+ * uniform write, not four hundred matrix updates -- which matters, because this
+ * is exactly the control somebody drags back and forth.
+ */
+const EXPLODE_REACH = 0.42;      // body heights at full separation
+/** Structures nearer the midline than this get a direction rather than a wobble. */
+const AXIS_EPSILON = 0.012;
+
+function computeExplodeOffsets() {
+  const { byId } = registry();
+  const out = new THREE.Vector3();
+  for (const [id, r] of byId) {
+    const c = app.centroids[id];
+    if (!c) continue;
+    /* Away from the vertical axis at this structure's own height. A structure
+     * sitting on the midline -- the sternum, the spine itself, the linea alba --
+     * has no radial direction, so it is pushed forward instead of being given an
+     * arbitrary one that would differ between builds. */
+    out.set(c.x, 0, c.z);
+    if (out.lengthSq() < AXIS_EPSILON * AXIS_EPSILON) out.set(0, 0, 1);
+    else out.normalize();
+    /* Deeper layers move less, so the body opens rather than scattering: the
+     * skin-side muscles get out of the way and the skeleton stays put, which is
+     * the picture somebody is asking for when they reach for this. */
+    const depth = XRAY_DEPTH[r.layer] ?? 0;
+    const reach = EXPLODE_REACH * (1 - depth / 5);
+    palette.setOffset(id, out.x * reach, 0, out.z * reach);
+  }
+  palette.upload();
+}
+
+/**
+ * How far apart the body is, 0 to 1.
+ *
+ * Picking is turned off above a threshold rather than corrected. The raycaster
+ * tests the geometry where it really is, and the geometry has not moved -- only
+ * its projection has -- so a click on a separated rib would select whatever is
+ * still standing at that rib's original position, which is worse than not
+ * answering. The labels keep working and stay attached to what they name, so
+ * there is still a way to ask what something is.
+ */
+export function setExplode(v) {
+  const next = Math.max(0, Math.min(1, +v || 0));
+  if (!app.explodeReady) { computeExplodeOffsets(); app.explodeReady = true; }
+  app.explode = next;
+  for (const m of materials) {
+    const u = m.userData.uniforms;
+    if (u?.uExplode) u.uExplode.value = next;
+  }
+  invalidate();
+}
+
 /** What is isolated right now, as ids. Empty when the whole body is drawn. */
 export const isolated = () => [...(app.isolate ?? [])];
 
@@ -3814,7 +3894,7 @@ const ui = mountUI({
   selectStructure, setLang, setAtlas, setXray, setCutaway, setClip, setLabels,
   setRotate, setRegister, setInstruction, setLayer, setLayerOpacity, setView, resetView,
   setExercise, setPathway, captureStage, activationOf, flyTo,
-  setGroup, anatomyGroups, groupsForStructure, setIsolate, isolated,
+  setGroup, anatomyGroups, groupsForStructure, setIsolate, isolated, setExplode,
   poseFromClip, setPlaying, setShowPaths, setShowMeshes, liveActivationOf, musclePathReport,
   frameRig, setLabelKind, clearLabelKinds,
   // a getter, not the value: the panel mounts before the rig has finished loading

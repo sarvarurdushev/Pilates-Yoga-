@@ -446,6 +446,11 @@ export const UI = {
   isolate:      { en: 'Show this alone', ko: '이것만 보기' },
   isolateOff:   { en: 'Show the whole body', ko: '전신 보기' },
   isolateOn:    { en: 'showing alone', ko: '단독 표시 중' },
+  explode:      { en: 'Take apart', ko: '분해해서 보기' },
+  explodeFrom:  { en: 'Assembled', ko: '조립' },
+  explodeTo:    { en: 'Separated', ko: '분리' },
+  explodeHelp:  { en: 'Moves every structure outward from the spine, so what is in front stops hiding what is behind. Clicking is off while it is apart — the labels still work.',
+                  ko: '모든 구조를 척추에서 바깥쪽으로 밀어내어 앞의 구조가 뒤의 구조를 가리지 않게 합니다. 분리된 동안에는 클릭 선택이 꺼집니다 — 이름표는 그대로 작동합니다.' },
   isolateHint:  { en: 'Everything else is hidden. It is also the fastest the picture gets — one structure instead of hundreds.',
                   ko: '나머지는 모두 숨깁니다. 화면이 가장 빨라지는 상태이기도 합니다 — 수백 개 대신 구조 하나만 그립니다.' },
 
@@ -512,10 +517,16 @@ export const UI = {
   explore:      { en: 'Click anything', ko: '아무거나 클릭해 보세요' },
   exploreBody:  { en: 'Every bone, muscle and organ here is individually selectable. Pick one to see what it does, what moves it, and which nerve carries the command.',
                   ko: '여기 모든 뼈, 근육, 장기를 개별적으로 선택할 수 있습니다. 하나를 골라 무슨 일을 하고 무엇이 움직이며 어떤 신경이 명령을 전달하는지 확인하세요.' },
-  noContent:    { en: 'No written entry for this structure yet',
-                  ko: '이 구조에 대한 설명이 아직 없습니다' },
-  noContentBody:{ en: 'It is in the model with its FMA identifier and it is selectable, but nobody has written the anatomy up yet. The named muscles in the exercise library all have entries.',
-                  ko: 'FMA 식별자와 함께 모델에 포함되어 있고 선택도 가능하지만 아직 해부학 설명이 작성되지 않았습니다. 운동 라이브러리에서 언급되는 근육은 모두 설명이 있습니다.' },
+  /* The label that keeps the fallback honest. It is said next to the paragraph
+   * rather than under it, because a system overview read as a description of
+   * the individual structure is exactly the confusion this project exists to
+   * prevent -- see KIND_OVERVIEW in content/help.js. */
+  systemNote:   { en: 'What this kind of structure is — not what this one does',
+                  ko: '이 종류의 구조에 대한 설명입니다 — 이 구조 개별의 기능이 아닙니다' },
+  noContent:    { en: 'No written entry for this one yet',
+                  ko: '이 구조에 대한 개별 설명은 아직 없습니다' },
+  noContentBody:{ en: 'It is in the model with its FMA identifier, it is selectable, and it belongs to the groups above — but nobody has written up this structure in particular. The 91 muscles the exercise library names all have full entries.',
+                  ko: 'FMA 식별자와 함께 모델에 포함되어 있고 선택할 수 있으며 위의 근육군에 속합니다. 다만 이 구조 자체에 대한 설명은 아직 작성되지 않았습니다. 운동 라이브러리가 언급하는 91개 근육에는 모두 완전한 설명이 있습니다.' },
   sources:      { en: 'Sources and licences', ko: '출처 및 라이선스' },
   bodiesHeading:{ en: 'Bodies', ko: '인체 모델' },
   bodyShown:    { en: 'shown now', ko: '현재 표시 중' },

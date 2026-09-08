@@ -127,6 +127,10 @@ export function makeStructureMaterial(palette, look = {}, dqTexture = null) {
     uSolid:       { value: 0 },
     uPalette:     { value: pal.texture },     // rgb = region colour, a = activation 0..1
     uPaletteSize: { value: pal.size },
+    /* Taking the body apart. `uOffset` holds where each structure goes when the
+     * slider is all the way over; `uExplode` is how far along the way it is. */
+    uOffset:      { value: pal.offsetTexture },
+    uExplode:     { value: 0 },
     /* The scan plane, so the anatomical look loses nothing by not being the volume one.
      * All of it is gated on `uTissue`, which is 0 on every body layer, so the four hundred
      * muscle and bone meshes sharing this material compile and shade exactly as before —
@@ -152,10 +156,30 @@ export function makeStructureMaterial(palette, look = {}, dqTexture = null) {
       .replace('#include <common>', `#include <common>
         attribute float _region;
         flat varying float vRegion;
-        varying vec3 vObjPos;`)
+        varying vec3 vObjPos;
+        uniform highp sampler2D uOffset;
+        uniform int uPaletteSize;
+        uniform float uExplode;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         vRegion = _region;
-        vObjPos = position;`);
+        vObjPos = position;`)
+      /* **Applied in view space, after the model matrix, and that is the whole
+       * trick.** Every muscle and every bone has been reparented into the rig,
+       * so a mesh's own space is some bone's space -- adding a displacement to
+       * `transformed` would have it rotated by whatever the femur is doing, and
+       * a body taken apart while posed would fly into a spiral. Adding it to
+       * `mvPosition` instead, rotated by the view matrix alone, is a
+       * translation in body coordinates whatever the mesh is attached to.
+       *
+       * `gl_Position` is recomputed rather than the chunk being replaced, so
+       * this survives three.js changing what else `project_vertex` does. */
+      .replace('#include <project_vertex>', `#include <project_vertex>
+        if (uExplode > 0.0) {
+          int _oi = clamp(int(_region + 0.5), 0, uPaletteSize - 1);
+          vec3 _off = texelFetch(uOffset, ivec2(_oi, 0), 0).xyz * uExplode;
+          mvPosition.xyz += (viewMatrix * vec4(_off, 0.0)).xyz;
+          gl_Position = projectionMatrix * mvPosition;
+        }`);
 
     /* Muscles blend their bones as dual quaternions rather than as matrices, because
      * averaging two rotation matrices is not a rotation and squeezes a muscle flat through
