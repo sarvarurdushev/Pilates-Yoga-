@@ -450,14 +450,24 @@ export function mountUI(ctx) {
    */
   const find = { q: '' };
 
-  /** Everything a search term could match on one structure, lowercased once. */
-  const HAY = new WeakMap();
-  function haystack(r) {
-    let h = HAY.get(r);
+  /**
+   * Everything a search term could match on one structure, lowercased once.
+   *
+   * Named for what it searches, not for what it is. Called `haystack` it was the
+   * second function of that name in this file -- the exercise library has one
+   * further down -- and two function declarations in one scope do not collide,
+   * they shadow: the later won, every call here handed a registry record to a
+   * function expecting an exercise key, and searching threw on the first
+   * keystroke. `tests/test_browser_sources.py` now fails on a duplicate name
+   * rather than leaving it to be found by typing.
+   */
+  const STRUCTURE_TEXT = new WeakMap();
+  function structureText(r) {
+    let h = STRUCTURE_TEXT.get(r);
     if (h === undefined) {
       h = [r.name.en, r.name.ko, r.key, r.muscle?.latin,
            ...(r.fma ?? [])].filter(Boolean).join(' ').toLowerCase();
-      HAY.set(r, h);
+      STRUCTURE_TEXT.set(r, h);
     }
     return h;
   }
@@ -488,7 +498,7 @@ export function mountUI(ctx) {
     if (q) {
       const hitGroups = gs.filter(g =>
         `${g.name.en} ${g.name.ko} ${g.formal} ${g.fma}`.toLowerCase().includes(q));
-      const hits = all.filter(r => haystack(r).includes(q));
+      const hits = all.filter(r => structureText(r).includes(q));
       /* Shortest name first. Searching "rectus" should offer `rectus femoris`
        * before `rectus capitis posterior minor`, and length is the cheap proxy
        * for "less qualified, so more likely the one meant". */
@@ -513,12 +523,16 @@ export function mountUI(ctx) {
       .map(([kind, str]) => [str, all.filter(r => r.kind === kind)
         .sort((a, b) => a.name[app.lang].localeCompare(b.name[app.lang]))])
       .filter(([, list]) => list.length);
+    /* Groups come straight after the search box, above the region network and the
+     * label filter, because they are the level a class is taught at and the
+     * network is a brain instrument. Sitting fourth they were below the fold on
+     * a laptop, which is indistinguishable from not being there. */
     return `
       ${detailBlock()}
       ${findBox(null)}
+      ${groupsSection(gs)}
       ${connBlock()}
       ${labelFilter()}
-      ${groupsSection(gs)}
       ${byKind.map(([str, list]) => `
         <h3>${T(str)}<em>${list.length}</em></h3>
         <div class="swatches">${list.map(swatch).join('')}</div>`).join('')}
@@ -548,18 +562,25 @@ export function mountUI(ctx) {
   function groupsSection(gs) {
     if (!gs.length) return '';
     const on = app.group ? (gs.find(g => g.fma === app.group) ?? null) : null;
+    /* Seventy-seven chips in seven sections is most of a screen, so the whole
+     * thing folds -- open, because a reader who has never seen it cannot ask for
+     * something they do not know is there. A native `details` rather than the
+     * accordion in the session layer: this is one disclosure with no state to
+     * keep, and the browser already does it. */
     return `
-      <h3>${T('groups')}<em>${gs.length}</em></h3>
-      <p class="note small">${T('groupsHint')}</p>
-      ${on ? `<div class="groupon">${T('groupOn')}: <b>${esc(on.name[app.lang])}</b>
-        <span class="small-number">${on.members.length} ${T('groupMembers')}</span>
-        <button class="mini" id="groupClear">${T('groupClear')}</button></div>` : ''}
-      ${GROUP_REGIONS.map(region => {
-        const list = gs.filter(g => g.region === region.id);
-        if (!list.length) return '';
-        return `<h4 class="gregion">${esc(region[app.lang] ?? region.en)}</h4>
-          <div class="gchips">${list.map(groupChip).join('')}</div>`;
-      }).join('')}`;
+      <details class="groups" open>
+        <summary><span>${T('groups')}</span><em>${gs.length}</em></summary>
+        <p class="note small">${T('groupsHint')}</p>
+        ${on ? `<div class="groupon">${T('groupOn')}: <b>${esc(on.name[app.lang])}</b>
+          <span class="small-number">${on.members.length} ${T('groupMembers')}</span>
+          <button class="mini" id="groupClear">${T('groupClear')}</button></div>` : ''}
+        ${GROUP_REGIONS.map(region => {
+          const list = gs.filter(g => g.region === region.id);
+          if (!list.length) return '';
+          return `<h4 class="gregion">${esc(region[app.lang] ?? region.en)}</h4>
+            <div class="gchips">${list.map(groupChip).join('')}</div>`;
+        }).join('')}
+      </details>`;
   }
   /* A colour block and a name. The block is the point: it is what a reader matches against the
    * structure they are looking at on the picture, and at this size a row of them reads as a

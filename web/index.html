@@ -852,6 +852,16 @@ button.analrow:hover{background:rgba(146,178,222,.06)}
 
 /* Groups: the sets a class is cued in. Wider and warmer than a facet chip, because these
  * are anatomy rather than a filter — pressing one lights eleven muscles on the body. */
+details.groups{margin:0 0 14px}
+details.groups>summary{list-style:none;cursor:pointer;display:flex;align-items:center;
+ gap:7px;margin:16px 0 8px;font-size:11px;letter-spacing:.13em;text-transform:uppercase;
+ color:var(--dim2);font-weight:400}
+details.groups>summary::-webkit-details-marker{display:none}
+details.groups>summary::before{content:"▸";font-size:9px;opacity:.7}
+details.groups[open]>summary::before{content:"▾"}
+details.groups>summary:hover{color:var(--txt)}
+details.groups>summary em{font-style:normal;font-size:10px;color:var(--dim2);
+ font-variant-numeric:tabular-nums}
 .gregion{margin:12px 0 5px;font-size:10px;letter-spacing:.13em;text-transform:uppercase;
  color:var(--dim2);font-weight:400}
 .gchips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
