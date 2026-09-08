@@ -1405,7 +1405,16 @@ groups a studio is offered — the generator emits `irregular bone` and `left ri
 finger` alongside `pelvic diaphragm`, because the ontology classifies bones by
 shape and fingers by name and both are true. The 77 that a Pilates or yoga class
 actually uses are chosen in `web/src/content/groups.js`, in a list somebody can
-read and argue with, with the Korean written out.
+read and argue with.
+
+The Korean there is in the register the atlas already speaks, and that was got
+wrong first: the ninety-one written muscle entries use the Sino-Korean clinical
+terms a studio uses — 대퇴이두근, 복직근, 요방형근 — and the groups were written
+in the revised native-Korean terms instead. Both are correct Korean; together
+they are two dialects in one panel, and pressing 넙다리 뒤칸 lit three muscles
+named 대퇴이두근, 반건양근 and 반막양근. Where a group *is* a muscle family the
+two are now checked against each other: the group's Korean has to appear inside
+at least one member's, which is what 극근 in 흉극근 means.
 
 Choosing one lights every member at a single level, turns on the layers they live
 in, names them on the picture, and frames the whole set. Every member is lit

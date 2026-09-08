@@ -328,7 +328,8 @@ exercise library, the muscle entries, the evidence tiers, the session layer, the
 coach evaluation, the accounts, the measurement pipeline, all 430 structures and
 all 8 GLB files. No geometry was replaced, no structure was removed, and nothing
 in the exercise library lost a muscle. The 1,780 tests that passed before still
-pass; the suite is 1,808 now.
+pass; the Python suite is 1,865 now, and the nine node tests carry 148
+assertions between them.
 
 ## WHAT WE BUILT
 
@@ -346,6 +347,18 @@ is offered, in seven sections, with Korean written out and a plainer English
 label where the ontology's own wording is unusable (`muscle of free lower limb`
 is exactly right and nobody says it). Editorial, and in a file that can be
 argued with.
+
+The Korean is in the register the atlas already speaks, and this was got wrong
+first. The 91 written muscle entries use the Sino-Korean clinical terms a studio
+uses — 대퇴이두근, 복직근, 요방형근 — and the groups were written in the revised
+native-Korean anatomical terms instead — 넙다리 뒤칸, 볼기근, 가시근. Both are
+correct Korean; together they are two dialects in one panel, and pressing
+넙다리 뒤칸 lit three muscles named 대퇴이두근, 반건양근 and 반막양근. All 77 are
+now in the first register (햄스트링, 대퇴사두근, 내전근군, 둔근, 척추기립근,
+골반저근, 경추, 흉추, 요추, 추간판, 흉곽), and where a group *is* a muscle family
+the two are checkable against each other — the group's Korean has to appear
+inside at least one member's, which is what 극근 in 흉극근 means. Twelve families
+are asserted that way.
 
 **Group selection** — `setGroup` in `main.js` lights every member at one level on
 the palette's activation channel, turns on the layers they live in, names them on
@@ -376,7 +389,11 @@ Korean actually in Hangul, and the Pilates core still offered); one re-derives
 the whole table from the published tables and fails if any membership was ever
 edited by hand.
 
-**11 tests for the server**, and 2 more for the cache rule.
+**11 tests for the server**, 2 more for the cache rule, 3 for the groups in
+`content.test.mjs`, 11 for the tap machine, and a scanner that fails on two
+function declarations of one name in a file — which is the shape of two bugs
+this project has now paid for, `_studio_name` in `api.py` and `haystack` in
+`ui.js`.
 
 ## ANATOMY IMPROVEMENT
 
