@@ -51,9 +51,11 @@ const ATTRS = ['position', 'normal', '_region', 'skinIndex', 'skinWeight'];
  * @param {THREE.BufferGeometry[]} geos  all indexed, same attributes, no groups
  * @returns {THREE.BufferGeometry|null}
  */
-export function mergeGeometry(geos) {
+export function mergeGeometry(geos, matrices = null) {
   const src = geos.filter(g => g?.index && g.getAttribute('position'));
   if (!src.length) return null;
+  if (matrices && matrices.length !== geos.length)
+    throw new Error('merge: one matrix per geometry or none');
 
   const keys = ATTRS.filter(k => src[0].getAttribute(k));
   for (const g of src) {
@@ -81,11 +83,21 @@ export function mergeGeometry(geos) {
     const Arr = a0.array.constructor;
     const data = new Arr(verts * items);
     let at = 0;
-    for (const g of src) {
+    for (let gi = 0; gi < src.length; gi++) {
+      const g = src[gi];
       const a = g.getAttribute(k);
       if (a.itemSize !== items)
         throw new Error(`merge: ${k} is ${a.itemSize} wide here and ${items} there`);
       data.set(a.array.subarray(0, a.count * items), at);
+      /* A rigid mesh has been reparented into the rig, so its geometry is in its
+       * bone's space and its own local matrix is what puts it where the bone
+       * holds it. Merging without applying that stacks every bone in a limb at
+       * the same place. The matrix is the *local* one and never the world one:
+       * local is fixed at attach time, world is wherever the pose has the rig,
+       * and baking a pose would weld the body into whatever it was doing when
+       * the layer happened to load. */
+      const M = matrices?.[gi];
+      if (M) applyTo(k, data, at, a.count, items, M);
       at += a.count * items;
     }
     out.setAttribute(k, new THREE.BufferAttribute(data, items, a0.normalized));
@@ -148,8 +160,85 @@ export function mergeLayer(meshes, { material, skeleton = null, name = '' } = {}
    * useless the moment a clip moves it, and there is nothing to gain by culling
    * a layer that fills the frame anyway. */
   out.frustumCulled = false;
-  out.userData = { layer: name, merged: true, sources: src.length };
+  out.userData = { layer: name, merged: true, sources: src.length, regions: regionsOf(geo) };
   if (skin) out.bind(skeleton ?? skinned[0].skeleton, new THREE.Matrix4());
+  return out;
+}
+
+/* Positions move by the matrix; normals by its inverse transpose, so a
+ * non-uniform scale does not tilt them. Nothing else is a direction or a point. */
+const _v = new THREE.Vector3(), _nm = new THREE.Matrix3();
+function applyTo(key, data, at, count, items, M) {
+  if (key === 'position') {
+    for (let i = 0; i < count; i++) {
+      const o = at + i * items;
+      _v.set(data[o], data[o+1], data[o+2]).applyMatrix4(M);
+      data[o] = _v.x; data[o+1] = _v.y; data[o+2] = _v.z;
+    }
+  } else if (key === 'normal') {
+    _nm.getNormalMatrix(M);
+    for (let i = 0; i < count; i++) {
+      const o = at + i * items;
+      _v.set(data[o], data[o+1], data[o+2]).applyMatrix3(_nm).normalize();
+      data[o] = _v.x; data[o+1] = _v.y; data[o+2] = _v.z;
+    }
+  }
+}
+
+/** Every structure a merged drawable stands for, read off the attribute the palette indexes. */
+function regionsOf(geo) {
+  const a = geo.getAttribute('_region');
+  const out = new Set();
+  if (a) for (let i = 0; i < a.count; i++) out.add(a.getX(i));
+  return out;
+}
+
+/**
+ * The rigid layers, merged one drawable per bone.
+ *
+ * Bones and organs are not skinned: `rig.attach` reparents each one into the rig
+ * hierarchy so it rides its segment, which means they cannot all be merged into
+ * one mesh the way the muscles can — a mesh has one parent, and these have
+ * forty-seven between them.
+ *
+ * Merging them *per parent* keeps that exactly as it is. Nothing is rebound,
+ * nothing is re-skinned, and — the reason to prefer this over rewriting them as
+ * single-bone skins — a ray still meets a rigid mesh rather than a skinned one.
+ * A bone raycast under dual-quaternion skinning walks every vertex of every
+ * candidate triangle through a bone transform, on every pointer move; a rigid one
+ * does not. Trading a cost paid once per frame for one paid on every hover would
+ * have been a poor bargain for the last sixty draw calls.
+ *
+ * @returns {{parent: THREE.Object3D, mesh: THREE.Mesh}[]}
+ */
+export function mergeByParent(meshes, { material, name = '' } = {}) {
+  const byParent = new Map();
+  for (const m of meshes) {
+    if (!m?.isMesh || m.isSkinnedMesh || !m.geometry || m.material !== material) continue;
+    if (!m.parent) continue;
+    if (!byParent.has(m.parent)) byParent.set(m.parent, []);
+    byParent.get(m.parent).push(m);
+  }
+  const out = [];
+  for (const [parent, list] of byParent) {
+    // one mesh under a bone is already one draw call; merging it buys nothing
+    // and costs a second copy of its geometry
+    if (list.length < 2) continue;
+    let geo;
+    try {
+      for (const m of list) m.updateMatrix();
+      geo = mergeGeometry(list.map(m => m.geometry), list.map(m => m.matrix));
+    } catch (e) {
+      console.error(`merge: ${name || 'layer'} under ${parent.name || 'a node'} not merged ` +
+        `— ${e.message}`);
+      continue;
+    }
+    if (!geo) continue;
+    const mesh = new THREE.Mesh(geo, material);
+    mesh.name = `${name || 'layer'}:merged:${parent.name || 'node'}`;
+    mesh.userData = { layer: name, merged: true, sources: list.length, regions: regionsOf(geo) };
+    out.push({ parent, mesh, sources: list });
+  }
   return out;
 }
 

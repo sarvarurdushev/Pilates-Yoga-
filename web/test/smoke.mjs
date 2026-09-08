@@ -1503,6 +1503,106 @@ const oneCall = await page.evaluate(async () => {
   out.picked = byLayer;
   return out;
 });
+
+/* Where the merged bones actually are.
+ *
+ * The rigid layers are merged per bone, which means each source mesh's own local
+ * matrix -- what `rig.attach` left on it -- has to be baked into the merged
+ * geometry. Skipping that does not throw and does not blank the screen: it
+ * stacks every bone of a limb at its segment's origin, and the only symptom is a
+ * body that looks wrong. So it is measured, against the sources themselves, in
+ * the rest pose and in a real one.
+ */
+const placed = await page.evaluate(async () => {
+  const m = await import('/src/main.js');
+  const THREE = await import('three');
+  const measure = () => {
+    let scene = m.rig?.root; while (scene?.parent) scene = scene.parent;
+    scene.updateMatrixWorld(true);
+    const merged = [];
+    scene.traverse(o => { if (o.userData?.merged && !o.isSkinnedMesh) merged.push(o); });
+    let worst = 0, worstName = null, compared = 0, empty = 0;
+    for (const mm of merged) {
+      const box = new THREE.Box3().setFromObject(mm, true);
+      const src = new THREE.Box3();
+      let any = false;
+      for (const o of mm.parent.children) {
+        if (o === mm || !o.isMesh || o.userData.merged) continue;
+        if (o.userData.layer !== mm.userData.layer) continue;
+        const b = new THREE.Box3().setFromObject(o, true);
+        if (any) src.union(b); else { src.copy(b); any = true; }
+      }
+      if (!any) { empty++; continue; }
+      compared++;
+      const d = Math.max(box.min.distanceTo(src.min), box.max.distanceTo(src.max));
+      if (d > worst) { worst = d; worstName = mm.name; }
+    }
+    return { merged: merged.length, compared, empty,
+             worst: +worst.toFixed(5), worstName };
+  };
+  const rest = measure();
+  await m.setExercise('swan');
+  await new Promise(r => setTimeout(r, 2500));
+  const posed = measure();
+  await m.setExercise(null);
+  await new Promise(r => setTimeout(r, 1200));
+  return { rest, posed };
+});
+console.log('merged placement:', JSON.stringify(placed));
+
+/* Taking the body apart, now that hiding shares the fetch that moves it.
+ *
+ * The explode offset and the visibility flag are the same texel read in the same
+ * branch of the vertex shader, so a mistake in one is a mistake in both — and
+ * the suite had no explode check at all. Measured as a picture: the camera does
+ * not move, so anything that changes is the geometry moving. */
+const apart = await page.evaluate(async () => {
+  const m = await import('/src/main.js');
+  const cv = document.querySelector('canvas');
+  const grid = () => {
+    const t = document.createElement('canvas'); t.width = 48; t.height = 30;
+    const x = t.getContext('2d', { willReadFrequently: true });
+    x.drawImage(cv, 0, 0, 48, 30);
+    const d = x.getImageData(0, 0, 48, 30).data;
+    const out = [];
+    for (let i = 0; i < d.length; i += 4) out.push(d[i] + d[i+1] + d[i+2]);
+    return out;
+  };
+  const settle = async () => { m.invalidate?.(8); await new Promise(r => setTimeout(r, 2200)); };
+  await m.setExplode(0);
+  await settle();
+  const before = grid();
+  await m.setExplode(0.9);
+  await settle();
+  const after = grid();
+  await m.setExplode(0);
+  await settle();
+  const back = grid();
+  const diff = (a, b) => {
+    let d = 0, t = 0;
+    for (let i = 0; i < a.length; i++) { d += Math.abs(a[i] - b[i]); t += Math.max(a[i], b[i]); }
+    return +(d / Math.max(1, t)).toFixed(3);
+  };
+  return { moved: diff(before, after), returned: diff(before, back), lit: before.filter(v => v > 90).length };
+});
+console.log('explode:', JSON.stringify(apart));
+if (!apart.lit) errors.push('nothing is on screen to take apart');
+else {
+  if (apart.moved < 0.08)
+    errors.push(`taking the body apart changed ${apart.moved} of the picture — ` +
+      `the explode offset is not reaching the geometry`);
+  if (apart.returned > 0.05)
+    errors.push(`putting the body back left ${apart.returned} of the picture changed`);
+}
+for (const [when, p] of Object.entries(placed)) {
+  if (!p.compared)
+    errors.push(`no merged rigid drawable could be compared with its sources (${when})`);
+  /* A body is one unit tall here, so a millimetre is 0.001. Anything above this
+   * is a bone drawn somewhere it is not. */
+  if (p.worst > 0.001)
+    errors.push(`${p.worstName} is ${p.worst.toFixed(3)} of a body height away from the ` +
+      `meshes it stands for (${when}) — the merge did not bake the local matrices`);
+}
 console.log('merged layers:', JSON.stringify(oneCall));
 /* 449 structures over 788 meshes before this; the three skinned layers are 437 of
  * them and now cost three. The bar is loose on purpose — it is here to catch the
@@ -1524,6 +1624,16 @@ if (!oneCall.bone.alone.ink)
  * emptied; and all of it back when the isolation is cleared. */
 {
   const at = (state, layer) => state?.[layer] ?? null;
+  /* Every layer merged, and each one drawing far fewer meshes than it holds.
+   * The skinned layers come to one apiece; the rigid ones to one per bone, plus
+   * whatever bone carries a single mesh and is left as it was. */
+  for (const l of ['muscles_superficial', 'muscles_deep', 'nervous', 'skeleton', 'organs']) {
+    const st = at(oneCall.open, l);
+    if (!st) { errors.push(`${l} is not merged at all`); continue; }
+    if (!(st.draws < st.sources / 2))
+      errors.push(`${l} merged ${st.sources} meshes into ${st.draws} drawables — ` +
+        `not worth the second copy of its geometry`);
+  }
   const sup = at(oneCall.open, 'muscles_superficial');
   if (!sup) errors.push('the superficial muscles are not merged at all');
   else {

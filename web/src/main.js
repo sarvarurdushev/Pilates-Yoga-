@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { makeStructureMaterial, makeBrainMaterial } from './brainMaterial.js';
-import { mergeLayer, PICK_LAYER } from './merged.js';
+import { mergeLayer, mergeByParent, PICK_LAYER } from './merged.js';
 import { makeTissueMaterial } from './tissue.js';
 import { NeuralNet } from './neuralNet.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -463,15 +463,23 @@ function bindLayer(name) {
  * the rig hierarchy, and each would have to be rewritten as a single-bone skin
  * first; that is the next step, not this one.
  */
-const MERGED = new Set(['muscles_superficial', 'muscles_deep', 'nervous']);
+const MERGED = new Set(['muscles_superficial', 'muscles_deep', 'nervous',
+                        'skeleton', 'organs']);
+/* The two that are not skinned. `rig.attach` reparents a bone into the rig, so
+ * these cannot be one mesh — a mesh has one parent and the skeleton has
+ * forty-seven — and they are merged per bone instead. See `mergeByParent` for
+ * why that is the right stopping point rather than rewriting them as
+ * single-bone skins. */
+const RIGID = new Set(['skeleton', 'organs']);
 
 /**
- * Rebuild a layer's single drawable from the meshes it has just bound.
+ * Rebuild a layer's drawables from the meshes it has just bound.
  *
  * Called at the end of `bindLayer`, because binding *replaces* meshes —
  * `skinMesh` returns a new object and `L2.meshes` is patched in place — so a
  * merge taken before it would be a merge of geometry nothing else refers to any
- * more.
+ * more. It is also the only point at which a rigid mesh's local matrix means
+ * what it has to mean here: after `rig.attach`, and so relative to its bone.
  *
  * The source meshes are not removed and not hidden. They are moved to a layer
  * the camera does not render, which leaves them in the scene as the model:
@@ -482,19 +490,30 @@ function remerge(name) {
   if (!MERGED.has(name)) return;
   const L2 = layers[name];
   if (!L2?.loaded || !L2.material) return;
-  if (L2.merged) {
-    L2.merged.parent?.remove(L2.merged);
-    L2.merged.geometry.dispose();
-    L2.merged = null;
-  }
+  for (const m of L2.merged ?? []) { m.parent?.remove(m); m.geometry.dispose(); }
+  L2.merged = null;
+
   const src = L2.meshes ?? [];
-  const m = mergeLayer(src, { material: L2.material, name });
-  /* Layer 0 again if the merge refused, so a layer that cannot be merged is
-   * drawn the way it always was rather than not at all. */
-  for (const o of src) o.layers.set(m ? PICK_LAYER : 0);
-  if (!m) return;
-  L2.group.add(m);
-  L2.merged = m;
+  const built = [];
+  if (RIGID.has(name)) {
+    const merged = mergeByParent(src, { material: L2.material, name });
+    /* Only the meshes that ended up inside a merge move off the camera's layer.
+     * A bone that is the only one on its segment is still drawn as itself —
+     * merging it would buy no draw call and cost a second copy of it. */
+    for (const { parent, mesh, sources } of merged) {
+      parent.add(mesh);
+      built.push(mesh);
+      for (const o of sources) o.layers.set(PICK_LAYER);
+    }
+  } else {
+    const m = mergeLayer(src, { material: L2.material, name });
+    /* Layer 0 again if the merge refused, so a layer that cannot be merged is
+     * drawn the way it always was rather than not at all. */
+    for (const o of src) o.layers.set(m ? PICK_LAYER : 0);
+    if (m) { L2.group.add(m); built.push(m); }
+  }
+  if (!built.length) return;
+  L2.merged = built;
   applyShown();
   invalidate();
 }
@@ -513,7 +532,7 @@ function remerge(name) {
  * caller already asks for, and what `onlyShow` and the isolate set both do.
  */
 function applyShown() {
-  const ls = [...MERGED].map(n => layers[n]).filter(L => L?.merged);
+  const ls = [...MERGED].map(n => layers[n]).filter(L => L?.merged?.length);
   if (!ls.length) return;
   palette.showAll();
   for (const L2 of ls) {
@@ -526,9 +545,13 @@ function applyShown() {
     }
     let hiding = 0;
     for (const id of off) if (!on.has(id)) { palette.setShown(id, false); hiding = 1; }
-    /* Nothing to draw is a hidden mesh rather than a draw call that clips every
-     * triangle it submits. */
-    L2.merged.visible = on.size > 0;
+    /* A drawable with nothing left to show is hidden rather than submitted for
+     * every one of its triangles to be clipped away. */
+    for (const m of L2.merged) {
+      let any = false;
+      for (const id of m.userData.regions) if (on.has(id)) { any = true; break; }
+      m.visible = any;
+    }
     /* And nothing hidden is a shader that does not look. The flag costs a
      * texture fetch per vertex to read, which on a body of 605k triangles is
      * more than the draw calls the merge saved -- so it is only read when
@@ -552,11 +575,12 @@ function applyShown() {
  */
 export const mergedState = () => Object.fromEntries([...MERGED].map(name => {
   const L2 = layers[name];
-  return [name, !L2?.merged ? null : {
-    sources: L2.merged.userData.sources,
+  return [name, !L2?.merged?.length ? null : {
+    draws: L2.merged.length,
+    sources: L2.merged.reduce((n, m) => n + m.userData.sources, 0),
     shown: L2.shownIds?.size ?? 0,
     hidden: L2.hiddenIds?.size ?? 0,
-    visible: L2.merged.visible,
+    visible: L2.merged.some(m => m.visible),
     hiding: L2.material?.userData?.uniforms?.uHiding?.value ?? 0,
   }];
 }));
