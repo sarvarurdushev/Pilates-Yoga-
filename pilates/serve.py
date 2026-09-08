@@ -90,6 +90,38 @@ class Handler(SimpleHTTPRequestHandler):
     #: rather than a record: a restart clearing it is correct.
     attempts = auth.Attempts()
 
+    #: Set while a handler is writing its own Cache-Control, so `end_headers`
+    #: does not add a second one.
+    _said_cache = False
+
+    def send_header(self, keyword, value):  # noqa: N802
+        if keyword.lower() == "cache-control":
+            self._said_cache = True
+        super().send_header(keyword, value)
+
+    def end_headers(self):  # noqa: N802
+        """Make the browser ask.
+
+        The application is ES modules loaded straight off disk, and this server
+        was sending them with a `Last-Modified` and nothing else. That is not
+        "do not cache" -- with no `Cache-Control`, a browser is free to guess a
+        freshness lifetime from the age of the file (RFC 9111 heuristic
+        expiry, conventionally a tenth of the age since it was last changed).
+        For a file untouched for a week that is most of a day serving the old
+        module out of cache **without asking the server at all**.
+
+        The symptom is the worst kind: the studio updates, reloads, and sees
+        the previous version with no error anywhere -- so the update looks like
+        it did not happen. `no-cache` does not mean "do not store", it means
+        "revalidate before use", so every load asks and almost every answer is
+        a 304 with no body. The cost is one conditional request per file; the
+        thing it buys is that what is on disk is what is on screen.
+        """
+        if not self._said_cache:
+            self.send_header("Cache-Control", "no-cache")
+        self._said_cache = False
+        super().end_headers()
+
     def _allowed(self) -> bool:
         """Whether this request may change something."""
         import hmac

@@ -111,6 +111,57 @@ class TestServingASession:
             assert b"<title>" in response.read(4000).lower()
 
 
+class TestWhatIsOnDiskIsWhatIsOnScreen:
+    """The worst update failure is the silent one.
+
+    This server hands a browser ES modules straight off disk. Sent with only a
+    `Last-Modified` and no `Cache-Control`, a browser is free to guess a
+    freshness lifetime from the age of the file and serve the old module
+    without asking. The studio updates, reloads, sees the previous version, and
+    there is no error anywhere to explain it.
+    """
+
+    def _head(self, url):
+        request = urllib.request.Request(url)
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return response.headers, response.status
+
+    def test_a_module_is_revalidated_rather_than_guessed_at(self, running):
+        base, _ = running
+        headers, _ = self._head(f"{base}/src/session/axes.js")
+        assert headers.get("Cache-Control") == "no-cache"
+
+    def test_so_is_the_page_that_loads_them(self, running):
+        base, _ = running
+        headers, _ = self._head(f"{base}/index.html")
+        assert headers.get("Cache-Control") == "no-cache"
+
+    def test_revalidating_costs_a_conditional_request_and_no_body(self, running):
+        """`no-cache` means "ask", not "do not store". The answer is a 304."""
+        base, _ = running
+        headers, _ = self._head(f"{base}/src/session/axes.js")
+        request = urllib.request.Request(
+            f"{base}/src/session/axes.js",
+            headers={"If-Modified-Since": headers["Last-Modified"]})
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                assert response.status == 304
+        except urllib.error.HTTPError as error:
+            assert error.code == 304
+
+    def test_a_json_route_keeps_its_own_stronger_rule(self, running):
+        """Nothing that carries somebody's record may be stored at all, and
+        the blanket header must not weaken that to "revalidate"."""
+        base, _ = running
+        headers, _ = self._head(f"{base}/capabilities")
+        assert headers.get("Cache-Control") == "no-store"
+
+    def test_the_header_is_sent_once(self, running):
+        base, _ = running
+        headers, _ = self._head(f"{base}/capabilities")
+        assert len(headers.get_all("Cache-Control")) == 1
+
+
 class TestCapabilities:
     def test_it_says_analysis_is_available(self, running):
         base, _ = running
