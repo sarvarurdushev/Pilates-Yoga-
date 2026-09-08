@@ -443,6 +443,11 @@ export const UI = {
   groupOf:      { en: 'Part of', ko: '소속' },
   groupMembers: { en: 'structures', ko: '개 구조' },
   groupFormal:  { en: 'Ontology name', ko: '온톨로지 명칭' },
+  isolate:      { en: 'Show this alone', ko: '이것만 보기' },
+  isolateOff:   { en: 'Show the whole body', ko: '전신 보기' },
+  isolateOn:    { en: 'showing alone', ko: '단독 표시 중' },
+  isolateHint:  { en: 'Everything else is hidden. It is also the fastest the picture gets — one structure instead of hundreds.',
+                  ko: '나머지는 모두 숨깁니다. 화면이 가장 빨라지는 상태이기도 합니다 — 수백 개 대신 구조 하나만 그립니다.' },
 
   /* the library browser — two hundred entries need finding, not scrolling */
   searchEx:     { en: 'Search exercises', ko: '운동 검색' },

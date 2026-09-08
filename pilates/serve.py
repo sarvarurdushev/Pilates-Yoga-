@@ -771,11 +771,49 @@ def serve(bundle: dict | None, root: Path = WEB, port: int = 8000,
     # with the job. Without one it still analyses; it just cannot remember.
     Handler.jobs = Jobs(db=db) if analyse else None
     Handler.db = db
+    if db:
+        claim_owner(db)
     server = ThreadingHTTPServer((host, port), handler)
     url = f"http://{host}:{server.server_address[1]}/index.html"
     if bundle is not None:
         url += f"?session={SESSION_ROUTE}"
     return server, url
+
+
+def claim_owner(db: str, email: str = "") -> str:
+    """Seat the deployment owner, from ``$PILATES_OWNER`` or an argument.
+
+    Run on every start, and idempotent, because the failure it prevents is the
+    slow one: a location gets added, the owner is not a member of it, and the
+    only person who could grant themselves access is the person who cannot see
+    it. Re-seating on boot means that whatever order studios were created in,
+    the owner holds every membership by the time the first request arrives.
+
+    An address with no account is not an error and does not stop the server. It
+    is the ordinary state of a deployment where the owner has not signed up yet,
+    and it is claimed the moment they do -- see ``store.set_owner``.
+    """
+    import os
+
+    from .accounts import normalise_email
+    from .store import Store
+
+    wanted = normalise_email(email or os.environ.get("PILATES_OWNER", ""))
+    if not db:
+        return ""
+    with Store.open(db) as store:
+        if wanted:
+            account = store.account_by_email(wanted)
+            if account is None:
+                return ""
+            store.set_owner(account.username)
+            return account.username
+        # No address named: re-seat whoever already owns it, so a studio added
+        # since the last start is not a room the owner cannot enter.
+        who = store.owner()
+        if who:
+            store.set_owner(who)
+        return who
 
 
 def run(bundle: dict | None, root: Path = WEB, port: int = 8000,

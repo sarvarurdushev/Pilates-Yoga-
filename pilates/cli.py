@@ -2169,6 +2169,54 @@ def cmd_studio(args) -> int:
     return 0
 
 
+def cmd_owner(args) -> int:
+    """Name the person who owns this deployment, and seat them everywhere.
+
+    The gap this closes: an admin is an admin *of a studio*, so adding a second
+    location produced a room its own owner could not enter, and the only person
+    who could have granted them access was them. Naming an owner makes that a
+    standing fact rather than something somebody has to remember on every new
+    location -- see ``Store.seat_owner``.
+
+    It grants memberships; it does not invent a way around them. The owner is
+    allowed to do things because they hold an active admin membership at each
+    studio, which every check downstream reads the same way it reads anybody
+    else's.
+    """
+    from .accounts import normalise_email
+    from .store import Store
+
+    with Store.open(args.db) as store:
+        if not args.email:
+            who = store.owner()
+            if not who:
+                print("no owner. Name one: pilates owner <email>")
+                return 1
+            account = store.account(who)
+            print(f"{account.display_name or who} <{account.email}> owns this "
+                  f"deployment")
+            for studio in store.studios():
+                roles = sorted(m.role for m in store.memberships(
+                    username=who, studio=studio["key"]) if m.state == "active")
+                print(f"  {studio['name']}: {', '.join(roles) or 'nothing'}")
+            return 0
+
+        email = normalise_email(args.email)
+        account = store.account_by_email(email)
+        if account is None:
+            print(f"no account for {email}. Make one first:\n"
+                  f"  pilates account {email} --name '...' --db {args.db}")
+            return 1
+        store.set_owner(account.username)
+        studios = store.studios()
+        print(f"{email} owns this deployment and is admin, coach and student "
+              f"at {len(studios)} location(s):")
+        for studio in studios:
+            print(f"  {studio['name']}")
+        print("Any location added later seats them automatically.")
+        return 0
+
+
 def cmd_account(args) -> int:
     """Create a person, or give one a role.
 
@@ -2680,6 +2728,14 @@ def main(argv: list[str] | None = None) -> int:
     ac.add_argument("--list", action="store_true")
     ac.add_argument("--db", default="studio.db")
     ac.set_defaults(func=cmd_account)
+
+    ow = sub.add_parser("owner",
+                        help="who owns this deployment: admin, coach and "
+                             "student at every location, including any added "
+                             "later. With no address, says who it is now")
+    ow.add_argument("email", nargs="?")
+    ow.add_argument("--db", default="studio.db")
+    ow.set_defaults(func=cmd_owner)
 
     sd = sub.add_parser("seed",
                         help="fill a database with a studio of fictional "

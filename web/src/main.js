@@ -48,6 +48,14 @@ export const app = {
    * talking about" — and they share the palette's activation channel, so
    * choosing either clears the other. See `setGroup`. */
   group: null,
+  /* Structure ids drawn alone, or null for the whole body. Isolation is the one
+   * visibility control that overrules every other: layers, x-ray and the shell
+   * all answer "what should be in front of this", and isolation answers "there
+   * is nothing else". It is also the cheapest picture this application can
+   * draw -- one muscle is one draw call instead of seven hundred and sixty-nine
+   * -- which is why the reader reaching for it on a slow machine is rewarded
+   * rather than punished. */
+  isolate: null,
   // §9: the clip, where the scrubber is, and whether it is running
   t: 0, playing: false, hasMotion: false, showPaths: false, showMeshes: true,
   pathway: null,
@@ -960,6 +968,7 @@ function sectReveal(el) {
  *              and for a language switch, which changes the caption but not the section
  */
 function refreshSections(force = false) {
+  invalidate();
   const host = document.getElementById('sections');
   if (!host) return;
   const on = !!app.layers.brain?.on && !!sections?.ready;
@@ -1257,6 +1266,7 @@ function indexGeometry(group) {
 
 /* ------------------------------------------------------------------ palette */
 function paintPalette() {
+  invalidate();
   const { byId } = registry();
   for (const [id, r] of byId) palette.setColor(id, r.color);
   for (const m of materials) m.userData.sync?.();
@@ -1278,7 +1288,28 @@ function paintPalette() {
 const XRAY_DEPTH = { muscles_superficial: 0, muscles_deep: 1, organs: 2,
                      skeleton: 3, brain: 4 };
 
+/* Every camera move, including each damping step after the drag ends. This one
+ * listener is what makes orbiting feel unchanged while the still body costs
+ * nothing. */
+controls.addEventListener('change', () => invalidate());
+
+/* Belt and braces. Every state change that moves a pixel is supposed to reach
+ * `syncLayers`, `paintPalette` or `refreshPosed`, and most do -- but this file
+ * is four thousand lines and a setter that forgets shows up as a control that
+ * does nothing until you nudge the camera, which is a maddening bug to find.
+ * So anything the reader does to the page also asks for a few frames. It costs
+ * three frames per interaction and it makes the whole class of mistake
+ * invisible. */
+for (const kind of ['pointerdown', 'pointerup', 'pointermove', 'wheel', 'keydown',
+                    'input', 'change', 'click'])
+  addEventListener(kind, () => invalidate(), { capture: true, passive: true });
+/* Coming back to the tab, and finishing a font or texture load, both leave the
+ * canvas holding whatever was there when it left. */
+addEventListener('visibilitychange', () => invalidate(8));
+addEventListener('focus', () => invalidate(8));
+
 export function syncLayers() {
+  invalidate();
   // the strip has nothing to cut without the brain, and says so by not being there
   refreshSections();
   /* The shell only makes sense behind something. With every body layer off there is nothing
@@ -1337,6 +1368,16 @@ export function syncLayers() {
     if (u) { u.uXray.value = 0; u.uShell.value = 1; u.uAtlas.value = app.atlas; }
     L2.material.needsUpdate = true;
   }
+  /* Isolation, applied last and over everything.
+   *
+   * Built from `meshesOfId` rather than from each mesh's own `regionId`,
+   * because a paired structure is two meshes under one id and reading the
+   * first vertex of each would have isolated one side of a body that has two.
+   */
+  const only = app.isolate?.size ? new Set() : null;
+  if (only) for (const id of app.isolate)
+    for (const mesh of meshesOfId.get(id) ?? []) only.add(mesh);
+
   /* Bound meshes live in the rig hierarchy, not in their layer's group, so hiding the group
    * no longer hides them. Visibility is therefore per mesh for anything the rig has taken
    * over — which is every bone and every muscle once the rig has loaded. */
@@ -1356,6 +1397,20 @@ export function syncLayers() {
     const hideSurface = mesh.isMesh && layer === 'brain' && app.brainLook === 'neurons';
     mesh.visible = st.on && !hideSurface
                    && (!layer.startsWith('muscles') || app.showMeshes);
+    /* A holder is not a mesh and must stay visible, or the thing hanging off it
+     * goes with it -- the brain rides one, and so does every rig segment. */
+    if (only && mesh.isMesh) mesh.visible = only.has(mesh);
+  }
+  if (only) {
+    for (const name of LAYER_ORDER) {
+      const L2 = layers[name];
+      if (!L2.loaded) continue;
+      // the group itself has to be open, or the meshes still inside it never draw
+      L2.group.visible = true;
+      for (const mesh of L2.meshes ?? []) mesh.visible = only.has(mesh);
+    }
+    for (const mesh of shell.meshes) mesh.visible = false;
+    shell.group.visible = false;
   }
 
   /* The cortex is an additive volume now — see `tissue.js` — so none of the state this used
@@ -1488,6 +1543,7 @@ function deltaFor(segment) {
  */
 const _acc = new Map();         // region id -> { sum: Vector3, n: number }, reused each pose
 function refreshPosed() {
+  invalidate();
   if (!rig?.bind) return;
   for (const e of _acc.values()) { e.sum.set(0, 0, 0); e.n = 0; }
   for (const [mesh, b] of bound) {
@@ -2638,8 +2694,8 @@ export function setLang(l) {
 export function setAtlas(v) { app.atlas = v; syncLayers(); }
 export function setXray(v) { app.xray = v; syncLayers(); }
 export function setCutaway(on) { app.cutaway = on; syncLayers(); }
-export function setClip(v) { clipPlane.constant = v; }
-export function setLabels(on) { app.labelsOn = on; }
+export function setClip(v) { clipPlane.constant = v; invalidate(); }
+export function setLabels(on) { app.labelsOn = on; invalidate(); }
 /**
  * Name one system at a time.
  *
@@ -2658,7 +2714,7 @@ export async function setLabelKind(kind, on) {
   syncLayers();
 }
 export function clearLabelKinds() { app.labelKinds.clear(); syncLayers(); }
-export function setRotate(on) { app.rotate = on; nudgeIdle(); }
+export function setRotate(on) { app.rotate = on; nudgeIdle(); invalidate(); }
 export function setRegister(r) { app.register = r; ui.relabel(); }
 export function setInstruction(on) { app.instructionOn = on; ui.relabel(); }
 
@@ -3429,6 +3485,38 @@ export async function setGroup(fma) {
   ui.relabel();
 }
 
+/**
+ * Draw one structure, or one group, and nothing else.
+ *
+ * Pass an id, an array of ids, or null to put the body back. The layers the
+ * isolated structures live in are turned on first, for the same reason
+ * `setGroup` does it: isolating something inside a layer that is off leaves an
+ * empty stage and no way to tell that from a bug.
+ *
+ * It is the fastest state this application has. Everything else is a question
+ * about how to draw seven hundred meshes at once; this one draws two.
+ */
+export async function setIsolate(ids) {
+  const list = ids == null ? [] : (Array.isArray(ids) ? ids : [ids]).map(Number)
+    .filter(id => get(id));
+  app.isolate = list.length ? new Set(list) : null;
+  if (app.isolate) {
+    for (const id of app.isolate) {
+      const layer = get(id)?.layer;
+      if (!layer || !hasLayer(layer)) continue;
+      app.layers[layer].on = true;
+      await loadLayer(layer);
+    }
+  }
+  syncLayers();
+  ui?.relabel?.();
+  if (app.isolate) flyToGroup(list);
+  else resetView();
+}
+
+/** What is isolated right now, as ids. Empty when the whole body is drawn. */
+export const isolated = () => [...(app.isolate ?? [])];
+
 /** Every group the loaded atlas offers, for the panel. */
 export const anatomyGroups = () => groups().list;
 /** The groups a structure belongs to, most specific first. */
@@ -3582,7 +3670,73 @@ export const musclePathsVisible = () => !!musclePaths?.group.visible;
 
 /** Camera position and target, for the smoke test to assert a view actually arrived. */
 let frameCount = 0;
-export const frameStats = () => ({ frames: frameCount, labels: labels.length });
+/* --------------------------------------------------- drawing only on change
+ *
+ * This loop drew the whole body sixty times a second whether or not anything
+ * had moved: 769 draw calls and 960,000 triangles per frame, measured, with the
+ * camera still and nothing selected. On a laptop with integrated graphics that
+ * is the difference between a body you can turn and a body that is stuck, and
+ * it is most of where the battery went.
+ *
+ * **Nothing in the body animates.** That is what makes this safe, and it was
+ * worth checking rather than assuming: the body materials declare `uPulse` and
+ * never read it, so writing a new phase into it every frame changes no pixel.
+ * The things that genuinely move are enumerated in `animating()` below -- a
+ * camera flight, damping, auto-rotate, a clip playing, the scan sweeping, a
+ * pathway's travelling dots, and the brain, whose tissue shader really does
+ * breathe and whose cells really do fire.
+ *
+ * `dirtyFrames` is a count rather than a flag on purpose. A state change often
+ * lands across two frames -- a texture upload here, a material recompile there
+ * -- so anything that invalidates asks for a few frames rather than one, and
+ * the cost of being wrong is three frames of work instead of a picture that is
+ * one change out of date.
+ */
+let dirtyFrames = 4;
+let lastDrawn = 0;
+const SETTLE = 3;
+/** Something changed; draw again. Cheap enough to call from anywhere. */
+export function invalidate(frames = SETTLE) {
+  dirtyFrames = Math.max(dirtyFrames, frames);
+}
+
+/* ------------------------------------------------------- the frame budget
+ *
+ * Where a frame goes, in milliseconds, accumulated per phase since the last
+ * read. Added because "it is slow and my laptop is hot" is not a bug report
+ * anyone can act on, and every guess about which phase costs what had been
+ * wrong at least once. `performance.now()` five times a frame is noise next to
+ * anything it measures.
+ *
+ * Read it from the console: `(await import('/src/main.js')).frameStats()`.
+ */
+const phase = { skin: 0, render: 0, labels: 0, hud: 0, net: 0, frames: 0, drawn: 0, since: 0 };
+const _t0 = () => performance.now();
+const _add = (k, t) => { phase[k] += performance.now() - t; };
+
+export const frameStats = () => {
+  const now = performance.now();
+  const span = now - (phase.since || now);
+  const per = k => +(phase[k] / Math.max(1, phase.frames)).toFixed(3);
+  const out = {
+    frames: frameCount, labels: labels.length,
+    drawn: phase.drawn, skipped: phase.frames - phase.drawn,
+    /* Averages over the window since the last call, so two calls a few seconds
+     * apart describe those seconds rather than the whole session. */
+    window: { frames: phase.frames, seconds: +(span / 1000).toFixed(2),
+              fps: +(phase.frames / Math.max(0.001, span / 1000)).toFixed(1) },
+    msPerFrame: { skinning: per('skin'), render: per('render'), labels: per('labels'),
+                  hud: per('hud'), neural: per('net') },
+    drawCalls: renderer.info.render.calls,
+    triangles: renderer.info.render.triangles,
+    programs: renderer.info.programs?.length ?? 0,
+    geometries: renderer.info.memory.geometries,
+    textures: renderer.info.memory.textures,
+  };
+  for (const k of ['skin', 'render', 'labels', 'hud', 'net']) phase[k] = 0;
+  phase.frames = 0; phase.drawn = 0; phase.since = now;
+  return out;
+};
 export const cameraState = () => ({
   p: camera.position.toArray().map(v => +v.toFixed(3)),
   t: controls.target.toArray().map(v => +v.toFixed(3)),
@@ -3660,7 +3814,7 @@ const ui = mountUI({
   selectStructure, setLang, setAtlas, setXray, setCutaway, setClip, setLabels,
   setRotate, setRegister, setInstruction, setLayer, setLayerOpacity, setView, resetView,
   setExercise, setPathway, captureStage, activationOf, flyTo,
-  setGroup, anatomyGroups, groupsForStructure,
+  setGroup, anatomyGroups, groupsForStructure, setIsolate, isolated,
   poseFromClip, setPlaying, setShowPaths, setShowMeshes, liveActivationOf, musclePathReport,
   frameRig, setLabelKind, clearLabelKinds,
   // a getter, not the value: the panel mounts before the rig has finished loading
@@ -3827,6 +3981,12 @@ function softwareRenderer() {
  * a GPU also gets bloom after it.
  */
 function buildComposer(w, h, withBloom) {
+  /* Rebuilt rather than reconfigured, because the bloom pass and the final pass
+   * disagree about who encodes sRGB and the answer is baked in at construction.
+   * Disposing first matters: the governor below rebuilds this whenever the
+   * machine turns out to be slower than the last guess, and a composer left
+   * behind keeps its render targets -- two full-size float buffers each. */
+  composer?.dispose?.();
   composer = new EffectComposer(renderer);
   composer.setSize(w, h);
   composer.addPass(new RenderPass(scene, camera));
@@ -3845,14 +4005,97 @@ function renderPipeline() {
   else renderer.render(scene, camera);          // only before the first resize
 }
 
+/* -------------------------------------------------- how hard to draw, measured
+ *
+ * The quality of a frame used to be decided once, from the GPU's *name*: if it
+ * called itself SwiftShader or llvmpipe, drop the bloom; otherwise render at up
+ * to twice the device's pixel ratio with the full chain. That is a guess about
+ * a machine dressed up as a fact about it, and it is wrong in the direction
+ * that hurts -- an integrated laptop GPU reports a real hardware name, gets the
+ * full treatment, and turns a body you can spin into a body that is stuck.
+ *
+ * So the frame time decides instead. Four steps, from the full chain at twice
+ * the pixel ratio down to no bloom at one, and the governor walks between them
+ * on what it measures rather than what it was told.
+ *
+ * Three things it has to get right, all of them learned the hard way in the
+ * general case and worth writing down here:
+ *
+ *  * **Median, not mean.** One 400 ms frame while a layer decodes must not
+ *    convince it the machine is slow for ever.
+ *  * **Hysteresis.** Stepping down at 45 fps and back up at 45 fps oscillates
+ *    for ever, and an image that changes resolution twice a second is worse
+ *    than one that is permanently soft. It steps down quickly and up slowly,
+ *    and it needs real headroom to go up.
+ *  * **Only drawn frames.** A skipped frame costs nothing and would otherwise
+ *    look like enormous headroom.
+ */
+const QUALITY = [
+  { pixels: 1,    bloom: false },
+  { pixels: 1.25, bloom: false },
+  { pixels: 1.5,  bloom: true  },
+  { pixels: 2,    bloom: true  },
+];
+/** Start optimistic: a capable machine should never see a soft first frame. */
+let quality = QUALITY.length - 1;
+/** Recent drawn-frame costs, in ms. Short, because it has to react in a second. */
+const recent = [];
+const RECENT_N = 30;
+/** Below 45 fps of *drawing* is where turning the body starts to feel stuck. */
+const TOO_SLOW_MS = 22;
+/** Above 100 fps there is room for more, but only if it holds. */
+const HEADROOM_MS = 9;
+let sinceStep = 0;
+
+function judgeFrame(ms) {
+  recent.push(ms);
+  if (recent.length > RECENT_N) recent.shift();
+  if (recent.length < RECENT_N || ++sinceStep < RECENT_N) return;
+  const sorted = [...recent].sort((a, b) => a - b);
+  const median = sorted[sorted.length >> 1];
+  if (median > TOO_SLOW_MS && quality > 0) setQuality(quality - 1);
+  else if (median < HEADROOM_MS && quality < QUALITY.length - 1) setQuality(quality + 1);
+}
+
+function setQuality(level) {
+  const next = QUALITY[Math.max(0, Math.min(QUALITY.length - 1, level))];
+  const was = QUALITY[quality];
+  quality = QUALITY.indexOf(next);
+  sinceStep = 0;
+  recent.length = 0;
+  renderer.setPixelRatio(Math.min(devicePixelRatio, next.pixels));
+  const r = canvas.getBoundingClientRect();
+  const w = Math.round(r.width), h = Math.round(r.height);
+  if (next.bloom !== was.bloom && w && h) {
+    app.bloom = next.bloom && !softwareRenderer();
+    buildComposer(w, h, app.bloom);
+  }
+  composer?.setSize(w, h);
+  bloomPass?.setSize(w * BLOOM_SCALE, h * BLOOM_SCALE);
+  invalidate(4);
+}
+
+/** What the governor settled on, for the reading page and for a test. */
+export const qualityLevel = () => ({
+  level: quality, of: QUALITY.length, ...QUALITY[quality],
+  pixelRatio: renderer.getPixelRatio(),
+  medianMs: recent.length
+    ? +[...recent].sort((a, b) => a - b)[recent.length >> 1].toFixed(2) : null,
+});
+
 function resize() {
+  invalidate(8);
   const r = canvas.getBoundingClientRect();
   const w = Math.round(r.width), h = Math.round(r.height);
   if (!w || !h || (canvas.width === w && canvas.height === h)) return;
   renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
   if (!composer) {
-    // decided once, on the first real size, when there is a context to ask
-    app.bloom = !softwareRenderer();
+    /* The first build only. After this the governor decides, from frame times
+     * rather than from the driver's name -- but a software rasteriser is worth
+     * believing straight away rather than making it prove itself for a second. */
+    if (softwareRenderer()) quality = 0;
+    app.bloom = QUALITY[quality].bloom && !softwareRenderer();
+    renderer.setPixelRatio(Math.min(devicePixelRatio, QUALITY[quality].pixels));
     buildComposer(w, h, app.bloom);
   } else {
     composer.setSize(w, h);
@@ -3913,6 +4156,7 @@ renderer.setAnimationLoop((now) => {
   const tsec = now * 0.001;
   lastT = tsec;
   // the instrument furniture is behind the lab too, and its trace is a canvas redrawn per frame
+  const hudMark = _t0();
   if (!app.labOpen) hud?.tick(tsec, {
     drive: app.layers.brain.on ? app.activity : 0,
     regions: app.layers.brain.on ? brainRegionIds() : [],
@@ -3920,6 +4164,7 @@ renderer.setAnimationLoop((now) => {
     structures: REG_READY ? registry().byId.size : 0,
     nodes: neuralNet?.stats().nodes ?? 0,
   });
+  _add('hud', hudMark);
   for (const m of materials) {
     const u = m.userData.uniforms;
     if (u?.uPulse) u.uPulse.value = tsec;
@@ -3931,7 +4176,7 @@ renderer.setAnimationLoop((now) => {
     app.scan.at = Math.sin(tsec * 0.42);
     applyScan();
   }
-  tickNeuralNet(tsec);
+  const netMark = _t0(); tickNeuralNet(tsec); _add('net', netMark);
 
   /* **The lab covers the stage, so the stage stops drawing itself.**
    *
@@ -3952,11 +4197,57 @@ renderer.setAnimationLoop((now) => {
     ui?.syncConn?.();
   }
   ui?.tickLab?.(tsec);
-  controls.update(); root.updateMatrixWorld();
+  /* `controls.update()` is what advances damping after a drag ends, and it fires
+   * `change` while it does -- which is what keeps the picture dirty for the rest
+   * of the glide. So it runs every frame; it is a few matrix operations. */
+  controls.update();
+  if (animating()) dirtyFrames = Math.max(dirtyFrames, 1);
+  /* A heartbeat, so that forgetting to invalidate somewhere can never freeze the
+   * picture -- the worst failure this whole mechanism can have, and the hardest
+   * to attribute, because a stale frame looks exactly like a control that does
+   * nothing. Twice a second against sixty is still ninety-seven per cent of the
+   * work gone, and it buys the property that no missing `invalidate` can cost
+   * more than half a second of staleness. */
+  if (now - lastDrawn > 500) dirtyFrames = Math.max(dirtyFrames, 1);
+  phase.frames++;
+  if (!dirtyFrames) return;
+  dirtyFrames--;
+  lastDrawn = now;
+  root.updateMatrixWorld();
   // after the bones have their world matrices for this frame and before anything is drawn
-  boneDQ?.update();
+  let mark = _t0(); boneDQ?.update(); _add('skin', mark);
   if (!hidden) {
-    renderPipeline();
-    updateLabels();
+    /* `renderer.info` resets itself on every `render()`, and the composer ends a
+     * frame with a fullscreen copy -- so reading the counters afterwards reports
+     * one draw call and one triangle for the whole body. Reset once per frame
+     * instead and let the passes accumulate. */
+    renderer.info.autoReset = false;
+    renderer.info.reset();
+    mark = _t0(); renderPipeline(); _add('render', mark);
+    const drawMs = performance.now() - mark;
+    mark = _t0(); updateLabels(); _add('labels', mark);
+    // the whole cost of putting one frame on screen, which is what the reader feels
+    judgeFrame(drawMs + (performance.now() - mark));
   }
+  phase.drawn++;
 });
+
+/**
+ * Is anything moving on its own?
+ *
+ * Everything here keeps the loop drawing without anybody touching the page, and
+ * the list is meant to be exhaustive -- a missing entry shows up as an animation
+ * that stutters or stops, which is a worse failure than a frame too many. The
+ * brain is two of them: its tissue shader breathes on `uTime`, and its cells
+ * fire on their own clock.
+ */
+function animating() {
+  if (flight) return true;
+  if (controls.autoRotate) return true;
+  if (app.playing) return true;
+  if (app.scan.sweeping) return true;
+  if (pathDots.length) return true;
+  if (heldCell != null) return true;
+  if (app.layers.brain?.on && (app.neural || app.brainLook !== 'anatomical')) return true;
+  return false;
+}

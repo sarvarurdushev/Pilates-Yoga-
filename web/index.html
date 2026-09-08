@@ -880,6 +880,11 @@ details.groups>summary em{font-style:normal;font-size:10px;color:var(--dim2);
 .groupsof{margin:0 0 12px;display:flex;flex-wrap:wrap;align-items:center;gap:5px}
 .groupsof h4{margin:0 4px 0 0;font-size:10px;letter-spacing:.13em;text-transform:uppercase;
  color:var(--dim2);font-weight:400}
+/* Isolate reads as an action rather than as another group, because it is one:
+ * the chips beside it change what is lit, this changes what exists. */
+.mini.solo{border-color:rgba(90,169,230,.45);color:#cfe4f6}
+.mini.solo:hover{border-color:rgba(90,169,230,.75);background:rgba(90,169,230,.12)}
+.mini.solo.on{background:rgba(90,169,230,.2);border-color:rgba(90,169,230,.7);color:#eaf4ff}
 
 /* the region network — see connectome.js */
 .connplot{position:relative;border:1px solid var(--line);

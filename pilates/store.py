@@ -210,6 +210,20 @@ CREATE TABLE IF NOT EXISTS accounts (
     verified_at   TEXT NOT NULL DEFAULT ''
 );
 
+-- The one person who owns this deployment, if anybody does. A single row keyed
+-- 'owner'; deliberately not a general settings table, because a settings table
+-- is where decisions go to become configuration nobody ever revisits.
+--
+-- The owner is not a role and it bypasses nothing. It is a standing
+-- instruction: wherever a studio exists, this person holds an active admin,
+-- coach and student membership in it. Every permission check downstream still
+-- reads memberships, so there is exactly one way to be allowed to do something
+-- and the owner goes through it like everybody else.
+CREATE TABLE IF NOT EXISTS deployment (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS studios (
     key        TEXT PRIMARY KEY,
     name       TEXT NOT NULL,
@@ -628,6 +642,52 @@ class Store:
             (studio.key, studio.name, studio.city, studio.country,
              studio.timezone, studio.created_at))
         self.db.commit()
+        # A new location the owner cannot see is a location they have to be
+        # granted access to by somebody -- and there is nobody above them to do
+        # it. So the grant happens here, once, where a studio comes into being.
+        self.seat_owner(studio.key)
+
+    # ------------------------------------------------------------- the owner
+
+    def owner(self) -> str:
+        """The username that owns this deployment, or an empty string."""
+        row = self.db.execute(
+            "SELECT value FROM deployment WHERE key = 'owner'").fetchone()
+        return row["value"] if row else ""
+
+    def set_owner(self, username: str) -> None:
+        """Name the owner and seat them at every studio.
+
+        Idempotent, and safe to run on every start: it writes memberships that
+        are already there. That is the point. The alternative is a deployment
+        where whether the owner can see a location depends on the order things
+        happened to be created in, which is not a rule anybody can hold in their
+        head.
+        """
+        self.db.execute(
+            "INSERT OR REPLACE INTO deployment (key, value) VALUES ('owner', ?)",
+            (username,))
+        self.db.commit()
+        for studio in self.studios():
+            self.seat_owner(studio["key"])
+
+    def seat_owner(self, studio: str) -> None:
+        """Give the owner all three roles at one studio, if there is an owner.
+
+        All three rather than admin alone, for the same reason the first admin
+        gets all three: the person who owns a studio also teaches in it and is
+        measured in it, and finding out what a student actually sees should not
+        need a second account.
+        """
+        from .accounts import ACTIVE, ADMIN, COACH, Membership, STUDENT, now
+
+        who = self.owner()
+        if not who or self.account(who) is None:
+            return
+        for role in (ADMIN, COACH, STUDENT):
+            self.put_membership(Membership(
+                username=who, studio=studio, role=role, state=ACTIVE,
+                decided_by="owner", decided_at=now()))
 
     def studios(self) -> list[dict]:
         return [dict(r) for r in
@@ -673,6 +733,9 @@ class Store:
         self.record_audit(actor=username, action="studio:created",
                           subject=username, studio=studio.key,
                           detail="first admin")
+        # The person who sets a deployment up owns it. Every studio made after
+        # this one seats them automatically -- see `add_studio`.
+        self.set_owner(username)
         return username
 
     def create_account(self, account: "Account", password: str = "") -> str:

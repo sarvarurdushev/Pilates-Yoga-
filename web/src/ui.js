@@ -30,7 +30,7 @@ export function mountUI(ctx) {
           selectStructure, setLang, setAtlas, setXray, setCutaway, setClip, setLabels,
           setRotate, setRegister, setInstruction, setLayer, setLayerOpacity, setView,
           resetView, setExercise, setPathway, activationOf,
-          setGroup, anatomyGroups, groupsForStructure,
+          setGroup, anatomyGroups, groupsForStructure, setIsolate, isolated,
           poseFromClip, setPlaying, setShowPaths, setShowMeshes, liveActivationOf,
           musclePathReport, setLabelKind, clearLabelKinds } = ctx;
 
@@ -571,8 +571,9 @@ export function mountUI(ctx) {
       <details class="groups" open>
         <summary><span>${T('groups')}</span><em>${gs.length}</em></summary>
         <p class="note small">${T('groupsHint')}</p>
-        ${on ? `<div class="groupon">${T('groupOn')}: <b>${esc(on.name[app.lang])}</b>
+          ${on ? `<div class="groupon">${T('groupOn')}: <b>${esc(on.name[app.lang])}</b>
           <span class="small-number">${on.members.length} ${T('groupMembers')}</span>
+          <button class="mini" data-isolate="${on.members.join(' ')}">${T('isolate')}</button>
           <button class="mini" id="groupClear">${T('groupClear')}</button></div>` : ''}
         ${GROUP_REGIONS.map(region => {
           const list = gs.filter(g => g.region === region.id);
@@ -656,11 +657,14 @@ export function mountUI(ctx) {
    */
   function groupBlock(r) {
     const gs = (groupsForStructure?.(r.id) ?? []).slice(0, 4);
-    if (!gs.length) return '';
+    const alone = (isolated?.() ?? []).includes(r.id);
+    const solo = `<button class="mini solo${alone ? ' on' : ''}" data-isolate="${r.id}">${
+      T(alone ? 'isolateOff' : 'isolate')}</button>`;
+    if (!gs.length) return `<div class="groupsof">${solo}</div>`;
     return `<div class="groupsof"><h4>${T('groupOf')}</h4>${gs.map(g =>
       `<button class="gchip${app.group === g.fma ? ' on' : ''}" data-group="${esc(g.fma)}"
                title="${esc(g.formal)}">${esc(g.name[app.lang])}
-        <em>${g.members.length}</em></button>`).join('')}</div>`;
+        <em>${g.members.length}</em></button>`).join('')}${solo}</div>`;
   }
 
   const plain = () => app.register !== 'clinical';
@@ -1107,6 +1111,14 @@ export function mountUI(ctx) {
         // pressing the group that is already showing turns it off, so a chip is
         // a toggle rather than a one-way door
         await setGroup(app.group === b.dataset.group ? null : b.dataset.group);
+        renderPanel(); syncControls();
+      };
+    for (const b of $('panelBody').querySelectorAll('[data-isolate]'))
+      b.onclick = async () => {
+        const ids = b.dataset.isolate.split(' ').map(Number);
+        const now = isolated?.() ?? [];
+        const same = ids.length === now.length && ids.every(id => now.includes(id));
+        await setIsolate(same ? null : ids);
         renderPanel(); syncControls();
       };
     const gclear = $('groupClear');
