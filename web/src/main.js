@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { makeStructureMaterial, makeBrainMaterial } from './brainMaterial.js';
+import { mergeLayer, PICK_LAYER } from './merged.js';
 import { makeTissueMaterial } from './tissue.js';
 import { NeuralNet } from './neuralNet.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -447,7 +448,118 @@ function bindLayer(name) {
     }
     if (rig.attach(o, seg)) { bound.set(o, { segment: seg, bindCentroid: c }); notePicking(o); }
   }
+  remerge(name);
 }
+
+/* ---------------------------------------------------- one draw call a layer
+ *
+ * See `merged.js` for why. In short: a whole body is 788 drawable meshes and
+ * most of a frame on integrated graphics is spent submitting them, before a
+ * pixel is shaded — which is why turning the quality down did not help.
+ *
+ * Only the skinned layers so far. Their meshes already sit at the identity under
+ * one skeleton with an identity bind matrix, so merging them is a concatenation
+ * and nothing else. The bones and the organs are rigid meshes reparented into
+ * the rig hierarchy, and each would have to be rewritten as a single-bone skin
+ * first; that is the next step, not this one.
+ */
+const MERGED = new Set(['muscles_superficial', 'muscles_deep', 'nervous']);
+
+/**
+ * Rebuild a layer's single drawable from the meshes it has just bound.
+ *
+ * Called at the end of `bindLayer`, because binding *replaces* meshes —
+ * `skinMesh` returns a new object and `L2.meshes` is patched in place — so a
+ * merge taken before it would be a merge of geometry nothing else refers to any
+ * more.
+ *
+ * The source meshes are not removed and not hidden. They are moved to a layer
+ * the camera does not render, which leaves them in the scene as the model:
+ * picking still raycasts them, `bound` still poses them, `restByMesh` still
+ * anchors labels to them. Only drawing moves.
+ */
+function remerge(name) {
+  if (!MERGED.has(name)) return;
+  const L2 = layers[name];
+  if (!L2?.loaded || !L2.material) return;
+  if (L2.merged) {
+    L2.merged.parent?.remove(L2.merged);
+    L2.merged.geometry.dispose();
+    L2.merged = null;
+  }
+  const src = L2.meshes ?? [];
+  const m = mergeLayer(src, { material: L2.material, name });
+  /* Layer 0 again if the merge refused, so a layer that cannot be merged is
+   * drawn the way it always was rather than not at all. */
+  for (const o of src) o.layers.set(m ? PICK_LAYER : 0);
+  if (!m) return;
+  L2.group.add(m);
+  L2.merged = m;
+  applyShown();
+  invalidate();
+}
+
+/**
+ * Carry per-mesh visibility into the palette, where a merged layer can read it.
+ *
+ * `syncLayers` and `onlyMeshes` decide what is on screen by writing
+ * `mesh.visible`, and that is still the one place the decision is made. This
+ * only copies the answer somewhere a single draw call can see it: the alpha of
+ * the offset texture, one texel per structure, read in the vertex shader.
+ *
+ * **A structure is shown if any mesh of it is.** A paired structure is one
+ * region id over two meshes and the flag cannot separate them, so the left and
+ * right of one muscle are on screen together or not at all — which is what every
+ * caller already asks for, and what `onlyShow` and the isolate set both do.
+ */
+function applyShown() {
+  const ls = [...MERGED].map(n => layers[n]).filter(L => L?.merged);
+  if (!ls.length) return;
+  palette.showAll();
+  for (const L2 of ls) {
+    const on = new Set(), off = new Set();
+    for (const o of L2.meshes ?? []) {
+      const own = restByMesh.get(o);
+      const ids = own ? [...own.keys()]
+                      : (o.userData.regionId != null ? [o.userData.regionId] : []);
+      for (const id of ids) (o.visible ? on : off).add(id);
+    }
+    let hiding = 0;
+    for (const id of off) if (!on.has(id)) { palette.setShown(id, false); hiding = 1; }
+    /* Nothing to draw is a hidden mesh rather than a draw call that clips every
+     * triangle it submits. */
+    L2.merged.visible = on.size > 0;
+    /* And nothing hidden is a shader that does not look. The flag costs a
+     * texture fetch per vertex to read, which on a body of 605k triangles is
+     * more than the draw calls the merge saved -- so it is only read when
+     * something is actually hidden, which is almost never. */
+    const u = L2.material?.userData?.uniforms;
+    if (u?.uHiding) u.uHiding.value = hiding;
+    L2.shownIds = on; L2.hiddenIds = new Set([...off].filter(id => !on.has(id)));
+  }
+  palette.upload();
+}
+
+/**
+ * What each merged layer is showing, for a test that cannot see pixels.
+ *
+ * Whether one structure is on screen inside a merged layer cannot be read off
+ * the picture: the lone view and the body view are each framed to their own
+ * subject, so they fill the same fraction of the same panel and a pixel count
+ * cannot tell a muscle from a body — which is the trap `parcelShare` exists to
+ * avoid on the brain side, and which one version of this test fell into. So the
+ * mechanism reports itself instead.
+ */
+export const mergedState = () => Object.fromEntries([...MERGED].map(name => {
+  const L2 = layers[name];
+  return [name, !L2?.merged ? null : {
+    sources: L2.merged.userData.sources,
+    shown: L2.shownIds?.size ?? 0,
+    hidden: L2.hiddenIds?.size ?? 0,
+    visible: L2.merged.visible,
+    hiding: L2.material?.userData?.uniforms?.uHiding?.value ?? 0,
+  }];
+}));
 
 /**
  * Cache what the raycaster needs for a skinned mesh.
@@ -1515,6 +1627,10 @@ export function syncLayers() {
     const u = m.userData.uniforms;
     if (u) { u.uSelected.value = app.selected ?? -1; u.uHover.value = app.hover ?? -1; }
   }
+  /* Last, because everything above is what decides it: the layer toggles, the
+   * mesh switch, the isolate set. A merged layer has no `mesh.visible` of its
+   * own, so this is where that decision reaches it. */
+  applyShown();
 }
 
 /* ------------------------------------------------- where a structure is now
@@ -2059,6 +2175,12 @@ export function captureStage(scale = 2) {
 
 /* ------------------------------------------------------------------ picking */
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+/* The merged layers' source meshes are moved off the camera's layer so the
+ * renderer skips them -- see `remerge`. They are still the things a ray is
+ * meant to hit, and `Raycaster` tests an object's layer before it looks at a
+ * triangle, so without this the muscles became unclickable the moment they
+ * started drawing in one call. */
+ray.layers.enable(PICK_LAYER);
 
 /**
  * Everything a ray could hit, as meshes rather than as groups.
@@ -2924,13 +3046,22 @@ function onlyMeshes(want, extra = []) {
   const hidden = [];
   scene.traverse(o => {
     if (!(o.isMesh || o.isPoints || o.isLine) || want.has(o) || !o.visible) return;
+    /* A merged layer is one mesh standing for four hundred structures, so hiding
+     * it would hide the one that was asked for along with the rest. It is left
+     * alone and `applyShown` narrows it to whatever `want` holds -- which is
+     * also why the wanted meshes below still have their visibility set even
+     * though the renderer no longer draws them: that flag is what the merged
+     * layer reads. */
+    if (o.userData.merged) return;
     hidden.push(o); o.visible = false;
   });
   for (const m of want) m.visible = true;
   for (const m of extra) m.visible = true;
+  applyShown();
   return () => {
     for (const o of hidden) o.visible = true;
     for (const m of extra) m.visible = false;
+    applyShown();
   };
 }
 

@@ -40,10 +40,19 @@ export class RegionPalette {
      * same growth rule and the same upload, and two objects that must always
      * be the same size are one object.
      *
-     * RGB is a displacement in body coordinates; A is unused. Float, like the
-     * colours, because a quantised displacement makes structures jitter as the
-     * slider moves. */
+     * RGB is a displacement in body coordinates. **A is whether the structure is
+     * drawn at all** — 1 by default, 0 to skip it — which is the one thing a
+     * merged layer cannot do per mesh any more, because it no longer has one
+     * mesh per structure to hide. It rides here rather than in a texture of its
+     * own for the same reason activation rides in the colour texture's alpha: it
+     * is the same indexing, the same growth rule and the same upload.
+     *
+     * Float, like the colours, because a quantised displacement makes structures
+     * jitter as the slider moves. */
     const offsets = new Float32Array(size * 4);
+    // shown by default: a structure with no flag written must draw, or a body
+    // whose ids outran the texture would silently lose its far half
+    for (let i = 0; i < size; i++) offsets[i*4+3] = 1;
     if (this.offsets) offsets.set(this.offsets.subarray(0, Math.min(this.offsets.length, offsets.length)));
     this.offsets = offsets;
     const oldOffset = this.offsetTexture;
@@ -139,7 +148,40 @@ export class RegionPalette {
   }
 
   clearOffsets() {
-    this.offsets.fill(0);
+    // xyz only: the alpha is visibility, not displacement, and clearing it would
+    // put the body back together by making all of it disappear
+    for (let i = 0; i < this.size; i++) {
+      this.offsets[i*4] = 0; this.offsets[i*4+1] = 0; this.offsets[i*4+2] = 0;
+    }
+    this._offsetDirty = true;
+    return this;
+  }
+
+  /**
+   * Whether a merged layer draws this structure.
+   *
+   * Per-structure visibility used to be `mesh.visible`, which a merged layer no
+   * longer has one of. The vertex shader reads this and sends a hidden
+   * structure's vertices outside the clip volume, so its triangles are thrown
+   * away before rasterisation — the same cost a hidden mesh had, without the
+   * draw call.
+   *
+   * @param {number} id @param {boolean} on
+   */
+  setShown(id, on) {
+    this._fit(id);
+    const v = on ? 1 : 0;
+    if (this.offsets[id*4+3] !== v) { this.offsets[id*4+3] = v; this._offsetDirty = true; }
+    return this;
+  }
+
+  isShown(id) {
+    return (id >= 0 && id < this.size) ? this.offsets[id*4+3] > 0.5 : true;
+  }
+
+  /** Put every structure back on screen, before a pass writes the ones it wants off. */
+  showAll() {
+    for (let i = 0; i < this.size; i++) this.offsets[i*4+3] = 1;
     this._offsetDirty = true;
     return this;
   }

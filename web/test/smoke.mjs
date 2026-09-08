@@ -1426,6 +1426,146 @@ else {
   if (found.nothing) errors.push('the structure search matches nonsense');
 }
 
+/* -------------------------------------------------- one draw call a layer
+ *
+ * The skinned layers are drawn as one mesh each -- see `merged.js`. Three things
+ * have to hold at once for that to be a saving rather than a regression, and
+ * none of them fails loudly: the merge has to actually be in effect, a merged
+ * layer has to still be able to show one structure on its own, and the meshes
+ * moved off the camera's layer have to still be the things a ray hits.
+ */
+await page.evaluate(async () => {
+  const m = await import('/src/main.js');
+  for (const l of ['skeleton', 'muscles_superficial', 'muscles_deep', 'organs', 'nervous'])
+    await m.setLayer(l, true);
+  await m.setLayer('brain', false);
+  m.setExercise(null); m.selectStructure(null); m.setIsolate(null);
+  /* Back to the standing figure. By this point the run has flown the camera at a
+   * muscle group, and where the camera is decides what a ray can reach -- the
+   * first version of the check below asserted per layer and failed on the
+   * framing rather than on the merge. */
+  m.resetView();
+});
+await page.waitForTimeout(5000);
+const oneCall = await page.evaluate(async () => {
+  const m = await import('/src/main.js');
+  const S = await import('/src/structures.js');
+  const ink = (cv) => {
+    const d = cv.getContext('2d', { willReadFrequently: true })
+               .getImageData(0, 0, cv.width, cv.height).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] + d[i+1] + d[i+2] > 90) n++;
+    return n;
+  };
+  let muscle = null, bone = null, drawn = 0;
+  for (const [id, r] of S.registry().byId) {
+    if (r.layer === 'muscles_superficial' && r.name.en === 'Rectus abdominis') muscle = id;
+    if (r.layer === 'skeleton' && r.name.en === 'Sacrum') bone = id;
+    if (r.layer !== 'brain' && !r.parts) drawn++;
+  }
+  const shot = (id, alone) => {
+    const cv = document.createElement('canvas'); cv.width = 220; cv.height = 220;
+    const placed = m.renderStructureInto(cv, 220, 220, id, { alone });
+    return { placed: !!placed, ink: ink(cv) };
+  };
+  const out = { structures: drawn, muscle: {}, bone: {} };
+  out.muscle.alone = shot(muscle, true);
+  out.bone.alone = shot(bone, true);
+  /* Whether hiding inside a merged layer works, asked of the mechanism rather
+   * than of the picture. Both offscreen views are framed to their own subject,
+   * so one muscle and a whole body fill the same fraction of the same panel and
+   * their ink is nearly equal -- 0.89 measured, which is why the pixel version
+   * of this check was thrown away. */
+  out.open = m.mergedState();
+  m.setIsolate([muscle]);
+  await new Promise(r => setTimeout(r, 900));
+  out.isolated = m.mergedState();
+  m.setIsolate(null);
+  await new Promise(r => setTimeout(r, 900));
+  out.reopened = m.mergedState();
+  m.invalidate?.(8);
+  await new Promise(r => setTimeout(r, 1400));
+  const st = m.frameStats();
+  out.draws = st.drawCalls;
+  out.triangles = st.triangles;
+  /* Picked over a grid rather than at a guessed pixel: the console covers the
+   * right of the stage, so the body is not where the middle of the canvas is,
+   * and a single probe through the centre finds nothing whether the merge works
+   * or not. */
+  const c = document.querySelector('canvas').getBoundingClientRect();
+  const byLayer = {};
+  for (let fx = 0.2; fx <= 0.8; fx += 0.1)
+    for (let fy = 0.15; fy <= 0.9; fy += 0.075) {
+      const id = m.pickAt(c.left + c.width * fx, c.top + c.height * fy);
+      const layer = id == null ? null : S.get(id)?.layer;
+      if (layer) byLayer[layer] = (byLayer[layer] ?? 0) + 1;
+    }
+  out.picked = byLayer;
+  return out;
+});
+console.log('merged layers:', JSON.stringify(oneCall));
+/* 449 structures over 788 meshes before this; the three skinned layers are 437 of
+ * them and now cost three. The bar is loose on purpose — it is here to catch the
+ * merge silently not happening, not to pin an exact count. */
+if (!(oneCall.draws < oneCall.structures))
+  errors.push(`${oneCall.draws} draw calls for ${oneCall.structures} structures — ` +
+    `the layer merge is not in effect`);
+if (oneCall.triangles < 400000)
+  errors.push(`only ${oneCall.triangles} triangles reach the renderer — the merge lost geometry`);
+if (!oneCall.muscle.alone.ink)
+  errors.push('a muscle rendered on its own is blank — a merged layer cannot show one structure');
+if (!oneCall.bone.alone.ink)
+  errors.push('a bone rendered on its own is blank');
+/* On its own means on its own — asked of the flags, not of the pixels.
+ *
+ * Nothing hidden while the body is whole, and the vertex shader told not to
+ * bother looking; one structure left in the superficial muscles when it is
+ * isolated, with the rest of that layer flagged off and the other merged layers
+ * emptied; and all of it back when the isolation is cleared. */
+{
+  const at = (state, layer) => state?.[layer] ?? null;
+  const sup = at(oneCall.open, 'muscles_superficial');
+  if (!sup) errors.push('the superficial muscles are not merged at all');
+  else {
+    if (sup.hidden) errors.push(`${sup.hidden} structures hidden with nothing isolated`);
+    if (sup.hiding) errors.push('the shader is reading the visibility flag with nothing hidden');
+    if (!(sup.shown > 30)) errors.push(`only ${sup.shown} superficial muscles are shown at rest`);
+  }
+  const iso = at(oneCall.isolated, 'muscles_superficial');
+  if (!iso) errors.push('isolating a muscle unmerged its layer');
+  else {
+    if (iso.shown !== 1)
+      errors.push(`isolating one muscle left ${iso.shown} shown in its layer`);
+    if (!(iso.hidden > 30))
+      errors.push(`isolating one muscle hid only ${iso.hidden} of its layer — ` +
+        `the merged layer is still drawing all of it`);
+    if (!iso.hiding)
+      errors.push('a structure is flagged hidden but the shader was not told to look');
+  }
+  for (const l of ['muscles_deep', 'nervous']) {
+    const other = at(oneCall.isolated, l);
+    if (other && other.visible)
+      errors.push(`${l} still draws while a superficial muscle is isolated`);
+  }
+  const back = at(oneCall.reopened, 'muscles_superficial');
+  if (back && back.hidden)
+    errors.push(`${back.hidden} structures stayed hidden after the isolation was cleared`);
+}
+/* The source meshes are on a layer the camera does not render. If the raycaster
+ * were not told about it, every muscle and every nerve would be unclickable — and
+ * nothing else in the app would say so.
+ *
+ * Any hit in any merged layer is the whole assertion. Which of the three the
+ * grid lands on is a fact about where the camera is; that none of them can be
+ * hit is the regression, and it is total when it happens. */
+{
+  const MERGED = ['muscles_superficial', 'muscles_deep', 'nervous'];
+  const n = MERGED.reduce((t, l) => t + (oneCall.picked[l] ?? 0), 0);
+  if (!n)
+    errors.push('nothing in a merged layer could be picked anywhere on the body — ' +
+      'the source meshes are off the camera\'s layer and the raycaster was not told');
+}
+
 const grouped = await page.evaluate(async () => {
   const chips = [...document.querySelectorAll('#panelBody [data-group]')];
   if (!chips.length) return { missing: true };
