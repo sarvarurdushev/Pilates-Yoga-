@@ -276,30 +276,38 @@ def roster(store, viewer: Viewer | None) -> dict:
         # What was written about this person's body, on the roster rather than
         # two clicks inside it. A reading nobody sees on the way into the class
         # is a reading that changes nothing about the class.
-        read = store.structure_evals(assignment.student)
-        # Two *different* findings, newest first. Taking the last two rows
-        # gives the same check twice, because a coach who flags a shoulder in
-        # week eleven usually flagged it in week ten as well -- and a roster
-        # that says the same thing twice has told you one thing.
-        flagged, said = [], set()
-        for one in reversed(read):
-            for line in one.flagged:
-                key = (one.structure, line.split(" — ")[0])
-                if key in said:
-                    continue
-                said.add(key)
-                flagged.append(f"{one.structure}: {line}")
-            if len(flagged) >= 2:
+        # The two findings worth putting on a roster line, which is not the two
+        # most recent. A body with three hundred structures on file has dozens
+        # of open findings written on the same day, so "most recent" picks
+        # whichever sorted first -- and the coach reads "third plantar
+        # interosseous" as the headline for a person with a knee history.
+        # Worst first, then longest-running, then alphabetical to settle it.
+        standing = standing_readings(store, assignment.student)
+        open_now = standing["open_readings"]
+        # Two different *structures*. Both checks on one calcaneal tendon is
+        # the same failure as two rows about one shoulder: it fills the line
+        # and tells the coach one thing.
+        flagged, shown = [], set()
+        for r in open_now:
+            if r["structure"] in shown:
+                continue
+            shown.add(r["structure"])
+            flagged.append(
+                f"{r['structure']}: {r['check']} — "
+                f"{'a problem' if r['verdict'] == 'problem' else 'worth watching'}")
+            if len(flagged) == 2:
                 break
-        flagged = flagged[:2]
-        seen["readings"] = len(read)
+        latest = store.latest_structure_evals(assignment.student, per=1)
+        latest.sort(key=lambda e: (e.made_on, e.made_at))
+        seen["readings"] = standing["readings"]
+        seen["open"] = len(open_now)
         seen["focus"] = flagged[0] if flagged else ""
         seen["also"] = flagged[1] if len(flagged) > 1 else ""
-        seen["last_read"] = read[-1].made_on if read else ""
-        seen["note"] = read[-1].note if read else ""
+        seen["last_read"] = latest[-1].made_on if latest else ""
+        seen["note"] = next((one.note for one in reversed(latest) if one.note), "")
         # A nerve symptom called a problem is the one thing that outranks
         # everything else on this list.
-        seen["urgent"] = seen["urgent"] or any(one.urgent for one in read[-6:])
+        seen["urgent"] = seen["urgent"] or any(one.urgent for one in latest)
         rows.append(seen)
     # Nothing written yet sorts up with the other things that should not be
     # found by scrolling: it is the row where the coach has nothing to go on.
@@ -462,7 +470,9 @@ def standing_readings(store, username: str, weeks: int = 6) -> dict:
     a sheet nobody reads twice.
     """
     latest: dict = {}
-    for one in store.structure_evals(username):
+    # The last few of each, not the first few of everything: a flat limit over
+    # a body with thousands of readings on file returns the earliest fortnight.
+    for one in store.latest_structure_evals(username, per=4):
         for check in one.checks:
             if not check["verdict"]:
                 continue
@@ -494,13 +504,13 @@ def standing_readings(store, username: str, weeks: int = 6) -> dict:
         (settled if row["verdict"] == "fine" else open_now).append(row)
 
     open_now.sort(key=lambda r: (r["verdict"] != "problem", -r["streak"],
-                                 r["structure"]))
+                                 r["structure"], r["check"]))
     # Something that was a problem and is now fine is worth one line, because
     # "this is fixed" is a thing a coach wants to walk in knowing.
     fixed = [r for r in settled if r["seen"] > 2][:4]
     fixed.sort(key=lambda r: r["last_on"], reverse=True)
     return {"open_readings": open_now[:8], "fixed_readings": fixed,
-            "readings": sum(1 for _ in store.structure_evals(username))}
+            "readings": sum(store.count_structure_evals(username).values())}
 
 
 def structure_history(store, viewer: Viewer | None, username: str,
@@ -533,13 +543,14 @@ def structures_seen(store, viewer: Viewer | None, username: str = "") -> dict:
     who = username or person.username
     guard_subject(store, person, who)
     mine = person.is_self(who)
+    counts = store.count_structure_evals(who)
     seen: dict[str, dict] = {}
-    for one in store.structure_evals(who):
+    for one in store.latest_structure_evals(who, per=1):
         row = seen.setdefault(one.structure, {
             "structure": one.structure, "kind": one.kind, "fma": one.fma,
             "count": 0, "last_on": "", "flagged": [], "note": "",
             "shared": "", "score": None, "urgent": False})
-        row["count"] += 1
+        row["count"] = counts.get(one.structure, 0)
         row["last_on"] = one.made_on
         row["score"] = one.average if one.average is not None else row["score"]
         if one.shared:

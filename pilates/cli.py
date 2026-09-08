@@ -2270,14 +2270,16 @@ def cmd_seed(args) -> int:
             return 1
         try:
             made = sow(store, password=args.password or PASSWORD,
-                       classes=not args.no_classes, into=args.studio or "")
+                       classes=not args.no_classes, into=args.studio or "",
+                       everything=not args.small)
         except ValueError as exc:
             print(str(exc), file=sys.stderr)
             return 1
         print(f"Seeded {args.db}: {len(made['people'])} people, "
               f"{len(made['studios'])} studios, {made['assignments']} "
               f"coach-student assignments, {made['sessions']} recorded "
-              f"classes, {made['notes']} coach notes.")
+              f"classes, {made['notes']} coach notes, "
+              f"{made['readings']:,} structure readings.")
         print(summary(made, password=args.password or PASSWORD))
     return 0
 
@@ -2691,6 +2693,12 @@ def main(argv: list[str] | None = None) -> int:
                     help="skip the measurements; much faster, no charts")
     sd.add_argument("--force", action="store_true",
                     help="seed even though this database already has accounts")
+    sd.add_argument("--small", action="store_true",
+                    help="only the hand-written stories. Without it every "
+                         "muscle, bone and nerve gets twenty classes of "
+                         "readings for everybody -- about 115,000 rows and "
+                         "55MB, which is the point, but is a lot to carry "
+                         "around if all you wanted was a login to look at")
     sd.set_defaults(func=cmd_seed)
 
     rs = sub.add_parser("reset",

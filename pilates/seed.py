@@ -26,11 +26,15 @@ way to tell a seeded student from a real one afterwards.
 """
 from __future__ import annotations
 
+import json
+import zlib
 from dataclasses import dataclass
 from datetime import date, timedelta
 
 from .accounts import (ACTIVE, ADMIN, COACH, PENDING, STUDENT, Account,
                        Assignment, Membership, Profile, Screening, Studio, now)
+from pathlib import Path
+
 from .demo import fill
 from .observations import Observation
 
@@ -240,7 +244,7 @@ def already_seeded(store) -> bool:
 
 
 def sow(store, password: str = PASSWORD, classes: bool = True,
-        into: str = "") -> dict:
+        into: str = "", everything: bool = True) -> dict:
     """Build the whole studio. Returns what was made, for printing.
 
     Ordered the way it has to be: studios, then people, then roles, then the
@@ -339,6 +343,11 @@ def sow(store, password: str = PASSWORD, classes: bool = True,
         made["notes"] += 1
 
     made["readings"] = _write_readings(store, handles, into)
+    if everything:
+        coach_of = {student: coach for coach, students in ROSTERS.items()
+                    for student in students}
+        made["readings"] += _write_everything(
+            store, handles, coach_of, {p.handle: p.name for p in PEOPLE})
 
     store.record_audit(actor="seed", action="seed:sown",
                        detail=f"{len(made['people'])} people, "
@@ -658,6 +667,140 @@ def _axis_key(check: str) -> str:
     fixture only needs the same string every week for the same question.
     """
     return check.lower().replace(" ", "-")[:60]
+
+
+#: Where the mesh list lives. The seeder reads it so that "every structure" is
+#: whatever the atlas actually ships rather than a list in this file that would
+#: drift away from it the first time a mesh was added.
+ATLAS = (Path(__file__).resolve().parent.parent
+         / "web" / "src" / "generated" / "structures.json")
+
+#: How many classes the exhaustive pass writes per person. Twenty because the
+#: question this fixture answers is what a screen looks like after a term of
+#: somebody actually using it, and a term is twenty classes.
+CLASSES = 20
+
+#: The axis keys the page derives for each kind, with the wording it shows. Kept
+#: in step with `web/src/session/axes.js` on purpose: seeded history that used
+#: different keys would draw its own lines beside the live ones instead of
+#: continuing them, and the chart would silently show a muscle twice.
+AXES = {
+    "muscle": [("job", "Is it doing its own job?"),
+               ("feel", "Do they feel it in the right place?")],
+    "bone": [("place", "Does it start in the right place?"),
+             ("hold", "Does it stay there under load?"),
+             ("stack", "Does the movement pass through it, or stop at it?")],
+    "nerve": [("symptom", "Did they feel anything in this area?"),
+              ("lasted", "How long did it last?")],
+}
+
+#: What a coach writes when something is not fine, per kind. Short, because a
+#: fixture with a paragraph on every one of a hundred thousand rows is a fixture
+#: nobody can read and a database nobody wants to ship.
+SAID = {
+    "muscle": ["quiet — something else is carrying it",
+               "grips and will not let go between reps",
+               "comes in late, after the movement has started",
+               "fine on the right, absent on the left",
+               "fades after about six reps"],
+    "bone": ["starts well and drifts once the spring goes on",
+             "the movement hinges here rather than passing through",
+             "sits rotated at the start",
+             "moves as a block with the one above"],
+    "nerve": ["pins and needles, gone within a minute",
+              "reported tingling; nothing during the class itself",
+              "numb patch, cleared before they left"],
+}
+
+#: The five shapes a twelve-to-twenty week arc can take, and how common each is.
+#: Weighted so that most of a body is fine — a person with three hundred and
+#: sixty problems is not a person, and a fixture that says otherwise teaches the
+#: interface to shout.
+SHAPES = (["settled"] * 62 + ["improving"] * 20 + ["from-a-problem"] * 9
+          + ["stubborn"] * 6 + ["worsening"] * 3)
+
+
+def _shape_for(person: str, structure: str) -> str:
+    """Deterministic, so two runs of the fixture agree with each other."""
+    seed = zlib.crc32(f"{person}|{structure}".encode())
+    return SHAPES[seed % len(SHAPES)]
+
+
+def _arc(shape: str, n: int) -> list:
+    """`n` scores, 0-10, following that shape. Never a straight line.
+
+    The wobble is what makes it look like somebody watching rather than a
+    function being plotted: a real coach's third reading is not reliably
+    between their second and their fourth.
+    """
+    out = []
+    for i in range(n):
+        t = i / max(1, n - 1)
+        base = {"settled": 8.6,
+                "improving": 5.0 + 4.0 * t,
+                "from-a-problem": 2.0 + 6.5 * t,
+                "stubborn": 4.4,
+                "worsening": 8.0 - 4.5 * t}[shape]
+        # A repeatable jitter, ±1, from the index alone.
+        wobble = ((i * 7919) % 5 - 2) / 2
+        out.append(max(0, min(10, round(base + wobble))))
+    return out
+
+
+def _write_everything(store, handles, coach_of, names) -> int:
+    """A reading of every structure, for everybody, across twenty classes.
+
+    This is the one that answers "what does it look like when it is full".
+    Written in one transaction because a hundred thousand commits is a hundred
+    thousand fsyncs; see `Store.evaluate_structures`.
+    """
+    from .structure_eval import StructureEval
+
+    if not ATLAS.exists():
+        return 0
+    meshes = json.loads(ATLAS.read_text(encoding="utf-8"))
+    meshes = meshes["structures"] if isinstance(meshes, dict) else meshes
+    wanted = []
+    for mesh in meshes:
+        layer = mesh.get("layer", "")
+        kind = ("muscle" if layer.startswith("muscles")
+                else "bone" if layer == "skeleton"
+                else "nerve" if layer == "nervous" else "")
+        if kind:
+            wanted.append((str(mesh["name"]).strip().capitalize(), kind))
+
+    rows = []
+    for handle, username in handles.items():
+        # Whoever has them. A reading is written by a person, and one written
+        # by "the studio" would be the only unattributed thing in the record.
+        by = names.get(coach_of.get(handle), "The studio")
+        curated = {structure for structure, *_ in ARCS.get(handle, [])}
+        for structure, kind in wanted:
+            if structure in curated:
+                continue          # the hand-written story already covers it
+            shape = _shape_for(handle, structure)
+            axes = AXES[kind]
+            arcs = {key: _arc(shape, CLASSES) for key, _ in axes}
+            phrases = SAID[kind]
+            for week in range(CLASSES):
+                when = date.today() - timedelta(weeks=CLASSES - week)
+                checks = []
+                for n, (key, label) in enumerate(axes):
+                    score = arcs[key][week]
+                    checks.append({
+                        "label": label, "axis": key, "score": score,
+                        "verdict": ("fine" if score >= 7
+                                    else "watch" if score >= 4 else "problem"),
+                        # Only where there is something to explain. A note
+                        # beside every score is noise beside a hundred thousand.
+                        "note": (phrases[(week + n) % len(phrases)]
+                                 if score < 7 else ""),
+                    })
+                rows.append(StructureEval(
+                    username=username, by=by, structure=structure, kind=kind,
+                    checks=checks, made_on=str(when),
+                    made_at=f"{when}T10:00:00+00:00"))
+    return store.evaluate_structures(rows)
 
 
 def _write_readings(store, handles, into: str = "") -> int:

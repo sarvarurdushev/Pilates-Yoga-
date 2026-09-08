@@ -915,6 +915,66 @@ class Store:
         self.db.commit()
         return int(cursor.lastrowid)
 
+    def latest_structure_evals(self, username: str, per: int = 3) -> list:
+        """The most recent `per` readings of each structure, for one person.
+
+        `structure_evals` takes a flat limit and orders oldest first, which is
+        right for drawing one structure's history and silently wrong for
+        anything that asks "what is the state of this body": with a few
+        thousand readings on file the limit cut it down to the *earliest* few
+        hundred, so the pre-class sheet and the notes list were both answering
+        from the first fortnight and would never have shown a recent finding at
+        all.
+
+        A window function does it in one pass and returns hundreds of rows
+        instead of thousands.
+        """
+        from .structure_eval import StructureEval
+
+        rows = self.db.execute(
+            "SELECT * FROM ("
+            "  SELECT *, ROW_NUMBER() OVER ("
+            "    PARTITION BY structure ORDER BY made_on DESC, made_at DESC,"
+            "    id DESC) AS rn"
+            "  FROM structure_evals WHERE username = ?"
+            ") WHERE rn <= ? ORDER BY structure, made_on, made_at, id",
+            (username, int(per)))
+        return [StructureEval(username=row["username"], by=row["by"],
+                              structure=row["structure"], kind=row["kind"],
+                              fma=row["fma"], side=row["side"],
+                              note=row["note"], shared=row["shared"],
+                              checks=json.loads(row["checks"] or "[]"),
+                              session=row["session"], made_on=row["made_on"],
+                              made_at=row["made_at"], id=row["id"])
+                for row in rows]
+
+    def count_structure_evals(self, username: str) -> dict:
+        """How many readings each structure has. Counted in SQL, not loaded."""
+        return {row["structure"]: row["n"] for row in self.db.execute(
+            "SELECT structure, COUNT(*) AS n FROM structure_evals "
+            "WHERE username = ? GROUP BY structure", (username,))}
+
+    def evaluate_structures(self, evaluations) -> int:
+        """Write many readings in one transaction. Returns how many.
+
+        `evaluate_structure` commits per row, which is right for a coach saving
+        one reading and catastrophic for anything bulk: a hundred thousand
+        commits is a hundred thousand fsyncs. This is the same write with the
+        commit pulled out of the loop.
+        """
+        rows = [(one.username, one.by, one.structure, one.kind, one.fma,
+                 one.side, one.note, one.shared, json.dumps(one.checks),
+                 one.session, one.made_on, one.made_at)
+                for one in evaluations]
+        if not rows:
+            return 0
+        self.db.executemany(
+            "INSERT INTO structure_evals (username, by, structure, kind, fma, "
+            "side, note, shared, checks, session, made_on, made_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
+        self.db.commit()
+        return len(rows)
+
     def structure_evals(self, username: str = "", structure: str = "",
                         limit: int = 400) -> list:
         """Readings, optionally for one person and one structure.

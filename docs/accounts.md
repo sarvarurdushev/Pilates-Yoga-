@@ -611,6 +611,46 @@ The prose is written some weeks and not others, because a coach with ninety
 seconds between classes writes a sentence sometimes, and a fixture where every
 week has a paragraph is a fixture flattering the interface.
 
+### Full, not sampled
+
+By default the fixture also writes **a reading of every muscle, every bone and
+every nerve, for every person, across twenty classes** — 115,000 readings, about
+7,200 per person, 55 MB. `pilates seed --small` (or `sow(..., everything=False)`)
+writes only the curated stories, which is what the unit tests use.
+
+Two reasons it is worth shipping something that large. It answers *what does
+this look like when it is full*, which nine students and four muscles cannot.
+And it is the only way to find the things that only break at scale — it found
+three:
+
+- **`structure_evals` silently returned the wrong rows.** It takes a flat limit
+  (400) and orders oldest first, which is right for drawing one structure's
+  history and wrong for anything asking what state a body is in. With thousands
+  of readings on file the pre-class sheet and the notes list were both answering
+  from the first fortnight and could never have shown a recent finding at all.
+  There is now `latest_structure_evals`, a window function returning the last
+  few of *each* structure, and a test that asserts the flat limit returns the
+  earliest rows so nobody re-introduces it.
+- **The roster headlined the wrong thing.** With dozens of open findings written
+  on the same day, "most recent" picked whichever sorted first — so a person
+  with a knee history led with *third plantar interosseous*. It now ranks worst
+  first, then longest-running, and takes two different *structures* rather than
+  two checks on one.
+- **Writing was one commit per row.** Fine for a coach saving a reading, and a
+  hundred thousand fsyncs for a fixture. `evaluate_structures` writes them in
+  one transaction — 136,000 rows a second, so the whole set takes about six.
+
+Most of a body is fine, deliberately: roughly 62% of structures settle, 20%
+improve, 9% climb out of a real problem, 6% stay stubborn and 3% get worse. A
+person with three hundred and sixty problems is not a person, and a fixture that
+says otherwise teaches the interface to shout. The arcs carry a repeatable
+wobble so the lines look like somebody watching rather than a function being
+plotted.
+
+The hand-written stories are not overwritten — the exhaustive pass skips any
+structure a curated arc already covers, so Kim Min-ji's psoas keeps its own
+vocabulary and its own prose.
+
 What it deliberately contains, one per thing somebody has to be able to see:
 
 | Person | Shows |

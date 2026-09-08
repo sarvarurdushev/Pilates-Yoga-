@@ -429,6 +429,83 @@ class TestMigration:
             assert rows[0].shared == ""
 
 
+class TestReadingABodyWithYearsOnFile:
+    """`structure_evals` takes a flat limit and orders oldest first. That is
+    right for drawing one structure's history and silently wrong for anything
+    asking what the state of a body is."""
+
+    def _fill(self, store, structures=5, weeks=200):
+        from pilates.structure_eval import StructureEval
+
+        store.enrol("ann")
+        rows = []
+        for n in range(structures):
+            for week in range(weeks):
+                rows.append(StructureEval(
+                    username="ann", by="Coach", kind="muscle",
+                    structure=f"muscle {n}",
+                    checks=[{"label": "job", "axis": "job", "score": week % 11}],
+                    made_on=f"2026-{1 + week // 28:02d}-{1 + week % 28:02d}"))
+        store.evaluate_structures(rows)
+        return len(rows)
+
+    def test_a_flat_limit_returns_the_earliest_rows_not_the_latest(self, tmp_path):
+        """The bug, written down: with a thousand readings on file the sheet
+        was answering from the first fortnight and could never have shown a
+        recent finding at all."""
+        with Store.open(tmp_path / "big.db") as store:
+            self._fill(store)
+            flat = store.structure_evals("ann")
+            assert len(flat) == 400          # the cap, silently
+            assert flat[-1].made_on < "2026-08-01"
+
+    def test_the_latest_of_each_is_actually_the_latest(self, tmp_path):
+        with Store.open(tmp_path / "big.db") as store:
+            self._fill(store)
+            rows = store.latest_structure_evals("ann", per=1)
+            assert len(rows) == 5
+            newest = max(r.made_on for r in rows)
+            assert all(r.made_on == newest for r in rows)
+
+    def test_it_returns_that_many_of_each_and_no_more(self, tmp_path):
+        with Store.open(tmp_path / "big.db") as store:
+            self._fill(store)
+            rows = store.latest_structure_evals("ann", per=3)
+            assert len(rows) == 15
+            per = {}
+            for one in rows:
+                per[one.structure] = per.get(one.structure, 0) + 1
+            assert set(per.values()) == {3}
+
+    def test_they_come_back_oldest_first_within_a_structure(self, tmp_path):
+        """A streak is counted backwards from the end, so the order matters."""
+        with Store.open(tmp_path / "big.db") as store:
+            self._fill(store)
+            rows = [r for r in store.latest_structure_evals("ann", per=3)
+                    if r.structure == "muscle 0"]
+            assert [r.made_on for r in rows] == sorted(r.made_on for r in rows)
+
+    def test_counting_does_not_load_them(self, tmp_path):
+        with Store.open(tmp_path / "big.db") as store:
+            written = self._fill(store)
+            counts = store.count_structure_evals("ann")
+            assert sum(counts.values()) == written
+            assert set(counts) == {f"muscle {n}" for n in range(5)}
+
+    def test_a_hundred_thousand_readings_stay_answerable(self, tmp_path):
+        """The fixture writes this many. If reading a body is linear in the
+        whole history, the studio's second year is unusable."""
+        import time
+
+        with Store.open(tmp_path / "big.db") as store:
+            self._fill(store, structures=360, weeks=20)
+            start = time.perf_counter()
+            rows = store.latest_structure_evals("ann", per=4)
+            took = time.perf_counter() - start
+            assert len(rows) == 360 * 4
+            assert took < 2.0, f"took {took:.1f}s"
+
+
 class TestArchiving:
     """Video is discarded, so the pose stream is the record. Everything else in
     a session can be recomputed from it; it can be recomputed from nothing."""

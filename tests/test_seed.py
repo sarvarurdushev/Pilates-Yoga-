@@ -17,9 +17,28 @@ from pilates.store import Store
 def sown(monkeypatch):
     monkeypatch.setattr("pilates.passwords.N", 2 ** 14)
     with Store.memory() as store:
-        made = seed.sow(store, classes=False)
+        made = seed.sow(store, classes=False, everything=False)
         store.made = made
         yield store
+
+
+@pytest.fixture(scope="module")
+def full():
+    """The whole thing: every structure, everybody, twenty classes.
+
+    Module-scoped because it writes a hundred thousand rows and the point of
+    the tests below is that doing so is fast and stays answerable.
+    """
+    import pilates.passwords as passwords
+
+    was, passwords.N = passwords.N, 2 ** 14
+    try:
+        store = Store.memory()
+        store.made = seed.sow(store, classes=False)
+        yield store
+        store.close()
+    finally:
+        passwords.N = was
 
 
 class TestNothingHereReachesAnybody:
@@ -338,3 +357,81 @@ class TestATermOfCoaching:
                 for check in one.checks:
                     assert " " in check["label"], check["label"]
                     assert check["label"] == check["label"].lower()
+
+
+class TestEverybodyEverything:
+    """"What does it look like when it is full" is a question a fixture with
+    nine students and four muscles cannot answer."""
+
+    def test_every_muscle_bone_and_nerve_is_written_about(self, full):
+        counts = {kind: full.db.execute(
+            "SELECT COUNT(DISTINCT structure) FROM structure_evals WHERE kind=?",
+            (kind,)).fetchone()[0] for kind in ("muscle", "bone", "nerve")}
+        assert counts["muscle"] > 150
+        assert counts["bone"] > 140
+        assert counts["nerve"] >= 20
+
+    def test_nothing_that_cannot_be_assessed_is_written_about(self, full):
+        """No organs, no brain regions. The panel refuses those for a reason
+        and a fixture that seeds them would make the refusal look like a bug."""
+        kinds = {row[0] for row in
+                 full.db.execute("SELECT DISTINCT kind FROM structure_evals")}
+        assert kinds == {"muscle", "bone", "nerve"}
+
+    def test_everybody_has_tens_of_classes_on_every_structure(self, full):
+        for _, username in full.made["people"]:
+            counts = full.count_structure_evals(username)
+            assert len(counts) > 300, username
+            assert min(counts.values()) >= 10, username
+
+    def test_most_of_a_body_is_fine(self, full):
+        """A person with three hundred and sixty problems is not a person, and
+        a fixture that says otherwise teaches the interface to shout."""
+        who = next(u for p, u in full.made["people"] if p.handle == "kim.minji")
+        rows = full.latest_structure_evals(who, per=1)
+        fine = sum(1 for one in rows if not one.flagged)
+        assert fine / len(rows) > 0.6
+
+    def test_but_some_of_it_is_not(self, full):
+        who = next(u for p, u in full.made["people"] if p.handle == "kim.minji")
+        rows = full.latest_structure_evals(who, per=1)
+        assert any(one.flagged for one in rows)
+
+    def test_the_lines_are_not_straight(self, full):
+        """A score that walks a formula looks like a plot, not like somebody
+        watching. A real third reading is not reliably between the second and
+        the fourth."""
+        from pilates.structure_eval import history
+
+        who = next(u for p, u in full.made["people"] if p.handle == "kim.minji")
+        structure = full.latest_structure_evals(who, per=1)[0].structure
+        points = history(full.structure_evals(who, structure))["lines"]
+        scores = [p["score"] for p in next(iter(points.values()))["points"]]
+        steps = {b - a for a, b in zip(scores, scores[1:])}
+        assert len(steps) > 1, scores
+
+    def test_the_curated_stories_are_not_overwritten(self, full):
+        """Kim Min-ji's psoas is written by hand, and the exhaustive pass has
+        to leave it alone rather than bury it under a generated arc."""
+        who = next(u for p, u in full.made["people"] if p.handle == "kim.minji")
+        rows = full.structure_evals(who, "Psoas major")
+        assert {c["label"] for one in rows for c in one.checks} == {
+            "how much work it's doing", "does it let go between reps"}
+
+    def test_each_reading_says_which_coach_made_it(self, full):
+        who = next(u for p, u in full.made["people"] if p.handle == "kim.minji")
+        assert {one.by for one in full.latest_structure_evals(who, per=1)} == {
+            "Park Min-seok"}
+
+    def test_the_fixture_can_be_asked_for_the_small_version(self):
+        """A hundred thousand rows is the wrong shape for a unit test, and the
+        seeder has to still be usable inside one."""
+        import pilates.passwords as passwords
+
+        was, passwords.N = passwords.N, 2 ** 14
+        try:
+            with Store.memory() as store:
+                made = seed.sow(store, classes=False, everything=False)
+                assert 0 < made["readings"] < 1000
+        finally:
+            passwords.N = was

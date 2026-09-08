@@ -691,6 +691,20 @@ const LIST_CSS = `
   font-size:12.5px;cursor:pointer;border:1px solid var(--line2);
   background:var(--glass);color:var(--dim)}
 #ss-notes .nx-none{font-size:12px;color:var(--dim2);line-height:1.7;margin:0}
+/* Three hundred and sixty rows is a list you cannot use. Find and filter, and
+   a count so it is obvious the rest are still there. */
+#ss-notes .nx-find{display:flex;gap:6px;margin:0 0 10px;flex-wrap:wrap}
+#ss-notes .nx-find input{flex:1 1 150px;min-width:0;padding:7px 9px;
+  border-radius:3px;font:inherit;font-size:12px;background:#05070d;
+  border:1px solid var(--line);color:var(--txt)}
+#ss-notes .nx-find input:focus{outline:0;border-color:var(--acc)}
+#ss-notes .nx-find button{padding:6px 10px;border-radius:3px;font:inherit;
+  font-size:11.5px;cursor:pointer;border:1px solid var(--line2);
+  background:transparent;color:var(--dim2)}
+#ss-notes .nx-find button:hover{color:var(--txt)}
+#ss-notes .nx-find button[aria-pressed=true]{border-color:var(--acc);
+  background:rgba(90,169,230,.14);color:var(--txt)}
+#ss-notes .nx-count{font-size:10.5px;color:var(--dim2);margin:0 0 8px}
 `;
 
 let listStyled = false;
@@ -747,19 +761,61 @@ async function openList(mine, username) {
   try {
     const { structures } = await get(
       `structures-seen?username=${encodeURIComponent(username)}`);
-    body.innerHTML = structures.length ? structures.map((row) => `
-      <div class="nx-row${row.urgent ? ' nx-urgent' : ''}">
-        <b>${esc(row.structure)}</b>
-        <span class="nx-meta">${esc(row.kind)} · ${esc(row.last_on)}${
-          row.count > 1 ? ` · ${row.count} readings` : ''}</span>
-        ${row.flagged.length
-          ? `<p>${esc(row.flagged.join(' · '))}</p>` : ''}
-        ${row.note ? `<p>“${esc(row.note)}”</p>` : ''}
-      </div>`).join('')
-      : `<p class="nx-none">${mine
-          ? 'Nothing written about a particular part of you yet.'
-          : 'Nothing yet. Click any muscle, bone or nerve on the body and the '
-            + 'box to write about it opens.'}</p>`;
+    if (!structures.length) {
+      body.innerHTML = `<p class="nx-none">${mine
+        ? 'Nothing written about a particular part of you yet.'
+        : 'Nothing yet. Click any muscle, bone or nerve on the body and the '
+          + 'box to write about it opens.'}</p>`;
+      return;
+    }
+
+    /* Find and filter. A body with every structure written about is three
+     * hundred and sixty rows, and a coach looking for the psoas should not be
+     * scrolling past the buccinator to reach it. */
+    host.querySelector('.nx-box').insertAdjacentHTML('afterbegin', '');
+    body.insertAdjacentHTML('beforebegin', `<div class="nx-find">
+        <input data-find placeholder="Find a muscle, bone or nerve…">
+        <button type="button" data-kind="" aria-pressed="true">All</button>
+        <button type="button" data-kind="flagged" aria-pressed="false">Flagged</button>
+        <button type="button" data-kind="muscle" aria-pressed="false">Muscles</button>
+        <button type="button" data-kind="bone" aria-pressed="false">Bones</button>
+        <button type="button" data-kind="nerve" aria-pressed="false">Nerves</button>
+      </div><p class="nx-count" data-count></p>`);
+
+    const draw = (find, kind) => {
+      const needle = find.trim().toLowerCase();
+      const shown = structures.filter((row) => {
+        if (kind === 'flagged' && !row.flagged.length && !row.urgent) return false;
+        if (kind && kind !== 'flagged' && row.kind !== kind) return false;
+        return !needle || row.structure.toLowerCase().includes(needle);
+      });
+      host.querySelector('[data-count]').textContent = shown.length === structures.length
+        ? `${structures.length} written about`
+        : `${shown.length} of ${structures.length}`;
+      body.innerHTML = shown.length ? shown.map((row) => `
+        <div class="nx-row${row.urgent ? ' nx-urgent' : ''}">
+          <b>${esc(row.structure)}</b>
+          <span class="nx-meta">${esc(row.kind)} · ${esc(row.last_on)}${
+            row.count > 1 ? ` · ${row.count} readings` : ''}</span>
+          ${row.flagged.length ? `<p>${esc(row.flagged.join(' · '))}</p>` : ''}
+          ${row.note ? `<p>“${esc(row.note)}”</p>` : ''}
+        </div>`).join('')
+        : '<p class="nx-none">Nothing matches that.</p>';
+    };
+
+    let kind = '';
+    const input = host.querySelector('[data-find]');
+    input.addEventListener('input', () => draw(input.value, kind));
+    for (const button of host.querySelectorAll('[data-kind]')) {
+      button.addEventListener('click', () => {
+        kind = button.dataset.kind;
+        for (const other of host.querySelectorAll('[data-kind]')) {
+          other.setAttribute('aria-pressed', String(other === button));
+        }
+        draw(input.value, kind);
+      });
+    }
+    draw('', '');
   } catch (error) {
     body.innerHTML = `<p class="nx-none">${esc(error.message)}</p>`;
   }
