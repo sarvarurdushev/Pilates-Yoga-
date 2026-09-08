@@ -8,7 +8,8 @@ import { MUSCLE_INFO } from '../src/content/muscles.js';
 import { UI, DISCLAIMERS } from '../src/content/strings.js';
 import { HELP } from '../src/content/help.js';
 import { REGION_INFO } from '../src/regionData.js';
-import { buildRegistry, vertebra } from '../src/structures.js';
+import { buildRegistry, vertebra, LAYER_ORDER } from '../src/structures.js';
+import { buildGroups, groups, GROUP_REGIONS } from '../src/content/groups.js';
 
 /**
  * The guardrail that keeps the project honest as the content grows.
@@ -531,4 +532,69 @@ test('the nervous layer records its own source and licence', () => {
   assert.match(src.licence, /CC BY-SA/);
   assert.ok(src.registration.residual_mm < 25,
     `nervous registration residual ${src.registration.residual_mm} mm is too large`);
+});
+
+
+/* ------------------------------------------------------------- the groups */
+
+const groupTable = JSON.parse(
+  readFileSync(new URL('../src/generated/groups.json', import.meta.url)));
+
+test('every offered group resolves to structures this atlas has', () => {
+  const reg = buildRegistry(generated, { brain: true });
+  buildGroups(groupTable, reg.byId, LAYER_ORDER);
+  const list = groups().list;
+  assert.ok(list.length > 50, `only ${list.length} groups were offered`);
+  for (const g of list) {
+    assert.ok(g.members.length >= 2, `${g.fma} ${g.name.en} has ${g.members.length} member(s)`);
+    for (const id of g.members) assert.ok(reg.byId.has(id), `${g.fma} names unknown ${id}`);
+    assert.ok(g.layers.length, `${g.fma} ${g.name.en} resolves to no layer`);
+    const known = new Set(GROUP_REGIONS.map(r => r.id));
+    assert.ok(known.has(g.region), `${g.fma} is filed under unknown region ${g.region}`);
+  }
+});
+
+test('a group named after a muscle family speaks the same Korean as its members', () => {
+  /* The atlas names muscles in the Sino-Korean clinical register the studio's
+   * own entries use -- 대퇴이두근, 복직근, 요방형근 -- and the groups were first
+   * written in the revised native-Korean terms instead: 넙다리 뒤칸, 볼기근,
+   * 가시근. Both are correct Korean. Together they are two dialects in one
+   * panel, and a coach pressing the group would see three muscles named in the
+   * other one.
+   *
+   * Where a group *is* a muscle family, the two are now checkable against each
+   * other: the group's Korean has to appear inside at least one member's. That
+   * is what 극근 in 흉극근 means, and it is exactly what was wrong before.
+   */
+  const reg = buildRegistry(generated, { brain: true });
+  buildGroups(groupTable, reg.byId, LAYER_ORDER);
+  const byFma = groups().byFma;
+  const FAMILIES = {
+    FMA13354: 'intercostal', FMA77177: 'iliocostalis', FMA77178: 'longissimus',
+    FMA77179: 'spinalis', FMA22823: 'semispinalis', FMA77180: 'splenius',
+    FMA23081: 'rotatores', FMA13400: 'serratus posterior', FMA64922: 'gluteal',
+    FMA19083: 'obturator', FMA37349: 'pectoral', FMA64829: 'scalene',
+  };
+  for (const [fma, what] of Object.entries(FAMILIES)) {
+    const g = byFma.get(fma);
+    assert.ok(g, `the curation no longer offers the ${what} group (${fma})`);
+    const stem = g.name.ko.replace(/\s/g, '');
+    const kos = g.members
+      .map(id => reg.byId.get(id))
+      .filter(r => r.name.ko !== r.name.en)
+      .map(r => r.name.ko);
+    assert.ok(kos.length, `no member of ${what} carries a Korean name to check against`);
+    assert.ok(kos.some(k => k.includes(stem)),
+      `the ${what} group is called ${g.name.ko}, but its members are ` +
+      `${kos.join(', ')} — two Korean registers in one panel`);
+  }
+});
+
+test('no group is offered in English where the atlas has Korean', () => {
+  const reg = buildRegistry(generated, { brain: true });
+  buildGroups(groupTable, reg.byId, LAYER_ORDER);
+  for (const g of groups().list) {
+    assert.match(g.name.ko, /[가-힣]/, `${g.fma} ${g.name.en} has no Hangul`);
+    assert.notEqual(g.name.ko, g.name.en, `${g.fma} falls back to English in Korean`);
+  }
 });

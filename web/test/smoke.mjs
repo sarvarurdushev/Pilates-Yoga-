@@ -1383,10 +1383,16 @@ const found = await page.evaluate(async () => {
     return document.querySelectorAll('#panelBody .swatch').length;
   };
   const out = { missing: false, blank: document.querySelectorAll('#panelBody .swatch').length };
-  // a muscle with a written entry, a bone with none, the Korean, and an FMA id
+  /* A muscle with a written entry, a bone with none, the Korean, and an FMA id.
+   *
+   * The Korean probe is 대퇴, not 넙다리. Both mean thigh; the atlas's own 91
+   * muscle entries are written in the Sino-Korean clinical register a studio
+   * uses -- 대퇴이두근, 복직근, 요방형근 -- so a search for the revised
+   * native-Korean term matches nothing, which is what this caught when the
+   * groups were first written in the other one. */
   out.muscle = type('semitendinosus');
   out.bone = type('lumbar vertebra');
-  out.korean = type('넙다리');
+  out.korean = type('대퇴');
   out.fma = type('FMA13377');
   out.nothing = type('qqqqzz');
   document.getElementById('anatQ').value = '';
