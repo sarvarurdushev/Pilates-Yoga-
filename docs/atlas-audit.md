@@ -506,7 +506,14 @@ In the order they are worth doing.
 7. **Exercise-to-group mapping.** The library names muscles individually; several
    entries name every member of a group, and saying "the adductors" once would be
    both shorter and truer to the cue.
-8. **Korean covers a quarter of the atlas.** Building the search made this
+8. **The browser test measures the rasteriser in places.** Under swiftshader with
+   x-ray up, the scene renders a frame every few seconds, so anything asserted by
+   waiting for an animation to land is a coin toss — the group check was written
+   twice wrong before it stopped asking the renderer a question meant for the
+   application. `smoke.mjs` already knows this in one place (the head view is
+   taken immediately for exactly this reason); the rest of the file has not been
+   swept for it.
+9. **Korean covers a quarter of the atlas.** Building the search made this
    measurable for the first time, and it is worse than it looked:
 
    | | with Korean | total |

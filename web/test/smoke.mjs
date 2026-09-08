@@ -1415,16 +1415,24 @@ const grouped = await page.evaluate(async () => {
   const m = await import('/src/main.js');
   const s = await import('/src/structures.js');
   const hamstrings = chips.find(c => c.dataset.group === 'FMA45157') ?? chips[0];
-  /* Where the camera was, not how many frames went by.
+  /* Where the flight was aimed, not where the camera got to.
    *
-   * This counted frames first, and on a software rasteriser running at half a
-   * frame a second that is a coin toss: the same assertion passed one run and
-   * failed the next with nothing different about the code. What the check is
-   * actually for is "choosing a group reached the picture", and the camera
-   * target is that, deterministically -- `setGroup` frames the whole member set,
-   * so the target has to move from wherever it was. */
+   * Two wrong versions before this one, and both were measuring the renderer
+   * rather than the application. Counting frames was a coin toss at half a frame
+   * a second. Waiting for the camera to *arrive* is worse: a flight is 620 ms of
+   * wall-clock but it only advances on a frame, and by this point in the run
+   * x-ray is up with every layer on -- which is the scene this file already
+   * warns "renders at a frame every few seconds", and is why the head view above
+   * is taken immediately rather than animated.
+   *
+   * So this reads the flight the moment `setGroup` resolves. `flightBy` and
+   * `flightTo` are the decision the application made -- which structures to
+   * frame, and where that put the camera -- and they are settled before a single
+   * frame is drawn. What the rasteriser does with that afterwards is not what
+   * this test is for. */
   const was = m.cameraState().t;
   await m.setGroup(hamstrings.dataset.group);
+  const aimed = m.cameraState();
   await new Promise(r => setTimeout(r, 2500));
   const lit = [];
   for (const [id] of s.registry().byId) if (m.activationOf(id)) lit.push(s.nameOf(id, 'en'));
@@ -1432,8 +1440,9 @@ const grouped = await page.evaluate(async () => {
   return { missing: false, chips: chips.length, chose: group.name.en,
            members: group.members.length, lit,
            layersOn: group.layers.every(l => m.app.layers[l].on),
-           was, now: m.cameraState().t,
-           framed: m.cameraState().t.some((v, i) => Math.abs(v - was[i]) > 0.01) };
+           was, aimedBy: aimed.flightBy, aimedAt: aimed.flightTo,
+           framed: aimed.flightBy === 'flyToGroup' && !!aimed.flightTo
+                   && aimed.flightTo.some((v, i) => Math.abs(v - was[i]) > 0.01) };
 });
 console.log('groups:', JSON.stringify(grouped));
 if (grouped.missing) errors.push('the Explore tab offers no anatomical groups');
@@ -1443,8 +1452,9 @@ else {
   if (!grouped.layersOn)
     errors.push(`choosing "${grouped.chose}" left one of its layers off, so it lit nothing visible`);
   if (!grouped.framed)
-    errors.push(`choosing "${grouped.chose}" did not move the camera onto it: ` +
-                `target ${JSON.stringify(grouped.was)} -> ${JSON.stringify(grouped.now)}`);
+    errors.push(`choosing "${grouped.chose}" did not aim the camera at it: ` +
+                `${grouped.aimedBy ?? 'no flight'} -> ${JSON.stringify(grouped.aimedAt)} ` +
+                `from ${JSON.stringify(grouped.was)}`);
 }
 await shot('12-group');
 await page.evaluate(async () => { (await import('/src/main.js')).setGroup(null); });
