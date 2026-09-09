@@ -1515,6 +1515,10 @@ await settleCamera(page);
   await page.waitForTimeout(900);
   const after = await camOf();
   const moved = Math.hypot(...after.t.map((v, i) => v - before.t[i]));
+  /* Deliberately at a point a name plate may be sitting on. The plates are buttons floating
+   * over the stage, and until they were made to hand a drag back to the canvas, starting a
+   * pan on one silently did nothing — which is indistinguishable, from the reader's side,
+   * from the navigation being broken. */
   const kept = Math.abs(dist(after) - dist(before));
   console.log('pan:', JSON.stringify({ moved: +moved.toFixed(4), distanceChange: +kept.toFixed(4) }));
   if (!(moved > 0.01)) errors.push(`a right-drag moved the view by ${moved.toFixed(4)} — it does not pan`);

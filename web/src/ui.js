@@ -209,8 +209,20 @@ export function mountUI(ctx) {
      * reading "Arteries" with no number beside it does not tell a reader that
      * turning it on adds three hundred and fifty-three things. */
     const per = {};
-    for (const r of registry().byId.values())
-      if (!r.parts) per[r.layer] = (per[r.layer] ?? 0) + 1;
+    /* And how many *meshes* those structures are, which is not the same number and is the one
+     * a reader comparing this with another atlas is counting. BodyParts3D's element archive
+     * ships a tortuous vessel as a run of separate files — the middle cardiac vein is
+     * fourteen of them, the posterior inferior cerebellar artery thirteen — and every one is
+     * drawn. They are one *structure* here because they are one named vessel, which is what a
+     * reader can select, search for and be told about; counting them as fourteen things would
+     * be counting the archive's file list rather than the anatomy. Both numbers are shown, so
+     * neither has to be guessed at. */
+    let pieces = 0;
+    for (const r of registry().byId.values()) {
+      if (r.parts) continue;
+      per[r.layer] = (per[r.layer] ?? 0) + 1;
+      pieces += r.pieces ?? 1;
+    }
     const shown = LAYER_ORDER.filter(n2 => hasLayer(n2));
     const anyOn = shown.some(n2 => app.layers[n2].on);
     $('layerList').innerHTML = shown.map(name => `
@@ -223,7 +235,7 @@ export function mountUI(ctx) {
                value="${app.layers[name].opacity}" aria-label="${T(name)} opacity">
       </div>`).join('')
       + `<div class="layerall"><span>${Object.values(per).reduce((a, b) => a + b, 0)} ${
-          T('structuresWord')}</span>
+          T('structuresWord')} · ${pieces} ${T('piecesWord')}</span>
          <button class="mini" data-layerall="${anyOn ? 'off' : 'on'}">${
           T(anyOn ? 'hideAll' : 'showAll')}</button></div>`;
     for (const b of $('layerList').querySelectorAll('.lyr'))

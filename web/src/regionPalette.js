@@ -201,6 +201,20 @@ export class RegionPalette {
   }
 
   /**
+   * The fixed point the scale above is applied about, in body coordinates.
+   *
+   * The shader scales a piece toward its own centroid before it moves it, so anything on the
+   * CPU that has to say where a piece is *drawn* — where to fly the camera, where to put its
+   * name, what the pointer is over — needs the same fixed point. Without it those three
+   * answered from the rest pose and pointed at where the piece used to stand.
+   */
+  getScaleCentre(id, target = new THREE.Vector3()) {
+    if (id >= this.size || id < 0) return target.set(0, 0, 0);
+    const o = (this.size + id) * 4;
+    return target.set(this.offsets[o+1], this.offsets[o+2], this.offsets[o+3]);
+  }
+
+  /**
    * Whether a merged layer draws this structure.
    *
    * Per-structure visibility used to be `mesh.visible`, which a merged layer no

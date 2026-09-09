@@ -333,11 +333,31 @@ export function makeStructureMaterial(palette, look = {}, dqTexture = null) {
   };
   mat.userData.setActivation = (id, v) => { pal.setActivation(id, v); };
   mat.userData.clearActivation = () => { pal.clearActivation(); };
-  /** Upload pending palette writes, and re-point the uniform if the palette grew. */
+  /**
+   * Upload pending palette writes, and re-point the uniforms if the palette grew.
+   *
+   * **Both textures, not just the colours.** A palette that outgrows its width allocates new
+   * arrays and builds new textures for them, and a material holds whichever texture it was
+   * given. This re-pointed the colour texture and left `uOffset` aimed at the one the palette
+   * had when the material was made — so a material built before the atlas registered read
+   * every structure's displacement and visibility out of a stale, empty texture for the rest
+   * of the session.
+   *
+   * Every body layer's material is made after its layer loads, by which time the palette has
+   * long since grown, so none of them could show the fault. The brain's two are made at
+   * module load, before a single structure exists — which is why the brain stood in the
+   * middle of the catalogue while two thousand pieces went to their cells, and why hiding a
+   * cortical parcel did nothing. One missing line, in the one function whose whole job is to
+   * notice that the palette moved.
+   */
   mat.userData.sync = () => {
     pal.upload();
     if (uniforms.uPalette.value !== pal.texture) {
       uniforms.uPalette.value = pal.texture;
+      uniforms.uPaletteSize.value = pal.size;
+    }
+    if (uniforms.uOffset.value !== pal.offsetTexture) {
+      uniforms.uOffset.value = pal.offsetTexture;
       uniforms.uPaletteSize.value = pal.size;
     }
   };

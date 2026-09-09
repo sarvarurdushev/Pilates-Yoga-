@@ -1030,6 +1030,10 @@ function loadBrain(L2) {
       indexGeometry(L2.group);
       bindBrain();
       warmRays(pickTargets);
+      /* A brain that arrives while the sheet is already open has to go to its cells with
+       * everything else, rather than standing in the middle of them until the slider is
+       * touched again. */
+      brainWhileApart();
       refreshPosed();
       syncLayers();
       pendingSections?.(); pendingSections = null;
@@ -1108,7 +1112,15 @@ function tickNeuralNet(t) {
    *
    * `app.neural` is untouched: it is the reader's own switch, and coming back to the volume
    * has to bring the network back with it rather than silently having turned it off. */
-  neuralNet.visible = app.neural && app.layers.brain.on && app.brainLook !== 'anatomical';
+  /* And not over the catalogue. The network is a diagram of what connects to what, drawn
+   * through the brain's own volume — there is no cell in an inventory of parts for it, and
+   * spread over a sheet two metres wide it is a haze of threads across everything else. */
+  neuralNet.visible = app.neural && app.layers.brain.on && app.brainLook !== 'anatomical'
+    && app.explode <= OPENED
+    /* And not behind something isolated. The network hangs off the brain's holder rather than
+     * living in a layer, so the isolation pass never reached it: asking to see one artery
+     * alone drew it in front of a full web of cells and threads. */
+    && (!app.isolate?.size || [...app.isolate].some(id => get(id)?.layer === 'brain'));
   /* Turned up when it is on its own. Inside the volume the network is one layer of a picture
    * and has to sit under the tissue; with nothing around it the same values read as a thin
    * scatter of dust, because there is no longer anything for them to be inside of. */
@@ -1287,7 +1299,17 @@ function refreshSections(force = false) {
   invalidate();
   const host = document.getElementById('sections');
   if (!host) return;
-  const on = !!app.layers.brain?.on && !!sections?.ready;
+  /* Not over the catalogue.
+   *
+   * The strip is nine cuts through the brain, and it sits along the bottom of the stage — a
+   * quarter of the height. That is a fair trade while the picture is a head; it is a quarter
+   * of the sheet covered while the picture is two thousand pieces laid out to be read, and
+   * the pieces underneath it cannot even be pointed at. Taking the body apart is a request to
+   * see the parts, so the cuts stand down until it is put back together. */
+  const on = !!app.layers.brain?.on && !!sections?.ready && app.explode <= OPENED
+    // nor beside something isolated that is not in the brain: the cuts would be of an organ
+    // that is not on the screen
+    && (!app.isolate?.size || [...app.isolate].some(id => get(id)?.layer === 'brain'));
   host.hidden = !on;
   if (!on) { sectDrawn = null; return; }
 
@@ -1823,6 +1845,14 @@ export function syncLayers() {
     const showInterior = app.layers.brain.on && app.brainLook !== 'neurons';
     for (const g of brainDeep.children) {
       const id = g.userData.regionId;
+      /* Isolation reaches in here too.
+       *
+       * This loop writes `m.visible` from an opacity of its own, and it runs *after* the
+       * isolation pass above — so isolating an artery hid every mesh in the body and then
+       * this put the cerebellum, the brainstem and the six subcortical structures straight
+       * back, and the picture was one small vessel in front of a whole brain. They are the
+       * meshes this file gave a material to, so they are the meshes it has to hide. */
+      const isolatedOut = !!app.isolate?.size && !app.isolate.has(+id);
       const interior = INTERIOR_IDS.has(id);
       const sel = app.selected != null && +id === +app.selected;
       /* The core never goes out.
@@ -1839,7 +1869,7 @@ export function syncLayers() {
       const deepBase = 0.10 + app.xray * 0.30;
       let o = interior ? (sel ? 0.55 : deepBase) : (0.30 + app.xray * 0.35);
       if (!sel && app.selected != null && !app.autoSelected) o *= interior ? 0.45 : 0.25;
-      o *= showInterior ? app.layers.brain.opacity : 0;
+      o *= showInterior && !isolatedOut ? app.layers.brain.opacity : 0;
       g.traverse(m => {
         if (!m.isMesh) return;
         m.material.opacity = o; m.visible = o > 0.01;
@@ -1961,6 +1991,61 @@ function posedSide(id) {
   return best;
 }
 
+/**
+ * Where a structure is actually drawn — posed, and then taken apart.
+ *
+ * `posedSide` answers where a structure stands in the body. While the body is a body those
+ * are the same question, and every camera flight, every label anchor and the pointer all
+ * asked it. Taking the body apart makes them different questions, and the one nobody was
+ * asking is the one that matters: the shader moves each piece to its cell in the catalogue
+ * and scales it to fit, and none of that is in the geometry. So flying to a structure picked
+ * out of the sheet flew to where that structure would be standing if the body were still
+ * assembled — for an artery of the parietal lobe, inside the head, with the brain filling the
+ * frame and the artery itself somewhere off in the grid. That is the whole of "it is still
+ * not choosing properly".
+ *
+ * This applies the same two steps the vertex shader applies, in the same order. The shader
+ * works in view space and this works in world space, which is the same transform: the view
+ * matrix is a rotation and a translation, so scaling about a point and translating are both
+ * unchanged by it.
+ */
+const _exC = new THREE.Vector3(), _exO = new THREE.Vector3();
+/**
+ * How far this structure has been moved and shrunk, right now.
+ *
+ * The palette is the shader's copy of the answer and it is the answer for almost everything.
+ * The exception is a structure that shares a mesh with others — a cortical parcel — whose
+ * palette entry is deliberately zeroed so no shader tears the sheet it is painted on, and
+ * whose real displacement belongs to the mesh. See `liftWholeMeshes`.
+ */
+function explodeFor(id) {
+  const w = wholeById.get(id);
+  const scale = w ? w.scale : palette.getScale(id);
+  if (w) _exC.copy(w.centre), _exO.copy(w.off);
+  else palette.getScaleCentre(id, _exC), palette.getOffset(id, _exO);
+  _exO.multiplyScalar(app.explode);
+  return 1 + (scale - 1) * app.explode;
+}
+/** Apply it to a point, in place. `explodeFor` must have been called for the same id. */
+const applyExplode = (p, k) => p.sub(_exC).multiplyScalar(k).add(_exC).add(_exO);
+
+function drawnSide(id) {
+  const side = posedSide(id);
+  if (!side || app.explode <= 0) return side;
+  const k = explodeFor(id);
+  return { centre: applyExplode(side.centre, k),
+           points: side.points.map(p => applyExplode(p, k)) };
+}
+
+/** The same, for a structure with no mesh of its own to measure — the centroid alone. */
+function drawnPoint(id, target = new THREE.Vector3()) {
+  const c = app.centroids[id];
+  if (!c) return null;
+  target.copy(c);
+  if (app.explode <= 0) return target;
+  return applyExplode(target, explodeFor(id));
+}
+
 /* ------------------------------------------------------------------ labels */
 /* LAB_MAX must match `.lab3d`'s max-width in index.html. The lane is placed from the width
  * the label reports, so a cap here that is smaller than the stylesheet's lets a label run
@@ -1979,13 +2064,23 @@ function panelInset() {
    * against whichever is further left. A panel that is closed reserves nothing:
    * the labels used to give up a third of the stage to a console that was not on
    * screen, because the element existed whether or not it was shown. */
+  /* Measured off the box, never off `offsetParent`.
+   *
+   * `offsetParent === null` was standing in for "not on screen", and for a `position: fixed`
+   * element it is *always* null — which both of these are. So the test threw away the panel
+   * and the rail whether they were open or not, this returned 10 pixels every time, and the
+   * label lane has been running underneath the console since the console started floating:
+   * a plate for a structure on the right of the subject was laid out into space that is
+   * behind glass, and its name was simply not readable. A closed panel is caught by `hidden`
+   * and by having no width, which is what the guard was for. */
   const c = canvas.getBoundingClientRect();
   let left = c.right;
   for (const id of ['panel', 'rail']) {
     const el = document.getElementById(id);
-    if (!el || el.hidden || el.offsetParent === null) continue;
+    if (!el || el.hidden) continue;
+    if (getComputedStyle(el).display === 'none') continue;
     const r = el.getBoundingClientRect();
-    if (r.width < 1 || r.top > c.bottom - 4) continue;
+    if (r.width < 1 || r.top > c.bottom - 4 || r.bottom < c.top + 4) continue;
     left = Math.min(left, r.left);
   }
   return Math.max(0, c.right - left + 10);
@@ -2009,6 +2104,31 @@ function buildLabelEls() {
   if (!labelLayer.querySelector('#leaders')) {
     labelLayer.innerHTML = '<svg id="leaders"></svg>';
     labels = [];
+    /* A name plate takes a click and never a drag.
+     *
+     * The plates are buttons over the stage, so they take the pointer — which is right for
+     * clicking a name and wrong for everything else: starting a pan or an orbit on one did
+     * nothing at all, and there is no way to tell from the screen that the twelve small
+     * rectangles floating over the picture are holes in it. It reads as the navigation
+     * failing at random, because from the reader's side that is exactly what it is.
+     *
+     * So anything but a plain left press is handed straight to the canvas: the layer stops
+     * taking events for the length of the gesture and the press is re-dispatched to the
+     * control that should have had it. A left click still selects the structure named. */
+    labelLayer.addEventListener('pointerdown', (e) => {
+      if (e.button === 0 && !e.ctrlKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      labelLayer.style.pointerEvents = 'none';
+      const done = () => {
+        labelLayer.style.pointerEvents = '';
+        removeEventListener('pointerup', done);
+        removeEventListener('pointercancel', done);
+      };
+      addEventListener('pointerup', done);
+      addEventListener('pointercancel', done);
+      canvas.dispatchEvent(new PointerEvent('pointerdown', e));
+    }, true);
   }
   const svg = document.getElementById('leaders');
   const have = new Set(labels.map(l => l.id));
@@ -2079,8 +2199,7 @@ const _lp = new THREE.Vector3();
  */
 function labelPoint(id) {
   _lp.copy(app.centroids[id] ?? _ORIGIN);
-  if (app.explode > 0)
-    _lp.add(palette.getOffset(id, _off).multiplyScalar(app.explode));
+  if (app.explode > 0) applyExplode(_lp, explodeFor(id));
   return _lp;
 }
 const _ORIGIN = new THREE.Vector3();
@@ -2092,16 +2211,20 @@ function anchorFor(id) {
    * it. Without this every label went on pointing at where its structure used to
    * stand: laid out as a catalogue, four hundred ropes converged on the middle
    * of an empty grid, which is exactly what the picture showed. */
-  const spread = app.explode > 0 ? palette.getOffset(id, _off).multiplyScalar(app.explode)
-                                 : null;
+  /* Scaled as well as displaced. A catalogue shrinks a femur to a cell and blows a sesamoid up
+   * to one, and an anchor that only carried the displacement landed a rope at where the piece
+   * would have reached at full size — outside its cell, over its neighbours. `explodeFor`
+   * loads the same transform `drawnSide` uses, so the rope ends on the shape it names. */
+  const k = app.explode > 0 ? explodeFor(id) : 0;
+  const spread = app.explode > 0;
   const owners = meshesOfId.get(id);
   if (!owners?.length) {
     _a.copy(app.centroids[id]);
-    return spread ? _a.add(spread) : _a;
+    return spread ? applyExplode(_a, k) : _a;
   }
   let bestD = Infinity;
   _a.copy(app.centroids[id]);
-  if (spread) _a.add(spread);
+  if (spread) applyExplode(_a, k);
   for (const mesh of owners) {
     const b = bound.get(mesh);
     const m = b ? deltaFor(b.segment) : null;
@@ -2110,7 +2233,7 @@ function anchorFor(id) {
     for (const p of own.pts) {
       _ap.copy(p);
       if (m) _ap.applyMatrix4(m);
-      if (spread) _ap.add(spread);
+      if (spread) applyExplode(_ap, k);
       _pts.push(_ap.x, _ap.y, _ap.z);
       const d = camera.position.distanceToSquared(_ap);
       if (d < bestD) { bestD = d; _a.copy(_ap); }
@@ -2675,7 +2798,8 @@ function pickApart(ev, rect) {
       for (const id of restByMesh.get(mesh)?.keys() ?? []) {
         const c = app.centroids[id];
         if (!c || !get(id)) continue;
-        _pp.copy(c).add(palette.getOffset(id, _off2).multiplyScalar(app.explode));
+        _pp.copy(c);
+        applyExplode(_pp, explodeFor(id));
         _pp.project(camera);
         if (_pp.z > 1) continue;
         const px = (_pp.x + 1) / 2 * rect.width, py = (1 - _pp.y) / 2 * rect.height;
@@ -2997,11 +3121,21 @@ function bodyCentre() {
 
 export function flyTo(id, immediate = false) {
   FLIGHT_BY = 'flyTo';
-  const side = posedSide(id);
-  const c = side?.centre ?? app.centroids[id];
+  /* Where it is drawn, not where it stands — see `drawnSide`. Taken apart, those differ by
+   * the whole width of the catalogue. */
+  const side = drawnSide(id);
+  const c = side?.centre ?? drawnPoint(id);
   if (!c) return;
-  const radius = Math.max(0.03, (app.radii[id] ?? 0.05) * 1.9);
-  let dir = clearestDir(id, c, Math.max(0.06, radius * 4), facingDir(c)).clone();
+  // scaled with the piece, for the same reason `flyToGroup` scales its fallback radius
+  const grow = app.explode > 0 ? 1 + (palette.getScale(id) - 1) * app.explode : 1;
+  const radius = Math.max(0.03, (app.radii[id] ?? 0.05) * 1.9) * grow;
+  /* Straight on, and no search for a line of sight, once the body is apart: a piece in a
+   * catalogue has nothing in front of it by construction, and `clearestDir` would be reading
+   * the geometry where it still stands rather than where it is drawn — so it would answer
+   * about a body that is not on the screen. */
+  let dir = app.explode > OPENED
+    ? new THREE.Vector3(0, 0, 1)
+    : clearestDir(id, c, Math.max(0.06, radius * 4), facingDir(c)).clone();
   // the structure's own extent, as a box of points the fit can measure
   const pts = side?.points ?? [];
   if (pts.length < 4) {
@@ -4265,7 +4399,19 @@ export async function setIsolate(ids) {
     app.autoSelected = false;
     ui?.showStructure?.(list[0]);
   }
+  /* Isolating puts the body back together.
+   *
+   * A catalogue is a way of seeing two thousand things at once; a catalogue of one piece is
+   * not a catalogue, it is one piece a long way from the camera with two thousand empty cells
+   * around it. Every reader who picks something out of the sheet and asks to see it alone
+   * means "take it out of the sheet", so the sheet closes. The slider goes back to nothing
+   * with it, so the control on screen says what the picture is doing.
+   *
+   * It happens before the flight, because the flight is fitted to where the piece is drawn
+   * and this is what decides that. */
+  if (app.isolate && app.explode > 0) { setExplode(0); ui?.syncControls?.(); }
   syncLayers();
+  refreshSections();
   ui?.relabel?.();
   /* One piece is framed as a piece, not as a group.
    *
@@ -4436,6 +4582,64 @@ function openOffsets() {
 function computeExplodeOffsets() {
   if (app.explodeLayout === 'open') openOffsets();
   else inventoryOffsets();
+  liftWholeMeshes();
+}
+
+/**
+ * Pieces that are regions of one surface, moved as that surface.
+ *
+ * The layout gives every structure a cell and the vertex shader takes each vertex to the cell
+ * its `_region` names. That works because a structure is its own closed mesh — for two
+ * thousand of them. The cortex is the exception and it is the one that matters: it is a single
+ * folded sheet carrying fifteen parcels, so the triangles along every parcel boundary have
+ * vertices bound for different cells, and displacing them per vertex tore the brain into
+ * sheets stretched across the whole screen. The parcels are painted on that surface; they are
+ * not pieces of it, and nothing in a shader can make them separable.
+ *
+ * So a mesh that carries several regions takes **one** cell and is moved by its own transform,
+ * which is what a mesh that cannot be cut up honestly is: one piece. Its regions' palette
+ * entries are zeroed so the shader leaves it alone in every look — the volume material has no
+ * displacement in it and the specimen material does, and this is what stops the answer
+ * depending on which one the reader happens to be in.
+ *
+ * `wholeMesh` is what `brainWhileApart` then reads: where the mesh goes, and how far it has to
+ * shrink to sit in a cell. The shrink is measured off the mesh's own radius rather than taken
+ * from any one parcel's, because a parcel's scale is sized for a parcel.
+ */
+const wholeMesh = new Map();
+/** The same answer keyed by structure, for everything on the CPU that asks where a piece is. */
+const wholeById = new Map();
+const _wmC = new THREE.Vector3();
+function liftWholeMeshes() {
+  wholeMesh.clear();
+  wholeById.clear();
+  const cell = (explodeExtent?.cell ?? 0.05) * 0.78;
+  for (const name of LAYER_ORDER) {
+    for (const mesh of layers[name]?.meshes ?? []) {
+      const own = restByMesh.get(mesh);
+      if (!own || own.size < 2) continue;
+      const ids = [...own.keys()].filter(id => get(id));
+      if (ids.length < 2) continue;
+      // the first cell the layout gave this mesh's regions; the rest go unused
+      const home = ids.find(id => palette.getOffset(id, _exO).lengthSq() > 0) ?? ids[0];
+      const off = palette.getOffset(home, new THREE.Vector3());
+      palette.getScaleCentre(home, _wmC);
+      mesh.updateWorldMatrix(true, false);
+      const bs = mesh.geometry.boundingSphere
+        ?? (mesh.geometry.computeBoundingSphere(), mesh.geometry.boundingSphere);
+      const radius = Math.max(1e-4, (bs?.radius ?? 0.05) * mesh.matrixWorld.getMaxScaleOnAxis());
+      const placed = { off, centre: _wmC.clone(), scale: Math.min(1, cell / radius) };
+      wholeMesh.set(mesh, placed);
+      for (const id of ids) wholeById.set(id, placed);
+      /* Zeroed, so no shader displaces it: `setOffset` keeps the visibility flag and
+       * `setScale` at 1 about the same point is the identity. */
+      for (const id of ids) {
+        palette.setOffset(id, 0, 0, 0);
+        palette.setScale(id, 1, 0, 0, 0);
+      }
+    }
+  }
+  if (wholeMesh.size) palette.upload();
 }
 
 /**
@@ -4527,7 +4731,13 @@ export function setExplode(v) {
   for (const m of materials) {
     const u = m.userData.uniforms;
     if (u?.uExplode) u.uExplode.value = next;
+    /* And re-point the offset texture, because a palette that grew since this material was
+     * made handed it a new one — see `sync` in `brainMaterial.js`. The layout the shader is
+     * about to read lives in that texture, so this is the moment it has to be the right one. */
+    m.userData.sync?.();
   }
+  brainWhileApart();
+  refreshSections();
   /* The catalogue is far wider than the body it came out of, so a camera framed
    * on a standing figure sees the middle few rows of it and nothing else. It is
    * fitted once, on the way out, and the view is restored once on the way back
@@ -4580,6 +4790,71 @@ function cullWhileApart(assembled) {
 
 /** Above this the body is opened rather than assembled — also `PICK_LIMIT`'s neighbour. */
 const OPENED = 0.02;
+
+/**
+ * The brain, in the catalogue.
+ *
+ * It stood in the middle of the sheet at full size while two thousand other pieces went to
+ * their cells — and it is the largest bright thing on the screen, so it is what the eye lands
+ * on first. Three reasons, and none of them was the layout: the brain had cells waiting for it
+ * the whole time.
+ *
+ *  * **The offset texture was stale.** `sync` re-pointed the colour texture when the palette
+ *    outgrew its width and left `uOffset` aimed at the one the material was born with. Every
+ *    body layer's material is made after its layer loads, long after the palette settled; the
+ *    brain's two are made at module load, before a single structure exists. So the one
+ *    material in the scene that could not read the layout was the brain's. Fixed in
+ *    `brainMaterial.js`, where the comment is.
+ *  * **The cortex cannot be displaced per vertex.** It is one folded sheet carrying fifteen
+ *    parcels, so its boundary triangles have vertices bound for different cells. See
+ *    `liftWholeMeshes`: it takes one cell and moves as one object, which is what it is.
+ *  * **The six deep structures** wear a plain basic material each — no shader to displace
+ *    them with, and no need for one, since each mesh is exactly one structure.
+ *
+ * So every brain mesh is placed here, by its own transform, and none of it depends on which
+ * look the reader is in. The network is the one thing left out: it is a diagram of what
+ * connects to what rather than a part, and an inventory of parts has no cell for it.
+ */
+const deepHome = new Map();
+const _bhC = new THREE.Vector3(), _bhD = new THREE.Vector3(), _bhO = new THREE.Vector3();
+function brainWhileApart() {
+  const apart = app.explode > OPENED;
+  if (neuralNet && apart) neuralNet.visible = false;
+  const L2 = layers.brain;
+  if (!L2?.loaded) return;
+  for (const mesh of L2.meshes ?? []) {
+    const whole = wholeMesh.get(mesh);
+    const id = whole ? null : mesh.userData.regionId;
+    if (!whole && id == null) continue;
+    let home = deepHome.get(mesh);
+    if (!home) deepHome.set(mesh, home = { p: mesh.position.clone(), s: mesh.scale.clone() });
+    if (!apart) { mesh.position.copy(home.p); mesh.scale.copy(home.s); continue; }
+    const parent = mesh.parent;
+    if (!parent) continue;
+    /* The shader scales a piece about its own centroid and then displaces it. The same
+     * transform, written for a mesh whose origin is not that centroid: a point p goes to
+     * `C + (p - C)k + D`, so the origin has to go to `O·k + C(1 - k) + D` for the geometry
+     * around it to land in the same place. Everything is converted into the holder's own
+     * space first, because the brain hangs off the skull at a scale of its own. */
+    const target = whole ?? {
+      scale: palette.getScale(id),
+      centre: palette.getScaleCentre(id, new THREE.Vector3()),
+      off: palette.getOffset(id, new THREE.Vector3()),
+    };
+    const k = 1 + (target.scale - 1) * app.explode;
+    parent.updateWorldMatrix(true, false);
+    _bhC.copy(target.centre);
+    _bhD.copy(target.off).multiplyScalar(app.explode);
+    _bhO.copy(_bhC).add(_bhD);
+    parent.worldToLocal(_bhC);                          // C, in the holder's space
+    parent.worldToLocal(_bhO);                          // C + D, so D is the difference
+    _bhO.sub(_bhC);
+    mesh.position.copy(home.p).multiplyScalar(k)
+      .addScaledVector(_bhC, 1 - k).add(_bhO);
+    mesh.scale.copy(home.s).multiplyScalar(k);
+  }
+}
+
 /** The threshold `syncLayers` uses for `seeingInside`, and so for the skin shell. */
 const SHELL_OFF = 0.01;
 
@@ -4625,11 +4900,14 @@ export function flyToGroup(ids, immediate = false) {
   FLIGHT_BY = 'flyToGroup';
   const pts = [];
   for (const id of ids) {
-    const side = posedSide(id);
-    const c = side?.centre ?? app.centroids[id];
+    const side = drawnSide(id);
+    const c = side?.centre ?? drawnPoint(id, new THREE.Vector3());
     if (!c) continue;
     if (side?.points?.length >= 4) { pts.push(...side.points); continue; }
-    const radius = Math.max(0.02, app.radii[id] ?? 0.04);
+    /* Scaled with the piece. A catalogue shrinks a femur and blows up a sesamoid so both fill
+     * a cell, and a radius measured off the body frames the cell it used to need. */
+    const k = app.explode > 0 ? 1 + (palette.getScale(id) - 1) * app.explode : 1;
+    const radius = Math.max(0.02, app.radii[id] ?? 0.04) * k;
     for (const axis of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]])
       pts.push(c.clone().addScaledVector(new THREE.Vector3(...axis), radius));
   }

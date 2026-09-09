@@ -74,6 +74,9 @@ export const UI = {
   sections:     { en: 'Sections', ko: '단면' },
   showAll:      { en: 'Show all', ko: '모두 보기' },
   structuresWord: { en: 'structures', ko: '구조' },
+  /* Meshes, not structures. A vessel that the source archive ships as fourteen separate files
+   * is one named structure and fourteen pieces, and both numbers are worth stating. */
+  piecesWord:      { en: 'pieces', ko: '조각' },
   skeleton:     { en: 'Skeleton', ko: '골격' },
   muscles_superficial: { en: 'Muscles — superficial', ko: '근육 — 표층' },
   muscles_deep: { en: 'Muscles — deep', ko: '근육 — 심층' },
