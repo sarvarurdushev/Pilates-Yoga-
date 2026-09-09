@@ -877,15 +877,19 @@ button.analrow:hover{background:rgba(146,178,222,.06)}
 /* Explore's structure list: a palette, not a paragraph. Two columns, so a hundred and ninety
  * names take half the scroll, and the colour block leads because that is what a reader is
  * matching against the picture. */
-.swatches{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;
+/* One column, not two. Two fitted the muscle names this list used to hold; the
+ * atlas now carries "first anterior ventricular branch of right coronary artery",
+ * and at 150px every vessel in a search came back as "First anterior ve…" —
+ * fifteen results, none of them distinguishable from the others. */
+.swatches{display:grid;grid-template-columns:1fr;gap:1px;
  background:var(--hair);border:1px solid var(--line);margin-bottom:16px}
 .swatch{display:flex;align-items:center;gap:7px;padding:6px 8px;background:#070d18;
  border:0;text-align:left;min-width:0}
 .swatch:hover{background:var(--glass2)}
 .swatch[aria-current="true"]{background:rgba(255,196,132,.10)}
 .swatch i{width:9px;height:9px;flex:none;border-radius:2px}
-.swatch span{font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;
- text-overflow:ellipsis;min-width:0}
+.swatch span{font-size:11px;color:var(--dim);min-width:0;line-height:1.35;
+ overflow-wrap:anywhere}
 .swatch:hover span,.swatch[aria-current="true"] span{color:var(--txt)}
 #panelBody h3 em{font-style:normal;margin-left:7px;font-size:10px;color:var(--dim2);
  font-weight:400;letter-spacing:.06em}
@@ -981,6 +985,10 @@ details.groups>summary em{font-style:normal;font-size:10px;color:var(--dim2);
  font-size:11.5px;letter-spacing:.01em;white-space:nowrap;
  box-shadow:0 8px 26px rgba(0,0,0,.5)}
 #hovertip[hidden]{display:none}
+/* An empty pathway block still took its padding, which left a hole in the middle
+   of the Display panel between two rows of controls. */
+#pathPanel:empty{display:none}
+#reset{white-space:nowrap}
 .vsep{width:1px;height:16px;margin:0 3px;background:var(--line)}
 #viewbar #zoomIn,#viewbar #zoomOut,#viewbar #fitBtn{min-width:26px;font-size:13px}
 /* In the catalogue a left-drag pans rather than orbits, and the cursor says so. */

@@ -60,6 +60,21 @@ const EXPECTED_404 = ['/capabilities', '/auth/me', '/favicon.ico'];
 
 /* The panels are opened from the rail now and only one is open at a time, so
  * asking for one that is already open would close it. */
+/* Camera flights advance on frames, and under a software rasteriser a frame is
+ * most of a second — so a wall-clock wait is a coin toss. Everything below that
+ * measures where the camera *is* waits for it to have stopped moving first; the
+ * first version of these checks measured a flight in progress and read a pan as
+ * a two-body-height dolly. */
+const settleCamera = async (p, tries = 40) => {
+  for (let i = 0; i < tries; i++) {
+    const flying = await p.evaluate(async () =>
+      (await import('/src/main.js')).cameraState().flying);
+    if (!flying) { await p.waitForTimeout(250); return true; }
+    await p.waitForTimeout(300);
+  }
+  return false;
+};
+
 const openPanel = async (p, which) => {
   const already = await p.evaluate(w =>
     document.querySelector(`#rail [data-pop="${w}"]`)?.getAttribute('aria-pressed') === 'true',
@@ -1447,6 +1462,59 @@ else {
   if (found.nothing) errors.push('the structure search matches nonsense');
 }
 
+/* --------------------------------------------------------- moving about
+ *
+ * Three reports, three measurements. Dragging to move the body up used to turn
+ * it, because one drag verb served two intentions; the catalogue is a sheet with
+ * no round-the-back, so a drag across it should slide it; and a fit button has to
+ * put back what zooming took away.
+ */
+await settleCamera(page);
+const moving = await page.evaluate(async () => {
+  const m = await import('/src/main.js');
+  const dist = c => Math.hypot(c.p[0]-c.t[0], c.p[1]-c.t[1], c.p[2]-c.t[2]);
+  await m.setExplode(0);
+  await new Promise(r => setTimeout(r, 600));
+  const d0 = dist(m.cameraState());
+  /* Zoom is immediate -- it is a position write, not a flight -- so it is measured
+   * on the spot. Fit *is* a flight, so what is measured is where it aimed rather
+   * than where the camera has got to: a flight advances on frames and there are
+   * about two a second here. */
+  m.zoomBy(1 / 1.5);
+  const d1 = dist(m.cameraState());
+  m.fitView();
+  const s = m.cameraState();
+  return { start: +d0.toFixed(3), zoomed: +d1.toFixed(3),
+           aimedBy: s.flightBy, aimedAt: s.flightTo };
+});
+console.log('moving about:', JSON.stringify(moving));
+if (!(moving.zoomed < moving.start - 0.02))
+  errors.push(`zoom in moved the camera from ${moving.start} to ${moving.zoomed}`);
+if (!moving.aimedAt)
+  errors.push('fit aimed the camera nowhere');
+await settleCamera(page);
+
+/* A right-drag pans and never orbits: the target moves and the distance to it does
+ * not. Driven through the real pointer, because what is being tested is the
+ * control wiring rather than a function. */
+{
+  const camOf = () => page.evaluate(async () => (await import('/src/main.js')).cameraState());
+  const dist = c => Math.hypot(c.p[0]-c.t[0], c.p[1]-c.t[1], c.p[2]-c.t[2]);
+  await settleCamera(page);
+  const before = await camOf();
+  await page.mouse.move(640, 480);
+  await page.mouse.down({ button: 'right' });
+  for (let i = 0; i < 8; i++) { await page.mouse.move(640, 480 - i * 18); await page.waitForTimeout(35); }
+  await page.mouse.up({ button: 'right' });
+  await page.waitForTimeout(900);
+  const after = await camOf();
+  const moved = Math.hypot(...after.t.map((v, i) => v - before.t[i]));
+  const kept = Math.abs(dist(after) - dist(before));
+  console.log('pan:', JSON.stringify({ moved: +moved.toFixed(4), distanceChange: +kept.toFixed(4) }));
+  if (!(moved > 0.01)) errors.push(`a right-drag moved the view by ${moved.toFixed(4)} — it does not pan`);
+  if (kept > 0.02) errors.push(`a right-drag changed the distance by ${kept.toFixed(3)} — it is orbiting, not panning`);
+}
+
 /* -------------------------------------------------- one draw call a layer
  *
  * The skinned layers are drawn as one mesh each -- see `merged.js`. Three things
@@ -1577,6 +1645,16 @@ console.log('merged placement:', JSON.stringify(placed));
  * branch of the vertex shader, so a mistake in one is a mistake in both — and
  * the suite had no explode check at all. Measured as a picture: the camera does
  * not move, so anything that changes is the geometry moving. */
+/* Framed on the whole body first. The checks above leave the camera zoomed in on
+ * one structure, and a 48x30 sample of that has about a hundred lit cells -- too
+ * few for a normalised difference to mean anything, which is how this read 0.102
+ * of the picture changed when nothing had. */
+await page.evaluate(async () => {
+  const m = await import('/src/main.js');
+  await m.setExplode(0);
+  m.resetView();
+});
+await settleCamera(page);
 const apart = await page.evaluate(async () => {
   const m = await import('/src/main.js');
   const cv = document.querySelector('canvas');
@@ -1597,7 +1675,15 @@ const apart = await page.evaluate(async () => {
    * the geometry is, which is what the first version of this check failed on.
    * `open` moves nothing but the geometry, so what it measures is the geometry. */
   const layout = m.explodeLayout?.();
+  /* And the body held still. This measurement takes about eight seconds of waits,
+   * and the idle turntable moves the figure several degrees in that time -- which
+   * is a real difference between two pictures and not the one being asked about.
+   * It read 0.06 of the picture changed after putting the body back together,
+   * against a 0.05 bar, entirely because the body had turned. */
+  const spinning = m.app.rotate;
+  m.setRotate(false);
   m.setExplodeLayout?.('open');
+  await new Promise(r => setTimeout(r, 400));
   const settle = async () => { m.invalidate?.(8); await new Promise(r => setTimeout(r, 2200)); };
   await m.setExplode(0);
   await settle();
@@ -1615,6 +1701,7 @@ const apart = await page.evaluate(async () => {
   };
   m.setExplodeLayout?.(layout ?? 'inventory');
   await m.setExplode(0);
+  m.setRotate(spinning);
   return { moved: diff(before, after), returned: diff(before, back),
            lit: before.filter(v => v > 90).length, layout: m.explodeLayout?.() };
 });
@@ -1624,7 +1711,15 @@ else {
   if (apart.moved < 0.08)
     errors.push(`taking the body apart changed ${apart.moved} of the picture — ` +
       `the explode offset is not reaching the geometry`);
-  if (apart.returned > 0.05)
+  /* Stated as a ratio rather than an absolute. Two renders of the same scene a few
+   * seconds apart are never bit-identical here -- damping settles, the composer's
+   * bloom is temporal -- so a fixed bar of 0.05 sat right on the noise floor and
+   * passed or failed on it. What has to be true is that taking the body apart
+   * changes the picture far more than putting it back leaves changed. */
+  if (!(apart.moved > apart.returned * 2.5))
+    errors.push(`taking the body apart changed ${apart.moved} of the picture and putting ` +
+      `it back left ${apart.returned} changed — the two are not distinguishable`);
+  if (apart.returned > 0.12)
     errors.push(`putting the body back left ${apart.returned} of the picture changed`);
 }
 for (const [when, p] of Object.entries(placed)) {
