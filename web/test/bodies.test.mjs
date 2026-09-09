@@ -76,8 +76,11 @@ test('every available body has the artefacts it claims', () => {
     if (b.motion === false)
       for (const lang of LANGS)
         assert.ok(b.noMotion?.[lang]?.length, `${id}: motion is off with no ${lang} reason`);
-    for (const name of b.assets.layers)
-      assert.ok(existsSync(ROOT + layerUrl(b, name)), `${id}: ${layerUrl(b, name)} does not exist`);
+    for (const name of b.assets.layers) {
+      const url = layerUrl(b, name);
+      // the URL carries a cache-busting content stamp — see `assetUrl`
+      assert.ok(existsSync(ROOT + url.split('?')[0]), `${id}: ${url} does not exist`);
+    }
     if (b.assets.shell)
       assert.ok(existsSync(ROOT + b.assets.shell), `${id}: ${b.assets.shell} does not exist`);
   }
@@ -148,4 +151,29 @@ test('the male body frame is exactly what it was before it moved out of frame.js
   assert.deepEqual(m.brainToBody.rotation, [-0.27194, 0.00676966, -0.0488966]);
   assert.deepEqual(m.brainToBody.translation, [-0.00179225, 0.404775, -0.0410048]);
   assert.equal(m.brainToBody.landmarks.length, 10);
+});
+
+
+/**
+ * The stamp on every model URL is the file's own hash.
+ *
+ * A stale stamp is worse than none: the URL looks versioned, so nothing is suspicious, and a
+ * browser goes on serving geometry from before the last build beside a structure table from
+ * after it. That is exactly what put a removed skin back on the screen and made it report
+ * itself as the spleen. Running a model build and forgetting `npm run stamp` is a one-line
+ * mistake with a symptom nobody can attribute, so it is a test rather than a convention.
+ */
+test('every model is stamped with its own current hash', async () => {
+  const { ASSET_STAMP } = await import('../src/generated/assets.js');
+  const { createHash } = await import('node:crypto');
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const dir = ROOT + 'models/';
+  const onDisk = readdirSync(dir).filter(f => f.endsWith('.glb')).sort();
+  assert.deepEqual(Object.keys(ASSET_STAMP).sort(), onDisk,
+    'the stamp file and models/ disagree about which models exist — run `npm run stamp`');
+  for (const f of onDisk) {
+    const want = createHash('sha256').update(readFileSync(dir + f)).digest('hex').slice(0, 10);
+    assert.equal(ASSET_STAMP[f], want,
+      `${f} has changed since it was stamped — run \`npm run stamp\``);
+  }
 });

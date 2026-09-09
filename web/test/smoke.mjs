@@ -1788,6 +1788,56 @@ const apart = await page.evaluate(async () => {
            lit: before.filter(v => v > 90).length, layout: m.explodeLayout?.() };
 });
 console.log('explode:', JSON.stringify(apart));
+
+/* Every piece laid out in the catalogue answers a click, and answers with itself.
+ *
+ * A sheet of two thousand pieces is a sheet of two thousand *controls*, and one that does
+ * not respond is invisible as a fault: there is nothing on screen to distinguish a piece
+ * that cannot be clicked from one the reader has not clicked yet. It reported as "I found
+ * something untouchable", which is exactly how it would have to be reported.
+ *
+ * So each structure is asked at its own drawn centre — which is where a reader aims — and
+ * has to come back as itself rather than as its neighbour. The cortex was the one that
+ * failed: fifteen parcels on a single sheet, drawn at a cell the pick knew nothing about. */
+{
+  const reach = await page.evaluate(async () => {
+    const m = await import('/src/main.js');
+    const S = await import('/src/structures.js');
+    const THREE = await import('three');
+    await m.setExplode(1);
+    await new Promise(r => setTimeout(r, 1400));
+    const cam = m.gfx.camera;
+    const c = document.querySelector('canvas').getBoundingClientRect();
+    const v = new THREE.Vector3();
+    let asked = 0, right = 0, other = 0, none = 0;
+    const wrong = [];
+    for (const [id, r] of S.registry().byId) {
+      if (r.parts || !m.app.layers[r.layer]?.on) continue;
+      const p = m.drawnPointOf(id);
+      if (!p) continue;
+      v.copy(p).project(cam);
+      if (v.z > 1) continue;
+      const x = c.left + (v.x * 0.5 + 0.5) * c.width;
+      const y = c.top + (1 - (v.y * 0.5 + 0.5)) * c.height;
+      if (x < c.left + 2 || x > c.right - 2 || y < c.top + 2 || y > c.bottom - 2) continue;
+      asked++;
+      const got = m.pickAt(x, y);
+      if (got === id) right++;
+      else if (got != null) { other++; if (wrong.length < 6) wrong.push(`${r.name.en} -> ${S.nameOf(got, 'en')}`); }
+      else { none++; if (wrong.length < 6) wrong.push(`${r.name.en} -> nothing`); }
+    }
+    await m.setExplode(0);
+    return { asked, right, other, none, wrong };
+  });
+  console.log('catalogue is clickable:', JSON.stringify(reach));
+  if (reach.asked < 100)
+    errors.push(`only ${reach.asked} pieces were on screen to click — the catalogue is not laid out`);
+  else if (reach.right < reach.asked)
+    errors.push(`${reach.asked - reach.right} of ${reach.asked} pieces in the catalogue do not ` +
+      `answer a click at their own centre: ${JSON.stringify(reach.wrong)}`);
+  await settleCamera(page);
+}
+
 if (!apart.lit) errors.push('nothing is on screen to take apart');
 else {
   if (apart.moved < 0.08)

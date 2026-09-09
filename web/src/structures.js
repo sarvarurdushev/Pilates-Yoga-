@@ -208,6 +208,11 @@ export function buildRegistry(generated, { brain = true } = {}) {
       fma: s.fma,
       sides: s.sides,
       tris: s.tris,
+      /* How many meshes this structure is drawn as. Not the same as one: BodyParts3D ships a
+       * tortuous vessel as a run of separate files, and a paired structure is two sides. The
+       * layers panel states the total beside the structure count, so a reader comparing this
+       * with another atlas's part list is not left to guess at the difference. */
+      pieces: s.pieces ?? 1,
       centroid: s.centroid,
       muscle,
     };

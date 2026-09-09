@@ -51,11 +51,14 @@ SUPERFICIAL = {
 
 # Triangle budget per structure, by layer. Total across the file matters more than any one
 # mesh; these were picked so the whole body lands near the brief's ~15 MB first paint.
+# Organs are raised well past the rest: they are smooth continuous surfaces seen close up,
+# and a faceted liver reads as a modelling error in a way a faceted vessel does not. See the
+# note on the same table in build_detail.py.
 BUDGET = {
     'skeleton': 2500,
     'muscles_superficial': 2500,
     'muscles_deep': 900,
-    'organs': 1200,
+    'organs': 3600,
 }
 
 # Which system a structure belongs to when it belongs to several. The FMA tree is a
@@ -293,6 +296,10 @@ def build_layer(layer, ar, parts_by_base, frame, alloc, verbose=True):
             'system': g['system'],
             'fma': [f for f, _ in entries],
             'sides': sorted(bySide),
+            # how many meshes this structure is drawn as -- one per side, and the panel
+            # states the total beside the structure count. The 4.0 build records the same
+            # field for the same reason; see build_detail.py.
+            'pieces': len(bySide),
             'tris': int(len(Fd)),
             'centroid': [round(float(v), 5) for v in centroid],
             # per-side centroids, so the rig can assign each mesh to a segment

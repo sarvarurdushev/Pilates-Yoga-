@@ -1009,12 +1009,23 @@ export function spanOf(mesh, rig, capsules, index, allowed, attach = null, note 
  * the same point can share no triangle at all — and an unwelded graph smooths each shell of
  * a seam separately, which is exactly the seam that tears.
  */
-export function smoothOverSurface(geo, value, passes) {
+/**
+ * The welded adjacency of a geometry: which vertices are one point, and which points touch.
+ *
+ * Built once per geometry and kept on it. It depends on nothing but the positions and the
+ * index, and `skinMesh` asks for it once per bone in the chain — three or four times for the
+ * same mesh, every time throwing the answer away and building it again. Across a full atlas
+ * that was **sixteen seconds of the twenty-four this took to load**, which is not a slow
+ * frame, it is a laptop with its fan at maximum and a page that will not answer.
+ */
+function weldedGraph(geo) {
   const pos = geo.getAttribute('position');
   const idx = geo.index;
-  if (!idx || !pos) return value;
-  const n = pos.count;
+  if (!idx || !pos) return null;
+  const cached = geo.userData.__weld;
+  if (cached && cached.n === pos.count && cached.count === idx.count) return cached;
 
+  const n = pos.count;
   /* Weld first, and weld properly.
    *
    * Quantising a position into a grid cell is not a weld: two vertices a nanometre apart can
@@ -1022,12 +1033,23 @@ export function smoothOverSurface(geo, value, passes) {
    * smoothed independently on each side — and that seam is exactly where the mesh tears. So
    * the grid is only a lookup, and any two vertices within `WELD` of each other are joined,
    * across cell boundaries included.
+   *
+   * The cell key is an integer hash rather than `"${cx},${cy},${cz}"`. Every vertex probes
+   * twenty-seven cells, so the string form allocated twenty-seven strings per vertex per
+   * call — millions of them across an atlas, and most of the cost of this function. A hash
+   * can put two unrelated cells in one bucket, which changes nothing: every candidate is
+   * distance-checked below anyway, and that check is what decides the weld.
    */
   const cell = WELD;
+  const key = (cx, cy, cz) =>
+    (Math.imul(cx, 73856093) ^ Math.imul(cy, 19349663) ^ Math.imul(cz, 83492791)) | 0;
   const buckets = new Map();
-  const cellKey = (x, y, z) => `${Math.floor(x / cell)},${Math.floor(y / cell)},${Math.floor(z / cell)}`;
+  const cxs = new Int32Array(n), cys = new Int32Array(n), czs = new Int32Array(n);
   for (let i = 0; i < n; i++) {
-    const k = cellKey(pos.getX(i), pos.getY(i), pos.getZ(i));
+    const cx = Math.floor(pos.getX(i) / cell), cy = Math.floor(pos.getY(i) / cell),
+          cz = Math.floor(pos.getZ(i) / cell);
+    cxs[i] = cx; cys[i] = cy; czs[i] = cz;
+    const k = key(cx, cy, cz);
     let b = buckets.get(k);
     if (!b) buckets.set(k, b = []);
     b.push(i);
@@ -1039,9 +1061,9 @@ export function smoothOverSurface(geo, value, passes) {
   const tol2 = WELD * WELD;
   for (let i = 0; i < n; i++) {
     const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
-    const cx = Math.floor(x / cell), cy = Math.floor(y / cell), cz = Math.floor(z / cell);
+    const cx = cxs[i], cy = cys[i], cz = czs[i];
     for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) {
-      const b = buckets.get(`${cx + dx},${cy + dy},${cz + dz}`);
+      const b = buckets.get(key(cx + dx, cy + dy, cz + dz));
       if (!b) continue;
       for (const j of b) {
         if (j <= i) continue;
@@ -1077,6 +1099,23 @@ export function smoothOverSurface(geo, value, passes) {
     adj[fill[b]++] = a; adj[fill[b]++] = c;
     adj[fill[c]++] = a; adj[fill[c]++] = b;
   }
+  const built = { n, count, group, groups, start, adj };
+  geo.userData.__weld = built;
+  return built;
+}
+
+/**
+ * Average a per-vertex scalar with its neighbours, over the mesh's own surface.
+ *
+ * The adjacency is built by welding on position rather than by trusting the index buffer.
+ * These meshes come out of a decimator that splits vertices for normals, so two vertices at
+ * the same point can share no triangle at all — and an unwelded graph smooths each shell of
+ * a seam separately, which is exactly the seam that tears.
+ */
+export function smoothOverSurface(geo, value, passes) {
+  const g0 = weldedGraph(geo);
+  if (!g0) return value;
+  const { n, group, groups, start, adj } = g0;
 
   // seed each group with the mean of its vertices, then relax
   let cur = new Float32Array(groups), next = new Float32Array(groups);
@@ -1247,16 +1286,84 @@ export function buildBoneField(meshes, rig, index) {
     if (!list) buckets.set(h, list = []);
     list.push(k);
   }
-  return { P, S, min, cell, nx, ny, nz, buckets, key };
+  /* A nearby sample for every cell, so the search below starts with a real bound.
+   *
+   * `segmentAtPoint` grows a ring of cells until it can prove nothing outside can be nearer
+   * than what it has found. Starting from nothing, a point in soft tissue — an artery, a
+   * length of gut, anything not lying on a bone — finds nothing for several rings and scans
+   * up to thirteen cubed cells before it gives up. Multiplied by the two hundred and forty
+   * samples each of fifteen hundred meshes votes with, that was **6.7 seconds of the
+   * twenty-four this took to load**, and it is the largest single thing a laptop was being
+   * asked to do before the atlas appeared.
+   *
+   * A breadth-first sweep out from the occupied cells gives every cell in the grid one sample
+   * that is near it — not necessarily the nearest, which is the point. It costs one pass over
+   * fifteen thousand cells, once, and it lets the search open with a bound tight enough that
+   * the proof lands at the first or second ring. **The answer does not change**: the bound is
+   * still `nothing outside ring r can beat what I have`, and that is true whatever the value
+   * being compared came from. */
+  const cells = nx * ny * nz;
+  const seed = new Int32Array(cells).fill(-1);
+  const queue = new Int32Array(cells);
+  let qh = 0, qt = 0;
+  for (const [h, list] of buckets) {
+    if (h < 0 || h >= cells || !list.length) continue;
+    seed[h] = list[0];
+    queue[qt++] = h;
+  }
+  while (qh < qt) {
+    const h = queue[qh++];
+    const c = h % nz, b = ((h - c) / nz) % ny, a = (h - c - b * nz) / (nz * ny);
+    for (let da = -1; da <= 1; da++) for (let db = -1; db <= 1; db++) for (let dc = -1; dc <= 1; dc++) {
+      const a2 = a + da, b2 = b + db, c2 = c + dc;
+      if (a2 < 0 || a2 >= nx || b2 < 0 || b2 >= ny || c2 < 0 || c2 >= nz) continue;
+      const h2 = key(a2, b2, c2);
+      if (seed[h2] >= 0) continue;
+      seed[h2] = seed[h];
+      queue[qt++] = h2;
+    }
+  }
+  /* And the answers themselves, kept.
+   *
+   * Every caller of `segmentAtPoint` is taking a *vote*: `nearestSegment` samples two hundred
+   * and forty points off a mesh and gives it the segment most of them land on;
+   * `meshNeighbourhood` and `withOccupied` do the same with a share threshold. Half a million
+   * of those queries are asked while an atlas loads, over a body that this grid divides into
+   * about fifteen thousand cells — so the same question is being asked and re-answered
+   * hundreds of times.
+   *
+   * The memo is keyed on a half-cell, about one and a half centimetres. That is a real
+   * approximation and it is the right one to make here: it can only change the answer for a
+   * point within a centimetre of the boundary between two bones' territories, and no vote of
+   * hundreds of samples turns on those. It is not used for anything that places geometry. */
+  const fine = cell / 2;
+  return { P, S, min, cell, fine, nx, ny, nz, buckets, key, seed, memo: new Map() };
 }
 
 /** The segment whose bone is nearest `p`, or -1 if nothing is within reach. */
 function segmentAtPoint(field, p, maxRings = 6) {
-  const { P, S, min, cell, nx, ny, nz, buckets, key } = field;
+  const { P, S, min, cell, fine, nx, ny, nz, buckets, key, seed, memo } = field;
+  let fk = 0;
+  if (memo) {
+    const fa = Math.floor((p.x - min.x) / fine), fb = Math.floor((p.y - min.y) / fine);
+    const fc = Math.floor((p.z - min.z) / fine);
+    fk = (Math.imul(fa, 73856093) ^ Math.imul(fb, 19349663) ^ Math.imul(fc, 83492791)) | 0;
+    const hit = memo.get(fk);
+    if (hit !== undefined) return hit;
+  }
   const a0 = Math.floor((p.x - min.x) / cell);
   const b0 = Math.floor((p.y - min.y) / cell);
   const c0 = Math.floor((p.z - min.z) / cell);
   let best = -1, bd = Infinity;
+  // an opening bound from the cell's own nearby sample — see `seed` above
+  if (seed && a0 >= 0 && a0 < nx && b0 >= 0 && b0 < ny && c0 >= 0 && c0 < nz) {
+    const k = seed[key(a0, b0, c0)];
+    if (k >= 0) {
+      const dx = P[k * 3] - p.x, dy = P[k * 3 + 1] - p.y, dz = P[k * 3 + 2] - p.z;
+      bd = dx * dx + dy * dy + dz * dz;
+      best = S[k];
+    }
+  }
   for (let r = 0; r <= maxRings; r++) {
     for (let a = a0 - r; a <= a0 + r; a++) {
       if (a < 0 || a >= nx) continue;
@@ -1281,6 +1388,7 @@ function segmentAtPoint(field, p, maxRings = 6) {
      * cell boundary. */
     if (best >= 0 && bd <= (r * cell) * (r * cell)) break;
   }
+  if (memo) memo.set(fk, best);
   return best;
 }
 
@@ -1310,8 +1418,11 @@ function segmentAtPoint(field, p, maxRings = 6) {
  *                            coarser stand-in; without either this falls back to the origin
  *                            test, which is what produced the bindings above
  */
+const _namesOf = new WeakMap();
 export function nearestSegment(o, rig, ref = null) {
-  const names = [...rig.nodes.keys()];
+  // cached: this is called once per mesh and the rig's node list does not change
+  let names = _namesOf.get(rig);
+  if (!names) _namesOf.set(rig, names = [...rig.nodes.keys()]);
   const field = ref && !Array.isArray(ref) ? ref : null;
   const capsules = Array.isArray(ref) ? ref : null;
   const pos = ref && o.geometry?.getAttribute('position');

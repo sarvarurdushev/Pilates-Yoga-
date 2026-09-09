@@ -19,7 +19,7 @@ import { buildRegistry, registry, get, nameOf, LAYER_ORDER, vertebra,
          drawnIds, isAggregate } from './structures.js';
 import { buildGroups, groups, groupOf, groupsOf } from './content/groups.js';
 import { PointerTap, slopFor } from './pointerTap.js';
-import { activeBody, layerUrl } from './bodies.js';
+import { activeBody, layerUrl, assetUrl } from './bodies.js';
 import { EXERCISE, ROLE_LEVEL } from './content/exercises.js';
 import { MOVEMENT_PATHWAY } from './content/pathways.js';
 import { brainOf, analyse } from './content/analysis.js';
@@ -809,7 +809,7 @@ function loadShell() {
   if (shell.loaded || shell.loading || !rig?.bind) return Promise.resolve();
   shell.loading = true;
   return new Promise(res => {
-    new GLTFLoader().load(body.assets.shell, (gltf) => {
+    new GLTFLoader().load(assetUrl(body.assets.shell), (gltf) => {
       const mat = new THREE.MeshStandardMaterial({
         color: 0x3a2422, roughness: 0.95, metalness: 0.0,
         side: THREE.FrontSide, transparent: false, depthWrite: true,
@@ -1045,7 +1045,7 @@ function loadBrain(L2) {
       done();
       res();
     };
-    new GLTFLoader().load('models/cortex.glb', (g) => {
+    new GLTFLoader().load(assetUrl('models/cortex.glb'), (g) => {
       g.scene.traverse(o => {
         if (o.isMesh) { o.material = brainMat; o.renderOrder = 2; o.userData.layer = 'brain';
                         brainSurfaces.add(o); cortex = o; }
@@ -1076,7 +1076,7 @@ function loadBrain(L2) {
       holder.add(g.scene);
       finish();
     }, undefined, finish);
-    const seg = loadDeepStructures('models/subcortical.glb', (g, ids) => {
+    const seg = loadDeepStructures(assetUrl('models/subcortical.glb'), (g, ids) => {
       /* The cerebellum and the brainstem wear the cortex's own material — they are visible
        * brain surface rather than interior structures — so they have to follow the look. The
        * interior structures have their own additive material and stay as they are. */
@@ -2130,32 +2130,81 @@ function buildLabelEls() {
       canvas.dispatchEvent(new PointerEvent('pointerdown', e));
     }, true);
   }
-  const svg = document.getElementById('leaders');
   const have = new Set(labels.map(l => l.id));
   for (const id of Object.keys(app.centroids).map(Number)) {
     if (have.has(id) || !get(id)) continue;
-    const el = document.createElement('button');
-    el.className = 'lab3d';
-    el.onclick = (e) => { e.stopPropagation(); selectStructure(id); };
-    /* Two nodes, not one string. The name is the label; the role tag is a second, dimmer
-     * field that appears only on a muscle the loaded exercise actually works, which is a
-     * handful of the four hundred rather than all of them. Keeping them separate is also
-     * what lets the width be re-read when either changes without re-reading it every frame. */
-    // so a test can ask what a label on screen is pointing at, without reaching into `labels`
-    el.dataset.id = String(id);
-    const nameEl = document.createElement('span');
-    nameEl.className = 'labname';
-    const roleEl = document.createElement('span');
-    roleEl.className = 'labrole';
-    el.append(nameEl, roleEl);
-    const dot = document.createElement('div');
-    dot.className = 'labdot';
-    const rope = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    rope.setAttribute('fill', 'none');
-    rope.setAttribute('stroke-width', '0.75');   // hairline: a leader line, not a connector
-    svg.appendChild(rope); labelLayer.appendChild(dot); labelLayer.appendChild(el);
-    labels.push({ id, el, dot, rope, nameEl, roleEl,
-                  side: null, text: null, role: null, w: null, hidden: false });
+    /* A record, and no elements.
+     *
+     * Sixteen names are ever on screen — eight a lane — and this used to build a button, a
+     * ring, a leader path and two spans for **every structure in the atlas**: 2,087 of them,
+     * 10,712 DOM nodes, all but a dozen of them permanently invisible. The browser still owns
+     * every one: style recalculation walks them, the SVG carries two thousand paths, and the
+     * memory is held for the life of the page. On the machine this is meant to run on that is
+     * a real share of why it stopped answering.
+     *
+     * The state each label carries between frames — which lane it settled in, where it eased
+     * to, the width its text measured — is a handful of numbers and stays here. The elements
+     * are borrowed from a pool when a label is actually placed, and given back when it is
+     * not. Nothing about which names appear changes; `updateLabels` still ranks every
+     * structure and still places the same sixteen. */
+    labels.push({ id, el: null, dot: null, rope: null, nameEl: null, roleEl: null,
+                  side: null, text: null, role: null, w: null, hidden: true });
+  }
+}
+
+/**
+ * The elements a placed label borrows.
+ *
+ * Comfortably more than the sixteen that can be placed, so a label keeps its own elements
+ * across frames while it stays on screen and the DOM does not churn every time the body
+ * turns. Past that the least recently placed gives its set up.
+ */
+const LABEL_POOL = 40;
+const livePlates = [];
+function attachEls(l) {
+  if (l.el) { markUsed(l); return l; }
+  const svg = document.getElementById('leaders');
+  if (!svg) return l;
+  if (livePlates.length >= LABEL_POOL) {
+    // the least recently placed, which by construction is not on screen
+    const old = livePlates.shift();
+    if (old && old !== l) detachEls(old);
+  }
+  const el = document.createElement('button');
+  el.className = 'lab3d';
+  el.onclick = (e) => { e.stopPropagation(); selectStructure(l.id); };
+  /* Two nodes, not one string. The name is the label; the role tag is a second, dimmer
+   * field that appears only on a muscle the loaded exercise actually works, which is a
+   * handful of the four hundred rather than all of them. Keeping them separate is also
+   * what lets the width be re-read when either changes without re-reading it every frame. */
+  // so a test can ask what a label on screen is pointing at, without reaching into `labels`
+  el.dataset.id = String(l.id);
+  const nameEl = document.createElement('span');
+  nameEl.className = 'labname';
+  const roleEl = document.createElement('span');
+  roleEl.className = 'labrole';
+  el.append(nameEl, roleEl);
+  const dot = document.createElement('div');
+  dot.className = 'labdot';
+  const rope = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  rope.setAttribute('fill', 'none');
+  rope.setAttribute('stroke-width', '0.75');   // hairline: a leader line, not a connector
+  svg.appendChild(rope); labelLayer.appendChild(dot); labelLayer.appendChild(el);
+  Object.assign(l, { el, dot, rope, nameEl, roleEl, text: null, role: null, w: null });
+  livePlates.push(l);
+  return l;
+}
+function detachEls(l) {
+  l.el?.remove(); l.dot?.remove(); l.rope?.remove();
+  l.el = l.dot = l.rope = l.nameEl = l.roleEl = null;
+  l.text = l.role = l.w = null;
+  l.hidden = true;
+}
+function markUsed(l) {
+  const at = livePlates.indexOf(l);
+  if (at >= 0 && at !== livePlates.length - 1) {
+    livePlates.splice(at, 1);
+    livePlates.push(l);
   }
 }
 
@@ -2488,6 +2537,7 @@ function hide(l) {
   // enough style-recalculation work to be visible in the frame time
   if (l.hidden) return;
   l.hidden = true;
+  if (!l.el) return;                       // never placed, so it owns nothing to hide
   l.el.style.opacity = 0; l.el.style.pointerEvents = 'none';
   l.dot.style.opacity = 0; l.rope.setAttribute('stroke-opacity', '0');
 }
@@ -2499,6 +2549,8 @@ function hide(l) {
  */
 function place(c, side, laneIn, w) {
   const { l, r, sel, act, role: actRole } = c;
+  attachEls(l);
+  if (!l.el) return;
   /* The block is centred on however many labels are in the lane, so one label appearing or
    * leaving moves every other one by half a row. Snapping to the new height is the shudder
    * that reads as the whole list twitching; easing toward it is the same layout, arrived at
@@ -2580,7 +2632,8 @@ export function captureStage(scale = 2) {
   ctx.scale(scale, scale);
   ctx.drawImage(canvas, 0, 0, w, h);
   for (const l of labels) {
-    if (l.el.style.opacity !== '1') continue;
+    // a label that was never placed owns no elements at all -- see `attachEls`
+    if (!l.el || l.el.style.opacity !== '1') continue;
     const d = l.rope.getAttribute('d');
     if (d && l.rope.getAttribute('stroke-opacity') !== '0') {
       ctx.save();
@@ -2811,6 +2864,9 @@ function pickApart(ev, rect) {
   return best;
 }
 const _off2 = new THREE.Vector3();
+
+/** Where a structure is drawn right now, so a test can ask whether it can be pointed at. */
+export const drawnPointOf = (id) => drawnPoint(+id, new THREE.Vector3());
 
 /** Pick at a client coordinate. Exported so a test can ask what is under a point. */
 export const pickAt = (clientX, clientY) => pick({ clientX, clientY });

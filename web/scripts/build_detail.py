@@ -89,10 +89,19 @@ ALREADY = ['FMA5018',    # bone organ
 
 #: Triangles per structure. Vessels are tubes and a tube reads at very few triangles; the
 #: cartilages are surfaces somebody may look at closely.
-BUDGET = {'arteries': 320, 'veins': 320, 'airways': 480,
-          'connective': 700, 'nerves_cranial': 400, 'heart_detail': 500,
+#: Triangles per structure, by layer.
+#:
+#: Organs are the ones a reader looks *at* rather than looks up. A liver is a smooth
+#: continuous surface, and at five hundred triangles it is a faceted lump with visible flat
+#: planes across the whole of it -- which is what "the organs look ugly, in Human Atlas they
+#: look realistic" is about, and it is entirely a budget question. Vessels and nerve twigs are
+#: tubes seen at a distance and gain nothing from the same treatment, so the extra triangles
+#: are spent where they show. The whole-atlas total goes from 1.7M to about 2.1M, which is
+#: nothing to a GPU: what actually made this application slow was never the triangle count.
+BUDGET = {'arteries': 320, 'veins': 320, 'airways': 640,
+          'connective': 700, 'nerves_cranial': 400, 'heart_detail': 900,
           'detail': 420,
-          'bones_full': 620, 'muscles_full': 520, 'organs_full': 520}
+          'bones_full': 620, 'muscles_full': 520, 'organs_full': 2400}
 
 
 _SIDE = re.compile(r'\b(?:left|right)\b\s*', re.I)
@@ -134,8 +143,11 @@ _VEIN = re.compile(r'\b(?:vein|veins|venous)\b', re.I)
 #: lost the hundred and seventy structures it was hiding. `shell.glb` was dropped for the same
 #: reason in `bodies.js` -- see the note there -- and this is the other half of that removal:
 #: the derived shell and the real skin are both a layer of brown over the anatomy.
+#: Hair is in here too, and it is the same call as the skin: an atlas of what is under the
+#: surface has no use for what grows out of it, and a four-hundred-triangle approximation of
+#: a head of hair is a brown cap over the skull that reads as a modelling mistake.
 _NOT_DRAWN = re.compile(r'\bgyrus\b|\bsulcus\b|\bcortex\b|\bcavity of\b'
-                        r'|^skin$|\bskin of\b', re.I)
+                        r'|^skin$|\bskin of\b|\bhair\b', re.I)
 
 
 def classify(best, kids, names_of, drawn=()):

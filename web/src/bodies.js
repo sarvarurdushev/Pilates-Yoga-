@@ -30,6 +30,8 @@
  * body was built here once, from published proportions, and removed again; `docs/DECISIONS.md`
  * records what it cost and what it could not produce.
  */
+import { ASSET_STAMP } from './generated/assets.js';
+
 export const BODIES = {
   male: {
     id: 'male',
@@ -199,7 +201,28 @@ export function templateDisclaimer(body, lang, base) {
   return { title, body: parts.filter(Boolean).join(' ') };
 }
 
+/**
+ * A model URL with its content hash on it.
+ *
+ * Without the hash a browser is entitled to keep `models/organs_full.glb` for as long as its
+ * cache headers allow, which is right until the file changes. It did: the skin was taken out
+ * of the atlas and the structure table shipped alongside it said so, while the browser went
+ * on serving the geometry from before — so the skin was still drawn, and because the region
+ * ids had shifted by one, clicking it reported "spleen". A fault with no symptom that points
+ * at its cause, on a machine nobody debugging it can see.
+ *
+ * The hash comes from `scripts/stamp_assets.py`. A file that changed gets a different URL and
+ * cannot be served from cache; a file that did not gets the identical URL and is not
+ * re-downloaded. An unstamped file — one added since the last build — is passed through
+ * unchanged rather than being given a wrong answer.
+ */
+export function assetUrl(path) {
+  const file = path.split('/').pop();
+  const v = ASSET_STAMP[file];
+  return v ? `${path}?v=${v}` : path;
+}
+
 /** Absolute-ish path to one of a body's layer meshes. */
 export function layerUrl(body, name) {
-  return `${body.assets.models}/${name}.glb`;
+  return assetUrl(`${body.assets.models}/${name}.glb`);
 }
