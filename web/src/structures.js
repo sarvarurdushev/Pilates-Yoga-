@@ -16,16 +16,43 @@ import { KO_NAME } from './content/koreanNames.js';
 import { INTERIOR_IDS } from './deepStructures.js';
 
 /** Layer names, in the order they stack from the outside in. */
-export const LAYER_ORDER = ['organs', 'muscles_superficial', 'muscles_deep', 'nervous', 'skeleton', 'brain'];
+export const LAYER_ORDER = ['organs', 'airways', 'arteries', 'veins',
+                            'muscles_superficial', 'muscles_deep',
+                            'nervous', 'nerves_cranial', 'heart_detail',
+                            'connective', 'skeleton', 'brain'];
 
 /** Palette colour per layer, used for any structure with no colour of its own. */
 export const LAYER_COLOR = {
+  /* The vasculature is read by colour before it is read by name, and it is the one
+   * place in the body where the convention is universal: arteries red, veins blue. */
+  arteries: '#C0392B',
+  veins: '#3D6C9E',
+  airways: '#8FA9B8',
+  connective: '#CFC3A8',
+  nerves_cranial: '#E8C86B',
+  heart_detail: '#B05A52',
   nervous: '#F2D98B',
   skeleton: '#D9D2C4',
   muscles_superficial: '#C1483F',
   muscles_deep: '#9E3B36',
   organs: '#B08658',
   brain: '#cfb2a8',
+};
+
+/**
+ * What kind of thing a layer holds, for the search headings and the written overview.
+ *
+ * Read from a table rather than from three chained conditions on the layer name: with the
+ * vasculature added, "not muscles, not skeleton, not nervous, therefore an organ" filed
+ * five hundred arteries and veins under Organs and told a reader that an artery is tissue
+ * organised to do one job.
+ */
+const KIND_OF_LAYER = {
+  skeleton: 'bone', connective: 'bone',
+  muscles_superficial: 'muscle', muscles_deep: 'muscle',
+  nervous: 'nerve', nerves_cranial: 'nerve', brain: 'brain',
+  arteries: 'vessel', veins: 'vessel',
+  organs: 'organ', airways: 'organ', heart_detail: 'organ',
 };
 
 /** Spread structures within a layer around its base colour so neighbours are separable. */
@@ -157,9 +184,7 @@ export function buildRegistry(generated, { brain = true } = {}) {
       // spread across the layer's range so two adjacent muscles are never the same colour
       color: shade(LAYER_COLOR[s.layer] ?? '#9aa3b8', 0.12 + 0.55 * ((k * 7) % 1)),
       layer: s.layer,
-      kind: s.layer.startsWith('muscles') ? 'muscle'
-          : s.layer === 'skeleton' ? 'bone'
-          : s.layer === 'nervous' ? 'nerve' : 'organ',
+      kind: KIND_OF_LAYER[s.layer] ?? 'organ',
       interior: false,
       fma: s.fma,
       sides: s.sides,

@@ -1568,6 +1568,15 @@ const apart = await page.evaluate(async () => {
     for (let i = 0; i < d.length; i += 4) out.push(d[i] + d[i+1] + d[i+2]);
     return out;
   };
+  /* Measured in the `open` layout, not the catalogue one, and that is the point of
+   * the difference. Both drive the same branch of the same vertex shader — the
+   * palette's offset texture — but the catalogue also fits the camera to itself on
+   * the way out and restores the view on the way back, both deliberately. Three
+   * pictures taken across that differ by where the camera is as well as by where
+   * the geometry is, which is what the first version of this check failed on.
+   * `open` moves nothing but the geometry, so what it measures is the geometry. */
+  const layout = m.explodeLayout?.();
+  m.setExplodeLayout?.('open');
   const settle = async () => { m.invalidate?.(8); await new Promise(r => setTimeout(r, 2200)); };
   await m.setExplode(0);
   await settle();
@@ -1583,7 +1592,10 @@ const apart = await page.evaluate(async () => {
     for (let i = 0; i < a.length; i++) { d += Math.abs(a[i] - b[i]); t += Math.max(a[i], b[i]); }
     return +(d / Math.max(1, t)).toFixed(3);
   };
-  return { moved: diff(before, after), returned: diff(before, back), lit: before.filter(v => v > 90).length };
+  m.setExplodeLayout?.(layout ?? 'inventory');
+  await m.setExplode(0);
+  return { moved: diff(before, after), returned: diff(before, back),
+           lit: before.filter(v => v > 90).length, layout: m.explodeLayout?.() };
 });
 console.log('explode:', JSON.stringify(apart));
 if (!apart.lit) errors.push('nothing is on screen to take apart');

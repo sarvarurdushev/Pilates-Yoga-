@@ -56,6 +56,13 @@ export const UI = {
   organs:       { en: 'Organs', ko: '장기' },
   nervous:      { en: 'Nerves', ko: '신경' },
   brain:        { en: 'Brain', ko: '뇌' },
+  // the layers built from the BodyParts3D 4.0 element archive
+  arteries:     { en: 'Arteries', ko: '동맥' },
+  veins:        { en: 'Veins', ko: '정맥' },
+  airways:      { en: 'Airways and ducts', ko: '기도와 관' },
+  connective:   { en: 'Cartilage and ligament', ko: '연골과 인대' },
+  nerves_cranial: { en: 'Cranial nerves', ko: '뇌신경' },
+  heart_detail: { en: 'Heart valves', ko: '심장판막' },
 
   // views
   views:        { en: 'View', ko: '시점' },
@@ -422,6 +429,7 @@ export const UI = {
   kindMuscle:   { en: 'Muscles', ko: '근육' },
   kindNerve:    { en: 'Nerves', ko: '신경' },
   kindOrgan:    { en: 'Organs', ko: '장기' },
+  kindVessel:   { en: 'Vessels', ko: '혈관' },
   kindBrain:    { en: 'Brain', ko: '뇌' },
   seeInside:    { en: 'See inside', ko: '내부 보기' },
   seeInsideOff: { en: 'Solid', ko: '불투명' },

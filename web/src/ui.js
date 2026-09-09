@@ -483,7 +483,7 @@ export function mountUI(ctx) {
    */
 
   const KIND_ORDER = [['muscle', 'kindMuscle'], ['bone', 'kindBone'], ['nerve', 'kindNerve'],
-                      ['organ', 'kindOrgan'], ['brain', 'kindBrain']];
+                      ['vessel', 'kindVessel'], ['organ', 'kindOrgan'], ['brain', 'kindBrain']];
 
   /**
    * Explore: find it, or browse to it.

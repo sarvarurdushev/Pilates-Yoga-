@@ -277,6 +277,10 @@ export const KIND_OVERVIEW = {
     en: 'A nerve carries signals, in both directions: the instruction to contract on the way out, and position, load and pain on the way back. A muscle with no supply cannot be trained, however healthy the muscle is — which is why the nerve that reaches a muscle matters as much as the muscle.',
     ko: '신경은 신호를 양방향으로 전달합니다. 나갈 때는 수축하라는 명령을, 돌아올 때는 위치와 부하와 통증을 전달합니다. 신경 지배가 없는 근육은 아무리 건강해도 훈련할 수 없습니다. 근육에 도달하는 신경이 근육 자체만큼 중요한 이유입니다.',
   },
+  vessel: {
+    en: 'A blood vessel is a tube under pressure. Arteries carry blood away from the heart and are thick-walled and elastic, which is why they hold their shape; veins carry it back at low pressure, have valves to stop it falling backwards, and are emptied and filled by the muscles around them. That last part is why movement matters to circulation at all: a calf contracting is a pump.',
+    ko: '혈관은 압력을 받는 관입니다. 동맥은 심장에서 나가는 혈액을 나르며 벽이 두껍고 탄력이 있어 형태를 유지합니다. 정맥은 낮은 압력으로 혈액을 되돌리며, 역류를 막는 판막이 있고 주변 근육에 의해 비워지고 채워집니다. 운동이 순환에 중요한 이유가 바로 이것입니다. 종아리의 수축이 곧 펌프입니다.',
+  },
   organ: {
     en: 'An organ is tissue organised to do one job. These are here for orientation rather than for training: they say what a muscle is in front of, what a movement compresses, and where the breath actually goes.',
     ko: '장기는 하나의 기능을 위해 조직된 구조입니다. 여기에서는 훈련 대상이 아니라 위치 파악을 위한 것입니다. 어떤 근육이 무엇 앞에 있는지, 어떤 움직임이 무엇을 압박하는지, 호흡이 실제로 어디로 가는지를 알려줍니다.',

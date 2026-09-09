@@ -75,7 +75,9 @@ export const BODIES = {
       rig: 'src/generated/rig.json',
       musclePaths: 'src/generated/muscle_paths.json',
       models: 'models',
-      layers: ['organs', 'muscles_superficial', 'muscles_deep', 'nervous', 'skeleton'],
+      layers: ['organs', 'muscles_superficial', 'muscles_deep', 'nervous', 'skeleton',
+               'arteries', 'veins', 'airways', 'connective', 'nerves_cranial',
+               'heart_detail'],
       shell: 'models/shell.glb',
     },
     /**

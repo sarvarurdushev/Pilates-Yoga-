@@ -10,18 +10,36 @@ before redistributing anything from here.
 > BodyParts3D, © The Database Center for Life Science licensed under
 > CC Attribution 4.0 International.
 
-- **What it is:** the skeleton, both muscle layers and the organs — 410 of the
-  430 structures in `web/src/generated/structures.json`, and the 8 GLB files
-  under `web/models/`.
+- **What it is:** the skeleton, both muscle layers, the organs, the arteries,
+  the veins, the airways and ducts, the cartilages and ligaments, the cranial
+  nerves and the heart valves — 1,063 of the 1,083 structures in
+  `web/src/generated/structures.json`, and 14 of the GLB files under
+  `web/models/`.
 - **Licence:** [CC BY 4.0](https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html).
   The sentence quoted above is the licensor's own required wording, not a
   paraphrase.
-- **Geometry release:** BodyParts3D/Anatomography release 3.0 (20110915), the
-  99% polygon-reduction set.
+- **Geometry, release 3.0:** BodyParts3D/Anatomography release 3.0 (20110915),
+  the 99% polygon-reduction set — 934 meshes, one per FMA concept with the two
+  sides of a paired structure in one file. This is the taught body: the bones,
+  the muscles and the viscera a class is cued out of.
+- **Geometry, release 4.0:** the IS-A element archive published at `LATEST`
+  (`isa_BP3D_4.0_obj_99.zip`) — the same body cut into 2,234 element files, one
+  per piece and sided. `web/scripts/build_detail.py` builds from it the layers
+  release 3.0 does not carry at all: the arterial and venous trees, the
+  tracheobronchial and biliary trees, the cranial nerves, the cartilages and
+  the heart valves. Both releases are in one frame at one scale, which is
+  measured rather than assumed — femur and liver from each agree to within a few
+  millimetres.
+
+  An earlier version of this file said no 4.0 mesh was used, downloaded or
+  redistributed. That was true when it was written and is not true now; it is
+  corrected here rather than quietly replaced, because a licence notice that has
+  ever been wrong is worth being able to see the history of.
 - **Concept hierarchy:** the IS-A and PART-OF inclusion tables published at
-  `LATEST`, which is release 4.0. These are FMA-to-FMA and carry no geometry, so
-  they close over the identifiers the 3.0 meshes already carry. No 4.0 mesh is
-  used, downloaded or redistributed here.
+  `LATEST`, which is release 4.0. These are FMA-to-FMA and carry no geometry.
+  They are also what joins an element file to the structure it is a piece of:
+  `isa_element_parts.txt` maps each `FJ####.obj` to every concept above it, and
+  the build takes the most specific one.
 - **Citation:** Mitsuhashi N, Fujieda K, Tamura T, Kawamoto S, Takagi T, Okubo K.
   BodyParts3D: 3D structure database for anatomical concepts.
   *Nucleic Acids Research* 2009;37(Database issue):D782–5.

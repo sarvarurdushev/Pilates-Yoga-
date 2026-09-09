@@ -214,6 +214,14 @@ const LOOK = {
   muscles_deep:        { color: 0xa04640, roughness: 0.70, clearcoat: 0.26, sheen: 0.30 },
   organs:             { color: 0xc09068, roughness: 0.62, clearcoat: 0.34, sheen: 0.30 },
   nervous:             { color: 0xF2D98B, roughness: 0.42, clearcoat: 0.45, sheen: 0.20 },
+  /* The layers built from the 4.0 element archive -- see scripts/build_detail.py. Wet
+   * surfaces, because that is what a vessel and an airway are. */
+  arteries:            { color: 0xC0392B, roughness: 0.36, clearcoat: 0.55, sheen: 0.18 },
+  veins:               { color: 0x3D6C9E, roughness: 0.38, clearcoat: 0.50, sheen: 0.18 },
+  airways:             { color: 0x8FA9B8, roughness: 0.44, clearcoat: 0.40, sheen: 0.22 },
+  connective:          { color: 0xCFC3A8, roughness: 0.66, clearcoat: 0.20, sheen: 0.28 },
+  nerves_cranial:      { color: 0xE8C86B, roughness: 0.42, clearcoat: 0.45, sheen: 0.20 },
+  heart_detail:        { color: 0xB05A52, roughness: 0.50, clearcoat: 0.40, sheen: 0.26 },
 };
 
 const layers = {};   // name -> { group, material, loaded, loading }
@@ -467,13 +475,20 @@ function bindLayer(name) {
  * first; that is the next step, not this one.
  */
 const MERGED = new Set(['muscles_superficial', 'muscles_deep', 'nervous',
-                        'skeleton', 'organs']);
+                        'skeleton', 'organs',
+                        /* The layers built from the 4.0 element archive. The arteries
+                         * alone are 359 structures over 400-odd meshes, so leaving them
+                         * out of the merge would have undone it: turning the vasculature
+                         * on took the body from 86 draw calls back past 700. */
+                        'arteries', 'veins', 'airways', 'connective',
+                        'nerves_cranial', 'heart_detail']);
 /* The two that are not skinned. `rig.attach` reparents a bone into the rig, so
  * these cannot be one mesh — a mesh has one parent and the skeleton has
  * forty-seven — and they are merged per bone instead. See `mergeByParent` for
  * why that is the right stopping point rather than rewriting them as
  * single-bone skins. */
-const RIGID = new Set(['skeleton', 'organs']);
+const RIGID = new Set(['skeleton', 'organs', 'arteries', 'veins', 'airways',
+                       'connective', 'nerves_cranial', 'heart_detail']);
 
 /**
  * Rebuild a layer's drawables from the meshes it has just bound.
@@ -1428,7 +1443,12 @@ function paintPalette() {
  * rather than fighting them. The fresnel shell is kept for the brain, where it works.
  */
 const XRAY_DEPTH = { muscles_superficial: 0, muscles_deep: 1, organs: 2,
-                     skeleton: 3, brain: 4 };
+                     skeleton: 3, brain: 4,
+                     /* The vasculature threads through every one of those, so it is not
+                      * at a depth of its own -- it is put where the tissue it runs in is,
+                      * which keeps a coronary from ghosting differently to the heart. */
+                     arteries: 2, veins: 2, airways: 2, heart_detail: 2,
+                     nerves_cranial: 2, connective: 3 };
 
 /* Every camera move, including each damping step after the drag ends. This one
  * listener is what makes orbiting feel unchanged while the still body costs
@@ -3933,7 +3953,7 @@ function flyToExtent(ext, immediate = false) {
   /* Straight on, because a grid read at an angle is a grid with its far rows
    * squeezed into a line. */
   const dir = new THREE.Vector3(0, 0, 1);
-  const { target, distance } = frameFor(pts, dir, ext.cell, 0.02);
+  const { target, distance } = frameFor(pts, dir, ext.cell * 2.5, 0.02);
   flyToPose(target.clone().addScaledVector(dir, distance), target, immediate);
 }
 

@@ -10,6 +10,7 @@
 set -euo pipefail
 
 BASE="https://dbarchive.biosciencedbc.jp/data/bodyparts3d/20110915"
+LATEST_ELEM="https://dbarchive.biosciencedbc.jp/data/bodyparts3d/LATEST"
 DIR="$(cd "$(dirname "$0")/.." && pwd)/bpdata"
 mkdir -p "$DIR"
 
@@ -24,6 +25,13 @@ get() {
 get "$BASE/parts_list_e.txt"          "$DIR/parts_list_e.txt"
 get "$BASE/conventional_part_of.txt"  "$DIR/conventional_part_of.txt"
 get "$BASE/BodyParts3D_3.0_obj_99.zip" "$DIR/obj99.zip"
+
+# The 4.0 element archive: the same body cut into 2,234 pieces rather than 934, sided, and
+# carrying the arteries, veins, airways, biliary tree and cranial nerves that 3.0 has none
+# of. scripts/build_detail.py turns it into the layers build_body.py does not build. The
+# two releases are in one frame at one scale -- femur and liver from each agree to within
+# a few millimetres.
+get "$LATEST_ELEM/isa_BP3D_4.0_obj_99.zip" "$DIR/isa_obj99_40.zip"
 
 # The 4.0 concept hierarchy, for scripts/build_groups.py. Six small text files, no meshes:
 # the IS-A and PART-OF trees are parent-FMA to child-FMA, so they close over the ids the
