@@ -73,6 +73,14 @@ export const UI = {
   fitView:      { en: 'Fit on screen', ko: '화면에 맞추기' },
   sections:     { en: 'Sections', ko: '단면' },
   showAll:      { en: 'Show all', ko: '모두 보기' },
+  /* The reveal pass -- see `revealSelection`. Named for what it does to the picture
+   * rather than for how it does it: "see through" is what a reader is asking for when
+   * the thing they clicked is behind a ribcage. */
+  seeThrough:     { en: '◉ See through', ko: '◉ 투시' },
+  seeThroughHint: { en: 'Draw the chosen structure over whatever is in front of it, '
+                      + 'so a deep one can be found without switching layers off',
+                    ko: '선택한 구조를 앞의 구조들 위에 겹쳐 그립니다. '
+                      + '레이어를 끄지 않아도 깊은 구조를 찾을 수 있습니다' },
   structuresWord: { en: 'structures', ko: '구조' },
   /* Meshes, not structures. A vessel that the source archive ships as fourteen separate files
    * is one named structure and fourteen pieces, and both numbers are worth stating. */

@@ -244,7 +244,7 @@ def already_seeded(store) -> bool:
 
 
 def sow(store, password: str = PASSWORD, classes: bool = True,
-        into: str = "", everything: bool = True) -> dict:
+        into: str = "", everything: bool = True, deep: bool = False) -> dict:
     """Build the whole studio. Returns what was made, for printing.
 
     Ordered the way it has to be: studios, then people, then roles, then the
@@ -347,7 +347,7 @@ def sow(store, password: str = PASSWORD, classes: bool = True,
         coach_of = {student: coach for coach, students in ROSTERS.items()
                     for student in students}
         made["readings"] += _write_everything(
-            store, handles, coach_of, {p.handle: p.name for p in PEOPLE})
+            store, handles, coach_of, {p.handle: p.name for p in PEOPLE}, deep=deep)
 
     store.record_audit(actor="seed", action="seed:sown",
                        detail=f"{len(made['people'])} people, "
@@ -680,6 +680,26 @@ ATLAS = (Path(__file__).resolve().parent.parent
 #: somebody actually using it, and a term is twenty classes.
 CLASSES = 20
 
+#: How many of those the *blanket* pass writes, and which layers it covers.
+#:
+#: `_write_everything` used to write twenty classes of every muscle, bone and
+#: nerve in the atlas for every person seeded. When it was written that was
+#: about four hundred structures; the complete BodyParts3D atlas arrived
+#: afterwards and `muscles_full` matched the same `startswith("muscles")` test,
+#: so it silently became **238,000 readings** -- thirteen seconds to seed, and a
+#: cost every roster and every coach sheet then paid forever after, because each
+#: of them reads the last few of *each* structure back.
+#:
+#: That is a load test, not a demonstration. What a demonstration owes is a
+#: studio that looks used: history on the structures a class is actually taught
+#: out of, deep enough to draw a line through. The taught body is exactly that
+#: list -- it is the one the exercise library, the written entries and the
+#: Korean are all keyed to -- and four classes is enough for a trend and a
+#: streak. The load test is still one flag away: `pilates seed --everything-deep`
+#: puts the old numbers back for anybody who wants to see the screen full.
+EVERY_CLASSES = 4
+EVERY_LAYERS = ('muscles_superficial', 'muscles_deep', 'skeleton', 'nervous')
+
 #: The axis keys the page derives for each kind, with the wording it shows. Kept
 #: in step with `web/src/session/axes.js` on purpose: seeded history that used
 #: different keys would draw its own lines beside the live ones instead of
@@ -747,10 +767,13 @@ def _arc(shape: str, n: int) -> list:
     return out
 
 
-def _write_everything(store, handles, coach_of, names) -> int:
-    """A reading of every structure, for everybody, across twenty classes.
+def _write_everything(store, handles, coach_of, names, deep: bool = False) -> int:
+    """A reading of every structure a class is taught out of, for everybody.
 
-    This is the one that answers "what does it look like when it is full".
+    `deep` puts back what this used to do unconditionally -- twenty classes of
+    every muscle, bone and nerve in the complete atlas, a quarter of a million
+    rows -- which is a load test rather than a demonstration. See `EVERY_CLASSES`.
+
     Written in one transaction because a hundred thousand commits is a hundred
     thousand fsyncs; see `Store.evaluate_structures`.
     """
@@ -758,11 +781,14 @@ def _write_everything(store, handles, coach_of, names) -> int:
 
     if not ATLAS.exists():
         return 0
+    weeks = CLASSES if deep else EVERY_CLASSES
     meshes = json.loads(ATLAS.read_text(encoding="utf-8"))
     meshes = meshes["structures"] if isinstance(meshes, dict) else meshes
     wanted = []
     for mesh in meshes:
         layer = mesh.get("layer", "")
+        if not deep and layer not in EVERY_LAYERS:
+            continue
         kind = ("muscle" if layer.startswith("muscles")
                 else "bone" if layer == "skeleton"
                 else "nerve" if layer == "nervous" else "")
@@ -780,10 +806,10 @@ def _write_everything(store, handles, coach_of, names) -> int:
                 continue          # the hand-written story already covers it
             shape = _shape_for(handle, structure)
             axes = AXES[kind]
-            arcs = {key: _arc(shape, CLASSES) for key, _ in axes}
+            arcs = {key: _arc(shape, weeks) for key, _ in axes}
             phrases = SAID[kind]
-            for week in range(CLASSES):
-                when = date.today() - timedelta(weeks=CLASSES - week)
+            for week in range(weeks):
+                when = date.today() - timedelta(weeks=weeks - week)
                 checks = []
                 for n, (key, label) in enumerate(axes):
                     score = arcs[key][week]

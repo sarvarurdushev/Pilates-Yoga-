@@ -61,6 +61,26 @@ let restTest = () => false;
 export function setRestTest(fn) { restTest = fn; }
 
 /**
+ * Which pose the rig is in, as a number that changes when it moves.
+ *
+ * A tree built from the buffer describes the bind pose, so once a clip poses the
+ * body it describes a body that is not there — and this used to hand those
+ * meshes straight back to three's own scan. That was correct and it was the
+ * whole cost: a pick went from 1.1 ms to **31.8 ms** the moment anything posed
+ * the rig, and one click, which asks for nine lines of sight, went from 140 ms
+ * to 580 ms. Hover runs once a frame, so a posed body was a body you could not
+ * point at.
+ *
+ * So the tree is *refitted* instead: the boxes are recomputed from where the
+ * vertices actually are, once per pose per mesh, and only for the meshes a ray
+ * reaches. The triangles are tested at their skinned positions too, so the
+ * answer is the answer three would give — this is the same search over the same
+ * geometry, with the boxes brought up to date.
+ */
+let poseSerial = 0;
+export const poseChanged = () => { poseSerial++; };
+
+/**
  * The tree for a geometry, built on first use and cached on it.
  * @returns {object|null} null when the geometry cannot or need not be accelerated
  */
@@ -199,9 +219,19 @@ export function bvhRaycast(raycaster, intersects) {
   const geo = this.geometry;
   const material = this.material;
   if (!geo || !material || Array.isArray(material)) return fallback(this, raycaster, intersects);
-  if (this.isSkinnedMesh && !restTest()) return fallback(this, raycaster, intersects);
   const bvh = bvhFor(geo);
   if (!bvh) return fallback(this, raycaster, intersects);
+  /* Posed, so the tree has to be brought to where the vertices are. Refitting
+   * walks this mesh's vertices once; the scan it replaces walks them on every
+   * candidate triangle, and does it again on the next pick. */
+  const posed = this.isSkinnedMesh && !restTest();
+  if (posed) {
+    if (bvh.pose !== poseSerial) { refit(this, bvh); bvh.pose = poseSerial; }
+  } else if (bvh.pose !== undefined && bvh.pose !== -1) {
+    // back at the bind pose: the buffer describes it again
+    refitFromBuffer(bvh);
+    bvh.pose = -1;
+  }
 
   _inv.copy(this.matrixWorld).invert();
   _ray.copy(raycaster.ray).applyMatrix4(_inv);
@@ -234,10 +264,16 @@ export function bvhRaycast(raycaster, intersects) {
       const start = link[node * 2];
       for (let i = start; i < start + count; i++) {
         const t = order[i] * 3;
-        const a = I[t] * 3, b = I[t + 1] * 3, c = I[t + 2] * 3;
-        _vA.set(P[a], P[a + 1], P[a + 2]);
-        _vB.set(P[b], P[b + 1], P[b + 2]);
-        _vC.set(P[c], P[c + 1], P[c + 2]);
+        if (posed) {
+          this.getVertexPosition(I[t], _vA);
+          this.getVertexPosition(I[t + 1], _vB);
+          this.getVertexPosition(I[t + 2], _vC);
+        } else {
+          const a = I[t] * 3, b = I[t + 1] * 3, c = I[t + 2] * 3;
+          _vA.set(P[a], P[a + 1], P[a + 2]);
+          _vB.set(P[b], P[b + 1], P[b + 2]);
+          _vC.set(P[c], P[c + 1], P[c + 2]);
+        }
         const p = side === THREE.BackSide
           ? _ray.intersectTriangle(_vC, _vB, _vA, true, _hit)
           : _ray.intersectTriangle(_vA, _vB, _vC, !backfaces, _hit);
@@ -271,9 +307,15 @@ export function bvhRaycast(raycaster, intersects) {
   if (distance < raycaster.near || distance > raycaster.far) return;
 
   const a = I[bestTri * 3], b = I[bestTri * 3 + 1], c = I[bestTri * 3 + 2];
-  _vA.set(P[a * 3], P[a * 3 + 1], P[a * 3 + 2]);
-  _vB.set(P[b * 3], P[b * 3 + 1], P[b * 3 + 2]);
-  _vC.set(P[c * 3], P[c * 3 + 1], P[c * 3 + 2]);
+  if (posed) {
+    this.getVertexPosition(a, _vA);
+    this.getVertexPosition(b, _vB);
+    this.getVertexPosition(c, _vC);
+  } else {
+    _vA.set(P[a * 3], P[a * 3 + 1], P[a * 3 + 2]);
+    _vB.set(P[b * 3], P[b * 3 + 1], P[b * 3 + 2]);
+    _vC.set(P[c * 3], P[c * 3 + 1], P[c * 3 + 2]);
+  }
   const normal = new THREE.Vector3();
   THREE.Triangle.getNormal(_vA, _vB, _vC, normal);
   intersects.push({
@@ -284,6 +326,59 @@ export function bvhRaycast(raycaster, intersects) {
     face: { a, b, c, normal, materialIndex: 0 },
   });
 }
+
+/**
+ * Bring a tree's boxes to where the vertices actually are.
+ *
+ * Bottom-up, and the order falls out of how the tree was built: a node's children
+ * are allocated after it, so their indices are always larger and one reverse pass
+ * over the array visits every child before its parent.
+ *
+ * A leaf is measured through the mesh's own `getVertexPosition`, which is what
+ * applies the skinning — so this is the same geometry the shader draws, and the
+ * hits found in it are the hits three would find.
+ */
+const _rv = new THREE.Vector3();
+function refitWith(bvh, at) {
+  const { box, link, order, index: I } = bvh;
+  const nodes = link.length / 2;
+  for (let node = nodes - 1; node >= 0; node--) {
+    const nb = node * 6;
+    const count = link[node * 2 + 1];
+    if (count > 0) {
+      const start = link[node * 2];
+      let lox = Infinity, loy = Infinity, loz = Infinity;
+      let hix = -Infinity, hiy = -Infinity, hiz = -Infinity;
+      for (let i = start; i < start + count; i++) {
+        const t = order[i] * 3;
+        for (let k = 0; k < 3; k++) {
+          at(I[t + k], _rv);
+          if (_rv.x < lox) lox = _rv.x;
+          if (_rv.y < loy) loy = _rv.y;
+          if (_rv.z < loz) loz = _rv.z;
+          if (_rv.x > hix) hix = _rv.x;
+          if (_rv.y > hiy) hiy = _rv.y;
+          if (_rv.z > hiz) hiz = _rv.z;
+        }
+      }
+      box[nb] = lox; box[nb + 1] = loy; box[nb + 2] = loz;
+      box[nb + 3] = hix; box[nb + 4] = hiy; box[nb + 5] = hiz;
+    } else {
+      const l = link[node * 2] * 6, r = l + 6;
+      for (let k = 0; k < 3; k++) box[nb + k] = Math.min(box[l + k], box[r + k]);
+      for (let k = 3; k < 6; k++) box[nb + k] = Math.max(box[l + k], box[r + k]);
+    }
+  }
+}
+
+/** Refit from where the rig currently holds this mesh's vertices. */
+const refit = (mesh, bvh) => refitWith(bvh, (i, v) => mesh.getVertexPosition(i, v));
+
+/** And back from the buffer, for a mesh that has returned to the bind pose. */
+const refitFromBuffer = (bvh) => refitWith(bvh, (i, v) => {
+  const P = bvh.position;
+  v.set(P[i * 3], P[i * 3 + 1], P[i * 3 + 2]);
+});
 
 /**
  * Slab test: the entry distance along the ray, or Infinity if it misses.

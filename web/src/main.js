@@ -3,7 +3,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { makeStructureMaterial, makeBrainMaterial } from './brainMaterial.js';
 import { mergeLayer, mergeByParent, PICK_LAYER } from './merged.js';
-import { accelerate as accelerateRays, setRestTest, warm as warmRays } from './raybvh.js';
+import { accelerate as accelerateRays, setRestTest, warm as warmRays,
+         poseChanged as bvhPoseChanged } from './raybvh.js';
 import { makeTissueMaterial } from './tissue.js';
 import { NeuralNet } from './neuralNet.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -85,6 +86,10 @@ export const app = {
   /* Which way the cortex is drawn: 'tissue' is the volume, 'anatomical' the lit surface with
    * flat parcel colours. See `setBrainLook`. */
   brainLook: 'tissue',
+  /* Draw the chosen structure through whatever is in front of it. On by default:
+   * the question a click asks about a deep structure is "where is that", and the
+   * answer has to be visible without switching six layers off. */
+  reveal: true,
   /** Whether the lab screen is covering the stage — see `lab.js`. */
   labOpen: false,
 };
@@ -654,6 +659,7 @@ function remerge(name) {
   L2.merged = built;
   applyShown();
   cullWhileApart(app.explode <= 0);
+  revealSelection();
   invalidate();
 }
 
@@ -752,7 +758,12 @@ const PICK_MARGIN = 2.6;
  * deriving it means walking forty-seven bones on every pointer move, which is the
  * cost this exists to avoid.
  */
-function markPosed(on) { if (boneDQ) boneDQ.posed = !!on; }
+function markPosed(on) {
+  if (boneDQ) boneDQ.posed = !!on;
+  /* The picking trees describe the bind pose and have to be told the rig moved,
+   * or a ray searches boxes belonging to a body that is no longer there. */
+  bvhPoseChanged();
+}
 /* `raybvh` answers from the geometry as it sits in the buffer, which for a skinned
  * mesh is the bind pose. That is what is on screen until a clip moves the rig, and
  * once one has, the tree describes a body that is no longer there — so this is how
@@ -1712,9 +1723,27 @@ export function syncLayers() {
     const selRec = chosen != null && app.explode <= OPENED ? get(chosen) : null;
     if (selRec) {
       const selDepth = XRAY_DEPTH[selRec.layer] ?? 0;
-      if (depth < selDepth) o *= 0.06;          // in front: nearly gone
-      else if (depth > selDepth) o *= 0.5;      // behind: kept as context
-      else o = Math.max(o, 0.96);               // the layer it is in: never faded
+      /* Gentle, when the selection is drawn through the body anyway.
+       *
+       * Dissolving what is in front to six per cent is a strong statement and it
+       * was the only one available: without it a chosen structure behind a
+       * ribcage simply could not be seen. It also produces the picture that came
+       * back with "impossible to see what's inside" -- a body at six and fifty
+       * per cent, drawn in the sorted pass without writing depth, is a haze with
+       * black polygons punched through it where the far wall of a rib shows
+       * through the near one.
+       *
+       * `revealSelection` answers the same question by drawing the one structure
+       * over the top, which needs nothing from the body. So with it on, this goes
+       * back to what a peel is for -- saying which layer the answer is in -- and
+       * stays inside the opaque pass, where the picture is clean. Turn it off and
+       * the old peel comes back, because then the fade is again the only way
+       * through. */
+      if (!app.reveal) {
+        if (depth < selDepth) o *= 0.06;        // in front: nearly gone
+        else if (depth > selDepth) o *= 0.5;    // behind: kept as context
+      }
+      if (depth === selDepth) o = Math.max(o, 0.96);   // its own layer: never faded
     }
     o = Math.max(0, o);
     /* An opaque layer has to be flagged opaque, not merely given opacity 1.
@@ -1900,6 +1929,117 @@ export function syncLayers() {
    * own, so this is where that decision reaches it. */
   applyShown();
 }
+
+/* ------------------------------------------------------------- seeing inside
+ *
+ * A structure buried in a body cannot be shown by making what is in front of it
+ * translucent. That is what x-ray does and it is the right control for "what is
+ * the layer under this one"; it is the wrong one for "where is this". Four
+ * hundred overlapping translucent shells is a milky haze, and the aortic valve
+ * behind the sternum behind the ribs behind the pectoralis is no more findable
+ * at full x-ray than at none — which is exactly what was reported, with a
+ * picture of it.
+ *
+ * So the answer is not to take things away. It is to draw the one structure the
+ * reader asked about **again, afterwards, with the depth test off**, so it is
+ * never behind anything. The body stays as it was and the structure sits in it
+ * where it belongs, visible through whatever is in the way. It is what a reader
+ * means by "show me where it is", and it is one extra draw call.
+ *
+ * The clone shares the geometry — no second copy of anything — and wears a
+ * material whose only difference is `uOnly`, which sends every vertex that is
+ * not this structure's outside the clip volume. A skinned clone is bound to the
+ * same skeleton, so it deforms with the body; a rigid one is parented to the
+ * same bone.
+ */
+let revealGroup = null;
+const revealMats = new Map();
+
+function revealMaterial(layer) {
+  let mat = revealMats.get(layer);
+  if (mat) return mat;
+  mat = makeStructureMaterial(palette, LOOK[layer] ?? {}, dqUniform);
+  /* Through everything, and never into the depth buffer: this is a marker on the
+   * picture rather than a thing in the scene, and letting it write depth would
+   * put whatever draws after it behind a structure that is not really in front. */
+  mat.depthTest = false;
+  mat.depthWrite = false;
+  mat.transparent = true;
+  mat.opacity = 0.92;
+  mat.side = THREE.DoubleSide;
+  revealMats.set(layer, mat);
+  materials.push(mat);
+  return mat;
+}
+
+/**
+ * Draw the selected structure over the body, or stop drawing it.
+ *
+ * Rebuilt on a change of selection rather than per frame: a selection changes
+ * when somebody clicks, and the clones are cheap but not free.
+ */
+function revealSelection() {
+  if (revealGroup) {
+    for (const m of revealGroup) m.parent?.remove(m);
+    revealGroup = null;
+  }
+  const id = app.selected;
+  /* Not while the body is apart — every piece is already in the open, and a
+   * second copy of one drawn through the sheet would be the only thing on it
+   * that ignores the layout. Not while it is the only thing drawn either. */
+  if (!app.reveal || id == null || app.explode > OPENED || app.isolate?.size) {
+    invalidate();
+    return;
+  }
+  const r = get(id);
+  if (!r || !app.layers[r.layer]?.on) { invalidate(); return; }
+  const made = [];
+  for (const name of LAYER_ORDER) {
+    const L2 = layers[name];
+    if (!L2?.loaded || !app.layers[name]?.on) continue;
+    const mat = revealMaterial(name);
+    const u = mat.userData.uniforms;
+    if (u?.uOnly) u.uOnly.value = id;
+    mat.userData.sync?.();
+    const drawables = L2.merged?.length ? L2.merged
+                    : (L2.meshes ?? []).filter(m => regionsOfMesh(m).has(id));
+    for (const src of drawables) {
+      if (src.userData.regions && !src.userData.regions.has(id)) continue;
+      if (!src.userData.regions && !regionsOfMesh(src).has(id)) continue;
+      const clone = src.isSkinnedMesh
+        ? new THREE.SkinnedMesh(src.geometry, mat)
+        : new THREE.Mesh(src.geometry, mat);
+      if (src.isSkinnedMesh) clone.bind(src.skeleton, src.bindMatrix);
+      else { clone.position.copy(src.position); clone.quaternion.copy(src.quaternion);
+             clone.scale.copy(src.scale); }
+      clone.frustumCulled = false;
+      clone.renderOrder = 20;              // after the body, before the labels
+      clone.userData = { layer: name, reveal: true };
+      (src.parent ?? scene).add(clone);
+      made.push(clone);
+    }
+  }
+  revealGroup = made.length ? made : null;
+  invalidate();
+}
+
+/** Which structures one un-merged mesh carries. */
+function regionsOfMesh(mesh) {
+  const own = restByMesh.get(mesh);
+  if (own) return new Set(own.keys());
+  const one = mesh.userData.regionId;
+  return new Set(one == null ? [] : [one]);
+}
+
+/** Show the chosen structure through the body, or do not. */
+export function setReveal(on) {
+  app.reveal = !!on;
+  revealSelection();
+  ui?.syncControls?.();
+}
+export const revealOn = () => !!app.reveal;
+/** How many reveal clones are in the scene, for a test. */
+export const revealCount = () => revealGroup?.length ?? 0;
 
 /* ------------------------------------------------- where a structure is now
  * `app.centroids`, `app.anchors` and `app.radii` are measured once, at load, in the rest
@@ -2865,6 +3005,12 @@ function pickApart(ev, rect) {
 }
 const _off2 = new THREE.Vector3();
 
+/** One layer's drawing material, so a test can ask how it is being drawn. */
+export const layerMaterialOf = (n) => layers[n]?.material ?? null;
+
+/** Whether the rig has been moved off the bind pose — see `raybvh`'s `setRestTest`. */
+export const posedNow = () => !!boneDQ?.posed;
+
 /** Where a structure is drawn right now, so a test can ask whether it can be pointed at. */
 export const drawnPointOf = (id) => drawnPoint(+id, new THREE.Vector3());
 
@@ -3085,6 +3231,42 @@ const _from = new THREE.Vector3(), _look = new THREE.Vector3();
  */
 const VANTAGE_BIAS = 0.22;
 
+/**
+ * How far along `ray` something that is not `id` gets in the way.
+ *
+ * Nearest first, and it stops at the first answer — the same pruning `pick` uses
+ * and for a stronger reason: this runs **nine times per click**, once per vantage.
+ * `intersectObjects` has no early-out and no ordering, so it tested every one of
+ * two thousand structures nine times over to find out which surface is nearest,
+ * and one click cost 140 milliseconds at rest and 580 posed. What it is actually
+ * asking is a question about the *first* thing along a line.
+ */
+const _one = [];
+function blockingDistance(targets, id) {
+  _order.length = 0;
+  for (const o of targets) {
+    const d = sphereEntry(o);
+    if (d !== Infinity) _order.push({ o, d });
+  }
+  _order.sort((a, b) => a.d - b.d);
+  let blocked = Infinity;
+  for (const { o, d } of _order) {
+    if (d > blocked) break;              // nothing further out can be in front
+    _one.length = 0;
+    o.raycast(ray, _one);
+    for (const h of _one) {
+      if (h.distance > blocked) continue;
+      const geo = h.object.geometry, reg = geo && regionAttr(geo);
+      const hid = reg && h.face ? Math.round(reg.getX(h.face.a))
+                : (h.object.userData.regionId ?? null);
+      if (hid === id) return Infinity;                            // reached it: clear
+      if (layerOpacity(String(h.object.userData.layer)) < GHOST) continue;  // see-through
+      blocked = h.distance;
+    }
+  }
+  return blocked;
+}
+
 function clearestDir(id, centre, distance, prefer) {
   const targets = pickTargets();
   if (!targets.length) return prefer;
@@ -3093,15 +3275,7 @@ function clearestDir(id, centre, distance, prefer) {
     _from.copy(centre).addScaledVector(dir, distance);
     ray.set(_from, _look.copy(centre).sub(_from).normalize());
     // how far along the ray before something that is not the structure gets in the way
-    let blockedAt = Infinity;
-    for (const h of ray.intersectObjects(targets, false)) {
-      const geo = h.object.geometry, reg = geo && regionAttr(geo);
-      const hid = reg && h.face ? Math.round(reg.getX(h.face.a))
-                : (h.object.userData.regionId ?? null);
-      if (hid === id) break;                                       // reached it: clear
-      if (layerOpacity(String(h.object.userData.layer)) < GHOST) continue;   // see-through
-      blockedAt = h.distance; break;
-    }
+    const blockedAt = blockingDistance(targets, id);
     /* Scored, not maximised. This used to take the least obstructed direction outright, and
      * with the skin gone most of them reach a superficial muscle unobstructed — so the
      * winner among eight equally clear views was whichever happened to be tested first, and
@@ -3596,11 +3770,21 @@ export function selectStructure(id, { auto = false } = {}) {
   // selecting something in a hidden layer has to reveal it, or the panel describes
   // something the user cannot see
   if (r && !app.layers[r.layer].on) { app.layers[r.layer].on = true; loadLayer(r.layer); }
-  if (r?.interior && app.xray === 0) app.xray = 1;
+  /* No longer forced into x-ray.
+   *
+   * Choosing something with an inside used to push the x-ray slider to 1, because
+   * otherwise the structure was behind an opaque body and nothing on screen
+   * answered the click. It is a poor answer: four hundred translucent shells in a
+   * sorted pass is a haze with black gaps punched through it — the picture that
+   * came back reported as "impossible to see what's inside" — and it takes the
+   * reader's own control away from them at the same time. The reveal pass shows
+   * the chosen structure through the body without touching anything else, so the
+   * body stays as it was and the slider stays where it was put. */
   syncLayers();
   /* And light it in the section strip: a structure the reader has just chosen should be the
    * bright thing in every cut that passes through it, not something they have to find. */
   refreshSections();
+  revealSelection();
   if (id != null && !auto) flyTo(id);
   ui.showStructure(id);
 }
@@ -3645,6 +3829,10 @@ export async function setLayer(name, on) {
   app.layers[name].on = on;
   if (on) await loadLayer(name);
   syncLayers();
+  /* The reveal clones hang off the layer's own drawables, so a layer arriving or
+   * leaving is a rebuild — otherwise the marker either points at nothing or is
+   * missing for the layer that just turned on. */
+  revealSelection();
   ui.syncControls();
 }
 export function setLayerOpacity(name, v) { app.layers[name].opacity = v; syncLayers(); }
@@ -4793,6 +4981,7 @@ export function setExplode(v) {
     m.userData.sync?.();
   }
   brainWhileApart();
+  revealSelection();
   refreshSections();
   /* The catalogue is far wider than the body it came out of, so a camera framed
    * on a standing figure sees the middle few rows of it and nothing else. It is
@@ -5231,6 +5420,7 @@ const ui = mountUI({
   drawSections, setScanToSlice, locateInSections, pickInSection, regionActivity, neuralStats, layerPending,
   exerciseBrainRegions, exerciseAnalysis, renderStageInto, renderStructureInto, jointCentre,
   selectStructure, setLang, setAtlas, setXray, setCutaway, setClip, setLabels,
+  setReveal, revealOn,
   setRotate, setRegister, setInstruction, setLayer, setLayerOpacity, setView, resetView,
   setExercise, setPathway, captureStage, activationOf, flyTo,
   setGroup, anatomyGroups, groupsForStructure, setIsolate, isolated, setExplode,

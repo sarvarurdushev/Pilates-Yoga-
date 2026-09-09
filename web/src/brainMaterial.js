@@ -138,6 +138,16 @@ export function makeStructureMaterial(palette, look = {}, dqTexture = null) {
      * unconditional, a body of 605k triangles cost 126 ms a frame on a software
      * rasteriser against 71 ms with it gated. */
     uHiding:      { value: 0 },
+    /* Draw this structure and no other.
+     *
+     * -1 means "all of them", which is every material but the reveal pass's. See
+     * `revealSelection` in main.js: a structure buried inside a body cannot be
+     * shown by making everything in front of it translucent — four hundred
+     * overlapping translucent shells is a milky haze that hides it just as well
+     * — so the answer to "where is it" is to draw the one structure again,
+     * afterwards, through everything. This is what makes that draw one
+     * structure instead of a whole layer. */
+    uOnly:        { value: -1 },
     /* The scan plane, so the anatomical look loses nothing by not being the volume one.
      * All of it is gated on `uTissue`, which is 0 on every body layer, so the four hundred
      * muscle and bone meshes sharing this material compile and shade exactly as before —
@@ -167,7 +177,8 @@ export function makeStructureMaterial(palette, look = {}, dqTexture = null) {
         uniform highp sampler2D uOffset;
         uniform int uPaletteSize;
         uniform float uExplode;
-        uniform float uHiding;`)
+        uniform float uHiding;
+        uniform float uOnly;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         vRegion = _region;
         vObjPos = position;`)
@@ -189,7 +200,14 @@ export function makeStructureMaterial(palette, look = {}, dqTexture = null) {
        * of them reach the rasteriser. `xyz` is where it goes when the body is
        * taken apart. */
       .replace('#include <project_vertex>', `#include <project_vertex>
-        if (uExplode > 0.0 || uHiding > 0.5) {
+        /* One structure only, for the reveal pass. Everything else is sent
+         * outside the clip volume and collapsed onto a point, so its triangles
+         * are degenerate and clipped and none of them reach the rasteriser --
+         * the same trick uHiding uses, and for the same reason: a merged layer
+         * has no per-structure visibility flag to switch. */
+        if (uOnly >= 0.0 && abs(_region - uOnly) > 0.5) {
+          gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+        } else if (uExplode > 0.0 || uHiding > 0.5) {
           int _oi = clamp(int(_region + 0.5), 0, uPaletteSize - 1);
           vec4 _o = texelFetch(uOffset, ivec2(_oi, 0), 0);
           if (uHiding > 0.5 && _o.w < 0.5) {

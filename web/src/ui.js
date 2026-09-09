@@ -28,6 +28,7 @@ export function mountUI(ctx) {
     : DISCLAIMERS[i][lang]);
   const { app, setScan, setScanAt, setSweep, setBrainLook, regionGraph, cellGraph, regionActivity,
           selectStructure, setLang, setAtlas, setXray, setCutaway, setClip, setLabels,
+          setReveal, revealOn,
           setRotate, setRegister, setInstruction, setLayer, setLayerOpacity, setView,
           resetView, setExercise, setPathway, activationOf,
           setGroup, anatomyGroups, groupsForStructure, setIsolate, isolated, setExplode,
@@ -171,6 +172,8 @@ export function mountUI(ctx) {
     $('scanSweep').textContent = T('scanSweep');
     $('clipLab').textContent = T('sliceSlider');
     $('mCut').textContent = T('cutaway');
+    $('mSee').textContent = T('seeThrough');
+    $('mSee').title = T('seeThroughHint');
     $('mRot').textContent = T('rotate');
     $('labToggle').textContent = T('labels');
     $('reset').textContent = T('reset');
@@ -1458,6 +1461,7 @@ export function mountUI(ctx) {
   $('scanSweep').onclick = () => { setSweep(!app.scan.sweeping); syncControls(); };
   $('scanAt').oninput = e => { setSweep(false); setScanAt(+e.target.value); syncControls(); };
   $('mCut').onclick  = () => { setCutaway(!app.cutaway); syncControls(); };
+  $('mSee').onclick  = () => { setReveal(!revealOn()); syncControls(); };
   $('mRot').onclick  = () => { setRotate(!app.rotate); syncControls(); };
   $('labToggle').onclick = () => {
     const on = $('labToggle').getAttribute('aria-pressed') !== 'true';
@@ -1523,6 +1527,7 @@ export function mountUI(ctx) {
       if (!first && tab === 'explore') { renderPanel(); }
     }
     $('mCut').setAttribute('aria-pressed', !!app.cutaway);
+    $('mSee').setAttribute('aria-pressed', revealOn());
     $('mRot').setAttribute('aria-pressed', !!app.rotate);
     $('clipRow').style.display = app.cutaway ? '' : 'none';
     /* A section through a brain that is not on the screen is not a control, it is a puzzle.

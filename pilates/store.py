@@ -1011,6 +1011,36 @@ class Store:
                               made_at=row["made_at"], id=row["id"])
                 for row in rows]
 
+    def count_readings(self, username: str) -> int:
+        """How many readings this person has, counted in SQL.
+
+        The count used to be taken by summing `count_structure_evals`, which
+        groups by structure and hands back a dictionary of several hundred rows
+        so the caller can add them up and throw it away.
+        """
+        row = self.db.execute(
+            "SELECT COUNT(*) AS n FROM structure_evals WHERE username = ?",
+            (username,)).fetchone()
+        return int(row["n"] if row else 0)
+
+    def session_counts(self, usernames) -> dict:
+        """How many distinct sessions each of these people is in. One query.
+
+        The roster wanted this per student and got it by calling `recordings()`
+        -- a join over every session and every measurement in the studio --
+        once per student, filtering the answer in Python each time.
+        """
+        names = [n for n in dict.fromkeys(usernames) if n]
+        if not names:
+            return {}
+        marks = ",".join("?" * len(names))
+        rows = self.db.execute(
+            f"SELECT l.username AS username, COUNT(DISTINCT s.key) AS n "
+            f"  FROM links l JOIN sessions s ON s.id = l.session_id "
+            f" WHERE l.status = 'confirmed' AND l.username IN ({marks}) "
+            f" GROUP BY l.username", names)
+        return {row["username"]: int(row["n"]) for row in rows}
+
     def count_structure_evals(self, username: str) -> dict:
         """How many readings each structure has. Counted in SQL, not loaded."""
         return {row["structure"]: row["n"] for row in self.db.execute(

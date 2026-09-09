@@ -251,6 +251,11 @@ def roster(store, viewer: Viewer | None) -> dict:
     else:
         live = [a for a in store.assignments(coach=person.username,
                                              studio=person.studio) if a.live]
+    # Counted for the whole roster in one query rather than by pulling every
+    # recording in the studio back and filtering it in Python once per student,
+    # which is what this did: twelve students meant twelve full joins over every
+    # session and every measurement in the building.
+    sessions = store.session_counts([a.student for a in live])
     rows = []
     for assignment in live:
         account = store.account(assignment.student)
@@ -268,8 +273,7 @@ def roster(store, viewer: Viewer | None) -> dict:
         due = sheet.due(on=today())
         seen["flags"] = flags
         seen["goals_due"] = [g.text for g in due]
-        seen["sessions"] = len({r["key"] for r in store.recordings()
-                                if r.get("username") == assignment.student})
+        seen["sessions"] = sessions.get(assignment.student, 0)
         seen["urgent"] = bool(sheet.urgent) or "not screened yet" in flags
         seen["since"] = assignment.since
 
@@ -297,17 +301,16 @@ def roster(store, viewer: Viewer | None) -> dict:
                 f"{'a problem' if r['verdict'] == 'problem' else 'worth watching'}")
             if len(flagged) == 2:
                 break
-        latest = store.latest_structure_evals(assignment.student, per=1)
-        latest.sort(key=lambda e: (e.made_on, e.made_at))
+        latest = standing["newest"]
         seen["readings"] = standing["readings"]
         seen["open"] = len(open_now)
         seen["focus"] = flagged[0] if flagged else ""
         seen["also"] = flagged[1] if len(flagged) > 1 else ""
-        seen["last_read"] = latest[-1].made_on if latest else ""
-        seen["note"] = next((one.note for one in reversed(latest) if one.note), "")
+        seen["last_read"] = latest[-1]["made_on"] if latest else ""
+        seen["note"] = next((one["note"] for one in reversed(latest) if one["note"]), "")
         # A nerve symptom called a problem is the one thing that outranks
         # everything else on this list.
-        seen["urgent"] = seen["urgent"] or any(one.urgent for one in latest)
+        seen["urgent"] = seen["urgent"] or any(one["urgent"] for one in latest)
         rows.append(seen)
     # Nothing written yet sorts up with the other things that should not be
     # found by scrolling: it is the row where the coach has nothing to go on.
@@ -470,9 +473,16 @@ def standing_readings(store, username: str, weeks: int = 6) -> dict:
     a sheet nobody reads twice.
     """
     latest: dict = {}
+    # The newest reading of each structure, kept as it goes past. The caller
+    # wants it -- the roster prints the last date, the last note and whether
+    # anything in it is urgent -- and asking for it separately meant a second
+    # window query over the same table and a second pass building the same
+    # objects, per student, every time a coach opened their roster.
+    newest: dict = {}
     # The last few of each, not the first few of everything: a flat limit over
     # a body with thousands of readings on file returns the earliest fortnight.
     for one in store.latest_structure_evals(username, per=4):
+        newest[one.structure] = one          # ordered oldest-first per structure
         for check in one.checks:
             if not check["verdict"]:
                 continue
@@ -510,7 +520,15 @@ def standing_readings(store, username: str, weeks: int = 6) -> dict:
     fixed = [r for r in settled if r["seen"] > 2][:4]
     fixed.sort(key=lambda r: r["last_on"], reverse=True)
     return {"open_readings": open_now[:8], "fixed_readings": fixed,
-            "readings": sum(store.count_structure_evals(username).values())}
+            "readings": store.count_readings(username),
+            # The newest reading of each structure, as plain fields rather than as
+            # objects: this dictionary is the `/sheet` response body, so anything in it
+            # has to survive `json.dumps`. The roster wants the last date, the last note
+            # and whether anything is urgent, and those are all of it.
+            "newest": [{"structure": e.structure, "made_on": e.made_on,
+                        "made_at": e.made_at, "note": e.note, "urgent": e.urgent}
+                       for e in sorted(newest.values(),
+                                       key=lambda e: (e.made_on, e.made_at))]}
 
 
 def structure_history(store, viewer: Viewer | None, username: str,

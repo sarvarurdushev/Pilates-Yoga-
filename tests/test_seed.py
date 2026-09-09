@@ -23,8 +23,33 @@ def sown(monkeypatch):
 
 
 @pytest.fixture(scope="module")
+def demo():
+    """What the admin console's button actually pours in: the defaults.
+
+    Distinct from `sown`, which passes `everything=False` and so has only the
+    hand-written stories, and from `full`, which asks for the load test.
+    """
+    import pilates.passwords as passwords
+
+    was, passwords.N = passwords.N, 2 ** 14
+    try:
+        store = Store.memory()
+        store.made = seed.sow(store, classes=False)
+        yield store
+        store.close()
+    finally:
+        passwords.N = was
+
+
+@pytest.fixture(scope="module")
 def full():
     """The whole thing: every structure, everybody, twenty classes.
+
+    `deep=True`, which is what that used to mean by default. It stopped being
+    the default because a demonstration studio should look like a studio in use
+    rather than like a load test -- see `EVERY_CLASSES` -- and a quarter of a
+    million rows is a cost every roster and every coach sheet goes on paying.
+    The load test is still worth having and this is where it lives.
 
     Module-scoped because it writes a hundred thousand rows and the point of
     the tests below is that doing so is fast and stays answerable.
@@ -34,7 +59,7 @@ def full():
     was, passwords.N = passwords.N, 2 ** 14
     try:
         store = Store.memory()
-        store.made = seed.sow(store, classes=False)
+        store.made = seed.sow(store, classes=False, deep=True)
         yield store
         store.close()
     finally:
@@ -435,3 +460,41 @@ class TestEverybodyEverything:
                 assert 0 < made["readings"] < 1000
         finally:
             passwords.N = was
+
+
+class TestTheDemonstrationIsNotALoadTest:
+    """What the button in the admin console pours in.
+
+    `_write_everything` wrote twenty classes of every muscle, bone and nerve in
+    the atlas for every person seeded. When it was written that was about four
+    hundred structures; the complete BodyParts3D atlas arrived afterwards and
+    `muscles_full` matched the same test, so it quietly became 238,000 rows --
+    thirteen seconds to fill, and a cost every roster and every coach sheet then
+    paid forever, because each of them reads the last few of *each* structure
+    back. It was reported as "adding the demo people takes too long".
+    """
+
+    def test_the_default_seed_is_a_studio_rather_than_a_load_test(self, demo):
+        rows = demo.db.execute(
+            "SELECT COUNT(*) FROM structure_evals").fetchone()[0]
+        assert rows < 60_000, (
+            f"{rows} readings for sixteen fictional people is a load test. "
+            "Deep seeding is `--deep`.")
+
+    def test_but_a_studio_in_use_rather_than_an_empty_one(self, demo):
+        """Every person still has history on the body a class is taught out of,
+        deep enough to draw a line through: a demonstration with no readings
+        demonstrates nothing."""
+        for _, username in demo.made["people"]:
+            counts = demo.count_structure_evals(username)
+            assert len(counts) > 200, f"{username} has {len(counts)} structures"
+            assert min(counts.values()) >= seed.EVERY_CLASSES, username
+
+    def test_the_taught_body_is_what_gets_read(self, demo):
+        """And not the complete atlas's finer cut of the same anatomy. A coach
+        does not write a weekly reading of the left third plantar interosseous;
+        the structures they cue are the ones with names, entries and Korean."""
+        who = next(u for _, u in demo.made["people"])
+        read = set(demo.count_structure_evals(who))
+        assert not any(name.startswith(("Left ", "Right ")) for name in read), (
+            "sided 4.0 duplicates are being seeded")

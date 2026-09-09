@@ -1789,6 +1789,82 @@ const apart = await page.evaluate(async () => {
 });
 console.log('explode:', JSON.stringify(apart));
 
+/* A structure inside a body can be found without switching the body off.
+ *
+ * X-ray answers "what is under this layer" and cannot answer "where is this": four
+ * hundred translucent shells is a haze, and a valve cusp behind a sternum behind
+ * the ribs was **one pixel** of the picture with everything the interface could
+ * offer already applied. The reveal pass draws the chosen structure again with the
+ * depth test off, so it is never behind anything, and that is measured here on the
+ * exact structure that was reported.
+ */
+{
+  const chosen = await page.evaluate(async () => {
+    const m = await import('/src/main.js');
+    const S = await import('/src/structures.js');
+    for (const l of ['organs', 'skeleton', 'muscles_superficial', 'heart_detail'])
+      await m.setLayer(l, true);
+    for (const [id, r] of S.registry().byId)
+      if (/cusp of aortic valve/i.test(r.name.en)) return { id, name: r.name.en, color: r.color };
+    return null;
+  });
+  if (!chosen) console.log('a buried structure: no valve cusp in this atlas, skipped');
+  else {
+    /* Counted as *what changed*, not as "how many pixels are the structure's colour".
+     * A selected structure is drawn with the highlight mixed over its own colour, so
+     * matching on the palette entry measures the tint rather than the claim. What is
+     * being claimed is that turning the reveal on changes the picture where that
+     * structure is, and that is what a difference counts. */
+    const shoot = async () => {
+      await settleCamera(page);
+      await page.waitForTimeout(1200);
+      return page.evaluate(() => {
+        const c = document.querySelector('canvas');
+        const g = document.createElement('canvas');
+        g.width = c.clientWidth; g.height = c.clientHeight;
+        const cx = g.getContext('2d');
+        cx.drawImage(c, 0, 0, g.width, g.height);
+        const d = cx.getImageData(0, 0, g.width, g.height).data;
+        if (!window.__revealShot) { window.__revealShot = d; return null; }
+        const was = window.__revealShot;
+        window.__revealShot = null;
+        let changed = 0;
+        for (let i = 0; i < d.length; i += 4)
+          if (Math.abs(d[i] - was[i]) > 24 || Math.abs(d[i + 1] - was[i + 1]) > 24
+              || Math.abs(d[i + 2] - was[i + 2]) > 24) changed++;
+        return changed;
+      });
+    };
+    await page.evaluate(async (id) => {
+      const m = await import('/src/main.js');
+      m.setReveal(false);
+      m.selectStructure(id);
+    }, chosen.id);
+    await shoot();                                     // the picture without it
+    const clones = await page.evaluate(async () => {
+      const m = await import('/src/main.js');
+      m.setReveal(true);
+      return m.revealCount();
+    });
+    const changed = await shoot();
+    console.log('a buried structure can be found:',
+      JSON.stringify({ name: chosen.name, pixelsChanged: changed, clones }));
+    if (!clones)
+      errors.push(`the reveal made no drawable for ${chosen.name} — nothing was drawn ` +
+        `over the body at all`);
+    if (!(changed > 150))
+      errors.push(`turning the reveal on changed ${changed} pixels: a structure inside ` +
+        `the body is still invisible when it is chosen`);
+    await page.evaluate(async () => {
+      const m = await import('/src/main.js');
+      m.setReveal(true);
+      m.selectStructure(null);
+      m.resetView(true);
+    });
+    await settleCamera(page);
+  }
+}
+
 /* Every piece laid out in the catalogue answers a click, and answers with itself.
  *
  * A sheet of two thousand pieces is a sheet of two thousand *controls*, and one that does
@@ -1805,7 +1881,8 @@ console.log('explode:', JSON.stringify(apart));
     const S = await import('/src/structures.js');
     const THREE = await import('three');
     await m.setExplode(1);
-    await new Promise(r => setTimeout(r, 1400));
+    m.fitView();                       // frame the sheet, not wherever the camera was left
+    await new Promise(r => setTimeout(r, 1800));
     const cam = m.gfx.camera;
     const c = document.querySelector('canvas').getBoundingClientRect();
     const v = new THREE.Vector3();

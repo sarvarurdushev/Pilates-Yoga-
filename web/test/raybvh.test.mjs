@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from '../vendor/three.module.js';
-import { bvhFor, bvhRaycast, accelerate, setRestTest } from '../src/raybvh.js';
+import { bvhFor, bvhRaycast, accelerate, setRestTest, poseChanged } from '../src/raybvh.js';
 
 /**
  * A tree that answers a different question from the scan it replaces is worse
@@ -57,6 +57,24 @@ function accelerated(mesh, ray) {
   const out = [];
   bvhRaycast.call(mesh, ray, out);
   return out[0] ?? null;
+}
+
+/** The same, aimed at where the rig is currently holding the vertices. */
+function* posedRays(mesh, seed, n, jitter = 0.35) {
+  const r = rng(seed);
+  const count = mesh.geometry.getAttribute('position').count;
+  const at = new THREE.Vector3(), from = new THREE.Vector3();
+  const caster = new THREE.Raycaster();
+  for (let i = 0; i < n; i++) {
+    mesh.getVertexPosition((r() * count) | 0, at);
+    at.applyMatrix4(mesh.matrixWorld);
+    at.x += (r() * 2 - 1) * jitter;
+    at.y += (r() * 2 - 1) * jitter;
+    at.z += (r() * 2 - 1) * jitter;
+    from.set(r() * 2 - 1, r() * 2 - 1, r() * 2 - 1).normalize().multiplyScalar(6);
+    caster.set(from, at.clone().sub(from).normalize());
+    yield caster;
+  }
 }
 
 /**
@@ -184,7 +202,13 @@ test('a mesh too small for a tree still answers, through three', () => {
   assert.ok(got && Math.abs(got.distance - 3) < 1e-9, 'the fallback still hits it');
 });
 
-test('a posed skinned mesh is handed back to three rather than answered stale', () => {
+test('a posed skinned mesh answers exactly what three answers, posed', () => {
+  /* The tree describes the buffer, and the buffer is the bind pose. Handing those
+   * meshes back to three's own scan was the first answer and it is what made a
+   * posed body unpointable: a pick went from 1.1 ms to 31.8 ms the moment a clip
+   * moved the rig, and hover runs once a frame. So the boxes are refitted from
+   * where the vertices actually are and the triangles are tested there too — and
+   * this is the test that the refit is a *refit* rather than an approximation. */
   const g = blob(9);
   const verts = g.getAttribute('position').count;
   g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(new Uint16Array(verts * 4), 4));
@@ -193,28 +217,63 @@ test('a posed skinned mesh is handed back to three rather than answered stale', 
   g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(w, 4));
   const bone = new THREE.Bone();
   const skeleton = new THREE.Skeleton([bone]);
-  const mesh = new THREE.SkinnedMesh(g, new THREE.MeshBasicMaterial());
+  const mesh = new THREE.SkinnedMesh(g, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
   mesh.add(bone);
   mesh.bind(skeleton, new THREE.Matrix4());
   mesh.updateMatrixWorld(true);
   skeleton.update();
 
-  let asked = 0;
-  setRestTest(() => { asked++; return false; });
-  const caster = new THREE.Raycaster();
-  caster.set(new THREE.Vector3(0, 0, 4), new THREE.Vector3(0, 0, -1));
-  const out = [];
-  bvhRaycast.call(mesh, caster, out);
-  assert.equal(asked, 1, 'it asked whether the buffer is still what is drawn');
-  assert.equal(g.userData.__bvh, undefined, 'and built nothing it could not trust');
-  assert.ok(out.length >= 1, 'three still found the surface');
+  setRestTest(() => false);                       // "the rig has moved"
+  // and move it: the bone carries the whole blob a long way off its bind position
+  bone.position.set(0.9, -0.6, 0.35);
+  bone.rotation.set(0.6, 1.2, -0.4);
+  mesh.updateMatrixWorld(true);
+  skeleton.update();
+  poseChanged();
+  /* three's own raycast rejects on a bounding sphere computed from the *buffer*,
+   * which after a pose describes where the mesh used to be — so left alone it
+   * would refuse every ray that reaches the posed geometry and the comparison
+   * below would be measuring that staleness rather than the search. Widened so
+   * its scan is exhaustive and the two are answering the same question. The
+   * application prunes on the same stale sphere, deliberately, exactly as three
+   * does; this test is about what happens after the pruning. */
+  g.computeBoundingSphere();
+  g.boundingSphere.radius *= 6;
+  g.computeBoundingBox();
+  g.boundingBox.expandByScalar(6);
 
+  let hits = 0;
+  for (const ray of posedRays(mesh, 77, 260)) {
+    const want = reference(mesh, ray), got = accelerated(mesh, ray);
+    assert.equal(!!got, !!want, 'posed: hit or miss must agree with three');
+    if (!want) continue;
+    hits++;
+    assert.ok(Math.abs(got.distance - want.distance) < 1e-9,
+      `posed distance ${got.distance} vs ${want.distance}`);
+    assert.ok(got.point.distanceTo(want.point) < 1e-9, 'posed point');
+  }
+  assert.ok(hits > 80, `only ${hits} rays reached the posed blob`);
+
+  /* And back. A body returned to the bind pose is described by its buffer again,
+   * and a tree left holding the posed boxes would answer about a pose nobody is
+   * in — the failure this direction is the quiet one, because the boxes are
+   * still *somewhere* and the hits merely go missing. */
+  bone.position.set(0, 0, 0);
+  bone.rotation.set(0, 0, 0);
+  mesh.updateMatrixWorld(true);
+  skeleton.update();
+  g.computeBoundingSphere();
+  g.computeBoundingBox();
   setRestTest(() => true);
-  const out2 = [];
-  bvhRaycast.call(mesh, caster, out2);
-  assert.ok(g.userData.__bvh, 'at rest it builds and uses the tree');
-  assert.ok(Math.abs(out2[0].distance - out.sort((a, b) => a.distance - b.distance)[0].distance) < 1e-9,
-    'and agrees with three at the bind pose');
+  let back = 0;
+  for (const ray of rays(mesh, 5, 200)) {
+    const want = reference(mesh, ray), got = accelerated(mesh, ray);
+    assert.equal(!!got, !!want, 'at rest again: hit or miss must agree');
+    if (!want) continue;
+    back++;
+    assert.ok(Math.abs(got.distance - want.distance) < 1e-9, 'at rest again');
+  }
+  assert.ok(back > 80, `only ${back} rays reached it back at rest`);
   setRestTest(() => false);
 });
 

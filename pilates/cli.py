@@ -2319,7 +2319,7 @@ def cmd_seed(args) -> int:
         try:
             made = sow(store, password=args.password or PASSWORD,
                        classes=not args.no_classes, into=args.studio or "",
-                       everything=not args.small)
+                       everything=not args.small, deep=bool(args.deep))
         except ValueError as exc:
             print(str(exc), file=sys.stderr)
             return 1
@@ -2751,10 +2751,14 @@ def main(argv: list[str] | None = None) -> int:
                     help="seed even though this database already has accounts")
     sd.add_argument("--small", action="store_true",
                     help="only the hand-written stories. Without it every "
-                         "muscle, bone and nerve gets twenty classes of "
-                         "readings for everybody -- about 115,000 rows and "
-                         "55MB, which is the point, but is a lot to carry "
-                         "around if all you wanted was a login to look at")
+                         "muscle, bone and nerve of the taught body gets four "
+                         "classes of readings for everybody, which is what a "
+                         "studio in use looks like")
+    sd.add_argument("--deep", action="store_true",
+                    help="twenty classes of every structure in the complete "
+                         "atlas instead -- about a quarter of a million rows. "
+                         "What the screens look like when they are full, and a "
+                         "load test rather than a demonstration")
     sd.set_defaults(func=cmd_seed)
 
     rs = sub.add_parser("reset",
