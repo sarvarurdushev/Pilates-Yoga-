@@ -60,14 +60,13 @@ const BANNER_CSS = `
    naming the session ran off a 390px screen -- 82px of room for about 300px of
    text -- and took the tap target with it, so the one control offering a reader
    the demo could not be reached on the device most of them open this on. */
-#demochip{position:fixed;left:12px;right:12px;bottom:22px;z-index:60;
-  display:flex;gap:10px;align-items:center;padding:9px 14px;border-radius:4px;
+/* In the About panel, so it is the width of the panel and over nothing. */
+#demochip[hidden]{display:none}
+#demochip{display:flex;width:100%;gap:10px;align-items:center;margin:0 0 14px;
+  padding:9px 12px;border-radius:6px;
   cursor:pointer;background:rgba(233,180,92,.10);
   border:1px solid rgba(233,180,92,.45);
   color:var(--txt);font-size:12px;letter-spacing:.02em;text-align:left}
-/* Wide enough for the console to sit beside it: clear the console, and shrink
-   back to the width of the sentence rather than stretching across the stage. */
-@media (min-width: 900px){#demochip{left:308px;right:auto;width:max-content}}
 /* So the session name is what gets clipped when there is no room for it, rather
    than the chip growing past the edge of the screen to fit. */
 #demochip span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -136,6 +135,12 @@ async function offerDemo() {
   const first = manifest.sessions?.[0];
   if (!first) return;
   styles();
+  /* In the rail's About panel rather than floating over the body.
+   *
+   * As a chip it sat at the bottom centre of the stage, over the section strip and
+   * over the figure's feet, on every load, for ever -- and once demo accounts exist
+   * a permanent advertisement for one demo session is furniture rather than an
+   * offer. It is still one press away, next to the rest of what this build is. */
   const chip = document.createElement('button');
   chip.id = 'demochip';
   chip.type = 'button';
@@ -146,6 +151,10 @@ async function offerDemo() {
     next.searchParams.set('session', `demo/${first.file}`);
     location.href = next.toString();
   });
+  /* Parked out of the way until the About panel has been rendered once and can
+   * adopt it — see `renderPanel`. Appending it to the body visible is what put it
+   * over the figure's feet on every load. */
+  chip.hidden = true;
   document.body.appendChild(chip);
 }
 

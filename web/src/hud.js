@@ -28,6 +28,21 @@ import { UI } from './content/strings.js';
 const TRACE_N = 260;          // samples held in the ring buffer
 const TRACE_W = 268, TRACE_H = 54;
 
+/**
+ * The corner marks stay; the readout does not.
+ *
+ * `#hudCol` carried a rolling trace labelled NETWORK DRIVE and three tiles counting
+ * structures, regions and cells. The trace was a setting this application chose for its
+ * own animation rather than a measurement of anything, it sat at 0.35 and never moved,
+ * and it was the first thing on the screen — an instrument reading, in the corner of a
+ * medical-looking picture, meaning nothing. The report on it was exactly that: "I have no
+ * idea why you even need network drive... it never changes".
+ *
+ * It is built and kept up to date but not shown, because the lab screen draws the same
+ * three counts where they are in context and beside the things they count. The element
+ * stays so `tick` has somewhere to write and so a debugger can unhide it; nothing on the
+ * default screen renders it.
+ */
 export class Hud {
   constructor(stage) {
     this.stage = stage;
@@ -47,14 +62,10 @@ export class Hud {
     root.innerHTML = `
       <i class="hudc tl"></i><i class="hudc tr"></i>
       <i class="hudc bl"></i><i class="hudc br"></i>
-      <div id="hudCol">
+      <div id="hudCol" hidden>
       <div id="hudTrace">
         <canvas width="${TRACE_W * 2}" height="${TRACE_H * 2}"></canvas>
         <div class="hudlab"><span data-k="trace"></span><b id="hudRate">—</b></div>
-        <!-- The one readout on this layer that carried a number and no words. A trace with a
-             name and a value, on an instrument, invites a reader to take it for a recording —
-             so it says what it is where it is, rather than only in a glossary they would have
-             to know to open. -->
         <p class="hudnote" data-k="traceNote"></p>
       </div>
       <div id="hudRead"></div>

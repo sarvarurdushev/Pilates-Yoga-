@@ -114,11 +114,11 @@ button{font:inherit;cursor:pointer}
 /* Bounded on the right by the console, not by the window. `max-width:calc(100% - 300px)` let
  * the strip run underneath the panel, so at nine cuts the last of them were behind the glass
  * with no way to reach them — which is what "why can't I scroll to see all the cuts" was. */
-#sections{position:absolute;left:284px;bottom:14px;z-index:4;
- right:calc(var(--panelw) + 30px)}
+#sections{position:absolute;left:24px;bottom:14px;z-index:4;right:74px}
+body.pop-open #sections,body.pop-open #orient{right:calc(var(--panelw) + 74px)}
 /* Which way the subject is facing, in the corner, the way an atlas plate captions itself.
  * A lateral view of a brain is ambiguous without it — front could be either end. */
-#orient{position:absolute;right:calc(var(--panelw) + 30px);bottom:18px;z-index:3;
+#orient{position:absolute;right:74px;bottom:18px;z-index:3;
  pointer-events:none;text-align:right;
  font-size:8.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--dim2)}
 .secthead{display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
@@ -310,8 +310,47 @@ body.busy #stage{cursor:progress}
 /* A pane of projected glass standing in the room, not the right-hand column of a document.
    It floats clear of all four edges so the scene runs behind and around it, and it is thin
    enough to read the render through. */
-#panel{position:fixed;right:14px;top:calc(var(--barh) - 6px);bottom:14px;width:var(--panelw);
- z-index:6;display:flex;flex-direction:column;min-height:0;border-radius:3px;
+/* ------------------------------------------------------------------- the rail
+ *
+ * One column of buttons down the right edge and one panel open at a time, closed
+ * by default. The console used to be a third of the window, permanently, holding
+ * a tab strip, a structure card, seventy-seven group chips, a region plot, a label
+ * filter, four hundred swatches and eighteen rows of controls at once -- and the
+ * report on it was that it is hard to find anything and hard to understand what
+ * you found. A reader wants one small clear box at a time; the body wants the
+ * screen. */
+#rail{position:fixed;right:12px;top:calc(var(--barh) + 12px);z-index:7;
+ display:flex;flex-direction:column;gap:4px;padding:6px;border-radius:10px;
+ border:1px solid var(--line);background:rgba(6,11,19,.72);
+ backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
+#rail button{position:relative;width:38px;height:38px;padding:0;cursor:pointer;
+ display:flex;align-items:center;justify-content:center;border-radius:8px;
+ border:1px solid transparent;background:transparent;color:var(--dim2);
+ font:400 16px/1 inherit;transition:color .15s,background .15s,border-color .15s}
+#rail button:hover{color:var(--txt);border-color:var(--line);background:rgba(255,255,255,.05)}
+#rail button[aria-pressed=true]{color:#eaf4ff;border-color:rgba(90,169,230,.55);
+ background:rgba(90,169,230,.16)}
+/* The name of the panel, revealed on hover so the rail can be learnt without being
+ * a column of words. */
+#rail button em{position:absolute;right:46px;white-space:nowrap;font-style:normal;
+ font-size:10.5px;letter-spacing:.06em;padding:5px 9px;border-radius:6px;
+ border:1px solid var(--line);background:rgba(6,11,19,.94);color:var(--txt);
+ opacity:0;pointer-events:none;transform:translateX(4px);transition:opacity .13s,transform .13s}
+#rail button:hover em,#rail button:focus-visible em{opacity:1;transform:translateX(0)}
+#railStructure[hidden]{display:none}
+
+#pophead{flex:none;display:flex;align-items:center;gap:10px;
+ padding:13px 14px 11px 18px;border-bottom:1px solid var(--hair)}
+#poptitle{flex:1;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+ color:var(--txt);font-weight:600}
+#popclose{width:26px;height:26px;padding:0;border-radius:6px;cursor:pointer;
+ border:1px solid transparent;background:transparent;color:var(--dim2);font-size:13px}
+#popclose:hover{color:var(--txt);border-color:var(--line);background:rgba(255,255,255,.05)}
+
+#panel[hidden]{display:none}
+#panel{position:fixed;right:62px;top:calc(var(--barh) + 12px);
+ max-height:calc(100vh - var(--barh) - 26px);width:var(--panelw);
+ z-index:6;display:flex;flex-direction:column;min-height:0;border-radius:10px;
  border:1px solid var(--line);
  background:linear-gradient(200deg,rgba(7,13,22,.72) 0%,rgba(5,9,16,.80) 100%);
  box-shadow:0 30px 90px rgba(0,0,0,.55), inset 0 1px 0 rgba(160,200,245,.07);
@@ -326,9 +365,12 @@ body.busy #stage{cursor:progress}
  text-transform:uppercase;margin-bottom:-1px;transition:color .18s}
 #tabs button:hover{color:var(--dim)}
 #tabs button[aria-selected=true]{color:var(--txt);border-bottom-color:var(--acc)}
-#panelBody{overflow:auto;padding:20px 20px 30px;flex:1;min-height:0}
-#controls{border-top:1px solid var(--hair);padding:13px 20px 16px;flex:none;
- background:rgba(2,5,10,.42);max-height:39vh;overflow:auto}
+#panelBody{overflow:auto;padding:16px 18px 22px;flex:1 1 auto;min-height:0}
+#panelBody:empty{display:none}
+#controls,#brainControls,#readControls{border-top:1px solid var(--hair);
+ padding:13px 18px 16px;flex:none;background:rgba(2,5,10,.42);overflow:auto}
+#controls:first-of-type,#brainControls:first-of-type,#readControls:first-of-type{border-top:0}
+#controls[hidden],#brainControls[hidden],#readControls[hidden]{display:none}
 /* thin, unobtrusive scrollbars — a console does not have chrome scrollbars */
 #panelBody::-webkit-scrollbar,#controls::-webkit-scrollbar{width:9px}
 #panelBody::-webkit-scrollbar-thumb,#controls::-webkit-scrollbar-thumb{
@@ -933,8 +975,26 @@ details.groups>summary em{font-style:normal;font-size:10px;color:var(--dim2);
 .layerall{display:flex;align-items:center;gap:8px;margin:8px 2px 0;
  font-size:10.5px;letter-spacing:.06em;color:var(--dim2)}
 .layerall span{margin-right:auto;font-variant-numeric:tabular-nums}
-.soloRow{margin:2px 0 14px}
-.solobtn{width:100%;padding:9px 12px;border-radius:7px;cursor:pointer;
+/* The name of what the pointer is over, beside the pointer. */
+#hovertip{position:fixed;z-index:9;pointer-events:none;padding:5px 9px;border-radius:6px;
+ border:1px solid var(--line);background:rgba(6,11,19,.94);color:var(--txt);
+ font-size:11.5px;letter-spacing:.01em;white-space:nowrap;
+ box-shadow:0 8px 26px rgba(0,0,0,.5)}
+#hovertip[hidden]{display:none}
+.vsep{width:1px;height:16px;margin:0 3px;background:var(--line)}
+#viewbar #zoomIn,#viewbar #zoomOut,#viewbar #fitBtn{min-width:26px;font-size:13px}
+/* In the catalogue a left-drag pans rather than orbits, and the cursor says so. */
+body.sheet #view{cursor:move}
+/* Name, kind and the two verbs, at the top of the card and above the reading. */
+.shead{margin:0 0 10px;min-width:0}
+/* A long provenance line -- kind, layer and two FMA ids -- has to wrap inside the
+ * card rather than run out under the rail, which is what an unbroken 60-character
+ * string does in a 312px box. */
+.shead .dwhere{overflow-wrap:anywhere;line-height:1.5}
+.soloRow{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:2px 0 14px}
+.soloRow .chelp{flex:1 0 100%;margin:2px 2px 0}
+.soloRow .mini.flyto{flex:0 0 auto}
+.solobtn{flex:1 1 150px;padding:9px 12px;border-radius:7px;cursor:pointer;
  font:500 12.5px/1.25 inherit;letter-spacing:.02em;
  border:1px solid rgba(90,169,230,.5);color:#dceaf7;background:rgba(90,169,230,.10)}
 .solobtn:hover{border-color:rgba(90,169,230,.85);background:rgba(90,169,230,.20);color:#f2f9ff}
@@ -1040,12 +1100,12 @@ details.groups>summary em{font-style:normal;font-size:10px;color:var(--dim2);
       <button id="vAnt"></button><button id="vPost"></button><button id="vLat"></button>
       <button id="vSup"></button><button id="vHead"></button><button id="vAll"></button>
       <button id="labBtn" class="labopen"></button>
+      <span class="vsep"></span>
+      <button id="zoomOut" title="">−</button>
+      <button id="zoomIn" title="">+</button>
+      <button id="fitBtn" title="">⤢</button>
     </div>
-    <div id="layerbar">
-      <button class="fold" data-fold="layerbar" title="">−</button>
-      <b id="layersLabel">Layers</b>
-      <div id="layerList"></div>
-    </div>
+
     <!-- The section series. Real sections of the model's own surfaces — see sections.js.
          Hidden until the brain is on, because there is nothing to cut otherwise. -->
     <div id="sections" hidden>
@@ -1066,9 +1126,25 @@ details.groups>summary em{font-style:normal;font-size:10px;color:var(--dim2);
   <!-- The lab: the network and the movement off the stage and at full size. See lab.js. -->
   <div id="lab" hidden></div>
 
-  <aside id="panel">
-    <button class="fold" data-fold="panel" title="">−</button>
-    <nav id="tabs">
+  <!-- The rail. One column of buttons down the right edge, one panel open at a
+       time, and nothing open by default -- the body is what the screen is for. -->
+  <nav id="rail" aria-label="Panels">
+    <button data-pop="structure" id="railStructure" hidden><span>◉</span><em></em></button>
+    <button data-pop="explore"><span>⌕</span><em></em></button>
+    <button data-pop="exercise"><span>⇄</span><em></em></button>
+    <button data-pop="evidence"><span>❋</span><em></em></button>
+    <button data-pop="layers"><span>≡</span><em></em></button>
+    <button data-pop="display"><span>◐</span><em></em></button>
+    <button data-pop="brain" id="railBrain"><span>◍</span><em></em></button>
+    <button data-pop="about"><span>?</span><em></em></button>
+  </nav>
+
+  <aside id="panel" hidden>
+    <header id="pophead">
+      <b id="poptitle"></b>
+      <button id="popclose" title="">✕</button>
+    </header>
+    <nav id="tabs" hidden>
       <button id="tabExplore" aria-selected="true"></button>
       <button id="tabExercise"></button>
       <button id="tabEvidence"></button>
@@ -1098,6 +1174,8 @@ details.groups>summary em{font-style:normal;font-size:10px;color:var(--dim2);
         <div class="seg"><button id="exInventory" aria-pressed="true"></button>
           <button id="exOpen"></button></div></div>
       <p class="chelp" id="explodeHelp" hidden></p>
+    </div>
+    <div id="brainControls">
       <!-- Two ways of drawing the cortex. Like the scan, it means nothing without the brain. -->
       <div class="crow" id="lookRow" style="display:none"><label id="lookLab"></label>
         <div class="seg"><button id="lookTissue" aria-pressed="true"></button>
@@ -1136,13 +1214,15 @@ details.groups>summary em{font-style:normal;font-size:10px;color:var(--dim2);
         <input id="scanAt" type="range" min="-1" max="1" step="0.005" value="0"></div>
       <div class="crow" id="clipRow" style="display:none"><label id="clipLab"></label>
         <input id="clip" type="range" min="-0.35" max="0.35" step="0.005" value="0.5"></div>
+      <div id="pathPanel"></div>
+    </div>
+    <div id="readControls">
       <div class="crow"><label id="registerLab"></label>
         <div class="seg"><button id="regPlain"></button><button id="regClinical"></button>
           <button id="regBoth" aria-pressed="true"></button></div></div>
       <div class="crow"><label id="instrLab"></label>
         <button id="instrToggle" class="tgl" aria-pressed="true">on</button>
         <button id="reset" class="tgl"></button></div>
-      <div id="pathPanel"></div>
     </div>
   </aside>
 </div>

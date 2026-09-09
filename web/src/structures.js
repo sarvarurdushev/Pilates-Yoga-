@@ -19,7 +19,7 @@ import { INTERIOR_IDS } from './deepStructures.js';
 export const LAYER_ORDER = ['organs', 'airways', 'arteries', 'veins',
                             'muscles_superficial', 'muscles_deep',
                             'nervous', 'nerves_cranial', 'heart_detail',
-                            'connective', 'skeleton', 'brain'];
+                            'connective', 'detail', 'skeleton', 'brain'];
 
 /** Palette colour per layer, used for any structure with no colour of its own. */
 export const LAYER_COLOR = {
@@ -31,6 +31,7 @@ export const LAYER_COLOR = {
   connective: '#CFC3A8',
   nerves_cranial: '#E8C86B',
   heart_detail: '#B05A52',
+  detail: '#9E8F7A',
   nervous: '#F2D98B',
   skeleton: '#D9D2C4',
   muscles_superficial: '#C1483F',
@@ -52,7 +53,7 @@ const KIND_OF_LAYER = {
   muscles_superficial: 'muscle', muscles_deep: 'muscle',
   nervous: 'nerve', nerves_cranial: 'nerve', brain: 'brain',
   arteries: 'vessel', veins: 'vessel',
-  organs: 'organ', airways: 'organ', heart_detail: 'organ',
+  organs: 'organ', airways: 'organ', heart_detail: 'organ', detail: 'organ',
 };
 
 /** Spread structures within a layer around its base colour so neighbours are separable. */

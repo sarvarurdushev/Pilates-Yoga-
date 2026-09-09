@@ -57,6 +57,16 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
  * that 404s is a broken import or a missing asset and still fails the run.
  */
 const EXPECTED_404 = ['/capabilities', '/auth/me', '/favicon.ico'];
+
+/* The panels are opened from the rail now and only one is open at a time, so
+ * asking for one that is already open would close it. */
+const openPanel = async (p, which) => {
+  const already = await p.evaluate(w =>
+    document.querySelector(`#rail [data-pop="${w}"]`)?.getAttribute('aria-pressed') === 'true',
+    which);
+  if (!already) await p.click(`#rail [data-pop="${which}"]`);
+  await p.waitForTimeout(350);
+};
 const errors = [], warnings = [];
 /* A console message says "Failed to load resource: ... 404" without naming the
  * URL, so the URL comes from the response event instead and the console line is
@@ -135,7 +145,7 @@ const stats = await page.evaluate(async () => {
 console.log('registry:', JSON.stringify(stats));
 
 // exercise -> activation
-await page.click('#tabExercise');
+await openPanel(page, 'exercise');
 await page.waitForTimeout(300);
 await page.click('[data-ex="hundred"]');
 await page.waitForTimeout(5000);
@@ -363,6 +373,13 @@ const cellProbe = await page.evaluate(async () => {
     changed: Math.abs(tissue.mean - anat.mean) > 8,
     back: m.app.brainLook,
   };
+  /* The region network lives in the Brain panel now, not in Explore. It is only in
+   * the DOM while that panel is open, so this opens it before it looks. */
+  {
+    const b = document.querySelector('#rail [data-pop="brain"]');
+    if (b && b.getAttribute('aria-pressed') !== 'true') b.click();
+    await new Promise(r => setTimeout(r, 500));
+  }
   out.graph = g ? {
     nodes: g.nodes.length, edges: g.edges.length,
     unnamed: g.nodes.filter(n => !s2.nameOf(n.region, 'en')).length,
@@ -935,7 +952,9 @@ const library = await page.evaluate(async () => {
     el.value = v;
     el.dispatchEvent(new Event('input', { bubbles: true }));
   };
-  document.getElementById('tabExercise').click();
+  // open it, rather than toggle it: the rail closes a panel that is already open
+  const exBtn = document.querySelector('#rail [data-pop="exercise"]');
+  if (exBtn.getAttribute('aria-pressed') !== 'true') exBtn.click();
   const back = document.getElementById('exBack');
   if (back) back.click();
   const total = document.querySelectorAll('[data-ex]').length;
@@ -1008,6 +1027,8 @@ await page.waitForTimeout(4000);
 await shot('09-motion');
 
 // pathway
+/* The pathway buttons are Display controls, and Display is a panel now. */
+await openPanel(page, 'display');
 await page.click('#pDesc');
 await page.waitForTimeout(6000);
 await shot('03-pathway');
@@ -1290,7 +1311,7 @@ if (strays[0] && strays[0][1] > 0.22)
  * Explore's list became a grid of swatches, logged `selected: null`, and passed. A check that
  * silently stops checking is worse than no check, so the result is asserted now: the click has
  * to name the muscle it meant *and* the application has to end up with it selected. */
-await page.click('#tabExplore');
+await openPanel(page, 'explore');
 await page.waitForTimeout(400);
 const picked = await page.evaluate(async () => {
   const b = [...document.querySelectorAll('#panelBody [data-id]')]
@@ -1316,7 +1337,7 @@ await page.waitForTimeout(1200);
 await shot('05-korean');
 
 // evidence tab
-await page.click('#tabEvidence');
+await openPanel(page, 'evidence');
 await page.waitForTimeout(800);
 await shot('06-evidence');
 
@@ -1371,7 +1392,7 @@ await page.evaluate(async () => {
   await m.setLayer('brain', false);
   m.selectStructure(null);
 });
-await page.click('#tabExplore');
+await openPanel(page, 'explore');
 await page.waitForTimeout(500);
 
 const found = await page.evaluate(async () => {
@@ -1688,6 +1709,9 @@ if (!oneCall.bone.alone.ink)
       'the source meshes are off the camera\'s layer and the raycaster was not told');
 }
 
+/* The group chips are in the Explore panel, and the checks above left Display
+ * open. One panel at a time means asking for the one this needs. */
+await openPanel(page, 'explore');
 const grouped = await page.evaluate(async () => {
   const chips = [...document.querySelectorAll('#panelBody [data-group]')];
   if (!chips.length) return { missing: true };

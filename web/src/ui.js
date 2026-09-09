@@ -31,7 +31,7 @@ export function mountUI(ctx) {
           setRotate, setRegister, setInstruction, setLayer, setLayerOpacity, setView,
           resetView, setExercise, setPathway, activationOf,
           setGroup, anatomyGroups, groupsForStructure, setIsolate, isolated, setExplode,
-          setExplodeLayout, explodeLayout,
+          setExplodeLayout, explodeLayout, zoomBy, fitView,
           poseFromClip, setPlaying, setShowPaths, setShowMeshes, liveActivationOf,
           musclePathReport, setLabelKind, clearLabelKinds } = ctx;
 
@@ -94,7 +94,8 @@ export function mountUI(ctx) {
     sagittal: 'scanSagittal', coronal: 'scanCoronal', axial: 'scanAxial', sweep: 'scanSweep',
   };
 
-  let tab = 'explore';
+  /* Which panel is open, or null for none — the body is what the screen is for. */
+  let tab = null;
   let ready = false;
 
   /* ------------------------------------------------------------------ chrome */
@@ -108,7 +109,19 @@ export function mountUI(ctx) {
       $(id).textContent = T(k);
     $('viewsLabel').textContent = T('views');
     $('labBtn').textContent = T('labView');
-    $('layersLabel').textContent = T('layers');
+    $('popclose').title = T('popClose');
+    $('zoomIn').title = T('zoomIn');
+    $('zoomOut').title = T('zoomOut');
+    $('fitBtn').title = T('fitView');
+    /* The rail is icons, and an icon nobody can read is a button nobody presses.
+     * Every one of them carries its name, shown on hover and read out by a screen
+     * reader, in whichever language the app is in. */
+    for (const b of document.querySelectorAll('#rail [data-pop]')) {
+      const sec = SECTIONS[b.dataset.pop];
+      const name = T(sec?.title ?? b.dataset.pop);
+      b.setAttribute('aria-label', name);
+      if (b.dataset.pop !== 'structure') b.querySelector('em').textContent = name;
+    }
     for (const [id, k] of [['vAnt', 'anterior'], ['vPost', 'posterior'], ['vLat', 'lateral'],
                            ['vSup', 'superior'], ['vHead', 'head'], ['vAll', 'wholeBody']])
       $(id).textContent = T(k);
@@ -181,6 +194,11 @@ export function mountUI(ctx) {
   }
 
   function renderLayerList() {
+    /* Only while its panel is open. The list used to live on the stage and be
+     * rebuilt from `renderChrome`; it is a panel section now, so on every language
+     * change and every body switch this was writing into an element that is not
+     * there. */
+    if (!$('layerList')) return;
     /* Only the layers this body actually carries. A toggle for a layer that does not exist is
      * a promise the atlas cannot keep — the peripheral nervous system comes from a source
      * derived from the male scan, so another body has no nerves to show and should not offer
@@ -223,7 +241,7 @@ export function mountUI(ctx) {
                    brain: '#cfb2a8',
                    arteries: '#C0392B', veins: '#3D6C9E', airways: '#8FA9B8',
                    connective: '#CFC3A8', nerves_cranial: '#E8C86B',
-                   heart_detail: '#B05A52' };
+                   heart_detail: '#B05A52', detail: '#9E8F7A' };
   const layerSwatch = n => SWATCH[n] ?? '#8b95ab';
 
   /** The four lines that must not move, rendered where the user is rather than in a footer. */
@@ -249,20 +267,89 @@ export function mountUI(ctx) {
    * had begun above them. Reset when the *subject* changes; a plain re-render must not,
    * because the search box re-renders on every keystroke and the filters on every click,
    * and jumping to the top mid-scroll is the same fault from the other side. */
+  /* --------------------------------------------------------------- the panels
+   *
+   * One at a time, in one box, opened from the rail and closed by default.
+   *
+   * `SECTIONS` is the whole list: what its title is, which renderer fills its
+   * body, and which of the three control blocks -- body, brain, reading -- sits
+   * under it. A section with no renderer is controls only, which is what
+   * separates "take the body apart" from "read about a muscle": they were in one
+   * scrolling column and every reader had to scroll past the whole atlas to
+   * reach a slider.
+   */
+  const SECTIONS = {
+    structure: { title: 'popStructure', body: () => detailBlock(), rail: 'railStructure' },
+    explore:   { title: 'tabExplore',  body: exploreTab },
+    exercise:  { title: 'tabExercise', body: exerciseTab },
+    evidence:  { title: 'tabEvidence', body: evidenceTab },
+    about:     { title: 'tabAbout',    body: aboutTab },
+    layers:    { title: 'layers',      body: () => '<div id="layerList"></div>' },
+    display:   { title: 'popDisplay',  controls: ['controls', 'readControls'] },
+    /* Every control in here is about the cortex, and every one of them hides itself
+     * when the brain layer is off — which left an empty box with a title. It says
+     * so instead, and offers the switch. */
+    /* The region network moved in here from Explore. It is a brain instrument --
+     * it has nothing to draw without a cortex -- and in Explore it sat between the
+     * group chips and four hundred swatches, which is most of why that panel could
+     * not be navigated. */
+    brain:     { title: 'popBrain',    controls: ['brainControls'],
+                 body: () => app.layers.brain?.on ? connBlock()
+                   : `<p class="note">${T('brainOffNote')}</p>
+                      <div class="soloRow"><button class="solobtn" data-brainon="1">${
+                        T('brainOn')}</button></div>` },
+  };
+  const SECTION_KEYS = Object.keys(SECTIONS);
+
   let shownKey = null;
   function renderPanel() {
-    for (const [id, k] of [['tabExplore', 'explore'], ['tabExercise', 'exercise'],
-                           ['tabEvidence', 'evidence'], ['tabAbout', 'about']])
-      $(id).setAttribute('aria-selected', tab === k);
-    $('panelBody').innerHTML =
-      tab === 'exercise' ? exerciseTab()
-      : tab === 'evidence' ? evidenceTab()
-      : tab === 'about' ? aboutTab()
-      : exploreTab();
-    const key = `${tab}:${tab === 'exercise' ? (app.exercise ?? '') : ''}`;
+    const sec = SECTIONS[tab] ?? SECTIONS.explore;
+    const open = !!tab;
+    $('panel').hidden = !open;
+    /* The section strip and the orientation caption run to the rail when nothing
+     * is open and stop at the panel when something is: a strip of nine cuts with
+     * its last three behind glass is a strip whose last three cuts do not exist. */
+    document.body.classList.toggle('pop-open', open);
+    for (const b of document.querySelectorAll('#rail [data-pop]'))
+      b.setAttribute('aria-pressed', String(b.dataset.pop === tab));
+    /* The structure button only exists while there is one, and it carries the
+     * name so the rail says what is selected without the panel being open. */
+    const rs = $('railStructure');
+    if (rs) {
+      const r = app.selected != null ? get(app.selected) : null;
+      rs.hidden = !r;
+      rs.querySelector('em').textContent = r ? r.name[app.lang] : '';
+    }
+    if (!open) { syncControlBlocks(null); return; }
+    $('poptitle').textContent = T(sec.title);
+    $('panelBody').innerHTML = sec.body ? sec.body() : '';
+    syncControlBlocks(sec.controls ?? null);
+    const key = `${tab}:${tab === 'exercise' ? (app.exercise ?? '')
+                        : tab === 'structure' ? (app.selected ?? '') : ''}`;
     if (key !== shownKey) { shownKey = key; $('panelBody').scrollTop = 0; }
+    if (tab === 'layers') renderLayerList();
+    if (tab === 'about') {
+      const chip = document.getElementById('demochip');
+      const slot = $('demoslot');
+      if (chip && slot && chip.parentElement !== slot) { slot.appendChild(chip); chip.hidden = false; }
+    }
     wirePanel();
   }
+
+  /** Show only the control blocks this section owns; the rest stay in the DOM, hidden. */
+  function syncControlBlocks(want) {
+    for (const id of ['controls', 'brainControls', 'readControls']) {
+      const el = $(id);
+      if (el) el.hidden = !want?.includes(id);
+    }
+  }
+
+  /** Open a section, or close the panel when the one already open is asked for again. */
+  function openPop(which) {
+    tab = (which && which !== tab && SECTION_KEYS.includes(which)) ? which : null;
+    renderPanel();
+  }
+  function closePop() { tab = null; renderPanel(); }
 
   /* ------------------------------------------------------------------ the lab
    * A screen rather than a panel. Everything it draws is a getter onto the live application
@@ -541,7 +628,6 @@ export function mountUI(ctx) {
         .map(([kind, str]) => [str, hits.filter(r => r.kind === kind)])
         .filter(([, list]) => list.length);
       return `
-        ${detailBlock()}
         ${findBox(hits.length + hitGroups.length)}
         ${hitGroups.length ? `<h3>${T('groups')}<em>${hitGroups.length}</em></h3>
           <div class="gchips">${hitGroups.map(groupChip).join('')}</div>` : ''}
@@ -561,10 +647,8 @@ export function mountUI(ctx) {
      * network is a brain instrument. Sitting fourth they were below the fold on
      * a laptop, which is indistinguishable from not being there. */
     return `
-      ${detailBlock()}
       ${findBox(null)}
       ${groupsSection(gs)}
-      ${connBlock()}
       ${labelFilter()}
       ${byKind.map(([str, list]) => `
         <h3>${T(str)}<em>${list.length}</em></h3>
@@ -669,11 +753,34 @@ export function mountUI(ctx) {
    */
   function soloAction(r) {
     const alone = (isolated?.() ?? []).includes(r.id);
+    const many = (isolated?.() ?? []).length > 1;
     return `<div class="soloRow">
       <button class="solobtn${alone ? ' on' : ''}" data-isolate="${r.id}">
-        ${T(alone ? 'isolateOff' : 'isolate')}</button>
+        ${T(alone && !many ? 'isolateOff' : 'isolate')}</button>
+      <button class="mini flyto" data-flyto="${r.id}">${T('flyTo')}</button>
       ${alone ? `<p class="chelp">${T('isolateHint')}</p>` : ''}
     </div>`;
+  }
+
+  /**
+   * The top of every structure card: what it is, and the two things to do with it.
+   *
+   * Above the description rather than below it, because "show me only this" is
+   * what a reader wants *before* they read three paragraphs, not after — and
+   * because on a bone or an artery the description is a system overview they have
+   * read a hundred times, and burying the control under it made it invisible.
+   */
+  function structureHead(r) {
+    const kind = T({ muscle: 'kindMuscle', bone: 'kindBone', nerve: 'kindNerve',
+                     vessel: 'kindVessel', organ: 'kindOrgan', brain: 'kindBrain' }[r.kind]
+                   ?? r.layer);
+    return `<div class="shead">
+      <div class="dname"><span class="dot" style="background:${r.color}"></span>${
+        esc(r.name[app.lang])}</div>
+      <div class="dwhere">${esc(kind)} · ${T(r.layer)}${
+        r.sides?.includes('L') && r.sides?.includes('R') ? ' · L+R' : ''}${
+        r.fma?.length ? ` · ${esc(r.fma[0])}` : ''}</div>
+    </div>${soloAction(r)}`;
   }
 
   function detailBlock() {
@@ -685,18 +792,16 @@ export function mountUI(ctx) {
     if (id == null) return `<p class="pickme">${T('explore')}</p>`;
     const r = get(id);
     if (!r) return '';
-    if (r.kind === 'brain') return brainDetail(r) + soloAction(r);
-    if (r.muscle) return muscleDetail(r) + soloAction(r);
+    if (r.kind === 'brain') return structureHead(r) + brainDetail(r);
+    if (r.muscle) return structureHead(r) + muscleDetail(r);
     const overview = KIND_OVERVIEW[r.kind]?.[app.lang] ?? '';
-    return `<div class="detail">
-      <div class="dname"><span class="dot" style="background:${r.color}"></span>${esc(r.name[app.lang])}</div>
-      <div class="dwhere">${T(r.layer)}${r.fma ? ` · ${T('fmaId')} ${r.fma.slice(0, 3).join(', ')}` : ''}</div>
+    return `${structureHead(r)}<div class="detail">
       ${groupBlock(r)}
       ${overview ? `<div class="blk overview">
         <h4>${T('systemNote')}</h4>
         <p>${esc(overview)}</p></div>` : ''}
       <div class="empty small"><h2>${T('noContent')}</h2><p>${T('noContentBody')}</p></div>
-    </div>${soloAction(r)}`;
+    </div>`;
   }
 
   /**
@@ -743,8 +848,6 @@ export function mountUI(ctx) {
     }).join('');
     return `<div class="detail">
       <div class="dko">${esc(m.latin)}</div>
-      <div class="dname"><span class="dot" style="background:${r.color}"></span>${esc(t.name)}</div>
-      <div class="dwhere">${T(r.layer)} · ${T('fmaId')} ${r.fma.length}${r.sides.includes('L') && r.sides.includes('R') ? ' · L+R' : ''}</div>
       ${role && roleLabel[role] ? `<div class="rolechip" style="border-color:${r.color}">${roleLabel[role]}</div>` : ''}
       ${groupBlock(r)}
       ${plain() ? `<div class="blk"><h4>${T('does')}</h4><p>${esc(t.does)}</p></div>` : ''}
@@ -805,7 +908,6 @@ export function mountUI(ctx) {
     const claims = claimsForRegion(r.id);
     return `<div class="detail">
       <div class="dko">${esc(r.info[app.lang === 'ko' ? 'en' : 'ko'].name)}</div>
-      <div class="dname"><span class="dot" style="background:${r.color}"></span>${esc(t.name)}</div>
       <p class="dwhere">${esc(t.where)}</p>
       ${plain() ? `<div class="blk"><h4>${T('does')}</h4><p>${esc(t.does)}</p></div>` : ''}
       ${clinical() ? `<div class="blk sci"><h4>${T('sci')}</h4><p>${esc(t.sci)}</p></div>` : ''}
@@ -1094,6 +1196,10 @@ export function mountUI(ctx) {
   function aboutTab() {
     const meta = registry().meta;
     return `
+      <div id="demoslot"></div>
+      ${/* filled by session/boot.js, which creates the chip before this panel has
+            ever been rendered — so it is adopted here rather than waiting for a
+            slot that did not exist yet. */ ''}
       ${DISCLAIMERS.map((d, i) => { const x = disc(i, app.lang); return `<div class="claim">
         <p class="cclaim">${esc(x.title)}</p>
         <p>${esc(x.body)}</p></div>`; }).join('')}
@@ -1180,6 +1286,10 @@ export function mountUI(ctx) {
         await setIsolate(same ? null : ids);
         renderPanel(); syncControls();
       };
+    for (const b of $('panelBody').querySelectorAll('[data-flyto]'))
+      b.onclick = () => selectStructure(+b.dataset.flyto);
+    const bon = $('panelBody').querySelector('[data-brainon]');
+    if (bon) bon.onclick = async () => { await setLayer('brain', true); renderPanel(); syncControls(); };
     const gclear = $('groupClear');
     if (gclear) gclear.onclick = async () => { await setGroup(null); renderPanel(); syncControls(); };
     const q = $('libQ');
@@ -1340,16 +1450,36 @@ export function mountUI(ctx) {
   for (const [id, k] of [['pDesc', 'descending'], ['pAsc', 'ascending'], ['pInt', 'interoceptive']])
     $(id).onclick = () => setPathway(app.pathway === k ? null : k);
   $('langBtn').onclick = () => setLang(app.lang === 'en' ? 'ko' : 'en');
-  $('tabExplore').onclick  = () => { tab = 'explore'; renderPanel(); };
-  $('tabExercise').onclick = () => { tab = 'exercise'; renderPanel(); };
-  $('tabEvidence').onclick = () => { tab = 'evidence'; renderPanel(); };
-  $('tabAbout').onclick    = () => { tab = 'about'; renderPanel(); };
+  $('tabExplore').onclick  = () => openPop('explore');
+  $('tabExercise').onclick = () => openPop('exercise');
+  $('tabEvidence').onclick = () => openPop('evidence');
+  $('tabAbout').onclick    = () => openPop('about');
+  for (const b of document.querySelectorAll('#rail [data-pop]'))
+    b.onclick = () => openPop(b.dataset.pop);
+  $('popclose').onclick = closePop;
+  $('zoomIn').onclick = () => zoomBy?.(1 / 1.25);
+  $('zoomOut').onclick = () => zoomBy?.(1.25);
+  $('fitBtn').onclick = () => fitView?.();
+
   addEventListener('keydown', e => {
     if (e.key === 'Escape' && app.labOpen) { setLab(false); return; }
     if (e.key === 'Escape') {
       if ($('overlay').classList.contains('on')) {
         $('overlay').classList.remove('on'); $('overlay').innerHTML = '';
-      } else selectStructure(null);
+      } else if (tab) closePop();
+      else selectStructure(null);
+      return;
+    }
+    /* One key for the one thing a reader of a thousand-structure atlas does most.
+     * Guarded on the focus being nowhere in particular, so typing a slash into the
+     * search box itself, or into a note, still types a slash. */
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? '')
+                   || document.activeElement?.isContentEditable;
+    if ((e.key === '/' || (e.key === 'f' && (e.metaKey || e.ctrlKey))) && !typing) {
+      e.preventDefault();
+      if (tab !== 'explore') openPop('explore');
+      $('anatQ')?.focus();
+      $('anatQ')?.select();
     }
   });
 
@@ -1411,7 +1541,8 @@ export function mountUI(ctx) {
       $(id).setAttribute('aria-pressed', app.register === r);
     for (const [id, k] of [['pDesc', 'descending'], ['pAsc', 'ascending'], ['pInt', 'interoceptive']])
       $(id).setAttribute('aria-pressed', app.pathway === k);
-    for (const b of $('layerList').querySelectorAll('.lyr'))
+    // the layer list is a panel section now, so it is only in the DOM while open
+    for (const b of $('layerList')?.querySelectorAll('.lyr') ?? [])
       b.setAttribute('aria-pressed', app.layers[b.dataset.layer].on);
     renderPathPanel();
   }
@@ -1449,8 +1580,14 @@ export function mountUI(ctx) {
        * those panels showing the structure before it, or the "choose a structure" placeholder
        * for ever. That is what "if I click on any region it just shows nothing" was. */
       if (app.labOpen) lab.draw();
-      if (tab === 'exercise' && app.exercise) return;   // keep the exercise on screen
-      if (tab !== 'explore') tab = 'explore';
+      /* Choosing a structure opens the card about it and nothing else. It used to
+       * open the whole Explore tab, so what a reader got for a click was the
+       * structure's name at the top of a column holding seventy-seven group chips,
+       * a region plot, a label filter and four hundred swatches -- and the one
+       * control they wanted, Isolate, below the fold. */
+      if (tab === 'exercise' && app.exercise) { renderPanel(); return; }
+      if (id == null) { if (tab === 'structure') tab = null; renderPanel(); return; }
+      tab = 'structure';
       renderPanel();
     },
     /* The graph is drawn, not templated, so a selection or a change in what the network is

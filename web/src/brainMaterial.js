@@ -195,6 +195,20 @@ export function makeStructureMaterial(palette, look = {}, dqTexture = null) {
           if (uHiding > 0.5 && _o.w < 0.5) {
             gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
           } else if (uExplode > 0.0) {
+            /* Scaled about its own centroid before it is moved, so a catalogue
+             * gives every piece a cell of the same size whether it is a femur or
+             * a sesamoid. Row 1 of the offset texture is (scale, centroid); the
+             * fixed point has to come from there because a vertex shader drawing
+             * one vertex has no idea where the middle of its structure is. Both
+             * happen in view space, after the model matrix, for the same reason
+             * the displacement does: every mesh here has been reparented into the
+             * rig, so its own space is some bone's space. */
+            vec4 _s = texelFetch(uOffset, ivec2(_oi, 1), 0);
+            float _k = mix(1.0, _s.x, uExplode);
+            if (abs(_k - 1.0) > 0.001) {
+              vec3 _c = (viewMatrix * vec4(_s.yzw, 1.0)).xyz;
+              mvPosition.xyz = _c + (mvPosition.xyz - _c) * _k;
+            }
             mvPosition.xyz += (viewMatrix * vec4(_o.xyz * uExplode, 0.0)).xyz;
             gl_Position = projectionMatrix * mvPosition;
           }

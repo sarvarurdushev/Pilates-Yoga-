@@ -17,6 +17,7 @@ What it emits:
     models/connective.glb    cartilage, ligament, tendon, membrane
     models/nerves_cranial.glb  cranial and peripheral nerve trunks
     models/heart_detail.glb  valve cusps and papillary muscles
+    models/detail.glb        every remaining named piece the archive has
     src/generated/structures.json   appended to, never overwritten
 
 Rules inherited from the body build and not up for renegotiation:
@@ -42,7 +43,8 @@ OUT_MODELS = os.path.join(ROOT, 'models')
 OUT_GEN = os.path.join(ROOT, 'src', 'generated')
 
 #: Layers this script owns. Anything else in structures.json is left exactly as it is.
-LAYERS = ['arteries', 'veins', 'airways', 'connective', 'nerves_cranial', 'heart_detail']
+LAYERS = ['arteries', 'veins', 'airways', 'connective', 'nerves_cranial',
+          'heart_detail', 'detail']
 
 #: Where each layer's members come from in the IS-A tree, most specific first.
 #:
@@ -79,7 +81,8 @@ ALREADY = ['FMA5018',    # bone organ
 #: Triangles per structure. Vessels are tubes and a tube reads at very few triangles; the
 #: cartilages are surfaces somebody may look at closely.
 BUDGET = {'arteries': 320, 'veins': 320, 'airways': 480,
-          'connective': 700, 'nerves_cranial': 400, 'heart_detail': 500}
+          'connective': 700, 'nerves_cranial': 400, 'heart_detail': 500,
+          'detail': 420}
 
 
 _SIDE = re.compile(r'\b(?:left|right)\b\s*', re.I)
@@ -88,6 +91,22 @@ _SIDE = re.compile(r'\b(?:left|right)\b\s*', re.I)
 def unsided(name):
     """'left third rib' -> 'third rib', the key `build_body.py` files a structure under."""
     return re.sub(r'\s+', ' ', _SIDE.sub('', str(name).strip().lower())).strip()
+
+
+#: The IS-A tree files a named vessel under `arterial tree organ`, but its *parts* -- an
+#: arch, a trunk, a digital branch -- under organ zones and segments that have no system
+#: above them at all. Six palmar digital veins and both palmar arches came out unfiled for
+#: exactly that reason. Where the tree does not say, the name does: these are the only two
+#: words in this vocabulary that are unambiguous about what a structure is.
+_ARTERY = re.compile(r'\barter(?:y|ies|ial)\b', re.I)
+_VEIN = re.compile(r'\b(?:vein|veins|venous)\b', re.I)
+
+#: Left out on purpose rather than by accident. The cerebral gyri and sulci are in this
+#: archive at 99% reduction; this project already carries the cortex properly parcellated
+#: at far better quality, and drawing a second, coarser copy of it inside the head would be
+#: two brains disagreeing. Cavities are holes -- a mesh of the inside of a ventricle drawn
+#: solid is a lie about what is there.
+_NOT_DRAWN = re.compile(r'\bgyrus\b|\bsulcus\b|\bcortex\b|\bcavity of\b', re.I)
 
 
 def classify(best, kids, names_of, drawn=()):
@@ -118,12 +137,18 @@ def classify(best, kids, names_of, drawn=()):
         if unsided(names_of.get(concept, '')) in have:
             skipped['already in the atlas by name'] += 1
             continue
+        nm = names_of.get(concept, '')
+        if _NOT_DRAWN.search(nm):
+            skipped['drawn better elsewhere'] += 1
+            continue
         for layer, _ in TYPE_ROOTS:
             if concept in under[layer]:
                 out[elem] = (layer, concept)
                 break
         else:
-            skipped['no layer'] += 1
+            # the tree did not say; the name does, or it goes in the catch-all
+            out[elem] = (('arteries' if _ARTERY.search(nm)
+                          else 'veins' if _VEIN.search(nm) else 'detail'), concept)
     return out, skipped
 
 

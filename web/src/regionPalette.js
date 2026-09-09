@@ -25,6 +25,9 @@ import * as THREE from 'three';
 
 export const UNMAPPED = '#6e6a68';
 
+/** Rows in the offset texture: 0 displacement and visibility, 1 catalogue scale. */
+const ROWS = 2;
+
 export class RegionPalette {
   /** @param {number} capacity initial id capacity; grows by doubling as ids arrive */
   constructor(capacity = 64) {
@@ -49,14 +52,33 @@ export class RegionPalette {
      *
      * Float, like the colours, because a quantised displacement makes structures
      * jitter as the slider moves. */
-    const offsets = new Float32Array(size * 4);
+    /* Two rows, not one. Row 0 is the displacement and the visibility flag; row 1 is
+     * how much the structure is scaled when the body is laid out as a catalogue,
+     * and the point it is scaled about.
+     *
+     * The scale is what makes an inventory readable. The pieces in this atlas run
+     * from a sesamoid bone to a femur, a factor of thirty, and laid out at their
+     * true sizes 1,280 of them cover three body heights — which put the camera
+     * nine body heights back, every piece a few pixels across and the whole sheet
+     * a dark smear. Normalised into one cell each, the same sheet is a page.
+     *
+     * The centroid rides here because a scale needs a fixed point and the vertex
+     * shader has no way to know where the middle of the structure it is drawing
+     * is: `position` is one vertex, in whichever bone's space the rig left it. */
+    const offsets = new Float32Array(size * 4 * ROWS);
     // shown by default: a structure with no flag written must draw, or a body
     // whose ids outran the texture would silently lose its far half
     for (let i = 0; i < size; i++) offsets[i*4+3] = 1;
-    if (this.offsets) offsets.set(this.offsets.subarray(0, Math.min(this.offsets.length, offsets.length)));
+    // and drawn at its own size by default, about its own origin
+    for (let i = 0; i < size; i++) offsets[(size + i)*4] = 1;
+    if (this.offsets) {
+      const was = this.offsets.length / (4 * ROWS);
+      offsets.set(this.offsets.subarray(0, was * 4), 0);
+      offsets.set(this.offsets.subarray(was * 4, was * 8), size * 4);
+    }
     this.offsets = offsets;
     const oldOffset = this.offsetTexture;
-    this.offsetTexture = new THREE.DataTexture(offsets, size, 1, THREE.RGBAFormat,
+    this.offsetTexture = new THREE.DataTexture(offsets, size, ROWS, THREE.RGBAFormat,
                                                THREE.FloatType);
     this.offsetTexture.magFilter = THREE.NearestFilter;
     this.offsetTexture.minFilter = THREE.NearestFilter;
@@ -152,9 +174,30 @@ export class RegionPalette {
     // put the body back together by making all of it disappear
     for (let i = 0; i < this.size; i++) {
       this.offsets[i*4] = 0; this.offsets[i*4+1] = 0; this.offsets[i*4+2] = 0;
+      this.offsets[(this.size + i)*4] = 1;
     }
     this._offsetDirty = true;
     return this;
+  }
+
+  /**
+   * How large this structure is drawn when the body is laid out, and about what point.
+   *
+   * @param {number} id
+   * @param {number} scale 1 leaves it at its own size
+   * @param {number} cx @param {number} cy @param {number} cz the fixed point, in body units
+   */
+  setScale(id, scale, cx, cy, cz) {
+    this._fit(id);
+    const o = (this.size + id) * 4;
+    this.offsets[o] = scale;
+    this.offsets[o+1] = cx; this.offsets[o+2] = cy; this.offsets[o+3] = cz;
+    this._offsetDirty = true;
+    return this;
+  }
+
+  getScale(id) {
+    return (id >= 0 && id < this.size) ? this.offsets[(this.size + id) * 4] : 1;
   }
 
   /**

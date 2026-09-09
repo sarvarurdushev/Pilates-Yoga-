@@ -155,9 +155,67 @@ camera.position.copy(HOME.p);
 
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true; controls.dampingFactor = 0.075;
-controls.minDistance = 0.10; controls.maxDistance = 6.0;
+controls.minDistance = 0.04; controls.maxDistance = 24.0;
 controls.autoRotate = true; controls.autoRotateSpeed = 0.34;
 controls.target.copy(HOME.t);
+
+/* ------------------------------------------------------------------ moving about
+ *
+ * Three fixes, all of them reports rather than preferences.
+ *
+ * **Panning parallel to the screen.** OrbitControls pans along the ground plane by
+ * default, so dragging up on a body seen from the side walks the target *away*
+ * along the floor instead of lifting it, and the figure appears to swing rather
+ * than to move. `screenSpacePanning` makes a drag up mean up.
+ *
+ * **A right-drag, a middle-drag and two fingers all pan, always.** "When I zoom
+ * in and try to go up or down it is rotating all the parts" is what one drag verb
+ * for two intentions feels like: at any distance where you can read a structure,
+ * orbiting is almost never what was meant. Left-drag still orbits the body,
+ * because turning it round is the other thing people came to do — except in the
+ * catalogue, where there is nothing to turn round and the layout is a sheet, so
+ * left-drag pans there too (see `setExplodeLayout`).
+ *
+ * **Zoom to the cursor**, so magnifying a wrist keeps the wrist under the pointer
+ * rather than sliding it off the edge while the middle of the body grows.
+ *
+ * The distance limits are widened to match: the catalogue is fifteen body heights
+ * across at two thousand pieces, and the old 6.0 ceiling could not get far enough
+ * back to see it — which read as the layout not fitting the screen.
+ */
+controls.screenSpacePanning = true;
+controls.zoomToCursor = true;
+controls.panSpeed = 1.0;
+const ORBIT_BUTTONS = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY,
+                        RIGHT: THREE.MOUSE.PAN };
+const SHEET_BUTTONS = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY,
+                        RIGHT: THREE.MOUSE.PAN };
+controls.mouseButtons = { ...ORBIT_BUTTONS };
+controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+
+/** Left-drag turns the body; in a flat catalogue there is nothing to turn, so it pans. */
+function setDragVerb(sheet) {
+  controls.mouseButtons = { ...(sheet ? SHEET_BUTTONS : ORBIT_BUTTONS) };
+  controls.touches = { ONE: sheet ? THREE.TOUCH.PAN : THREE.TOUCH.ROTATE,
+                       TWO: THREE.TOUCH.DOLLY_PAN };
+  document.body.classList.toggle('sheet', !!sheet);
+}
+
+/** Step the camera in or out along its own line of sight, for the zoom buttons. */
+export function zoomBy(factor) {
+  const v = camera.position.clone().sub(controls.target);
+  const len = THREE.MathUtils.clamp(v.length() * factor,
+                                    controls.minDistance, controls.maxDistance);
+  camera.position.copy(controls.target).add(v.setLength(len));
+  controls.update();
+  invalidate();
+}
+
+/** Frame whatever is on screen: the catalogue if it is open, the body if it is not. */
+export function fitView() {
+  if (app.explode > OPENED && explodeExtent) flyToExtent(explodeExtent);
+  else resetView();
+}
 
 /* Image-based lighting. Three directional lights alone leave tissue looking like matte
  * plastic; a real environment is what gives muscle its soft gradient and bone its sheen. */
@@ -222,6 +280,7 @@ const LOOK = {
   connective:          { color: 0xCFC3A8, roughness: 0.66, clearcoat: 0.20, sheen: 0.28 },
   nerves_cranial:      { color: 0xE8C86B, roughness: 0.42, clearcoat: 0.45, sheen: 0.20 },
   heart_detail:        { color: 0xB05A52, roughness: 0.50, clearcoat: 0.40, sheen: 0.26 },
+  detail:              { color: 0x9E8F7A, roughness: 0.58, clearcoat: 0.28, sheen: 0.24 },
 };
 
 const layers = {};   // name -> { group, material, loaded, loading }
@@ -481,14 +540,14 @@ const MERGED = new Set(['muscles_superficial', 'muscles_deep', 'nervous',
                          * out of the merge would have undone it: turning the vasculature
                          * on took the body from 86 draw calls back past 700. */
                         'arteries', 'veins', 'airways', 'connective',
-                        'nerves_cranial', 'heart_detail']);
+                        'nerves_cranial', 'heart_detail', 'detail']);
 /* The two that are not skinned. `rig.attach` reparents a bone into the rig, so
  * these cannot be one mesh — a mesh has one parent and the skeleton has
  * forty-seven — and they are merged per bone instead. See `mergeByParent` for
  * why that is the right stopping point rather than rewriting them as
  * single-bone skins. */
 const RIGID = new Set(['skeleton', 'organs', 'arteries', 'veins', 'airways',
-                       'connective', 'nerves_cranial', 'heart_detail']);
+                       'connective', 'nerves_cranial', 'heart_detail', 'detail']);
 
 /**
  * Rebuild a layer's drawables from the meshes it has just bound.
@@ -1448,7 +1507,7 @@ const XRAY_DEPTH = { muscles_superficial: 0, muscles_deep: 1, organs: 2,
                       * at a depth of its own -- it is put where the tissue it runs in is,
                       * which keeps a coronary from ghosting differently to the heart. */
                      arteries: 2, veins: 2, airways: 2, heart_detail: 2,
-                     nerves_cranial: 2, connective: 3 };
+                     nerves_cranial: 2, connective: 3, detail: 2 };
 
 /* Every camera move, including each damping step after the drag ends. This one
  * listener is what makes orbiting feel unchanged while the still body costs
@@ -1784,12 +1843,20 @@ function posedSide(id) {
  * would be wrong at two thirds of the sizes it takes.
  */
 function panelInset() {
-  const el = document.getElementById('panel');
-  if (!el) return 0;
-  const r = el.getBoundingClientRect(), c = canvas.getBoundingClientRect();
-  // docked to the bottom on a narrow window: it covers no part of the lane
-  if (r.top > c.bottom - 4) return 0;
-  return Math.max(0, c.right - r.left + 10);
+  /* The rail is always there and the panel only sometimes, so the lane is measured
+   * against whichever is further left. A panel that is closed reserves nothing:
+   * the labels used to give up a third of the stage to a console that was not on
+   * screen, because the element existed whether or not it was shown. */
+  const c = canvas.getBoundingClientRect();
+  let left = c.right;
+  for (const id of ['panel', 'rail']) {
+    const el = document.getElementById(id);
+    if (!el || el.hidden || el.offsetParent === null) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.top > c.bottom - 4) continue;
+    left = Math.min(left, r.left);
+  }
+  return Math.max(0, c.right - left + 10);
 }
 const LAB_H = 24, LAB_GAP = 7, LANE_PAD = 13, MAX_PER_SIDE = 8, LAB_MAX = 300, MIN_PX = 26;
 /* Clear air between the subject's own silhouette and the nearest edge of a plate. A leader
@@ -1905,6 +1972,13 @@ function anchorFor(id) {
 function labelVisible(id) {
   const r = get(id);
   if (!r) return false;
+  /* No plates over a catalogue. Every piece in one is its own shape in its own
+   * cell with nothing behind it, so a floating name on a leader rope names what
+   * is already unambiguous -- and eighteen of them, in two columns at the edges
+   * with ropes across the whole sheet, were the messiest thing in the picture.
+   * Pointing at a piece still names it, and clicking it still opens its card. */
+  if (app.explode > OPENED && app.explodeLayout === 'inventory'
+      && app.selected !== id) return false;
   /* Isolation first, and before the selected-structure shortcut, because it is the
    * strongest statement a reader can make about what they want to see. Without it,
    * isolating the sacrum left fifteen muscle labels on screen with leader ropes
@@ -2385,9 +2459,37 @@ canvas.addEventListener('pointermove', e => {
   if (tap.pointers) return;
   const id = pick(e);
   if (id !== app.hover) { app.hover = id; syncLayers(); }
-  canvas.style.cursor = id != null ? 'pointer' : 'grab';
+  canvas.style.cursor = id != null ? 'pointer' : (document.body.classList.contains('sheet') ? 'move' : 'grab');
+  showHoverTip(id, e.clientX, e.clientY);
   pickCell(e);
 });
+canvas.addEventListener('pointerleave', () => showHoverTip(null, 0, 0));
+
+/**
+ * The name of whatever is under the pointer, beside the pointer.
+ *
+ * The catalogue draws no label plates -- see `labelVisible` -- because a sheet of
+ * a thousand cells with eighteen names on ropes across it is less legible than
+ * the sheet alone. This is the other half of that bargain: pointing at a piece
+ * says what it is, immediately, without taking a click or covering anything.
+ */
+let tipEl = null;
+function showHoverTip(id, x, y) {
+  const r = id != null ? get(id) : null;
+  if (!r) { if (tipEl) tipEl.hidden = true; return; }
+  if (!tipEl) {
+    tipEl = document.createElement('div');
+    tipEl.id = 'hovertip';
+    document.body.appendChild(tipEl);
+  }
+  tipEl.textContent = r.name[app.lang];
+  tipEl.hidden = false;
+  /* Flipped to the other side of the cursor near the right edge, so the name of
+   * something on the last column is not written off the screen. */
+  const w = tipEl.offsetWidth || 140;
+  tipEl.style.left = `${Math.min(x + 16, window.innerWidth - w - 12)}px`;
+  tipEl.style.top = `${Math.max(6, y - 30)}px`;
+}
 
 /** The region of the cell under the pointer, or null. Used by the click path. */
 function cellUnder(ev) {
@@ -3813,10 +3915,14 @@ export async function setIsolate(ids) {
 const EXPLODE_REACH = 0.42;      // body heights at full separation, `open`
 /** Structures nearer the midline than this get a direction rather than a wobble. */
 const AXIS_EPSILON = 0.012;
-/** Cell size as a multiple of the median piece radius, in `inventory`. */
-const CELL_GAIN = 2.6;
+/** One cell, in body heights. Every piece is scaled to sit inside one. */
+const CELL = 0.052;
+/** The share of a cell left empty, so neighbours never touch. */
+const GUTTER = 0.22;
+/** How much a small piece may be blown up. Past this a sesamoid reads as a femur. */
+const MAX_MAGNIFY = 3.2;
 /** Wider than tall, because a screen is. */
-const GRID_ASPECT = 1.7;
+const GRID_ASPECT = 1.9;
 
 export const EXPLODE_LAYOUTS = ['inventory', 'open'];
 
@@ -3834,23 +3940,44 @@ function inventoryOrder() {
     rows.push({ id, layer: r.layer, name: r.name.en });
   }
   const rank = n => { const i = LAYER_ORDER.indexOf(n); return i < 0 ? 99 : i; };
-  rows.sort((a, b) => rank(a.layer) - rank(b.layer) || a.name.localeCompare(b.name));
+  for (const r of rows) r.rank = rank(r.layer);
+  rows.sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
   return rows;
 }
 
+/**
+ * Lay every piece out so that no two of them touch.
+ *
+ * A fixed cell cannot do this. The pieces in this atlas run from a sesamoid bone
+ * to a femur, a factor of thirty in size, so a cell sized for the median leaves
+ * the long bones lying across four of their neighbours -- which is what the first
+ * version drew, and it is the difference between a catalogue and a heap. A cell
+ * sized for the femur instead spreads two thousand pieces over a field so wide
+ * that everything in it is a speck.
+ *
+ * So the shelf packs rather than tiles. Pieces are sorted by size, which puts
+ * things of a like size beside each other; each row is as tall as its own tallest
+ * piece; and within a row each piece advances by its own width. Rows break at a
+ * target width chosen so the whole thing comes out roughly as wide as a screen is.
+ * Nothing overlaps at any count, and the grid stays dense, because those two are
+ * only in tension if every cell has to be the same size.
+ */
 function inventoryOffsets() {
   const rows = inventoryOrder();
   if (!rows.length) { explodeExtent = null; return; }
 
-  /* The median rather than the largest: one femur is four times the size of the
-   * bone beside it, and a cell sized for the femur spreads two thousand pieces
-   * over a grid nobody can read. The long ones overlap their neighbours a
-   * little, which is what a parts catalogue looks like. */
-  const radii = rows.map(r => app.radii[r.id] ?? 0.02).sort((a, b) => a - b);
-  const cell = Math.max(0.03, CELL_GAIN * radii[radii.length >> 1]);
-
-  const cols = Math.max(1, Math.round(Math.sqrt(rows.length * GRID_ASPECT)));
+  /* One cell for everything, and every piece scaled into it.
+   *
+   * Laid out at their true sizes these pieces cover three body heights, which puts
+   * the camera nine body heights back and turns the sheet into a dark smear —
+   * measured, not guessed. Normalised, the same 1,280 pieces are a page you can
+   * read, which is what an inventory is for. A cap keeps a sesamoid bone from
+   * being blown up to the size of a femur and reading as one. */
+  const cols = Math.max(6, Math.round(Math.sqrt(rows.length * GRID_ASPECT)));
   const lines = Math.ceil(rows.length / cols);
+  const cell = CELL;
+  const inner = cell * (1 - GUTTER);
+
   /* Centred on the body's own middle, measured from the pieces themselves rather
    * than from a frame constant -- `FRAME` describes the brain's placement, and
    * using it here put the catalogue at the height of somebody's forehead. */
@@ -3863,14 +3990,22 @@ function inventoryOffsets() {
   const midY = (lo + hi) / 2;
 
   for (let i = 0; i < rows.length; i++) {
-    const c = app.centroids[rows[i].id];
-    const col = i % cols, line = (i / cols) | 0;
+    const r = rows[i];
+    const c = app.centroids[r.id];
+    const rad = Math.max(0.004, app.radii[r.id] ?? 0.02);
+    const k = Math.min(MAX_MAGNIFY, inner / (2 * rad));
+    const col = i % cols, ln = (i / cols) | 0;
     const x = (col - (cols - 1) / 2) * cell;
-    const y = midY - (line - (lines - 1) / 2) * cell;
-    palette.setOffset(rows[i].id, x - c.x, y - c.y, -c.z);
+    const y = midY - (ln - (lines - 1) / 2) * cell;
+    /* The piece shrinks about its own centroid and then the centroid is moved to
+     * its cell, so the offset is measured from where the centroid ends up rather
+     * than from where the geometry was. */
+    palette.setScale(r.id, k, c.x, c.y, c.z);
+    palette.setOffset(r.id, x - c.x, y - c.y, -c.z);
   }
   explodeExtent = { width: cols * cell, height: lines * cell,
-                    centre: new THREE.Vector3(0, midY, 0), cell, pieces: rows.length };
+                    centre: new THREE.Vector3(0, midY, 0),
+                    cell, cols, rows: lines, pieces: rows.length };
   palette.upload();
 }
 
@@ -3892,6 +4027,8 @@ function openOffsets() {
     const depth = XRAY_DEPTH[r.layer] ?? 0;
     const reach = EXPLODE_REACH * (1 - depth / 5);
     palette.setOffset(id, out.x * reach, 0, out.z * reach);
+    // opened, not catalogued: every structure keeps its own size
+    palette.setScale(id, 1, c.x, c.y, c.z);
   }
   explodeExtent = null;
   palette.upload();
@@ -3909,6 +4046,7 @@ export function setExplodeLayout(which) {
   app.explodeLayout = next;
   app.explodeReady = false;
   setExplode(app.explode);
+  if (app.explode > OPENED && explodeExtent) flyToExtent(explodeExtent);
   ui?.syncControls?.();
 }
 export const explodeLayout = () => app.explodeLayout;
@@ -3941,6 +4079,10 @@ export function setExplode(v) {
     if (was <= OPENED && next > OPENED) flyToExtent(explodeExtent);
     else if (was > OPENED && next <= OPENED) resetView();
   }
+  /* A sheet of pieces is read by moving across it, not by orbiting it: there is
+   * no "round the back" of a catalogue. Left-drag pans while one is open and goes
+   * back to turning the body the moment it closes. */
+  setDragVerb(!!explodeExtent && next > OPENED);
   invalidate();
 }
 
@@ -3959,7 +4101,7 @@ function flyToExtent(ext, immediate = false) {
   /* Straight on, because a grid read at an angle is a grid with its far rows
    * squeezed into a line. */
   const dir = new THREE.Vector3(0, 0, 1);
-  const { target, distance } = frameFor(pts, dir, ext.cell * 2.5, 0.02);
+  const { target, distance } = frameFor(pts, dir, ext.cell * 1.4, 0.02);
   flyToPose(target.clone().addScaledVector(dir, distance), target, immediate);
 }
 
@@ -4264,7 +4406,7 @@ const ui = mountUI({
   setRotate, setRegister, setInstruction, setLayer, setLayerOpacity, setView, resetView,
   setExercise, setPathway, captureStage, activationOf, flyTo,
   setGroup, anatomyGroups, groupsForStructure, setIsolate, isolated, setExplode,
-  setExplodeLayout, explodeLayout,
+  setExplodeLayout, explodeLayout, zoomBy, fitView, explodeLayoutExtent,
   poseFromClip, setPlaying, setShowPaths, setShowMeshes, liveActivationOf, musclePathReport,
   frameRig, setLabelKind, clearLabelKinds,
   // a getter, not the value: the panel mounts before the rig has finished loading
