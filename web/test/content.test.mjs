@@ -280,12 +280,19 @@ test('all four disclaimers are present in both languages', () => {
 /* ------------------------------------------------------------------ the build */
 
 test('the generated structure table is internally consistent', () => {
-  const ids = new Set(), names = new Set();
+  /* Names are unique per *key*, not per display name. The complete-atlas layers
+   * are the same anatomy the taught body carries at BodyParts3D 4.0's own
+   * granularity, so `atlas`, `sacrum` and `liver` legitimately arrive twice —
+   * under two keys, because the registry is a map and the second write would
+   * otherwise take every exercise and every written entry keyed to that name with
+   * it, into a layer that is switched off. */
+  const ids = new Set(), keys = new Set();
   for (const s of generated.structures) {
+    const key = s.key ?? s.name;
     assert.ok(s.id >= generated.idBase, `${s.name}: id ${s.id} collides with the brain range`);
     assert.ok(!ids.has(s.id), `duplicate id ${s.id}`);
-    assert.ok(!names.has(s.name), `duplicate name ${s.name}`);
-    ids.add(s.id); names.add(s.name);
+    assert.ok(!keys.has(key), `duplicate key ${key}`);
+    ids.add(s.id); keys.add(key);
     // the nervous layer comes from Z-Anatomy, which is named by Terminologia Anatomica
     // rather than FMA, so it carries a source instead of an ontology id
     if (s.layer === 'nervous') assert.ok(s.source, `${s.name}: no source`);
@@ -655,12 +662,20 @@ test('no two structures answer to the same Korean name', () => {
    * from 鼻骨, so distinct structures can collide into one name. A collision is
    * not cosmetic: the search box matches on substrings, and two structures with
    * one name are two rows a coach cannot tell apart. */
-  const byKo = new Map();
-  for (const rec of REG.byId.values()) {
-    const hit = byKo.get(rec.name.ko);
-    assert.equal(hit, undefined,
-      `${rec.name.ko} is both ${hit?.name.en} and ${rec.name.en}`);
-    byKo.set(rec.name.ko, rec);
+  /* Within one atlas. A reader is looking at the taught body or at the complete
+   * one, never at both — `setAtlasDepth` turns one off to turn the other on — so
+   * what has to be unambiguous is each of them on its own. Across the two, 척추
+   * naming the taught sacrum and 4.0's sacrum is the same bone twice, which is
+   * the whole point of there being two sets. */
+  for (const set of ['taught', 'complete']) {
+    const byKo = new Map();
+    for (const rec of REG.byId.values()) {
+      if ((rec.set ?? 'taught') !== set) continue;
+      const hit = byKo.get(rec.name.ko);
+      assert.equal(hit, undefined,
+        `in the ${set} atlas, ${rec.name.ko} is both ${hit?.name.en} and ${rec.name.en}`);
+      byKo.set(rec.name.ko, rec);
+    }
   }
 });
 

@@ -19,7 +19,9 @@ import { INTERIOR_IDS } from './deepStructures.js';
 export const LAYER_ORDER = ['organs', 'airways', 'arteries', 'veins',
                             'muscles_superficial', 'muscles_deep',
                             'nervous', 'nerves_cranial', 'heart_detail',
-                            'connective', 'detail', 'skeleton', 'brain'];
+                            'connective', 'detail',
+                            'organs_full', 'muscles_full', 'bones_full',
+                            'skeleton', 'brain'];
 
 /** Palette colour per layer, used for any structure with no colour of its own. */
 export const LAYER_COLOR = {
@@ -32,6 +34,9 @@ export const LAYER_COLOR = {
   nerves_cranial: '#E8C86B',
   heart_detail: '#B05A52',
   detail: '#9E8F7A',
+  /* The complete atlas draws the same anatomy the taught body does, so it wears the
+   * same colours: a bone is bone-coloured whichever set it came out of. */
+  bones_full: '#D9D2C4', muscles_full: '#B04A41', organs_full: '#B08658',
   nervous: '#F2D98B',
   skeleton: '#D9D2C4',
   muscles_superficial: '#C1483F',
@@ -54,6 +59,7 @@ const KIND_OF_LAYER = {
   nervous: 'nerve', nerves_cranial: 'nerve', brain: 'brain',
   arteries: 'vessel', veins: 'vessel',
   organs: 'organ', airways: 'organ', heart_detail: 'organ', detail: 'organ',
+  bones_full: 'bone', muscles_full: 'muscle', organs_full: 'organ',
 };
 
 /** Spread structures within a layer around its base colour so neighbours are separable. */
@@ -172,16 +178,28 @@ export function buildRegistry(generated, { brain = true } = {}) {
     seen[s.layer] = (seen[s.layer] ?? 0);
     const k = perLayer[s.layer] > 1 ? (seen[s.layer] / (perLayer[s.layer] - 1)) : 0.5;
     seen[s.layer]++;
-    const muscle = MUSCLE_INFO[s.name] ?? null;
+    /* The key the registry files this under, and it is not always the name.
+     *
+     * The complete-atlas layers carry the same anatomy the taught body does, so
+     * `atlas` and `sacrum` and `liver` arrive twice. This map is keyed by name and
+     * the second write wins, so without a separate key every exercise, every
+     * written entry and all the Korean keyed to `atlas` would have followed it
+     * into a layer that is switched off. The build qualifies the key; the name a
+     * reader sees is untouched. */
+    const key = s.key ?? s.name;
+    const muscle = MUSCLE_INFO[key] ?? null;
     const rec = {
       id: s.id,
-      key: s.name,
+      key,
       /* Korean falls back to KO_NAME rather than to the English name. The
        * fallback used to be `titleCase` for both languages, which put an English
        * label on every bone, organ and nerve and — because the search box indexes
        * `name.ko` — made 요추 match nothing at all. */
       name: muscle ? { en: muscle.en.name, ko: muscle.ko.name }
                    : { en: titleCase(s.name), ko: KO_NAME[s.name] ?? titleCase(s.name) },
+      /* Which of the two atlases this belongs to, so a panel can say and a test
+       * can hold each of them to being internally consistent on its own. */
+      set: s.key && s.key !== s.name ? 'complete' : 'taught',
       // spread across the layer's range so two adjacent muscles are never the same colour
       color: shade(LAYER_COLOR[s.layer] ?? '#9aa3b8', 0.12 + 0.55 * ((k * 7) % 1)),
       layer: s.layer,
@@ -194,7 +212,7 @@ export function buildRegistry(generated, { brain = true } = {}) {
       muscle,
     };
     byId.set(s.id, rec);
-    byName.set(s.name, rec);
+    byName.set(key, rec);
   }
 
   addAggregates(byId, byName);

@@ -115,8 +115,19 @@ def build(structures):
     names = load_names()
     kids, via = load_graph()
 
+    #: The complete-atlas layers are BodyParts3D 4.0's own cut of anatomy the taught
+    #: body already carries, and they are never drawn at the same time as it. Counted
+    #: into these groups they double every membership -- `abdominal wall` went from
+    #: nineteen structures to thirty-eight and straight past MAX, so the group was
+    #: dropped and the curation in src/content/groups.js started naming concepts that
+    #: no longer existed. A group is a set of things you can see at once; these are
+    #: not, so they are not in one.
+    FULL_LAYERS = {'bones_full', 'muscles_full', 'organs_full'}
+
     by_fma = collections.defaultdict(set)
     for s in structures:
+        if s.get('layer') in FULL_LAYERS:
+            continue
         for fma in s['fma']:
             by_fma[fma].add(s['id'])
 

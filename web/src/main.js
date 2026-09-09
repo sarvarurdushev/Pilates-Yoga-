@@ -63,11 +63,17 @@ export const app = {
   /* Laid out as a catalogue by default, which is what the control is reached for:
    * "show me everything in here". `open` is the other layout -- see EXPLODE_LAYOUTS. */
   explodeLayout: 'inventory',
+  /* 'taught' is the rigged 449-structure body every exercise is keyed to;
+   * 'complete' is BodyParts3D 4.0's own 2,186 pieces. See `setAtlasDepth`. */
+  atlasDepth: 'taught',
   // §9: the clip, where the scrubber is, and whether it is running
   t: 0, playing: false, hasMotion: false, showPaths: false, showMeshes: true,
   pathway: null,
   layers: {},                // name -> { on, opacity }
   centroids: {}, radii: {}, anchors: {},
+  /* The furthest a structure reaches from its own centroid, where `radii` is the
+   * average. The catalogue sizes its cells on this -- see `inventoryOffsets`. */
+  extent: {},
   /* The laboratory look. `bloom` routes the frame through the composer; `neural` draws the
    * network inside the cortex; `activity` is how awake it is. All three are on by default —
    * this is what the app is, not an effect it can wear. */
@@ -281,6 +287,9 @@ const LOOK = {
   nerves_cranial:      { color: 0xE8C86B, roughness: 0.42, clearcoat: 0.45, sheen: 0.20 },
   heart_detail:        { color: 0xB05A52, roughness: 0.50, clearcoat: 0.40, sheen: 0.26 },
   detail:              { color: 0x9E8F7A, roughness: 0.58, clearcoat: 0.28, sheen: 0.24 },
+  bones_full:          { color: 0xe8e2d4, roughness: 0.55, clearcoat: 0.18, sheen: 0.12 },
+  muscles_full:        { color: 0xb04a41, roughness: 0.68, clearcoat: 0.30, sheen: 0.32 },
+  organs_full:         { color: 0xc09068, roughness: 0.62, clearcoat: 0.34, sheen: 0.30 },
 };
 
 const layers = {};   // name -> { group, material, loaded, loading }
@@ -540,14 +549,16 @@ const MERGED = new Set(['muscles_superficial', 'muscles_deep', 'nervous',
                          * out of the merge would have undone it: turning the vasculature
                          * on took the body from 86 draw calls back past 700. */
                         'arteries', 'veins', 'airways', 'connective',
-                        'nerves_cranial', 'heart_detail', 'detail']);
+                        'nerves_cranial', 'heart_detail', 'detail',
+                        'bones_full', 'muscles_full', 'organs_full']);
 /* The two that are not skinned. `rig.attach` reparents a bone into the rig, so
  * these cannot be one mesh — a mesh has one parent and the skeleton has
  * forty-seven — and they are merged per bone instead. See `mergeByParent` for
  * why that is the right stopping point rather than rewriting them as
  * single-bone skins. */
 const RIGID = new Set(['skeleton', 'organs', 'arteries', 'veins', 'airways',
-                       'connective', 'nerves_cranial', 'heart_detail', 'detail']);
+                       'connective', 'nerves_cranial', 'heart_detail', 'detail',
+                       'bones_full', 'muscles_full', 'organs_full']);
 
 /**
  * Rebuild a layer's drawables from the meshes it has just bound.
@@ -592,6 +603,7 @@ function remerge(name) {
   if (!built.length) return;
   L2.merged = built;
   applyShown();
+  cullWhileApart(app.explode <= 0);
   invalidate();
 }
 
@@ -816,6 +828,15 @@ function loadLayer(name) {
       L2.loaded = true; L2.loading = false;
       indexGeometry(L2.group);
       bindLayer(name);
+      /* A layer that arrives after the body was taken apart has to be taken apart
+       * too. The offsets were computed once, on the first drag of the slider, from
+       * whichever structures had centroids at that moment -- and a centroid only
+       * exists once its layer has loaded. So turning the arteries on with the body
+       * already open left three hundred and seventy-two of them standing in a
+       * figure in the middle of the catalogue, which is exactly what it looked
+       * like. Nothing is recomputed while the body is assembled; the cost is one
+       * pass over the registry when a layer lands mid-explode. */
+      relayoutExplode();
       // the skeleton is the bone field's only source, so its arrival is what unblocks every
       // other layer — including any that loaded first and returned without binding
       if (name === 'skeleton' && buildBoneRegions())
@@ -1471,9 +1492,22 @@ function indexGeometry(group) {
       app.anchors[id] = (app.anchors[id] ?? []).concat(e.pts).slice(0, 40);
       if (!meshesOfId.has(id)) meshesOfId.set(id, []);
       meshesOfId.get(id).push(o);
-      let rad = 0;
-      for (const p of e.pts) rad += p.distanceTo(c);
+      let rad = 0, far = 0;
+      for (const p of e.pts) {
+        const d = p.distanceTo(c);
+        rad += d;
+        if (d > far) far = d;
+      }
       app.radii[id] = Math.max(app.radii[id] ?? 0, e.pts.length ? rad / e.pts.length : 0.01);
+      /* The furthest a structure reaches, as well as its average reach.
+       *
+       * `app.radii` is a *mean*, which is the right size proxy for "how big does
+       * this look on screen" and badly wrong for "will this fit in a box". A
+       * fascia sheet or a long strap muscle has a small mean and a long reach, so
+       * a catalogue cell sized from the mean magnified it three times and it
+       * sprawled across a dozen of its neighbours -- the dark shapes lying over
+       * the middle of the sheet. */
+      app.extent[id] = Math.max(app.extent[id] ?? 0, far || 0.01);
     }
     restByMesh.set(o, own);
   }
@@ -1507,7 +1541,8 @@ const XRAY_DEPTH = { muscles_superficial: 0, muscles_deep: 1, organs: 2,
                       * at a depth of its own -- it is put where the tissue it runs in is,
                       * which keeps a coronary from ghosting differently to the heart. */
                      arteries: 2, veins: 2, airways: 2, heart_detail: 2,
-                     nerves_cranial: 2, connective: 3, detail: 2 };
+                     nerves_cranial: 2, connective: 3, detail: 2,
+                     bones_full: 3, muscles_full: 0, organs_full: 2 };
 
 /* Every camera move, including each damping step after the drag ends. This one
  * listener is what makes orbiting feel unchanged while the still body costs
@@ -3929,6 +3964,8 @@ export const EXPLODE_LAYOUTS = ['inventory', 'open'];
 /** Where the laid-out grid sits and how big it is, so a camera can be fitted to it. */
 let explodeExtent = null;
 export const explodeLayoutExtent = () => explodeExtent;
+/** Where a structure is displaced to when the body is apart. For diagnosing a piece that stays put. */
+export const paletteOffsetOf = (id) => palette.getOffset(+id, new THREE.Vector3());
 
 /** Everything with a mesh of its own, in the order the inventory reads. */
 function inventoryOrder() {
@@ -3992,8 +4029,11 @@ function inventoryOffsets() {
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     const c = app.centroids[r.id];
-    const rad = Math.max(0.004, app.radii[r.id] ?? 0.02);
-    const k = Math.min(MAX_MAGNIFY, inner / (2 * rad));
+    /* Sized on the reach, not the average: what has to fit in the cell is the
+     * whole piece. Magnification is still capped, so a sesamoid is not blown up
+     * to read as a femur, but nothing is ever made bigger than its cell. */
+    const reach = Math.max(0.004, app.extent[r.id] ?? app.radii[r.id] ?? 0.02);
+    const k = Math.min(MAX_MAGNIFY, inner / (2 * reach));
     const col = i % cols, ln = (i / cols) | 0;
     const x = (col - (cols - 1) / 2) * cell;
     const y = midY - (ln - (lines - 1) / 2) * cell;
@@ -4039,6 +4079,65 @@ function computeExplodeOffsets() {
   else inventoryOffsets();
 }
 
+/**
+ * The set of structures changed, so the layout has to be built again.
+ *
+ * Cheap and idempotent when the body is assembled: it just marks the offsets
+ * stale, and the next `setExplode` above zero rebuilds them. When the body is
+ * already apart it rebuilds now, because the alternative is a layer that arrived
+ * late standing in the middle of a catalogue.
+ */
+function relayoutExplode() {
+  app.explodeReady = false;
+  if (app.explode > 0) {
+    computeExplodeOffsets();
+    app.explodeReady = true;
+    invalidate();
+  }
+}
+
+/* ------------------------------------------------------- taught, or complete
+ *
+ * Two sets of the same anatomy, and they must never both be on.
+ *
+ * The **taught body** is 449 structures from release 3.0: one per named muscle,
+ * bone and organ, both sides together, rigged, skinned, and the thing every
+ * exercise, every written entry and all the Korean is keyed to. It is what a
+ * class is taught out of and it is what this application is for.
+ *
+ * The **complete atlas** is BodyParts3D 4.0's own 2,186 pieces: the same body cut
+ * finer and sided, so the left and right gluteus maximus are two things and a
+ * trapezius is three. It is what you want when the question is "what is in a
+ * body" rather than "what does this muscle do".
+ *
+ * Drawn together they are two copies of one anatomy in the same space, fighting
+ * for the same pixels. So they are one choice, and the choice turns the other
+ * side off.
+ */
+const TAUGHT_LAYERS = ['skeleton', 'muscles_superficial', 'muscles_deep', 'organs'];
+const FULL_LAYERS = ['bones_full', 'muscles_full', 'organs_full'];
+
+export async function setAtlasDepth(which) {
+  const full = which === 'complete';
+  app.atlasDepth = full ? 'complete' : 'taught';
+  for (const n of TAUGHT_LAYERS) app.layers[n].on = !full && app.layers[n].on;
+  /* Turning the taught body off does not turn the whole complete atlas on: which
+   * of its layers a reader wants is still theirs to choose, and switching should
+   * not silently load ten megabytes. The three that replace what was showing come
+   * on; the vessels and the rest stay as they were. */
+  if (full) {
+    for (const n of FULL_LAYERS) app.layers[n].on = true;
+  } else {
+    for (const n of FULL_LAYERS) app.layers[n].on = false;
+    for (const n of ['skeleton', 'muscles_superficial']) app.layers[n].on = true;
+  }
+  await Promise.all(LAYER_ORDER.filter(n => app.layers[n].on).map(loadLayer));
+  syncLayers();
+  relayoutExplode();
+  ui?.syncControls?.();
+}
+export const atlasDepth = () => app.atlasDepth;
+
 /** Swap between opening the body and laying it out. Recomputes and keeps the slider where it is. */
 export function setExplodeLayout(which) {
   const next = EXPLODE_LAYOUTS.includes(which) ? which : 'inventory';
@@ -4083,11 +4182,47 @@ export function setExplode(v) {
    * no "round the back" of a catalogue. Left-drag pans while one is open and goes
    * back to turning the body the moment it closes. */
   setDragVerb(!!explodeExtent && next > OPENED);
+  cullWhileApart(next <= 0);
+  /* The skin shell is drawn only while the body is closed -- `syncLayers` decides
+   * that from `seeingInside`, which this slider is one of the three inputs to.
+   * Nothing was calling it, so the shell stayed on: a head and a pelvis sized for
+   * a whole body, lying across the middle of a catalogue of two thousand cells,
+   * dark and unlabelled and not answering to anything. Only on the crossing,
+   * because `syncLayers` walks every structure and this is a drag. */
+  if ((was > SHELL_OFF) !== (next > SHELL_OFF)) syncLayers();
   invalidate();
+}
+
+/**
+ * Stop culling against bounding spheres the shader has moved away from.
+ *
+ * Taking the body apart moves vertices in the vertex shader, and three.js decides
+ * whether to draw a mesh at all from a bounding sphere computed on the CPU from
+ * the geometry as it sits. Those two stop agreeing the moment the slider leaves
+ * zero: a piece can be in plain sight while the sphere it is culled by is off the
+ * side of the screen, and it simply is not drawn. That is what "why does it
+ * disappear as I zoom in" is -- zooming in is what takes the *old* position out
+ * of the frustum while leaving the new one in it.
+ *
+ * Turned back on when the body is whole, because culling four hundred structures
+ * that are where they say they are is worth having.
+ */
+function cullWhileApart(assembled) {
+  for (const name of LAYER_ORDER) {
+    const L2 = layers[name];
+    if (!L2?.loaded) continue;
+    for (const m of L2.merged ?? []) m.frustumCulled = assembled && !m.isSkinnedMesh;
+    /* And the meshes that were never merged -- a bone alone on its segment is
+     * still drawn as itself, and it vanished for the same reason. */
+    for (const m of L2.meshes ?? [])
+      if (!m.isSkinnedMesh) m.frustumCulled = assembled;
+  }
 }
 
 /** Above this the body is opened rather than assembled — also `PICK_LIMIT`'s neighbour. */
 const OPENED = 0.02;
+/** The threshold `syncLayers` uses for `seeingInside`, and so for the skin shell. */
+const SHELL_OFF = 0.01;
 
 /** Frame the laid-out catalogue: face on, far enough back to hold all of it. */
 function flyToExtent(ext, immediate = false) {
@@ -4407,6 +4542,7 @@ const ui = mountUI({
   setExercise, setPathway, captureStage, activationOf, flyTo,
   setGroup, anatomyGroups, groupsForStructure, setIsolate, isolated, setExplode,
   setExplodeLayout, explodeLayout, zoomBy, fitView, explodeLayoutExtent,
+  setAtlasDepth, atlasDepth,
   poseFromClip, setPlaying, setShowPaths, setShowMeshes, liveActivationOf, musclePathReport,
   frameRig, setLabelKind, clearLabelKinds,
   // a getter, not the value: the panel mounts before the rig has finished loading

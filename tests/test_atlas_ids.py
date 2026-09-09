@@ -90,6 +90,11 @@ class TestTheOtherBuildSurvives:
             assert need in names, f"the nervous layer lost {need!r}"
 
 
+#: BodyParts3D 4.0's own cut of anatomy the taught body already has. Same names,
+#: different granularity, never drawn at the same time -- see `setAtlasDepth`.
+FULL_LAYERS = {"bones_full", "muscles_full", "organs_full"}
+
+
 class TestTheSegmentalMuscles:
     """The nine this backfill added, and the rule that was dropping them.
 
@@ -114,9 +119,17 @@ class TestTheSegmentalMuscles:
         assert not missing, f"the build is dropping {missing} again"
 
     def test_they_are_deep_muscles(self, structures):
-        by_name = {s["name"]: s for s in structures}
+        """Keyed within the taught set.
+
+        The complete-atlas layers carry the same anatomy under the same names --
+        that is what they are -- so a plain name index silently returned whichever
+        of the two came last, and this asserted the layer of a structure it was not
+        asking about.
+        """
+        taught = {s["name"]: s for s in structures
+                  if s["layer"] not in FULL_LAYERS}
         for name in self.ADDED:
-            assert by_name[name]["layer"] == "muscles_deep", name
+            assert taught[name]["layer"] == "muscles_deep", name
 
     def test_none_is_still_called_a_set(self, structures):
         """The plural is the anatomical name. "Set of" is the ontology's way of

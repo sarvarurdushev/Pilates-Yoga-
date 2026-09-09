@@ -32,6 +32,7 @@ export function mountUI(ctx) {
           resetView, setExercise, setPathway, activationOf,
           setGroup, anatomyGroups, groupsForStructure, setIsolate, isolated, setExplode,
           setExplodeLayout, explodeLayout, zoomBy, fitView,
+          setAtlasDepth, atlasDepth,
           poseFromClip, setPlaying, setShowPaths, setShowMeshes, liveActivationOf,
           musclePathReport, setLabelKind, clearLabelKinds } = ctx;
 
@@ -229,6 +230,8 @@ export function mountUI(ctx) {
       b.onclick = () => setLayer(b.dataset.layer, b.getAttribute('aria-pressed') !== 'true');
     for (const s of $('layerList').querySelectorAll('.lyop'))
       s.oninput = e => setLayerOpacity(s.dataset.layer, +e.target.value);
+    for (const b of $('panelBody').querySelectorAll('[data-depth]'))
+      b.onclick = async () => { await setAtlasDepth(b.dataset.depth); renderPanel(); syncControls(); };
     const all = $('layerList').querySelector('[data-layerall]');
     if (all) all.onclick = async () => {
       const on = all.dataset.layerall === 'on';
@@ -241,7 +244,9 @@ export function mountUI(ctx) {
                    brain: '#cfb2a8',
                    arteries: '#C0392B', veins: '#3D6C9E', airways: '#8FA9B8',
                    connective: '#CFC3A8', nerves_cranial: '#E8C86B',
-                   heart_detail: '#B05A52', detail: '#9E8F7A' };
+                   heart_detail: '#B05A52', detail: '#9E8F7A',
+                   bones_full: '#e8e2d4', muscles_full: '#b04a41',
+                   organs_full: '#c09068' };
   const layerSwatch = n => SWATCH[n] ?? '#8b95ab';
 
   /** The four lines that must not move, rendered where the user is rather than in a footer. */
@@ -284,7 +289,17 @@ export function mountUI(ctx) {
     exercise:  { title: 'tabExercise', body: exerciseTab },
     evidence:  { title: 'tabEvidence', body: evidenceTab },
     about:     { title: 'tabAbout',    body: aboutTab },
-    layers:    { title: 'layers',      body: () => '<div id="layerList"></div>' },
+    layers:    { title: 'layers',
+                 body: () => `<div class="crow depthrow"><label>${T('atlasDepth')}</label>
+                   <div class="seg">
+                     <button data-depth="taught" aria-pressed="${atlasDepth?.() !== 'complete'}">${
+                       T('depthTaught')}</button>
+                     <button data-depth="complete" aria-pressed="${atlasDepth?.() === 'complete'}">${
+                       T('depthComplete')}</button>
+                   </div></div>
+                   <p class="chelp">${T(atlasDepth?.() === 'complete'
+                     ? 'depthCompleteHelp' : 'depthTaughtHelp')}</p>
+                   <div id="layerList"></div>` },
     display:   { title: 'popDisplay',  controls: ['controls', 'readControls'] },
     /* Every control in here is about the cortex, and every one of them hides itself
      * when the brain layer is off — which left an empty box with a title. It says

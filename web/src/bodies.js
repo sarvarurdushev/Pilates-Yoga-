@@ -77,7 +77,8 @@ export const BODIES = {
       models: 'models',
       layers: ['organs', 'muscles_superficial', 'muscles_deep', 'nervous', 'skeleton',
                'arteries', 'veins', 'airways', 'connective', 'nerves_cranial',
-               'heart_detail', 'detail'],
+               'heart_detail', 'detail',
+               'bones_full', 'muscles_full', 'organs_full'],
       shell: 'models/shell.glb',
     },
     /**

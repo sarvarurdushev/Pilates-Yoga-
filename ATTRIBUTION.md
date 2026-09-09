@@ -10,11 +10,14 @@ before redistributing anything from here.
 > BodyParts3D, © The Database Center for Life Science licensed under
 > CC Attribution 4.0 International.
 
-- **What it is:** the skeleton, both muscle layers, the organs, the arteries,
-  the veins, the airways and ducts, the cartilages and ligaments, the cranial
-  nerves and the heart valves — 1,063 of the 1,083 structures in
-  `web/src/generated/structures.json`, and 14 of the GLB files under
-  `web/models/`.
+- **What it is:** nearly all of the body — 2,047 of the 2,067 structures in
+  `web/src/generated/structures.json`, and 17 of the GLB files under
+  `web/models/`, in two sets that are never drawn at the same time. The *taught
+  body* is 449 structures from release 3.0, one per named muscle, bone and organ
+  with both sides together. The *complete atlas* is release 4.0's own cut of the
+  same anatomy, sided and split into parts, plus everything 3.0 does not carry at
+  all: the arterial and venous trees, the airways and ducts, the cranial nerves,
+  the cartilages and the heart valves.
 - **Licence:** [CC BY 4.0](https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html).
   The sentence quoted above is the licensor's own required wording, not a
   paraphrase.
@@ -39,7 +42,10 @@ before redistributing anything from here.
   `LATEST`, which is release 4.0. These are FMA-to-FMA and carry no geometry.
   They are also what joins an element file to the structure it is a piece of:
   `isa_element_parts.txt` maps each `FJ####.obj` to every concept above it, and
-  the build takes the most specific one.
+  the build takes the most specific one. All 2,234 element files are accounted
+  for: 2,186 are built, and 48 are deliberately not drawn — the cerebral gyri and
+  sulci, which this project already carries properly parcellated at far better
+  quality, and the ventricular cavities, which are holes.
 - **Citation:** Mitsuhashi N, Fujieda K, Tamura T, Kawamoto S, Takagi T, Okubo K.
   BodyParts3D: 3D structure database for anatomical concepts.
   *Nucleic Acids Research* 2009;37(Database issue):D782–5.

@@ -51,6 +51,13 @@ export const UI = {
   // layers
   layers:       { en: 'Layers', ko: '레이어' },
   hideAll:      { en: 'Hide all', ko: '모두 숨기기' },
+  atlasDepth:   { en: 'Atlas', ko: '아틀라스' },
+  depthTaught:  { en: 'Taught body', ko: '수업용 신체' },
+  depthComplete: { en: 'Every piece', ko: '전체 부위' },
+  depthTaughtHelp: { en: 'One structure per named muscle, bone and organ, both sides together — the body every exercise, every written entry and all the Korean is keyed to.',
+                     ko: '이름이 있는 근육·뼈·장기마다 하나의 구조로, 좌우를 함께 다룹니다. 모든 운동과 설명, 한국어 이름이 이 신체를 기준으로 합니다.' },
+  depthCompleteHelp: { en: 'BodyParts3D’s own 2,186 pieces: the same body cut finer and sided, so left and right are two things and a trapezius is three. For looking things up rather than for teaching.',
+                       ko: 'BodyParts3D의 2,186개 부위 전체입니다. 같은 신체를 더 잘게, 좌우로 나누어 좌·우가 서로 다른 부위이고 승모근은 셋으로 나뉩니다. 수업보다는 찾아보기 위한 것입니다.' },
   foldPanel:    { en: 'Close this panel', ko: '이 패널 닫기' },
   unfoldPanel:  { en: 'Open this panel', ko: '이 패널 열기' },
   panelWord:    { en: 'Panel', ko: '패널' },
@@ -81,6 +88,9 @@ export const UI = {
   nerves_cranial: { en: 'Cranial nerves', ko: '뇌신경' },
   heart_detail: { en: 'Heart valves', ko: '심장판막' },
   detail:       { en: 'Further detail', ko: '기타 세부' },
+  bones_full:   { en: 'Bones — every piece', ko: '뼈 — 전체' },
+  muscles_full: { en: 'Muscles — every piece', ko: '근육 — 전체' },
+  organs_full:  { en: 'Organs — every piece', ko: '장기 — 전체' },
 
   // views
   views:        { en: 'View', ko: '시점' },

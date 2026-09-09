@@ -43,8 +43,17 @@ OUT_MODELS = os.path.join(ROOT, 'models')
 OUT_GEN = os.path.join(ROOT, 'src', 'generated')
 
 #: Layers this script owns. Anything else in structures.json is left exactly as it is.
+#: The complete-atlas layers: BodyParts3D 4.0's own cut of anatomy the taught body
+#: already has. Named apart from the taught structures -- see `key` below.
+FULL_LAYERS = ('bones_full', 'muscles_full', 'organs_full')
+
 LAYERS = ['arteries', 'veins', 'airways', 'connective', 'nerves_cranial',
-          'heart_detail', 'detail']
+          'heart_detail', 'detail',
+          # The pieces the taught body already draws, at 4.0's own granularity:
+          # sided, and split into the parts a whole muscle is made of. Human Atlas
+          # shows these as separate pieces -- "Left Gluteus Maximus" is one of its
+          # 2,234 -- and skipping them is why this atlas had half its count.
+          'bones_full', 'muscles_full', 'organs_full']
 
 #: Where each layer's members come from in the IS-A tree, most specific first.
 #:
@@ -82,15 +91,25 @@ ALREADY = ['FMA5018',    # bone organ
 #: cartilages are surfaces somebody may look at closely.
 BUDGET = {'arteries': 320, 'veins': 320, 'airways': 480,
           'connective': 700, 'nerves_cranial': 400, 'heart_detail': 500,
-          'detail': 420}
+          'detail': 420,
+          'bones_full': 620, 'muscles_full': 520, 'organs_full': 520}
 
 
 _SIDE = re.compile(r'\b(?:left|right)\b\s*', re.I)
+#: `set of interspinales lumborum` is the ontology's word for a container, not part of the
+#: muscle's name -- and the taught build strips it for the eleven of these it keeps, so a
+#: reader seeing both atlases would meet the same muscle under two names, one of which reads
+#: like a filing category. tests/test_atlas_ids.py holds the whole table to this.
+_SET_PREFIX = re.compile(r'^set\s+of\s+', re.I)
+
+
+def clean_name(name):
+    return _SET_PREFIX.sub('', str(name).strip())
 
 
 def unsided(name):
     """'left third rib' -> 'third rib', the key `build_body.py` files a structure under."""
-    return re.sub(r'\s+', ' ', _SIDE.sub('', str(name).strip().lower())).strip()
+    return re.sub(r'\s+', ' ', _SIDE.sub('', clean_name(name).lower())).strip()
 
 
 #: The IS-A tree files a named vessel under `arterial tree organ`, but its *parts* -- an
@@ -112,13 +131,22 @@ _NOT_DRAWN = re.compile(r'\bgyrus\b|\bsulcus\b|\bcortex\b|\bcavity of\b', re.I)
 def classify(best, kids, names_of, drawn=()):
     """element id -> (layer, concept), for the elements this build owns.
 
-    `drawn` is every structure name the rest of the atlas already carries. A 4.0 concept
-    whose name matches one is the same structure arriving a second time by another road --
-    the intervertebral disks come through `ligament organ`, and building them here put a
-    second copy of all twenty-three inside the body, in a layer with its own toggle,
-    z-fighting with the first.
+    `drawn` maps every structure name the rest of the atlas already carries to its layer. A 4.0 concept
+    that matches one -- by its system root or by its name -- is the same anatomy the taught
+    body already has, at 4.0's finer granularity: sided, and split into parts. Those go into
+    the `_full` layers rather than being dropped, because they are most of what a complete
+    atlas is, and they are kept apart from the taught layers rather than mixed in with them
+    so that the two are never drawn at once. See `setAtlasDepth` on the application side.
     """
-    have = {unsided(n) for n in drawn}
+    #: The taught structure this 4.0 concept is a second cut of, by name -> its layer.
+    #: Routing by IS-A membership alone put `set of interspinales cervicis` in
+    #: organs_full: a *set of* muscles is filed under `anatomical set`, not under
+    #: `muscle organ`, so the muscle test missed it. What the taught body already
+    #: decided is the better answer, and it is one lookup away.
+    have = {unsided(n): l for n, l in drawn.items()}
+    TO_FULL = {'skeleton': 'bones_full',
+               'muscles_superficial': 'muscles_full', 'muscles_deep': 'muscles_full',
+               'organs': 'organs_full'}
     under = {}
     for layer, roots in TYPE_ROOTS:
         s = set()
@@ -130,16 +158,20 @@ def classify(best, kids, names_of, drawn=()):
         already |= bp3d.isa_descendants(kids, r) | {r}
 
     out, skipped = {}, collections.Counter()
+    bone = bp3d.isa_descendants(kids, 'FMA5018') | {'FMA5018'}
+    muscle = bp3d.isa_descendants(kids, 'FMA5022') | {'FMA5022'}
+
     for elem, concept in best.items():
-        if concept in already:
-            skipped['already drawn'] += 1
-            continue
-        if unsided(names_of.get(concept, '')) in have:
-            skipped['already in the atlas by name'] += 1
-            continue
         nm = names_of.get(concept, '')
         if _NOT_DRAWN.search(nm):
             skipped['drawn better elsewhere'] += 1
+            continue
+        twin = have.get(unsided(nm))
+        if concept in already or twin:
+            out[elem] = (TO_FULL.get(twin)
+                         or ('bones_full' if concept in bone
+                             else 'muscles_full' if concept in muscle
+                             else 'organs_full'), concept)
             continue
         for layer, _ in TYPE_ROOTS:
             if concept in under[layer]:
@@ -165,7 +197,7 @@ def build_layer(layer, owned, names, el, frame, alloc, verbose=True):
     parts_out, table, rows = [], [], []
 
     for concept in sorted(byConcept, key=lambda c: names.get(c, c)):
-        nm = names.get(concept, concept)
+        nm = clean_name(names.get(concept, concept))
         elems = sorted(byConcept[concept])
         bySide = {}
         for e in elems:
@@ -179,7 +211,7 @@ def build_layer(layer, owned, names, el, frame, alloc, verbose=True):
             bySide.setdefault(side_of(nm), []).append(((C - center) * scale, F))
         if not bySide:
             continue
-        rid = alloc(nm)
+        rid = alloc(f'{layer}:{nm}')
         before, emitted = 0, []
         for side, meshes in sorted(bySide.items()):
             P, F = bp3d.merge(meshes)
@@ -197,6 +229,16 @@ def build_layer(layer, owned, names, el, frame, alloc, verbose=True):
         table.append({
             'id': rid,
             'name': nm,
+            # The key the registry files this under, where that cannot be the name.
+            #
+            # The complete-atlas layers are the same anatomy the taught body already
+            # carries, so "atlas" and "sacrum" and "liver" arrive a second time. The
+            # registry is a Map keyed by name, and a second `atlas` would replace the
+            # first -- taking every exercise, every written entry and all the Korean
+            # keyed to that name with it, and pointing them at a record in a layer that
+            # is switched off. The displayed name is unchanged; only the key is
+            # qualified, and only for the layers that need it.
+            'key': f'{nm} (4.0)' if layer in FULL_LAYERS else nm,
             'layer': layer,
             'system': layer,
             'fma': [concept],
@@ -262,7 +304,8 @@ def main():
     doc_path = os.path.join(OUT_GEN, 'structures.json')
     previous, keep, reserved = existing_document(doc_path)
 
-    owned, skipped = classify(best, kids, names, {s['name'] for s in keep})
+    owned, skipped = classify(best, kids, names,
+                              {s['name']: s['layer'] for s in keep})
     per = collections.Counter(l for l, _ in owned.values())
     print(f'{len(el.index)} element files, {len(best)} with a concept')
     for k, v in skipped.most_common():

@@ -1515,6 +1515,78 @@ await settleCamera(page);
   if (kept > 0.02) errors.push(`a right-drag changed the distance by ${kept.toFixed(3)} — it is orbiting, not panning`);
 }
 
+/* A layer that arrives after the body was taken apart is taken apart too, and
+ * nothing vanishes when you zoom in on it.
+ *
+ * Two faults, both of them things you could see and neither of which failed
+ * anything. The offsets were computed once, on the first drag, from whichever
+ * structures had a centroid then -- and a centroid only exists once its layer has
+ * loaded, so turning a layer on afterwards left it standing in a figure in the
+ * middle of the catalogue. And three.js culls a mesh by a bounding sphere it
+ * computes on the CPU, which stops describing where the piece is the moment the
+ * vertex shader moves it: zooming in took the *old* position out of the frustum
+ * while leaving the new one in it, and the piece simply stopped being drawn.
+ */
+const lateLayer = await page.evaluate(async () => {
+  const m = await import('/src/main.js');
+  const S = await import('/src/structures.js');
+  const THREE = await import('three');
+  for (const l of S.LAYER_ORDER) if (l !== 'brain') await m.setLayer(l, false);
+  await m.setLayer('skeleton', true);
+  await new Promise(r => setTimeout(r, 1200));
+  await m.setExplode(1);
+  await new Promise(r => setTimeout(r, 600));
+  // now bring one in late, the way a reader does
+  await m.setLayer('arteries', true);
+  await new Promise(r => setTimeout(r, 4000));
+  const v = new THREE.Vector3();
+  let n = 0, still = 0, name = null;
+  for (const [id, r] of S.registry().byId) {
+    if (r.layer !== 'arteries' || r.parts || !m.app.centroids[id]) continue;
+    n++;
+    const o = m.paletteOffsetOf(id);
+    if (o.length() < 1e-6) { still++; name = name ?? r.name.en; }
+  }
+  return { n, still, name };
+});
+console.log('late layer:', JSON.stringify(lateLayer));
+if (!lateLayer.n) errors.push('the arteries never loaded, so nothing was checked');
+else if (lateLayer.still)
+  errors.push(`${lateLayer.still} of ${lateLayer.n} arteries stayed put when the layer ` +
+    `arrived after the body was taken apart (${lateLayer.name})`);
+
+/* Zoom in five times and count what is drawn. Culling against a stale sphere shows
+ * up as the picture emptying out; a picture that is genuinely magnified keeps at
+ * least as much ink as it started with. */
+{
+  const ink = () => page.evaluate(() => {
+    const c = document.querySelector('canvas');
+    const t = document.createElement('canvas'); t.width = 300; t.height = 190;
+    const x = t.getContext('2d', { willReadFrequently: true });
+    x.drawImage(c, 0, 0, 300, 190);
+    const d = x.getImageData(0, 0, 300, 190).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] + d[i+1] + d[i+2] > 60) n++;
+    return n;
+  });
+  await page.evaluate(async () => { const m = await import('/src/main.js'); m.fitView(); });
+  await settleCamera(page);
+  const far = await ink();
+  for (let i = 0; i < 5; i++) {
+    await page.evaluate(async () => { const m = await import('/src/main.js'); m.zoomBy(1 / 1.5); });
+    await page.waitForTimeout(700);
+  }
+  await page.waitForTimeout(1600);
+  const near = await ink();
+  console.log('zoom keeps the pieces:', JSON.stringify({ far, near }));
+  if (!(far > 200)) errors.push(`the catalogue drew only ${far} lit pixels to begin with`);
+  else if (near < far * 0.5)
+    errors.push(`zooming in took the picture from ${far} lit pixels to ${near} — ` +
+      `pieces are being culled against bounding spheres the shader has moved`);
+  await page.evaluate(async () => { const m = await import('/src/main.js'); await m.setExplode(0); });
+  await settleCamera(page);
+}
+
 /* -------------------------------------------------- one draw call a layer
  *
  * The skinned layers are drawn as one mesh each -- see `merged.js`. Three things
