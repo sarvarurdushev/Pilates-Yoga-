@@ -889,10 +889,57 @@ details.groups>summary em{font-style:normal;font-size:10px;color:var(--dim2);
 .groupsof h4{margin:0 4px 0 0;font-size:10px;letter-spacing:.13em;text-transform:uppercase;
  color:var(--dim2);font-weight:400}
 /* Isolate reads as an action rather than as another group, because it is one:
- * the chips beside it change what is lit, this changes what exists. */
-.mini.solo{border-color:rgba(90,169,230,.45);color:#cfe4f6}
-.mini.solo:hover{border-color:rgba(90,169,230,.75);background:rgba(90,169,230,.12)}
-.mini.solo.on{background:rgba(90,169,230,.2);border-color:rgba(90,169,230,.7);color:#eaf4ff}
+ * the chips change what is lit, this changes what exists. It is the width of the
+ * card because at chip size, three quarters of the way down, nobody found it --
+ * and on a body of a thousand structures, showing one alone is the only way to
+ * actually look at most of them. */
+/* Every panel on the stage opens and closes, and remembers which it was.
+ *
+ * The console covers a third of the window and the layer list covers a corner of the
+ * body; on a laptop screen that is most of what there is to look at. Folding leaves the
+ * header and the button, so a folded panel still says what it is and how to get it back --
+ * a panel that collapses to nothing is a panel a reader has lost. */
+/* In the flow, not on top of it.
+ *
+ * The first version positioned this absolutely and gave each bar `position:relative`
+ * and a right padding to clear it. Both were wrong: the three stage bars are already
+ * absolutely positioned, so `position:relative` took the section strip out of its own
+ * placement and ran it 610px under the console, and the padding pushed the view bar off
+ * the right of a 390px screen. Only the console, which is a normal block, needs the
+ * absolute one. */
+.fold{flex:0 0 auto;width:20px;height:20px;padding:0;order:-1;
+ line-height:18px;text-align:center;border-radius:5px;cursor:pointer;
+ font:400 13px/18px inherit;color:var(--dim2);
+ border:1px solid transparent;background:transparent}
+.fold:hover{color:var(--txt);border-color:var(--line);background:rgba(255,255,255,.06)}
+#sections .fold{position:absolute;top:6px;right:8px;z-index:3}
+#panel > .fold{position:absolute;top:10px;right:10px;z-index:5}
+.folded > *:not(.fold){display:none !important}
+/* Narrow as well as short. Hiding the children of a flex row that is stretched to
+ * the stage leaves a full-width empty bar sitting across the picture, which is what
+ * the first version did: 1440 pixels of nothing with a + on the end of it. */
+#viewbar.folded,#layerbar.folded,#sections.folded{
+ min-height:0;min-width:0;width:max-content;padding:5px 9px;gap:6px}
+#viewbar.folded::after,#layerbar.folded::after,#sections.folded::after{
+ content:attr(data-foldname);font-size:9px;letter-spacing:.16em;
+ text-transform:uppercase;color:var(--dim2);white-space:nowrap}
+#panel.folded{width:46px;min-width:46px;flex:0 0 46px;padding:0;overflow:hidden}
+
+/* Per-layer counts and one switch for all of them, so the panel says what turning
+ * a layer on will cost before it is turned on. */
+.lycount{margin-left:auto;padding-left:8px;font-style:normal;font-size:10.5px;
+ color:var(--dim2);font-variant-numeric:tabular-nums}
+.lyr[aria-pressed="true"] .lycount{color:var(--txt)}
+.layerall{display:flex;align-items:center;gap:8px;margin:8px 2px 0;
+ font-size:10.5px;letter-spacing:.06em;color:var(--dim2)}
+.layerall span{margin-right:auto;font-variant-numeric:tabular-nums}
+.soloRow{margin:2px 0 14px}
+.solobtn{width:100%;padding:9px 12px;border-radius:7px;cursor:pointer;
+ font:500 12.5px/1.25 inherit;letter-spacing:.02em;
+ border:1px solid rgba(90,169,230,.5);color:#dceaf7;background:rgba(90,169,230,.10)}
+.solobtn:hover{border-color:rgba(90,169,230,.85);background:rgba(90,169,230,.20);color:#f2f9ff}
+.solobtn.on{background:rgba(90,169,230,.26);border-color:rgba(90,169,230,.8);color:#f4faff}
+.soloRow .chelp{margin:6px 2px 0}
 
 /* the region network — see connectome.js */
 .connplot{position:relative;border:1px solid var(--line);
@@ -988,18 +1035,21 @@ details.groups>summary em{font-style:normal;font-size:10px;color:var(--dim2);
     <canvas id="view"></canvas>
     <div id="labels"></div>
     <div id="viewbar">
+      <button class="fold" data-fold="viewbar" title="">−</button>
       <b id="viewsLabel">View</b>
       <button id="vAnt"></button><button id="vPost"></button><button id="vLat"></button>
       <button id="vSup"></button><button id="vHead"></button><button id="vAll"></button>
       <button id="labBtn" class="labopen"></button>
     </div>
     <div id="layerbar">
+      <button class="fold" data-fold="layerbar" title="">−</button>
       <b id="layersLabel">Layers</b>
       <div id="layerList"></div>
     </div>
     <!-- The section series. Real sections of the model's own surfaces — see sections.js.
          Hidden until the brain is on, because there is nothing to cut otherwise. -->
     <div id="sections" hidden>
+      <button class="fold" data-fold="sections" title="">−</button>
       <div class="secthead"><b id="sectLab">Sections</b><em id="sectPlane"></em></div>
       <div class="sectwrap">
         <button class="sectnav prev" id="sectPrev" tabindex="-1" aria-hidden="true">‹</button>
@@ -1017,6 +1067,7 @@ details.groups>summary em{font-style:normal;font-size:10px;color:var(--dim2);
   <div id="lab" hidden></div>
 
   <aside id="panel">
+    <button class="fold" data-fold="panel" title="">−</button>
     <nav id="tabs">
       <button id="tabExplore" aria-selected="true"></button>
       <button id="tabExercise"></button>

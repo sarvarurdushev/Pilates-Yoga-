@@ -185,22 +185,45 @@ export function mountUI(ctx) {
      * a promise the atlas cannot keep — the peripheral nervous system comes from a source
      * derived from the male scan, so another body has no nerves to show and should not offer
      * a switch for them. */
-    $('layerList').innerHTML = LAYER_ORDER.filter(n2 => hasLayer(n2)).map(name => `
+    /* How many structures each layer holds, counted off the registry rather than
+     * off what has loaded: a layer that is off has loaded nothing, and a row
+     * reading "Arteries" with no number beside it does not tell a reader that
+     * turning it on adds three hundred and fifty-three things. */
+    const per = {};
+    for (const r of registry().byId.values())
+      if (!r.parts) per[r.layer] = (per[r.layer] ?? 0) + 1;
+    const shown = LAYER_ORDER.filter(n2 => hasLayer(n2));
+    const anyOn = shown.some(n2 => app.layers[n2].on);
+    $('layerList').innerHTML = shown.map(name => `
       <div class="layerrow">
         <button class="lyr" data-layer="${name}" aria-pressed="${app.layers[name].on}">
           <i style="background:${layerSwatch(name)}"></i>${T(name)}
+          <em class="lycount">${per[name] ?? 0}</em>
         </button>
         <input type="range" class="lyop" data-layer="${name}" min="0.08" max="1" step="0.01"
                value="${app.layers[name].opacity}" aria-label="${T(name)} opacity">
-      </div>`).join('');
+      </div>`).join('')
+      + `<div class="layerall"><span>${Object.values(per).reduce((a, b) => a + b, 0)} ${
+          T('structuresWord')}</span>
+         <button class="mini" data-layerall="${anyOn ? 'off' : 'on'}">${
+          T(anyOn ? 'hideAll' : 'showAll')}</button></div>`;
     for (const b of $('layerList').querySelectorAll('.lyr'))
       b.onclick = () => setLayer(b.dataset.layer, b.getAttribute('aria-pressed') !== 'true');
     for (const s of $('layerList').querySelectorAll('.lyop'))
       s.oninput = e => setLayerOpacity(s.dataset.layer, +e.target.value);
+    const all = $('layerList').querySelector('[data-layerall]');
+    if (all) all.onclick = async () => {
+      const on = all.dataset.layerall === 'on';
+      for (const n2 of shown) await setLayer(n2, on);
+      renderLayerList();
+    };
   }
   const SWATCH = { skeleton: '#e8e2d4', muscles_superficial: '#b8544a',
                    muscles_deep: '#8f3c36', organs: '#c09068', nervous: '#F2D98B',
-                   brain: '#cfb2a8' };
+                   brain: '#cfb2a8',
+                   arteries: '#C0392B', veins: '#3D6C9E', airways: '#8FA9B8',
+                   connective: '#CFC3A8', nerves_cranial: '#E8C86B',
+                   heart_detail: '#B05A52' };
   const layerSwatch = n => SWATCH[n] ?? '#8b95ab';
 
   /** The four lines that must not move, rendered where the user is rather than in a footer. */
@@ -634,6 +657,25 @@ export function mountUI(ctx) {
       <i style="background:${r.color}"></i>${esc(r.name[app.lang])}</button>`;
 
   /** What is on screen, in whichever register the user asked for. */
+  /**
+   * Show this one thing, and nothing else.
+   *
+   * It used to be a `mini` button inside the group chips, three quarters of the
+   * way down a card, and the report on that was "where is my isolation feature?"
+   * — which is the correct reading of a control that small in that position. A
+   * body of a thousand structures needs *show me only this* to be the loudest
+   * thing on the card after the name, because it is the only way to actually see
+   * most of them.
+   */
+  function soloAction(r) {
+    const alone = (isolated?.() ?? []).includes(r.id);
+    return `<div class="soloRow">
+      <button class="solobtn${alone ? ' on' : ''}" data-isolate="${r.id}">
+        ${T(alone ? 'isolateOff' : 'isolate')}</button>
+      ${alone ? `<p class="chelp">${T('isolateHint')}</p>` : ''}
+    </div>`;
+  }
+
   function detailBlock() {
     const id = app.selected;
     /* One line, not a paragraph. Nothing is selected yet, so this is the state a reader is in
@@ -643,8 +685,8 @@ export function mountUI(ctx) {
     if (id == null) return `<p class="pickme">${T('explore')}</p>`;
     const r = get(id);
     if (!r) return '';
-    if (r.kind === 'brain') return brainDetail(r);
-    if (r.muscle) return muscleDetail(r);
+    if (r.kind === 'brain') return brainDetail(r) + soloAction(r);
+    if (r.muscle) return muscleDetail(r) + soloAction(r);
     const overview = KIND_OVERVIEW[r.kind]?.[app.lang] ?? '';
     return `<div class="detail">
       <div class="dname"><span class="dot" style="background:${r.color}"></span>${esc(r.name[app.lang])}</div>
@@ -654,7 +696,7 @@ export function mountUI(ctx) {
         <h4>${T('systemNote')}</h4>
         <p>${esc(overview)}</p></div>` : ''}
       <div class="empty small"><h2>${T('noContent')}</h2><p>${T('noContentBody')}</p></div>
-    </div>`;
+    </div>${soloAction(r)}`;
   }
 
   /**
@@ -671,14 +713,13 @@ export function mountUI(ctx) {
    */
   function groupBlock(r) {
     const gs = (groupsForStructure?.(r.id) ?? []).slice(0, 4);
-    const alone = (isolated?.() ?? []).includes(r.id);
-    const solo = `<button class="mini solo${alone ? ' on' : ''}" data-isolate="${r.id}">${
-      T(alone ? 'isolateOff' : 'isolate')}</button>`;
-    if (!gs.length) return `<div class="groupsof">${solo}</div>`;
+    // isolation moved out of here and into `soloAction`, which is the whole width
+    // of the card: a control nobody could find was a control that did not exist
+    if (!gs.length) return '';
     return `<div class="groupsof"><h4>${T('groupOf')}</h4>${gs.map(g =>
       `<button class="gchip${app.group === g.fma ? ' on' : ''}" data-group="${esc(g.fma)}"
                title="${esc(g.formal)}">${esc(g.name[app.lang])}
-        <em>${g.members.length}</em></button>`).join('')}${solo}</div>`;
+        <em>${g.members.length}</em></button>`).join('')}</div>`;
   }
 
   const plain = () => app.register !== 'clinical';
@@ -1228,6 +1269,43 @@ export function mountUI(ctx) {
   $('reset').onclick = resetView;
   $('atlas').oninput = e => setAtlas(+e.target.value);
   $('explode').oninput = e => { setExplode(+e.target.value); syncControls(); };
+  /* Fold any panel away and remember it.
+   *
+   * Kept in localStorage per panel, because which ones somebody wants open is a
+   * property of their screen rather than of the session: a coach on a laptop
+   * folds the console to see the body and expects it folded next time, not every
+   * time they select something. */
+  const FOLD_KEY = 'nw.folded';
+  const foldState = () => {
+    try { return JSON.parse(localStorage.getItem(FOLD_KEY) || '{}'); } catch { return {}; }
+  };
+  function applyFold(el, btn, on) {
+    el.classList.toggle('folded', on);
+    btn.textContent = on ? '+' : '−';
+    btn.title = T(on ? 'unfoldPanel' : 'foldPanel');
+    btn.setAttribute('aria-expanded', String(!on));
+  }
+  for (const btn of document.querySelectorAll('[data-fold]')) {
+    const key = btn.dataset.fold;
+    const el = $(key);
+    if (!el) continue;
+    el.dataset.foldname = T(key === 'layerbar' ? 'layers'
+                          : key === 'viewbar' ? 'views'
+                          : key === 'sections' ? 'sections' : 'panelWord');
+    applyFold(el, btn, !!foldState()[key]);
+    btn.onclick = () => {
+      const now = !el.classList.contains('folded');
+      applyFold(el, btn, now);
+      const st = foldState();
+      st[key] = now;
+      try { localStorage.setItem(FOLD_KEY, JSON.stringify(st)); } catch { /* private window */ }
+      /* The stage is sized from the window minus the console, so folding the
+       * console changes how much canvas there is. Without this the picture stays
+       * the old width with a strip of background beside it. */
+      window.dispatchEvent(new Event('resize'));
+    };
+  }
+
   $('exInventory').onclick = () => { setExplodeLayout('inventory'); syncControls(); };
   $('exOpen').onclick = () => { setExplodeLayout('open'); syncControls(); };
   $('xray').oninput  = e => setXray(+e.target.value);

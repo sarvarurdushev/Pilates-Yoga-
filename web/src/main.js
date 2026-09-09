@@ -1905,6 +1905,12 @@ function anchorFor(id) {
 function labelVisible(id) {
   const r = get(id);
   if (!r) return false;
+  /* Isolation first, and before the selected-structure shortcut, because it is the
+   * strongest statement a reader can make about what they want to see. Without it,
+   * isolating the sacrum left fifteen muscle labels on screen with leader ropes
+   * running to structures that were no longer drawn -- the picture said one thing
+   * and the labels said another. */
+  if (app.isolate?.size) return app.isolate.has(id);
   if (app.selected === id) return true;
   if (app.labelKinds.size && !app.labelKinds.has(r.kind)) return false;
   if (!app.layers[r.layer]?.on) return false;

@@ -50,6 +50,13 @@ export const UI = {
 
   // layers
   layers:       { en: 'Layers', ko: '레이어' },
+  hideAll:      { en: 'Hide all', ko: '모두 숨기기' },
+  foldPanel:    { en: 'Close this panel', ko: '이 패널 닫기' },
+  unfoldPanel:  { en: 'Open this panel', ko: '이 패널 열기' },
+  panelWord:    { en: 'Panel', ko: '패널' },
+  sections:     { en: 'Sections', ko: '단면' },
+  showAll:      { en: 'Show all', ko: '모두 보기' },
+  structuresWord: { en: 'structures', ko: '구조' },
   skeleton:     { en: 'Skeleton', ko: '골격' },
   muscles_superficial: { en: 'Muscles — superficial', ko: '근육 — 표층' },
   muscles_deep: { en: 'Muscles — deep', ko: '근육 — 심층' },
