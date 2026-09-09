@@ -52,6 +52,14 @@ export class BoneDualQuats {
     this.texture.minFilter = THREE.NearestFilter;
     this.texture.colorSpace = THREE.NoColorSpace;
     this.texture.generateMipmaps = false;
+    /**
+     * Whether the rig has been moved off the bind pose.
+     *
+     * Set by whoever poses it. `false` lets the raycast skip a blend that is the
+     * identity — see `useDualQuatRaycast`. It says nothing about the shader, which
+     * reads the texture either way and costs the same.
+     */
+    this.posed = false;
     this.update();
   }
 
@@ -149,6 +157,19 @@ export function useDualQuatRaycast(mesh, dq) {
   if (!iAttr || !wAttr) return mesh;
   const i4 = [0, 0, 0, 0], w4 = [0, 0, 0, 0];
   mesh.applyBoneTransform = function (index, vector) {
+    /* Nothing to do at the bind pose, and that is nearly always.
+     *
+     * three calls this once per vertex of every triangle it tests, so a raycast
+     * against a thousand-triangle muscle is three thousand dual-quaternion blends.
+     * Two thousand structures on a pointer move came to 119 ms -- the application
+     * stopping dead every time the mouse crossed the body. But a reader browsing an
+     * atlas is looking at a body that is standing still, and at the bind pose every
+     * bone's transform is the identity: the whole blend is a no-op that has to be
+     * computed to discover it is one. `dq.posed` is set by whoever moves the rig,
+     * so the answer is known rather than derived.
+     *
+     * Exact either way. While a clip is playing this runs as it always did. */
+    if (dq.posed === false) return vector;
     vector.applyMatrix4(this.bindMatrix);
     for (let k = 0; k < 4; k++) {
       i4[k] = iAttr.getComponent(index, k);

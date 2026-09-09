@@ -79,7 +79,17 @@ export const BODIES = {
                'arteries', 'veins', 'airways', 'connective', 'nerves_cranial',
                'heart_detail', 'detail',
                'bones_full', 'muscles_full', 'organs_full'],
-      shell: 'models/shell.glb',
+      /* No skin.
+       *
+       * `shell.glb` is a derived surface that filled the gaps between structures so a
+       * body with the organ layer off did not read as full of holes. It cost fourteen
+       * draw calls and a layer of brown over everything, it is not anatomy -- nothing
+       * in it is selectable, named or in the structure table -- and with the complete
+       * atlas drawn there are far fewer gaps for it to fill. The request was "I don't
+       * need the skin, remove that", and it is right: an atlas of two thousand real
+       * structures does not need a fake one over the top. The file and its build script
+       * stay; a body that wants one sets this. */
+      shell: null,
     },
     /**
      * Origin: ASIS midpoint. Scale: standing height = 1.0, so y = 0 is the pelvis,

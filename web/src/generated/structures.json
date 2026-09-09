@@ -56690,33 +56690,6 @@
   },
   {
    "id": 2149,
-   "name": "skin",
-   "key": "skin (4.0)",
-   "layer": "organs_full",
-   "system": "organs_full",
-   "fma": [
-    "FMA7163"
-   ],
-   "sides": [
-    "M"
-   ],
-   "tris": 518,
-   "pieces": 1,
-   "centroid": [
-    0.00722,
-    -0.06582,
-    -0.02817
-   ],
-   "perSide": {
-    "M": [
-     0.00722,
-     -0.06582,
-     -0.02817
-    ]
-   }
-  },
-  {
-   "id": 2150,
    "name": "spleen",
    "key": "spleen (4.0)",
    "layer": "organs_full",
@@ -56743,7 +56716,7 @@
    }
   },
   {
-   "id": 2151,
+   "id": 2150,
    "name": "splenic artery",
    "key": "splenic artery (4.0)",
    "layer": "organs_full",
@@ -56770,7 +56743,7 @@
    }
   },
   {
-   "id": 2152,
+   "id": 2151,
    "name": "splenic vein",
    "key": "splenic vein (4.0)",
    "layer": "organs_full",
@@ -56797,7 +56770,7 @@
    }
   },
   {
-   "id": 2153,
+   "id": 2152,
    "name": "stomach",
    "key": "stomach (4.0)",
    "layer": "organs_full",
@@ -56824,7 +56797,7 @@
    }
   },
   {
-   "id": 2154,
+   "id": 2153,
    "name": "stria terminalis",
    "key": "stria terminalis (4.0)",
    "layer": "organs_full",
@@ -56851,7 +56824,7 @@
    }
   },
   {
-   "id": 2155,
+   "id": 2154,
    "name": "superior mesenteric artery",
    "key": "superior mesenteric artery (4.0)",
    "layer": "organs_full",
@@ -56878,7 +56851,7 @@
    }
   },
   {
-   "id": 2156,
+   "id": 2155,
    "name": "superior mesenteric vein",
    "key": "superior mesenteric vein (4.0)",
    "layer": "organs_full",
@@ -56905,7 +56878,7 @@
    }
   },
   {
-   "id": 2157,
+   "id": 2156,
    "name": "superior vena cava",
    "key": "superior vena cava (4.0)",
    "layer": "organs_full",
@@ -56932,7 +56905,7 @@
    }
   },
   {
-   "id": 2158,
+   "id": 2157,
    "name": "thyroid cartilage",
    "key": "thyroid cartilage (4.0)",
    "layer": "organs_full",
@@ -56959,7 +56932,7 @@
    }
   },
   {
-   "id": 2159,
+   "id": 2158,
    "name": "trachea",
    "key": "trachea (4.0)",
    "layer": "organs_full",
@@ -56986,7 +56959,7 @@
    }
   },
   {
-   "id": 2160,
+   "id": 2159,
    "name": "trunk of left coronary artery",
    "key": "trunk of left coronary artery (4.0)",
    "layer": "organs_full",
@@ -57013,7 +56986,7 @@
    }
   },
   {
-   "id": 2161,
+   "id": 2160,
    "name": "trunk of right coronary artery",
    "key": "trunk of right coronary artery (4.0)",
    "layer": "organs_full",
@@ -57040,7 +57013,7 @@
    }
   },
   {
-   "id": 2162,
+   "id": 2161,
    "name": "tuber cinereum",
    "key": "tuber cinereum (4.0)",
    "layer": "organs_full",
@@ -57067,7 +57040,7 @@
    }
   },
   {
-   "id": 2163,
+   "id": 2162,
    "name": "urethra",
    "key": "urethra (4.0)",
    "layer": "organs_full",
@@ -57094,7 +57067,7 @@
    }
   },
   {
-   "id": 2164,
+   "id": 2163,
    "name": "urinary bladder",
    "key": "urinary bladder (4.0)",
    "layer": "organs_full",
@@ -57121,7 +57094,7 @@
    }
   },
   {
-   "id": 2165,
+   "id": 2164,
    "name": "white matter of left cerebral hemisphere",
    "key": "white matter of left cerebral hemisphere (4.0)",
    "layer": "organs_full",
@@ -57148,7 +57121,7 @@
    }
   },
   {
-   "id": 2166,
+   "id": 2165,
    "name": "white matter of right cerebral hemisphere",
    "key": "white matter of right cerebral hemisphere (4.0)",
    "layer": "organs_full",

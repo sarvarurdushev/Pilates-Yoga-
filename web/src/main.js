@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { makeStructureMaterial, makeBrainMaterial } from './brainMaterial.js';
 import { mergeLayer, mergeByParent, PICK_LAYER } from './merged.js';
+import { accelerate as accelerateRays, setRestTest, warm as warmRays } from './raybvh.js';
 import { makeTissueMaterial } from './tissue.js';
 import { NeuralNet } from './neuralNet.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -135,6 +136,40 @@ const scene = new THREE.Scene();
  * reading at the same weight as the one in front of it. */
 scene.background = null;
 scene.fog = new THREE.Fog(0x04070c, 1.9, 4.6);
+/**
+ * The fog, as a share of how far away whatever is being looked at is.
+ *
+ * These were absolute distances, and the absolute distance was measured against a person
+ * standing at the default view — 1.9 to 4.6 world units, with the camera 2.53 away. That is
+ * correct for a body and only for a body. Take the same body apart into a catalogue of two
+ * thousand pieces and the camera has to stand at 4.2 to see the sheet at all, which is 85% of
+ * the way from `near` to `far`: every piece in the inventory came out at 85% fog colour, a
+ * grid of dark brown smudges on near-black. It was not the lighting and it was not the size
+ * of the pieces. It was this.
+ *
+ * The fix is to say what the fog is actually for. It is depth cueing *within the subject* —
+ * it stops the far arm reading at the same weight as the near one — so it belongs to the
+ * subject's own scale, not to a fixed distance from the origin. Anchored to the camera's
+ * distance to what it is aimed at, the far side of a body is cued exactly as it was, a
+ * catalogue read from four metres back is cued the same way, and nothing goes dark for the
+ * sole reason that it is being looked at from further away.
+ *
+ * The ratios are the old constants over that default distance, so the whole-body view this
+ * was tuned on is unchanged to the pixel.
+ */
+const FOG_NEAR = 1.9 / 2.532, FOG_FAR = 4.6 / 2.532;
+/**
+ * @param cam the camera about to render — not always the stage's. Every panel that borrows
+ *   the renderer draws *this* scene through a camera of its own, at its own distance, so a
+ *   fog fitted to the stage's camera and left there is fog fitted to the wrong subject: a
+ *   close view of one structure through a fog sized for a whole standing body came out black.
+ * @param at  what that camera is aimed at
+ */
+function fitFog(cam = camera, at = controls.target) {
+  const d = Math.max(0.05, cam.position.distanceTo(at));
+  scene.fog.near = d * FOG_NEAR;
+  scene.fog.far = d * FOG_FAR;
+}
 /* The room. It was CSS behind a transparent canvas, which the composed pipeline ended — see
  * `backdrop.js` for why. `#stage`'s own gradient is still there underneath and is still what
  * shows on the un-composed path; this is what is actually seen. */
@@ -556,9 +591,16 @@ const MERGED = new Set(['muscles_superficial', 'muscles_deep', 'nervous',
  * forty-seven — and they are merged per bone instead. See `mergeByParent` for
  * why that is the right stopping point rather than rewriting them as
  * single-bone skins. */
+/* `muscles_full` is not in here, and that is not an oversight.
+ *
+ * `bindLayer` skins any layer whose name starts with `muscles`, so the complete
+ * atlas's muscles arrive as SkinnedMesh like the taught ones do. Listing the layer
+ * as rigid sent them to `mergeByParent`, which skips skinned meshes -- so it
+ * merged nothing, said nothing, and 378 muscles were drawn one at a time. That was
+ * 378 of the 644 draw calls a whole body cost. */
 const RIGID = new Set(['skeleton', 'organs', 'arteries', 'veins', 'airways',
                        'connective', 'nerves_cranial', 'heart_detail', 'detail',
-                       'bones_full', 'muscles_full', 'organs_full']);
+                       'bones_full', 'organs_full']);
 
 /**
  * Rebuild a layer's drawables from the meshes it has just bound.
@@ -600,7 +642,15 @@ function remerge(name) {
     for (const o of src) o.layers.set(m ? PICK_LAYER : 0);
     if (m) { L2.group.add(m); built.push(m); }
   }
-  if (!built.length) return;
+  if (!built.length) {
+    /* Loud, because this is how 378 draw calls hid: a layer that asks to be merged
+     * and gets nothing back is a bug in the routing, not a property of the data. */
+    if (src.length > 1)
+      console.error(`merge: ${name} has ${src.length} meshes and merged none of them — ` +
+        `${RIGID.has(name) ? 'listed as rigid' : 'merged as one'} but its meshes are ` +
+        `${src[0]?.isSkinnedMesh ? 'skinned' : 'rigid'}`);
+    return;
+  }
   L2.merged = built;
   applyShown();
   cullWhileApart(app.explode <= 0);
@@ -693,6 +743,21 @@ function notePicking(mesh) {
   mesh.boundingSphere = new THREE.Sphere(s.center.clone(), s.radius * PICK_MARGIN);
 }
 const PICK_MARGIN = 2.6;
+
+/**
+ * Whether the body is standing at the bind pose or has been moved by a clip.
+ *
+ * The one consumer is the skinned raycast, which can skip a blend that is the
+ * identity — see `useDualQuatRaycast`. It is set rather than derived because
+ * deriving it means walking forty-seven bones on every pointer move, which is the
+ * cost this exists to avoid.
+ */
+function markPosed(on) { if (boneDQ) boneDQ.posed = !!on; }
+/* `raybvh` answers from the geometry as it sits in the buffer, which for a skinned
+ * mesh is the bind pose. That is what is on screen until a clip moves the rig, and
+ * once one has, the tree describes a body that is no longer there — so this is how
+ * it knows to hand those meshes back to three's own scan. */
+setRestTest(() => !boneDQ || boneDQ.posed === false);
 /* How far around each segment the mesh lies on the candidate set reaches, so the voted
  * segments join into one connected chain. Swept against `skinbench` and `bindcheck`
  * together: 0 leaves trunk sheets disconnected, 2 measures identically to 1. */
@@ -828,6 +893,12 @@ function loadLayer(name) {
       L2.loaded = true; L2.loading = false;
       indexGeometry(L2.group);
       bindLayer(name);
+      /* After binding, because `skinMesh` replaces each mesh with a skinned one and
+       * patches `L2.meshes` in place: installing before this would accelerate the
+       * objects that were about to be thrown away and leave the ones that are picked
+       * on the linear scan. */
+      for (const m of L2.meshes ?? []) accelerateRays(m);
+      warmRays(pickTargets);
       /* A layer that arrives after the body was taken apart has to be taken apart
        * too. The offsets were computed once, on the first drag of the slider, from
        * whichever structures had centroids at that moment -- and a centroid only
@@ -954,9 +1025,11 @@ function loadBrain(L2) {
       if (--left) return;
       L2.meshes = [];
       holder.traverse(o => { if (o.isMesh) L2.meshes.push(o); });
+      for (const m of L2.meshes) accelerateRays(m);
       L2.loaded = true; L2.loading = false;
       indexGeometry(L2.group);
       bindBrain();
+      warmRays(pickTargets);
       refreshPosed();
       syncLayers();
       pendingSections?.(); pendingSections = null;
@@ -1085,7 +1158,13 @@ function orientText() {
   const ax = Math.abs(_vd.x), ay = Math.abs(_vd.y), az = Math.abs(_vd.z);
   let key;
   if (ax >= ay && ax >= az) key = _vd.x < 0 ? 'viewLeftLat' : 'viewRightLat';
-  else if (az >= ay) key = _vd.z < 0 ? 'viewPost' : 'viewAnt';
+  /* The camera's own direction points *from* the eye *into* the picture, so a viewer looking
+   * at the anterior surface is looking along -Z in a frame where +Z is anterior. This read
+   * the sign the other way and captioned every front view "Posterior view" and every back
+   * view "Anterior view" — a readout that names the wrong side of the body is worse than no
+   * readout, because it is believed. The left/right and superior/inferior arms of the same
+   * test were already right, which is why it went unnoticed. */
+  else if (az >= ay) key = _vd.z < 0 ? 'viewAnt' : 'viewPost';
   else key = _vd.y < 0 ? 'viewSup' : 'viewInf';
   const out = [UI_STR[key]?.[app.lang] ?? ''];
   // "front at right" only means anything on a view that has a front and a back on screen
@@ -1603,7 +1682,12 @@ export function syncLayers() {
      * behind. Fading every other layer equally — which is what the brain did, where there
      * was only ever one — buries the thing you asked about in a uniform haze instead of
      * revealing it. */
-    const selRec = chosen != null ? get(chosen) : null;
+    /* Not while the body is laid out. The peel is a statement about depth -- what is
+     * in front of the thing you asked for gets out of the way -- and a catalogue has
+     * no depth: every piece is side by side on a sheet. Applied there it drops most
+     * of the atlas to six per cent opacity over a black background, which is the
+     * whole sheet going dark the moment anything is chosen. */
+    const selRec = chosen != null && app.explode <= OPENED ? get(chosen) : null;
     if (selRec) {
       const selDepth = XRAY_DEPTH[selRec.layer] ?? 0;
       if (depth < selDepth) o *= 0.06;          // in front: nearly gone
@@ -1764,9 +1848,22 @@ export function syncLayers() {
       tintStructure(g, { selected: sel, atlas: app.atlas });
     }
   }
+  /* Nothing to pick out when there is nothing to pick it out from.
+   *
+   * The selection highlight is a signal colour mixed over the structure's own — it exists so
+   * one muscle can be found among four hundred that are all the same red. Isolated, that
+   * muscle *is* the picture, and the highlight turned a specimen into a blue-white ghost:
+   * the one view whose whole job is to show what a structure actually looks like was the one
+   * view that did not show it. So while everything drawn is what the reader asked for, the
+   * highlight stands down and the surface is the surface. */
+  const soloLit = app.isolate?.size && app.selected != null && app.isolate.has(app.selected)
+    && app.isolate.size === 1;
   for (const m of materials) {
     const u = m.userData.uniforms;
-    if (u) { u.uSelected.value = app.selected ?? -1; u.uHover.value = app.hover ?? -1; }
+    if (u) {
+      u.uSelected.value = soloLit ? -1 : (app.selected ?? -1);
+      u.uHover.value = app.hover ?? -1;
+    }
   }
   /* Last, because everything above is what decides it: the layer toggles, the
    * mesh switch, the isolate set. A merged layer has no `mesh.visible` of its
@@ -1894,6 +1991,8 @@ function panelInset() {
   return Math.max(0, c.right - left + 10);
 }
 const LAB_H = 24, LAB_GAP = 7, LANE_PAD = 13, MAX_PER_SIDE = 8, LAB_MAX = 300, MIN_PX = 26;
+/** How many candidates get a real anchor. Comfortably more than the 2 x MAX_PER_SIDE placed. */
+const SHORTLIST = 28;
 /* Clear air between the subject's own silhouette and the nearest edge of a plate. A leader
  * rope has to look like it connects a name to a thing; the gutter is what stops the plate
  * sitting on top of the thing, and everything past it is wasted line. */
@@ -1970,6 +2069,22 @@ const _pts = [];
  * a label to nothing, which is exactly what a rope must never be.
  */
 const _off = new THREE.Vector3();
+const _lp = new THREE.Vector3();
+/**
+ * Roughly where a structure is, for deciding whether to name it at all.
+ *
+ * The centroid, carried out to wherever the body being apart has put it -- the same
+ * displacement `anchorFor` applies, and the only part of it that is not cheap to
+ * compute. Used to rank and reject; never used to place anything.
+ */
+function labelPoint(id) {
+  _lp.copy(app.centroids[id] ?? _ORIGIN);
+  if (app.explode > 0)
+    _lp.add(palette.getOffset(id, _off).multiplyScalar(app.explode));
+  return _lp;
+}
+const _ORIGIN = new THREE.Vector3();
+
 function anchorFor(id) {
   _pts.length = 0;
   /* The shader moves a structure by its palette offset when the body is taken
@@ -2004,30 +2119,43 @@ function anchorFor(id) {
   return _a;
 }
 
+/** The structure's record when its name may be drawn at all, otherwise null. */
 function labelVisible(id) {
   const r = get(id);
-  if (!r) return false;
+  if (!r) return null;
   /* No plates over a catalogue. Every piece in one is its own shape in its own
    * cell with nothing behind it, so a floating name on a leader rope names what
    * is already unambiguous -- and eighteen of them, in two columns at the edges
    * with ropes across the whole sheet, were the messiest thing in the picture.
    * Pointing at a piece still names it, and clicking it still opens its card. */
   if (app.explode > OPENED && app.explodeLayout === 'inventory'
-      && app.selected !== id) return false;
+      && app.selected !== id) return null;
   /* Isolation first, and before the selected-structure shortcut, because it is the
    * strongest statement a reader can make about what they want to see. Without it,
    * isolating the sacrum left fifteen muscle labels on screen with leader ropes
    * running to structures that were no longer drawn -- the picture said one thing
    * and the labels said another. */
-  if (app.isolate?.size) return app.isolate.has(id);
-  if (app.selected === id) return true;
-  if (app.labelKinds.size && !app.labelKinds.has(r.kind)) return false;
-  if (!app.layers[r.layer]?.on) return false;
-  if (r.interior && app.xray === 0) return false;
+  if (app.isolate?.size) return app.isolate.has(id) ? r : null;
+  if (app.selected === id) return r;
+  if (app.labelKinds.size && !app.labelKinds.has(r.kind)) return null;
+  /* One name, when one structure has been chosen.
+   *
+   * Clicking a muscle used to leave eighteen other plates on screen, each on a leader rope,
+   * and near the top of the frame those ropes all run up toward the head — which is what
+   * "why does it show me ... connected to brain" was looking at. It is also simply the wrong
+   * answer to the question the click asked: the reader pointed at one thing and wants that
+   * thing named, not a lane of everything else that happened to be big enough.
+   *
+   * The two contexts that outrank it both survive, because in each the reader asked for the
+   * other names: an exercise or a group, handled below, names what it activates; and naming
+   * a whole system by kind is a standing request that a later click does not cancel. */
+  if (app.selected != null && !app.exercise && !app.group && !app.labelKinds.size) return null;
+  if (!app.layers[r.layer]?.on) return null;
+  if (r.interior && app.xray === 0) return null;
   // during an exercise the muscles in the movement are the point of the picture,
   // and a chosen group is the same request said a different way
-  if (app.exercise || app.group) return activation.has(id);
-  return true;
+  if (app.exercise || app.group) return activation.has(id) ? r : null;
+  return r;
 }
 
 function updateLabels() {
@@ -2037,13 +2165,46 @@ function updateLabels() {
   // the lane's right edge, which is the console's left edge rather than the canvas's
   const w = wFull - panelInset();
   const projScale = h / (2 * Math.tan(camera.fov * Math.PI / 360));
-  const cand = [];
+  const cand = [], rough = [];
   for (const l of labels) {
-    if (!app.labelsOn || !labelVisible(l.id)) { hide(l); continue; }
-    const r = get(l.id);
-    _v.copy(anchorFor(l.id));
-    const dist = camera.position.distanceTo(_v);
-    _v.project(camera);
+    const r = app.labelsOn ? labelVisible(l.id) : null;
+    if (!r) { hide(l); continue; }
+    /* The centroid first, and the real anchor only for the ones that survive.
+     *
+     * `anchorFor` walks up to forty surface points through a bone matrix each, and
+     * this loop runs once per frame per structure. At two thousand structures that
+     * was 8.6 ms a frame -- more than the whole render -- to decide which sixteen
+     * names to draw, when fifteen hundred of them are rejected on size or on being
+     * off screen and never needed an anchor at all. The centroid is a cheap stand-in
+     * for that decision and the true anchor is computed below, for the survivors,
+     * so where a plate actually lands is unchanged. */
+    const at = labelPoint(l.id);
+    const distSq = camera.position.distanceToSquared(at);
+    const sel = app.selected === l.id;
+    const act = activation.has(l.id);
+    /* Two thresholds, not one. A structure sitting exactly on the bar crosses it several
+     * times a second as the body moves, and a label that blinks is harder to read than one
+     * that is simply absent: it has to grow past MIN_PX to appear and shrink well under it
+     * to leave again. */
+    const bar = l.hidden ? MIN_PX : MIN_PX * MIN_PX_KEEP;
+    const rad = app.radii[l.id] ?? 0.01;
+    /* Sized before it is projected, and against a squared distance, and that order is most
+     * of the cost of this loop.
+     *
+     * How big a structure is on screen needs only its distance from the camera; where it is
+     * on screen needs the projection matrix. With the whole atlas on, two thousand of these
+     * are rejected on size and about twenty survive — so projecting first meant two thousand
+     * matrix multiplies a frame to throw away nineteen hundred and eighty of them, and it
+     * was 4.5 ms, more than half the render. The comparison itself is rearranged the same
+     * way: `rad / dist * projScale < bar` is `dist > rad * projScale / bar`, which is a
+     * multiply rather than a division and can be tested squared, so the two thousand that
+     * fail cost no square root either. Nothing about which labels appear changes — the bar
+     * does not depend on the projection, so testing it earlier tests the same thing. */
+    const reach = rad * projScale / bar;
+    if (!sel && !act && distSq > reach * reach) { hide(l); continue; }
+    const dist = Math.sqrt(distSq);
+    const px = rad / Math.max(0.001, dist) * projScale;
+    _v.copy(at).project(camera);
     if (_v.z > 1) { hide(l); continue; }
     /* Canvas pixels, not lane pixels.
      *
@@ -2066,9 +2227,6 @@ function updateLabels() {
      * the console is still on screen and still worth naming — only its plate has to stop
      * short of the glass. */
     if (app.selected !== l.id && (ax < 0 || ax > wFull || ay < 0 || ay > h)) { hide(l); continue; }
-    const px = (app.radii[l.id] ?? 0.01) / Math.max(0.001, dist) * projScale;
-    const sel = app.selected === l.id;
-    const act = activation.has(l.id);
     // the role itself, for the tag on the plate. `act` stays a boolean: it is sorted on
     // arithmetically two lines down and tested as a flag above.
     const role = activation.get(l.id) ?? null;
@@ -2076,12 +2234,6 @@ function updateLabels() {
     // with metacarpals and phalanges: they are small but close to the camera, so their
     // projected size beats every trunk muscle in the picture.
     const told = !!(r.muscle || r.kind === 'brain');
-    /* Two thresholds, not one. A structure sitting exactly on the bar crosses it several
-     * times a second as the body moves, and a label that blinks is harder to read than one
-     * that is simply absent: it has to grow past MIN_PX to appear and shrink well under it
-     * to leave again. */
-    const bar = l.hidden ? MIN_PX : MIN_PX * MIN_PX_KEEP;
-    if (px < bar && !sel && !act) { hide(l); continue; }
     /* How wide this structure is on screen, from the surface points `anchorFor` just walked.
      * Done here rather than above the bar so it runs for the dozen labels that will be placed
      * rather than for all four hundred that will not.
@@ -2090,7 +2242,25 @@ function updateLabels() {
      * the subject reaches well past the outermost of them: sized from the anchors the right
      * lane landed on the occipital lobe, and sized from anchor ± the structure's own radius
      * it still did, because a parcel's radius does not know about the cerebellum below it. */
-    let x0 = ax, x1 = ax;
+    rough.push({ l, r, sel, act, role, told, px, ax, ay });
+  }
+  /* Ranked on the cheap proxy, then anchored -- and only the top of the list is
+   * anchored at all.
+   *
+   * Sixteen plates are ever placed, eight a side. Walking every surviving
+   * structure's forty surface points through a bone matrix to rank them was six
+   * milliseconds a frame with the whole atlas on, to throw almost all of it away.
+   * `SHORTLIST` is generously more than can be placed, so which sixteen win is
+   * decided by exactly what decided it before. */
+  rough.sort((a, b) => (b.sel - a.sel) || (b.act - a.act) || (b.told - a.told) || (b.px - a.px));
+  for (const c of rough.slice(SHORTLIST)) hide(c.l);
+  for (const c of rough.slice(0, SHORTLIST)) {
+    /* The real anchor. `anchorFor` fills `_pts` as a side effect, which is what the
+     * width below is measured from, so this both places the plate and sizes the lane. */
+    _s.copy(anchorFor(c.l.id)).project(camera);
+    c.ax = (_s.x * 0.5 + 0.5) * wFull;
+    c.ay = (-_s.y * 0.5 + 0.5) * h;
+    let x0 = c.ax, x1 = c.ax;
     for (let i = 0; i < _pts.length; i += 3) {
       _s.set(_pts[i], _pts[i + 1], _pts[i + 2]).project(camera);
       if (_s.z > 1) continue;
@@ -2098,9 +2268,9 @@ function updateLabels() {
       if (sx < x0) x0 = sx;
       if (sx > x1) x1 = sx;
     }
-    cand.push({ l, r, sel, act, role, told, px, ax, ay, x0, x1 });
+    c.x0 = x0; c.x1 = x1;
+    cand.push(c);
   }
-  cand.sort((a, b) => (b.sel - a.sel) || (b.act - a.act) || (b.told - a.told) || (b.px - a.px));
 
   /* Stable lanes. Choosing the side from live screen position makes every label hop
    * sideways as the model turns; a label keeps its side until its anchor crosses well past
@@ -2395,24 +2565,80 @@ function shown(o) {
 /** Above this the projection and the geometry have parted company — see `setExplode`. */
 const PICK_LIMIT = 0.02;
 
+/**
+ * Nearest sphere first, and stop when nothing left can be nearer.
+ *
+ * `intersectObjects` tests every object it is handed. Two thousand structures, most
+ * of them skinned -- and a skinned raycast walks each candidate triangle's vertices
+ * through a bone transform -- came to **119 ms for one pick**, on every pointer
+ * move. That is not a slow frame, it is the application stopping dead every time
+ * the mouse moves across the body, and it is most of what "my computer is lagging
+ * a lot" was.
+ *
+ * Nothing about the answer changes. Each candidate's bounding sphere gives the
+ * nearest distance along the ray at which that object could possibly be hit;
+ * sorted by it, the first real hit at distance d proves that every candidate whose
+ * sphere starts beyond d cannot beat it. Those are never tested. The hits that do
+ * come back are the same hits, in the same order.
+ */
+const _rs = new THREE.Vector3();
+function sphereEntry(mesh) {
+  const s = mesh.boundingSphere ?? mesh.geometry?.boundingSphere;
+  if (!s) return 0;                       // no sphere: cannot prune, so test it
+  /* World space. A skinned mesh sits at the identity and keeps its sphere in body
+   * coordinates; a bone-parented one carries its parent's transform. */
+  _rs.copy(s.center);
+  if (!mesh.isSkinnedMesh) _rs.applyMatrix4(mesh.matrixWorld);
+  const scale = mesh.isSkinnedMesh ? 1
+    : Math.max(1e-6, mesh.matrixWorld.getMaxScaleOnAxis());
+  const rad = s.radius * scale;
+  _rs.sub(ray.ray.origin);
+  const along = _rs.dot(ray.ray.direction);
+  const perp2 = _rs.lengthSq() - along * along;
+  if (perp2 > rad * rad) return Infinity;      // the ray misses the sphere entirely
+  return Math.max(0, along - Math.sqrt(Math.max(0, rad * rad - perp2)));
+}
+
+const _order = [];
 function pick(ev) {
   const r0 = canvas.getBoundingClientRect();
   if (app.explode > PICK_LIMIT) return pickApart(ev, r0);
-  const r = canvas.getBoundingClientRect();
-  ndc.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
-  ndc.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+  ndc.x = ((ev.clientX - r0.left) / r0.width) * 2 - 1;
+  ndc.y = -((ev.clientY - r0.top) / r0.height) * 2 + 1;
   ray.setFromCamera(ndc, camera);
-  const hits = ray.intersectObjects(pickTargets(), false);
-  let ghosted = null;
-  for (const h of hits) {
-    if (app.cutaway && clipPlane.distanceToPoint(h.point) < 0) continue;
-    const geo = h.object.geometry;
-    const reg = geo && regionAttr(geo);
-    const id = reg && h.face ? Math.round(reg.getX(h.face.a))
-             : (h.object.userData.regionId ?? null);
-    if (id == null || !get(id)) continue;
-    if (layerOpacity(String(h.object.userData.layer)) >= GHOST) return id;
-    if (ghosted == null) ghosted = id;
+
+  _order.length = 0;
+  for (const o of pickTargets()) {
+    const d = sphereEntry(o);
+    if (d !== Infinity) _order.push({ o, d });
+  }
+  _order.sort((a, b) => a.d - b.d);
+
+  let ghosted = null, best = Infinity;
+  const one = [];
+  for (const { o, d } of _order) {
+    // nothing beyond here can be nearer than the hit already found
+    if (d > best) break;
+    one.length = 0;
+    o.raycast(ray, one);
+    for (const h of one) {
+      if (h.distance > best) continue;
+      if (app.cutaway && clipPlane.distanceToPoint(h.point) < 0) continue;
+      const geo = h.object.geometry;
+      const reg = geo && regionAttr(geo);
+      const id = reg && h.face ? Math.round(reg.getX(h.face.a))
+               : (h.object.userData.regionId ?? null);
+      if (id == null || !get(id)) continue;
+      /* A ghosted layer is still there -- see `GHOST` -- so a hit on one is kept as
+       * a fallback and does not stop the search, which is what lets a click go
+       * through a peeled-away layer to the structure behind it. */
+      if (layerOpacity(String(h.object.userData.layer)) >= GHOST) {
+        best = h.distance;
+        ghosted = id;
+        break;
+      }
+      if (ghosted == null) ghosted = id;
+    }
   }
   return ghosted;
 }
@@ -2485,20 +2711,51 @@ canvas.addEventListener('pointerup', e => {
   if (cell != null) { selectStructure(cell); return; }
   selectStructure(pick(e));
 });
-canvas.addEventListener('pointermove', e => {
-  tap.move(e.pointerId, e.clientX, e.clientY);
-  if (e.buttons & 1) return;
-  /* Hover picking is a mouse affordance and costs a raycast through four hundred
-   * meshes. A finger already down is orbiting or pinching, and running it then
-   * spent the frame budget deciding what was under a gesture nobody was aiming. */
-  if (tap.pointers) return;
+/**
+ * Hover, at most once a frame.
+ *
+ * A pick costs a raycast through the meshes under the pointer, and a mouse
+ * dragged across the stage delivers a `pointermove` far more often than the
+ * screen is redrawn -- a fast sweep on a 120 Hz mouse is several hundred a
+ * second. Picking on each one meant the main thread spent its whole budget
+ * answering a question about pointer positions that were already stale before
+ * the answer arrived, which is what "it is lagging really hard" was: not the
+ * render, which is under eight milliseconds with the whole atlas on, but the
+ * hover behind it.
+ *
+ * So the event only records where the pointer is and asks for a frame. The pick
+ * happens once, in that frame, at the newest position -- the only one that can
+ * still be seen. Everything between is coalesced, which is exactly what the
+ * intermediate positions of a moving pointer are worth.
+ */
+let hoverAt = null, hoverQueued = false;
+function runHover() {
+  hoverQueued = false;
+  const e = hoverAt;
+  if (!e) return;
   const id = pick(e);
   if (id !== app.hover) { app.hover = id; syncLayers(); }
   canvas.style.cursor = id != null ? 'pointer' : (document.body.classList.contains('sheet') ? 'move' : 'grab');
   showHoverTip(id, e.clientX, e.clientY);
   pickCell(e);
+}
+canvas.addEventListener('pointermove', e => {
+  tap.move(e.pointerId, e.clientX, e.clientY);
+  if (e.buttons & 1) return;
+  /* Hover picking is a mouse affordance. A finger already down is orbiting or
+   * pinching, and running it then spent the frame budget deciding what was under
+   * a gesture nobody was aiming. */
+  if (tap.pointers) return;
+  hoverAt = { clientX: e.clientX, clientY: e.clientY };
+  if (hoverQueued) return;
+  hoverQueued = true;
+  requestAnimationFrame(runHover);
 });
-canvas.addEventListener('pointerleave', () => showHoverTip(null, 0, 0));
+canvas.addEventListener('pointerleave', () => {
+  hoverAt = null;
+  if (app.hover != null) { app.hover = null; syncLayers(); }
+  showHoverTip(null, 0, 0);
+});
 
 /**
  * The name of whatever is under the pointer, beside the pointer.
@@ -2637,6 +2894,17 @@ const VANTAGES = [
 ].map(v => new THREE.Vector3(...v).normalize());
 const _from = new THREE.Vector3(), _look = new THREE.Vector3();
 
+/**
+ * How much a clear line of sight is worth against looking at the thing the right way round.
+ *
+ * Clearance is scored 0..1 — the share of the way to the structure before something opaque
+ * gets in front of it — so this is the fraction of a completely blocked view a natural
+ * vantage is worth. Set so that a fully clear direction still beats a half-blocked one from
+ * the opposite side, and no higher: the *first* job of this function is to find a view that
+ * reaches the structure at all.
+ */
+const VANTAGE_BIAS = 0.22;
+
 function clearestDir(id, centre, distance, prefer) {
   const targets = pickTargets();
   if (!targets.length) return prefer;
@@ -2654,10 +2922,77 @@ function clearestDir(id, centre, distance, prefer) {
       if (layerOpacity(String(h.object.userData.layer)) < GHOST) continue;   // see-through
       blockedAt = h.distance; break;
     }
-    const score = blockedAt === Infinity ? 1e3 : blockedAt;
+    /* Scored, not maximised. This used to take the least obstructed direction outright, and
+     * with the skin gone most of them reach a superficial muscle unobstructed — so the
+     * winner among eight equally clear views was whichever happened to be tested first, and
+     * for the rectus abdominis that was the one looking *up* at the body from below and in
+     * front. A view of a person from underneath is not an answer to "show me this muscle".
+     *
+     * So clearance decides whether a direction is usable and the preference decides which
+     * usable one is chosen. The preferred direction is the one the anatomy asks for — see
+     * `facingDir` — and it wins every tie without ever overriding a genuinely blocked view. */
+    const clear = blockedAt === Infinity
+      ? 1 : Math.min(1, blockedAt / Math.max(1e-6, distance));
+    const score = clear + VANTAGE_BIAS * dir.dot(prefer);
     if (score > bestScore + 1e-6) { bestScore = score; best = dir; }
   }
   return best;
+}
+
+/**
+ * Which way a structure faces, so the camera can stand in front of it.
+ *
+ * A body part is a shape on the outside of a body, and the view that shows it is the one
+ * looking in at the surface it belongs to: the rectus abdominis from the front, the
+ * latissimus from behind, a rib from the side. That is what this computes — the structure's
+ * own direction out of the body, in the transverse plane, so nothing ever looks up at a
+ * person from underneath.
+ *
+ * It replaces a rule that sent every *paired* structure to a fixed left lateral vantage. The
+ * reasoning was sound for the case it was written for — a paired structure's centroid sits on
+ * the midline, so a direction derived from it points nowhere — but the conclusion did not
+ * follow: being paired says nothing about which way the pair faces. The rectus abdominis is
+ * paired, and seen from the left it is a flat strap edge-on, two pixels wide. Taking the
+ * direction from where the structure sits *front to back* rather than left to right answers
+ * the degenerate case without throwing away the answer.
+ *
+ * The result is a three-quarter view rather than face-on. A surface square to the camera has
+ * no silhouette, and most of what makes a muscle recognisable is its outline.
+ */
+const _out = new THREE.Vector3(), _side = new THREE.Vector3();
+function facingDir(c) {
+  const mid = bodyCentre();
+  _out.set(c.x - mid.x, 0, c.z - mid.z);
+  /* Deep and central — a vertebral body, a psoas at the midline. Nothing about where it sits
+   * says which way to look at it, and the standing lateral vantage is the one that shows a
+   * spine. */
+  if (_out.lengthSq() < 4e-4) return LEFT_VIEW.clone();
+  _out.normalize();
+  // turned toward the side the structure is on, so a left arm is seen from the left
+  const hand = c.x < 0 ? -1 : 1;
+  _side.set(-_out.z * hand, 0, _out.x * hand);
+  return _out.addScaledVector(_side, 0.42).setY(0.13).normalize();
+}
+
+/**
+ * The middle of the body as it has actually been loaded.
+ *
+ * `facingDir` needs to know which way is out, and out is measured from the body's own axis
+ * rather than from the origin: the midline is x = 0 by construction but the coronal middle is
+ * not z = 0, and taking it as zero puts the whole back half of the body on the "anterior"
+ * side. Averaged over every structure that has arrived, and recomputed when more do — the
+ * count is the only thing that can change it, since centroids are measured once at load.
+ */
+let bodyMid = null, bodyMidAt = -1;
+function bodyCentre() {
+  const ids = Object.keys(app.centroids);
+  if (bodyMid && ids.length === bodyMidAt) return bodyMid;
+  const m = new THREE.Vector3();
+  let n = 0;
+  for (const id of ids) { const p = app.centroids[id]; if (p) { m.add(p); n++; } }
+  if (n) m.divideScalar(n);
+  bodyMidAt = ids.length;
+  return (bodyMid = m);
 }
 
 export function flyTo(id, immediate = false) {
@@ -2665,16 +3000,8 @@ export function flyTo(id, immediate = false) {
   const side = posedSide(id);
   const c = side?.centre ?? app.centroids[id];
   if (!c) return;
-  const r = get(id);
   const radius = Math.max(0.03, (app.radii[id] ?? 0.05) * 1.9);
-  /* A paired structure's centroid sits on the midline, so its direction from the model
-   * centre is degenerate and any camera derived from it points nowhere useful. Bilateral
-   * structures and anything near the midline take a fixed left-lateral vantage instead. */
-  const bilateral = r?.sides?.length === 2 || Math.abs(c.x) < 0.02;
-  let dir = bilateral ? LEFT_VIEW.clone()
-          : new THREE.Vector3(c.x, 0, Math.abs(c.z) + 0.25).normalize();
-  if (dir.x < 0.15) { dir.x = 0.5; dir.normalize(); }
-  dir = clearestDir(id, c, Math.max(0.06, radius * 4), dir).clone();
+  let dir = clearestDir(id, c, Math.max(0.06, radius * 4), facingDir(c)).clone();
   // the structure's own extent, as a box of points the fit can measure
   const pts = side?.points ?? [];
   if (pts.length < 4) {
@@ -2684,10 +3011,19 @@ export function flyTo(id, immediate = false) {
   /* Close enough to fill the frame, far enough to be outside the limb. A metacarpal is two
    * centimetres across and its own fit puts the camera five centimetres away — which is
    * inside the forearm, looking at the inside wall of a muscle. Ten centimetres clears any
-   * body part while still filling the picture with a small bone. */
-  const { target, distance } = frameFor(pts, dir, radius * 0.45, 0.06);
+   * body part while still filling the picture with a small bone.
+   *
+   * The padding is the structure's own size rather than a flesh-thickness constant, and the
+   * headroom is small. `TOP_BAR` gives a sixth of the frame to the view bar, which is right
+   * for a standing figure whose head would otherwise be behind it and wrong for one muscle
+   * framed in the middle of the stage: paid on both the pad and the bar and again on the
+   * console inset, the three of them together were most of "why does it show me from far". */
+  const { target, distance } = frameFor(pts, dir, radius * 0.22, 0.05, STRUCTURE_TOP_BAR);
   flyToPose(target.clone().addScaledVector(dir, distance), target, immediate);
 }
+/* One structure sits in the middle of the stage, well under the bar floating over the top
+ * left. It needs enough headroom that its name plate has somewhere to go, and no more. */
+const STRUCTURE_TOP_BAR = 0.04;
 
 /** Standard anatomical views. A body needs these; a brain did not. */
 const VIEWS = {
@@ -2970,11 +3306,11 @@ export function frameRig(immediate = false, overClip = false) {
     for (const t of [0, 0.2, 0.4, 0.6, 0.8, 1]) {
       const s = sample(app.exercise, t);
       if (!s) continue;
-      rig.setAll(s.coordinates); rig.root.updateMatrixWorld(true);
+      rig.setAll(s.coordinates); markPosed(true); rig.root.updateMatrixWorld(true); markPosed(true);
       jointCloud(pts);
     }
     const back = sample(app.exercise, app.t);       // put the pose on screen back
-    if (back) { rig.setAll(back.coordinates); rig.root.updateMatrixWorld(true); refreshPosed(); }
+    if (back) { rig.setAll(back.coordinates); rig.root.updateMatrixWorld(true); markPosed(true); refreshPosed(); }
   } else jointCloud(pts);
   const box = new THREE.Box3();
   for (const p of pts) box.expandByPoint(p);
@@ -3623,7 +3959,7 @@ export function renderStructureInto(canvas, width, height, id,
    * is in a `finally`: a throw inside the render would otherwise leave the body permanently
    * hidden, or the stage's peel permanently off, with nothing on screen to say why. */
   let ok = false;
-  try { ok = paintInto(canvas, w, h, cam); } finally { undo?.(); peel?.(); look?.(); }
+  try { ok = paintInto(canvas, w, h, cam, aim.target); } finally { undo?.(); peel?.(); look?.(); }
   if (!ok) return null;
 
   const mark = at ?? (id != null ? posedSide(id)?.centre ?? app.centroids[id] : null) ?? null;
@@ -3682,7 +4018,7 @@ export function renderStageInto(canvas, width, height) {
  * the dark, and the deep end — which is most of this picture — is exactly where the codes have
  * run out. The quad costs a fraction of the scene render it follows.
  */
-function paintInto(canvas, w, h, cam) {
+function paintInto(canvas, w, h, cam, aimAt = null) {
   if (!stageTarget || stageTarget.width !== w || stageTarget.height !== h) {
     stageTarget?.dispose(); stageOut?.dispose();
     stageTarget = new THREE.WebGLRenderTarget(w, h, {
@@ -3708,6 +4044,11 @@ function paintInto(canvas, w, h, cam) {
   const prevAuto = renderer.autoClear;
   const prevClear = renderer.getClearColor(new THREE.Color());
   const prevAlpha = renderer.getClearAlpha();
+  /* The fog belongs to the subject — see `fitFog` — and this camera has a different one.
+   * Restored below with everything else this borrows, because the stage's next frame may
+   * be drawn before its own `fitFog` runs. */
+  const prevFog = { near: scene.fog.near, far: scene.fog.far };
+  fitFog(cam, aimAt ?? controls.target);
   renderer.setRenderTarget(stageTarget);
   renderer.autoClear = true;
   renderer.setClearColor(0x060b14, 1);
@@ -3728,6 +4069,7 @@ function paintInto(canvas, w, h, cam) {
   renderer.setRenderTarget(prevTarget);
   renderer.autoClear = prevAuto;
   renderer.setClearColor(prevClear, prevAlpha);
+  scene.fog.near = prevFog.near; scene.fog.far = prevFog.far;
 
   const c = canvas.getContext('2d');
   if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; stageImg = null; }
@@ -3835,7 +4177,7 @@ export async function setExercise(key) {
     poseFromClip(0);
     frameRig(false, true);
   } else if (rig) {
-    rig.reset();
+    rig.reset(); markPosed(false);
     setShowPaths(false);
     setShowMeshes(true);
     afterPose();
@@ -3914,10 +4256,27 @@ export async function setIsolate(ids) {
       await loadLayer(layer);
     }
   }
+  /* Isolating something selects it. Without this the panel could be describing one structure
+   * while the stage drew another — and `flyTo` below, the labels, and the natural-colour
+   * surface above are all keyed on the selection, so a piece isolated from the layer list
+   * would have been framed as a group and named as a stranger. */
+  if (list.length === 1 && app.selected !== list[0]) {
+    app.selected = list[0];
+    app.autoSelected = false;
+    ui?.showStructure?.(list[0]);
+  }
   syncLayers();
   ui?.relabel?.();
-  if (app.isolate) flyToGroup(list);
-  else resetView();
+  /* One piece is framed as a piece, not as a group.
+   *
+   * `flyToGroup` fits a cloud from a fixed left-lateral vantage with a flesh-thickness pad,
+   * which is the right answer for a pelvic floor and the wrong one for a single structure:
+   * it put the rectus abdominis edge-on, a flat strap seen from the side, a third of the way
+   * across the stage. Isolating is the strongest way of asking to look at one thing, so it
+   * gets the closest look this application has. */
+  if (!app.isolate) resetView();
+  else if (list.length === 1) flyTo(list[0]);
+  else flyToGroup(list);
 }
 
 /* ------------------------------------------------------------- taking it apart
@@ -4942,6 +5301,7 @@ renderer.setAnimationLoop((now) => {
   dirtyFrames--;
   lastDrawn = now;
   root.updateMatrixWorld();
+  fitFog();
   // after the bones have their world matrices for this frame and before anything is drawn
   let mark = _t0(); boneDQ?.update(); _add('skin', mark);
   if (!hidden) {

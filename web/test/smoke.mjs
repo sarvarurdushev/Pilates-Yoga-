@@ -282,12 +282,18 @@ const cellProbe = await page.evaluate(async () => {
   const r = c.getBoundingClientRect();
   const note = document.getElementById('cellnote');
   /* Sweep a short line across the middle of the brain rather than trusting one pixel: a soma
-   * is a few pixels across and the head view is not pinned to the centre of the canvas. */
+   * is a few pixels across and the head view is not pinned to the centre of the canvas.
+   *
+   * A frame between the moves, because the application answers a hover once a frame rather
+   * than once an event — see `runHover`. Forty-one moves dispatched inside one turn are not
+   * a gesture anybody can make: they coalesce to the last position, which is the far end of
+   * the sweep and off the brain. Waiting a frame is what a moving pointer actually does. */
   for (let i = 0; i <= 40; i++) {
     const x = r.left + r.width * (0.30 + 0.40 * (i / 40));
     const y = r.top + r.height * 0.50;
     c.dispatchEvent(new PointerEvent('pointermove',
       { clientX: x, clientY: y, bubbles: true }));
+    await new Promise(rq => requestAnimationFrame(rq));
     if (!note.hidden) break;
   }
   const out = note.hidden ? { shown: false } : {

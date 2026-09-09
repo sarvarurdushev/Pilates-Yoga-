@@ -125,7 +125,17 @@ _VEIN = re.compile(r'\b(?:vein|veins|venous)\b', re.I)
 #: at far better quality, and drawing a second, coarser copy of it inside the head would be
 #: two brains disagreeing. Cavities are holes -- a mesh of the inside of a ventricle drawn
 #: solid is a lie about what is there.
-_NOT_DRAWN = re.compile(r'\bgyrus\b|\bsulcus\b|\bcortex\b|\bcavity of\b', re.I)
+#:
+#: And the skin. It is an organ, so the IS-A tree files it under `organ` and it arrived in
+#: organs_full quite correctly -- as one closed body-shaped envelope wrapped around
+#: everything else, which is what "why do organs have the skin?" was looking at. An atlas is
+#: read from the outside in and the outermost thing has to be the first one gone; this one
+#: could not even be switched off on its own, because turning off organs_full to lose it also
+#: lost the hundred and seventy structures it was hiding. `shell.glb` was dropped for the same
+#: reason in `bodies.js` -- see the note there -- and this is the other half of that removal:
+#: the derived shell and the real skin are both a layer of brown over the anatomy.
+_NOT_DRAWN = re.compile(r'\bgyrus\b|\bsulcus\b|\bcortex\b|\bcavity of\b'
+                        r'|^skin$|\bskin of\b', re.I)
 
 
 def classify(best, kids, names_of, drawn=()):

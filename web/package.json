@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "npx http-server . -p 8080 -c-1",
-    "test": "node --test test/frame.test.mjs test/palette.test.mjs test/content.test.mjs test/library.test.mjs test/skin.test.mjs test/rig.test.mjs test/bind.test.mjs test/bodies.test.mjs",
+    "test": "node --test test/frame.test.mjs test/palette.test.mjs test/content.test.mjs test/library.test.mjs test/skin.test.mjs test/rig.test.mjs test/bind.test.mjs test/bodies.test.mjs test/merged.test.mjs test/raybvh.test.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
