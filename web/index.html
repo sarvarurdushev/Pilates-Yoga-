@@ -1041,6 +1041,11 @@ details.groups>summary em{font-style:normal;font-size:10px;color:var(--dim2);
            question -- what is behind this -- in the two ways there are. -->
       <div class="crow"><label id="explodeLab"></label>
         <input id="explode" type="range" min="0" max="1" step="0.01" value="0"></div>
+      <!-- Two layouts, because they answer two different questions: lay every
+           piece out as a catalogue, or open the body where it stands. -->
+      <div class="crow" id="explodeLayoutRow"><label id="explodeLayoutLab"></label>
+        <div class="seg"><button id="exInventory" aria-pressed="true"></button>
+          <button id="exOpen"></button></div></div>
       <p class="chelp" id="explodeHelp" hidden></p>
       <!-- Two ways of drawing the cortex. Like the scan, it means nothing without the brain. -->
       <div class="crow" id="lookRow" style="display:none"><label id="lookLab"></label>

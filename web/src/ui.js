@@ -31,6 +31,7 @@ export function mountUI(ctx) {
           setRotate, setRegister, setInstruction, setLayer, setLayerOpacity, setView,
           resetView, setExercise, setPathway, activationOf,
           setGroup, anatomyGroups, groupsForStructure, setIsolate, isolated, setExplode,
+          setExplodeLayout, explodeLayout,
           poseFromClip, setPlaying, setShowPaths, setShowMeshes, liveActivationOf,
           musclePathReport, setLabelKind, clearLabelKinds } = ctx;
 
@@ -118,7 +119,19 @@ export function mountUI(ctx) {
     $('explodeLab').textContent = app.explode > 0.01
       ? `${T('explode')} — ${Math.round(app.explode * 100)}%` : T('explode');
     const eh = $('explodeHelp');
-    if (eh) { eh.textContent = T('explodeHelp'); eh.hidden = app.explode <= 0.01; }
+    if (eh) {
+      eh.textContent = T(explodeLayout?.() === 'open' ? 'explodeHelp' : 'exInventoryHelp');
+      eh.hidden = app.explode <= 0.01;
+    }
+    const lay = explodeLayout?.() ?? 'inventory';
+    const ell = $('explodeLayoutLab');
+    if (ell) ell.textContent = T('exLayout');
+    for (const [id, which] of [['exInventory', 'inventory'], ['exOpen', 'open']]) {
+      const b = $(id);
+      if (!b) continue;
+      b.textContent = T(id);
+      b.setAttribute('aria-pressed', String(lay === which));
+    }
     const ex = $('explode');
     if (ex && document.activeElement !== ex) ex.value = String(app.explode);
     $('scanLab').textContent = T('scan');
@@ -1215,6 +1228,8 @@ export function mountUI(ctx) {
   $('reset').onclick = resetView;
   $('atlas').oninput = e => setAtlas(+e.target.value);
   $('explode').oninput = e => { setExplode(+e.target.value); syncControls(); };
+  $('exInventory').onclick = () => { setExplodeLayout('inventory'); syncControls(); };
+  $('exOpen').onclick = () => { setExplodeLayout('open'); syncControls(); };
   $('xray').oninput  = e => setXray(+e.target.value);
   $('clip').oninput  = e => setClip(+e.target.value);
   /* The scan. `Off` is a plane like the others rather than a separate toggle, because the

@@ -60,6 +60,9 @@ export const app = {
   isolate: null,
   /** How far apart the body is pulled, 0 to 1. See `setExplode`. */
   explode: 0, explodeReady: false,
+  /* Laid out as a catalogue by default, which is what the control is reached for:
+   * "show me everything in here". `open` is the other layout -- see EXPLODE_LAYOUTS. */
+  explodeLayout: 'inventory',
   // §9: the clip, where the scrubber is, and whether it is running
   t: 0, playing: false, hasMotion: false, showPaths: false, showMeshes: true,
   pathway: null,
@@ -1844,12 +1847,24 @@ const _pts = [];
  * exercise every rope pointed at where the structure had been standing — a line drawn from
  * a label to nothing, which is exactly what a rope must never be.
  */
+const _off = new THREE.Vector3();
 function anchorFor(id) {
   _pts.length = 0;
+  /* The shader moves a structure by its palette offset when the body is taken
+   * apart, and the geometry the anchors were measured from does not move with
+   * it. Without this every label went on pointing at where its structure used to
+   * stand: laid out as a catalogue, four hundred ropes converged on the middle
+   * of an empty grid, which is exactly what the picture showed. */
+  const spread = app.explode > 0 ? palette.getOffset(id, _off).multiplyScalar(app.explode)
+                                 : null;
   const owners = meshesOfId.get(id);
-  if (!owners?.length) return _a.copy(app.centroids[id]);
+  if (!owners?.length) {
+    _a.copy(app.centroids[id]);
+    return spread ? _a.add(spread) : _a;
+  }
   let bestD = Infinity;
   _a.copy(app.centroids[id]);
+  if (spread) _a.add(spread);
   for (const mesh of owners) {
     const b = bound.get(mesh);
     const m = b ? deltaFor(b.segment) : null;
@@ -1858,6 +1873,7 @@ function anchorFor(id) {
     for (const p of own.pts) {
       _ap.copy(p);
       if (m) _ap.applyMatrix4(m);
+      if (spread) _ap.add(spread);
       _pts.push(_ap.x, _ap.y, _ap.z);
       const d = camera.position.distanceToSquared(_ap);
       if (d < bestD) { bestD = d; _a.copy(_ap); }
@@ -2245,7 +2261,8 @@ function shown(o) {
 const PICK_LIMIT = 0.02;
 
 function pick(ev) {
-  if (app.explode > PICK_LIMIT) return null;
+  const r0 = canvas.getBoundingClientRect();
+  if (app.explode > PICK_LIMIT) return pickApart(ev, r0);
   const r = canvas.getBoundingClientRect();
   ndc.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
   ndc.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
@@ -2264,6 +2281,51 @@ function pick(ev) {
   }
   return ghosted;
 }
+
+/**
+ * Picking while the body is apart, by projection rather than by ray.
+ *
+ * The raycaster tests the geometry where it really is, and taking the body apart
+ * moves only the projection -- so a ray at a separated rib selects whatever is
+ * still standing where that rib used to be. That is why clicking was simply
+ * turned off above `PICK_LIMIT`, which is defensible while the answer is "the
+ * body is open, look at it" and indefensible once the answer is a catalogue of
+ * two thousand pieces laid out to be clicked.
+ *
+ * So it picks the way a catalogue is picked: every structure's anchor is
+ * projected to the screen and the nearest one inside a radius wins. The pieces
+ * are spread out by construction here -- that is what the layout is for -- so
+ * nearest-on-screen is not an approximation of the right answer, it is the right
+ * answer.
+ */
+const _pp = new THREE.Vector3();
+function pickApart(ev, rect) {
+  const sx = ev.clientX - rect.left, sy = ev.clientY - rect.top;
+  /* Generous, because a piece in the grid is small on screen and the reader is
+   * aiming at a shape rather than at a pixel. Scaled by the cell so it stays the
+   * same fraction of a cell whatever the layout's size. */
+  let bestD = (rect.width * 0.035) ** 2, best = null;
+  for (const name of LAYER_ORDER) {
+    const L2 = layers[name], st = app.layers[name];
+    if (!L2.loaded || !st?.on || (st.opacity ?? 1) <= 0.05) continue;
+    if (name.startsWith('muscles') && !app.showMeshes) continue;
+    for (const mesh of L2.meshes ?? []) {
+      if (!shown(mesh)) continue;
+      for (const id of restByMesh.get(mesh)?.keys() ?? []) {
+        const c = app.centroids[id];
+        if (!c || !get(id)) continue;
+        _pp.copy(c).add(palette.getOffset(id, _off2).multiplyScalar(app.explode));
+        _pp.project(camera);
+        if (_pp.z > 1) continue;
+        const px = (_pp.x + 1) / 2 * rect.width, py = (1 - _pp.y) / 2 * rect.height;
+        const d = (px - sx) ** 2 + (py - sy) ** 2;
+        if (d < bestD) { bestD = d; best = id; }
+      }
+    }
+  }
+  return best;
+}
+const _off2 = new THREE.Vector3();
 
 /** Pick at a client coordinate. Exported so a test can ask what is under a point. */
 export const pickAt = (clientX, clientY) => pick({ clientX, clientY });
@@ -3697,29 +3759,96 @@ export async function setIsolate(ids) {
 
 /* ------------------------------------------------------------- taking it apart
  *
- * A body is four hundred structures packed into the shape of a person, and most
+ * A body is hundreds of structures packed into the shape of a person, and most
  * of them are behind another one. X-ray answers that by making what is in front
- * translucent; this answers it by moving what is in front out of the way, which
- * is the better answer for "how many layers deep does this go" and the worse one
- * for "where exactly is it".
+ * translucent; this answers it by moving what is in front out of the way.
  *
- * **Radially, from the spine.** Every structure moves along the line from the
- * body's own vertical axis, at its own height, out through where it already is
- * -- so the ribs open like a cage, the two sides separate, and the deep spinal
- * muscles are left standing on the midline with nothing over them. A grid, which
- * is the other way to do this, sorts by nothing anatomical and turns an atlas
- * into a parts catalogue.
+ * **Two layouts, because they answer two different questions.**
  *
- * Computed once, from the centroids the geometry index already measured, and
- * uploaded as a texture the vertex shader reads. Moving the slider costs one
- * uniform write, not four hundred matrix updates -- which matters, because this
- * is exactly the control somebody drags back and forth.
+ * `open` pushes every structure away from the body's own vertical axis at its
+ * own height, deeper layers moving less -- so the ribs open like a cage and the
+ * deep spinal muscles are left standing on the midline with nothing over them.
+ * That is the picture for *how many layers deep does this go*.
+ *
+ * `inventory` lays every piece out on a regular grid, sorted by layer and then
+ * by name, so the whole atlas can be read at once as a catalogue: every bone
+ * together, every muscle together, each one separated from its neighbours and
+ * none of them hiding any other. That is the picture for *what is in here*, and
+ * it is the one this defaulted to being unable to draw. A comment here used to
+ * dismiss it as sorting by nothing anatomical; that was wrong twice over, since
+ * it sorts by exactly the grouping the layer list already uses, and since being
+ * able to see the whole inventory is the thing an atlas is for.
+ *
+ * Both are computed once, from the centroids the geometry index already
+ * measured, and uploaded as a texture the vertex shader reads. Moving the slider
+ * costs one uniform write, not hundreds of matrix updates -- which matters,
+ * because this is exactly the control somebody drags back and forth.
  */
-const EXPLODE_REACH = 0.42;      // body heights at full separation
+const EXPLODE_REACH = 0.42;      // body heights at full separation, `open`
 /** Structures nearer the midline than this get a direction rather than a wobble. */
 const AXIS_EPSILON = 0.012;
+/** Cell size as a multiple of the median piece radius, in `inventory`. */
+const CELL_GAIN = 2.6;
+/** Wider than tall, because a screen is. */
+const GRID_ASPECT = 1.7;
 
-function computeExplodeOffsets() {
+export const EXPLODE_LAYOUTS = ['inventory', 'open'];
+
+/** Where the laid-out grid sits and how big it is, so a camera can be fitted to it. */
+let explodeExtent = null;
+export const explodeLayoutExtent = () => explodeExtent;
+
+/** Everything with a mesh of its own, in the order the inventory reads. */
+function inventoryOrder() {
+  const { byId } = registry();
+  const rows = [];
+  for (const [id, r] of byId) {
+    // an aggregate has no geometry, so it has nothing to lay out -- its parts do
+    if (r.parts || !app.centroids[id]) continue;
+    rows.push({ id, layer: r.layer, name: r.name.en });
+  }
+  const rank = n => { const i = LAYER_ORDER.indexOf(n); return i < 0 ? 99 : i; };
+  rows.sort((a, b) => rank(a.layer) - rank(b.layer) || a.name.localeCompare(b.name));
+  return rows;
+}
+
+function inventoryOffsets() {
+  const rows = inventoryOrder();
+  if (!rows.length) { explodeExtent = null; return; }
+
+  /* The median rather than the largest: one femur is four times the size of the
+   * bone beside it, and a cell sized for the femur spreads two thousand pieces
+   * over a grid nobody can read. The long ones overlap their neighbours a
+   * little, which is what a parts catalogue looks like. */
+  const radii = rows.map(r => app.radii[r.id] ?? 0.02).sort((a, b) => a - b);
+  const cell = Math.max(0.03, CELL_GAIN * radii[radii.length >> 1]);
+
+  const cols = Math.max(1, Math.round(Math.sqrt(rows.length * GRID_ASPECT)));
+  const lines = Math.ceil(rows.length / cols);
+  /* Centred on the body's own middle, measured from the pieces themselves rather
+   * than from a frame constant -- `FRAME` describes the brain's placement, and
+   * using it here put the catalogue at the height of somebody's forehead. */
+  let lo = Infinity, hi = -Infinity;
+  for (const r of rows) {
+    const y = app.centroids[r.id].y;
+    if (y < lo) lo = y;
+    if (y > hi) hi = y;
+  }
+  const midY = (lo + hi) / 2;
+
+  for (let i = 0; i < rows.length; i++) {
+    const c = app.centroids[rows[i].id];
+    const col = i % cols, line = (i / cols) | 0;
+    const x = (col - (cols - 1) / 2) * cell;
+    const y = midY - (line - (lines - 1) / 2) * cell;
+    palette.setOffset(rows[i].id, x - c.x, y - c.y, -c.z);
+  }
+  explodeExtent = { width: cols * cell, height: lines * cell,
+                    centre: new THREE.Vector3(0, midY, 0), cell, pieces: rows.length };
+  palette.upload();
+}
+
+function openOffsets() {
   const { byId } = registry();
   const out = new THREE.Vector3();
   for (const [id, r] of byId) {
@@ -3733,14 +3862,30 @@ function computeExplodeOffsets() {
     if (out.lengthSq() < AXIS_EPSILON * AXIS_EPSILON) out.set(0, 0, 1);
     else out.normalize();
     /* Deeper layers move less, so the body opens rather than scattering: the
-     * skin-side muscles get out of the way and the skeleton stays put, which is
-     * the picture somebody is asking for when they reach for this. */
+     * skin-side muscles get out of the way and the skeleton stays put. */
     const depth = XRAY_DEPTH[r.layer] ?? 0;
     const reach = EXPLODE_REACH * (1 - depth / 5);
     palette.setOffset(id, out.x * reach, 0, out.z * reach);
   }
+  explodeExtent = null;
   palette.upload();
 }
+
+function computeExplodeOffsets() {
+  if (app.explodeLayout === 'open') openOffsets();
+  else inventoryOffsets();
+}
+
+/** Swap between opening the body and laying it out. Recomputes and keeps the slider where it is. */
+export function setExplodeLayout(which) {
+  const next = EXPLODE_LAYOUTS.includes(which) ? which : 'inventory';
+  if (next === app.explodeLayout) return;
+  app.explodeLayout = next;
+  app.explodeReady = false;
+  setExplode(app.explode);
+  ui?.syncControls?.();
+}
+export const explodeLayout = () => app.explodeLayout;
 
 /**
  * How far apart the body is, 0 to 1.
@@ -3755,12 +3900,41 @@ function computeExplodeOffsets() {
 export function setExplode(v) {
   const next = Math.max(0, Math.min(1, +v || 0));
   if (!app.explodeReady) { computeExplodeOffsets(); app.explodeReady = true; }
+  const was = app.explode;
   app.explode = next;
   for (const m of materials) {
     const u = m.userData.uniforms;
     if (u?.uExplode) u.uExplode.value = next;
   }
+  /* The catalogue is far wider than the body it came out of, so a camera framed
+   * on a standing figure sees the middle few rows of it and nothing else. It is
+   * fitted once, on the way out, and the view is restored once on the way back
+   * -- rather than on every step of the drag, which would take the camera off
+   * whatever the reader had aimed it at while they were still moving it. */
+  if (explodeExtent) {
+    if (was <= OPENED && next > OPENED) flyToExtent(explodeExtent);
+    else if (was > OPENED && next <= OPENED) resetView();
+  }
   invalidate();
+}
+
+/** Above this the body is opened rather than assembled — also `PICK_LIMIT`'s neighbour. */
+const OPENED = 0.02;
+
+/** Frame the laid-out catalogue: face on, far enough back to hold all of it. */
+function flyToExtent(ext, immediate = false) {
+  FLIGHT_BY = 'flyToExtent';
+  const half = new THREE.Vector3(ext.width / 2, ext.height / 2, ext.cell);
+  const pts = [];
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1])
+    pts.push(new THREE.Vector3(ext.centre.x + sx * half.x,
+                               ext.centre.y + sy * half.y,
+                               ext.centre.z + sz * half.z));
+  /* Straight on, because a grid read at an angle is a grid with its far rows
+   * squeezed into a line. */
+  const dir = new THREE.Vector3(0, 0, 1);
+  const { target, distance } = frameFor(pts, dir, ext.cell, 0.02);
+  flyToPose(target.clone().addScaledVector(dir, distance), target, immediate);
 }
 
 /** What is isolated right now, as ids. Empty when the whole body is drawn. */
@@ -4064,6 +4238,7 @@ const ui = mountUI({
   setRotate, setRegister, setInstruction, setLayer, setLayerOpacity, setView, resetView,
   setExercise, setPathway, captureStage, activationOf, flyTo,
   setGroup, anatomyGroups, groupsForStructure, setIsolate, isolated, setExplode,
+  setExplodeLayout, explodeLayout,
   poseFromClip, setPlaying, setShowPaths, setShowMeshes, liveActivationOf, musclePathReport,
   frameRig, setLabelKind, clearLabelKinds,
   // a getter, not the value: the panel mounts before the rig has finished loading
