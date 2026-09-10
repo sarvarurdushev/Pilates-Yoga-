@@ -1865,6 +1865,108 @@ console.log('explode:', JSON.stringify(apart));
   }
 }
 
+/* The taught body and the complete atlas are never drawn together.
+ *
+ * They are two releases of the same anatomy at two granularities — 449 fused,
+ * rigged structures against 2,186 sided pieces — so drawing both puts two
+ * slightly different meshes of every muscle in the same space, fighting for the
+ * same pixels. `setAtlasDepth` had always said so and turned the other side off;
+ * the layer list had not, so switching "Muscles — every piece" on beside
+ * "Muscles — deep" drew **491 structures twice**. On screen that is a second
+ * limb inside the first, and it was reported as exactly that.
+ *
+ * Measured as anatomy rather than as flags: an FMA identifier that is drawn from
+ * both sides at once is one structure on screen twice, whatever the switches say.
+ */
+{
+  const atlas = await page.evaluate(async () => {
+    const m = await import('/src/main.js');
+    const S = await import('/src/structures.js');
+    const TAUGHT = ['skeleton', 'muscles_superficial', 'muscles_deep', 'organs'];
+    const FULL = ['bones_full', 'muscles_full', 'organs_full'];
+    const lit = (names) => names.filter((n) => m.app.layers[n]?.on);
+    /* One FMA can be carried by several structures on one side — a trapezius is
+     * three pieces in 4.0 — so the sides are sets and the question is whether
+     * both are represented, not how many pieces each brought. */
+    const twice = () => {
+      const sides = new Map();
+      for (const [, r] of S.registry().byId) {
+        if (!m.app.layers[r.layer]?.on) continue;
+        const which = TAUGHT.includes(r.layer) ? 'taught'
+                    : FULL.includes(r.layer) ? 'full' : null;
+        if (!which) continue;
+        for (const f of r.fma ?? []) {
+          if (!sides.has(f)) sides.set(f, new Set());
+          sides.get(f).add(which);
+        }
+      }
+      let n = 0;
+      for (const v of sides.values()) if (v.size > 1) n++;
+      return n;
+    };
+    /* Put back exactly what was on. This check has to turn layers off to make
+     * its point, and the checks after it read the body it is handed — leaving
+     * three layers off would quietly shrink what they measure. */
+    const was = Object.fromEntries(
+      Object.keys(m.app.layers).map((n) => [n, !!m.app.layers[n].on]));
+    // flipped one switch at a time, which is the path a reader takes
+    for (const n of TAUGHT) await m.setLayer(n, true);
+    const taught = { on: lit(TAUGHT).length, full: lit(FULL).length,
+                     depth: m.atlasDepth(), twice: twice() };
+    await m.setLayer('muscles_full', true);
+    const full = { on: lit(TAUGHT), full: lit(FULL).length,
+                   depth: m.atlasDepth(), twice: twice() };
+    await m.setLayer('muscles_deep', true);   // and back the other way
+    const back = { on: lit(TAUGHT).length, full: lit(FULL),
+                   depth: m.atlasDepth(), twice: twice() };
+    for (const n of FULL) await m.setLayer(n, false);
+    for (const [n, on] of Object.entries(was)) await m.setLayer(n, on);
+    return { taught, full, back };
+  });
+  /* And the switch on the screen says the same thing. The depth control is
+   * templated with the panel rather than redrawn per change, so a layer that
+   * moves the depth underneath it used to leave it reading the other atlas —
+   * a control disagreeing with the picture it controls. */
+  await openPanel(page, 'layers');
+  const shown = await page.evaluate(async () => {
+    const m = await import('/src/main.js');
+    const was = Object.fromEntries(
+      Object.keys(m.app.layers).map((n) => [n, !!m.app.layers[n].on]));
+    const read = () => [...document.querySelectorAll('[data-depth]')]
+      .filter((b) => b.getAttribute('aria-pressed') === 'true')
+      .map((b) => b.dataset.depth);
+    await m.setLayer('muscles_full', true);
+    const onFull = { lit: read(), depth: m.atlasDepth() };
+    await m.setLayer('muscles_deep', true);
+    const onTaught = { lit: read(), depth: m.atlasDepth() };
+    for (const n of ['bones_full', 'muscles_full', 'organs_full']) await m.setLayer(n, false);
+    for (const [n, on] of Object.entries(was)) await m.setLayer(n, on);
+    return { onFull, onTaught };
+  });
+  // and the rail is left as it was found: this check needed the panel open, the
+  // ones after it did not ask for it
+  await page.click('#rail [data-pop="layers"]');
+  await page.waitForTimeout(300);
+  console.log('atlas switch:', JSON.stringify(shown));
+  for (const [what, seen] of [['complete', shown.onFull], ['taught', shown.onTaught]])
+    if (seen.lit.join() !== what)
+      errors.push(`the atlas switch reads "${seen.lit.join() || 'nothing'}" ` +
+        `with the ${what} atlas drawn`);
+  console.log('atlas depth:', JSON.stringify(atlas));
+  if (atlas.taught.twice)
+    errors.push(`the taught body alone draws ${atlas.taught.twice} structures twice`);
+  if (atlas.full.on.length)
+    errors.push(`turning a complete-atlas layer on left the taught body on: ` +
+      `${atlas.full.on.join(', ')} — ${atlas.full.twice} structures drawn twice`);
+  if (atlas.full.depth !== 'complete')
+    errors.push(`the atlas switch reads "${atlas.full.depth}" with a complete layer on`);
+  if (atlas.back.full.length)
+    errors.push(`turning a taught layer on left the complete atlas on: ` +
+      `${atlas.back.full.join(', ')} — ${atlas.back.twice} structures drawn twice`);
+  if (atlas.back.depth !== 'taught')
+    errors.push(`the atlas switch reads "${atlas.back.depth}" with a taught layer on`);
+}
+
 /* Every piece laid out in the catalogue answers a click, and answers with itself.
  *
  * A sheet of two thousand pieces is a sheet of two thousand *controls*, and one that does

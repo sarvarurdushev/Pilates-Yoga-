@@ -11,6 +11,7 @@
     "test:render": "node test/render/capture.mjs",
     "test:render:diff": "node test/render/compare.mjs",
     "test:smoke": "node test/smoke.mjs",
+    "test:panel": "node test/panel.test.mjs",
     "poses": "node tools/posesheet.mjs .render/poses.html",
     "poses:check": "node tools/check.mjs",
     "poses:solve": "node tools/solve.mjs --all",

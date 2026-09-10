@@ -385,10 +385,36 @@ function wire(root, nw) {
  * still arriving, so a tile that is not ready is tried again rather than left
  * black.
  */
-function paintThumbs(root, nw, tries = 0) {
+function paintThumbs(root, nw, tries = 0, run = null) {
+  /* One loop per strip. This is called again every time the reader comes back to
+   * the tab, and without a token each visit started a second loop beside the
+   * first — two scene renders a frame instead of one, from a function written to
+   * do exactly one. The newest call wins and the older loops see a token that is
+   * no longer theirs and stop. */
+  if (run === null) { run = (root.__thumbRun = (root.__thumbRun ?? 0) + 1); }
+  else if (run !== root.__thumbRun) return;
+  /* On screen only. A tile scrolled out of the strip costs exactly as much to
+   * draw as one being looked at — a full scene render and a pipeline stall — and
+   * a grid of forty is mostly out of view at any moment. */
+  const seen = (c) => {
+    const b = c.getBoundingClientRect();
+    return b.width > 0 && b.bottom > 0 && b.top < (window.innerHeight || 0);
+  };
   const pending = [...root.querySelectorAll('canvas[data-thumb]')]
-    .filter((c) => !c.dataset.drawn);
-  if (!pending.length || tries > 600) return;
+    .filter((c) => !c.dataset.drawn && seen(c));
+  if (!pending.length || tries > 600) {
+    /* Something may still be below the fold, or waiting on a layer. Come back
+     * slowly rather than spending a scene render every frame finding out — and
+     * without spending an attempt, because `tries` is a budget for *renders*.
+     * Charging the waiting to it meant a strip left open for a few minutes had
+     * spent the whole budget doing nothing, and the tiles the reader then
+     * scrolled down to were never drawn. What stops this loop is the strip
+     * leaving the document, or a newer loop taking the token. */
+    if (root.isConnected
+        && root.querySelector('canvas[data-thumb]:not([data-drawn])'))
+      setTimeout(() => paintThumbs(root, nw, tries, run), 700);
+    return;
+  }
   const canvas = pending[0];
   const box = canvas.getBoundingClientRect();
   if (box.width) {
@@ -402,7 +428,7 @@ function paintThumbs(root, nw, tries = 0) {
       console.warn('[session] could not draw', canvas.dataset.thumb, error);
     }
   }
-  requestAnimationFrame(() => paintThumbs(root, nw, tries + 1));
+  requestAnimationFrame(() => paintThumbs(root, nw, tries + 1, run));
 }
 
 export const _internals = { tiles, score, ranked, plots, thumbnails,

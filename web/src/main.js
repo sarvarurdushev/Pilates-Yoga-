@@ -3827,6 +3827,28 @@ export async function setLayer(name, on) {
    * in a layer name and a body that genuinely lacks one look identical from here. */
   if (!app.layers[name]) { console.warn(`no layer "${name}" on this body`); return; }
   app.layers[name].on = on;
+  /* The two atlases are one choice, and this is the other place it can be made.
+   *
+   * `setAtlasDepth` says it plainly — the taught body and the complete atlas are
+   * the same anatomy at two granularities and drawing both is two copies of one
+   * body in the same space — and then turns the other side off. The layer list
+   * never did: switching "Muscles — every piece" on beside "Muscles — deep" left
+   * **491 structures drawn twice**, two slightly different meshes of every leg
+   * muscle fighting for the same pixels. That is what "why do we have 2 legs"
+   * was looking at, and it is a rule that was stated in one place and enforced
+   * in one place. */
+  if (on) {
+    const other = FULL_LAYERS.includes(name) ? TAUGHT_LAYERS
+                : TAUGHT_LAYERS.includes(name) ? FULL_LAYERS : null;
+    if (other) {
+      for (const n of other) if (app.layers[n]) app.layers[n].on = false;
+      app.atlasDepth = FULL_LAYERS.includes(name) ? 'complete' : 'taught';
+      /* The catalogue is packed from the structures that are drawn, so switching
+       * sides changes it — the same reason `setAtlasDepth` ends with this. Free
+       * while the body is assembled: it does nothing unless it is open. */
+      relayoutExplode();
+    }
+  }
   if (on) await loadLayer(name);
   syncLayers();
   /* The reveal clones hang off the layer's own drawables, so a layer arriving or
@@ -3983,7 +4005,7 @@ function onlyLayers(names) {
 }
 
 /** Hide every drawable but the meshes of `ids`. Returns the undo. */
-function onlyShow(ids) {
+function onlyShow(ids, opts) {
   const want = new Set();
   const extra = [];
   for (const id of ids) for (const m of meshesOfId.get(id) ?? []) {
@@ -3993,7 +4015,7 @@ function onlyShow(ids) {
      * material the cortex used to have. It follows its parent every time it is shown. */
     if (sub) { sub.material = m.material; extra.push(sub); } else want.add(m);
   }
-  return onlyMeshes(want, extra);
+  return onlyMeshes(want, extra, opts);
 }
 
 /**
@@ -4004,7 +4026,7 @@ function onlyShow(ids) {
  * `extra` is for meshes built for this render — a single cortical parcel — which are hidden
  * again rather than restored, because they were never visible in the first place.
  */
-function onlyMeshes(want, extra = []) {
+function onlyMeshes(want, extra = [], { merged = true } = {}) {
   if (!want.size && !extra.length) return null;
   const hidden = [];
   scene.traverse(o => {
@@ -4021,7 +4043,31 @@ function onlyMeshes(want, extra = []) {
   for (const m of want) m.visible = true;
   for (const m of extra) m.visible = true;
   applyShown();
+  /* And, for one structure on its own, the merged drawables go too.
+   *
+   * A merged layer is one mesh standing for hundreds of structures, and hiding all
+   * but one of them is a *shader* decision: the vertices are still submitted and
+   * still transformed, and only then collapsed out of the clip volume. That is the
+   * right trade on the stage, where the layer is being drawn anyway. It is the wrong
+   * one for a 340-pixel panel thumbnail of a single muscle, which paid a vertex pass
+   * over half a million triangles to draw one — **3.4 seconds of synchronous
+   * rendering per click**, twice, with the whole atlas loaded, and a tab that died
+   * under it.
+   *
+   * The per-structure meshes are still there; merging moved them off the camera's
+   * layer rather than throwing them away. So the panel draws those instead — the
+   * cost becomes the size of the structure, which is what a picture of one structure
+   * should cost — and `PICK_LAYER` on the panel's own camera is what lets it see
+   * them. `applyShown` runs first, because it decides merged visibility itself and
+   * would undo this. */
+  const mergedOff = [];
+  if (!merged) {
+    for (const name of LAYER_ORDER)
+      for (const m of layers[name]?.merged ?? [])
+        if (m.visible) { m.visible = false; mergedOff.push(m); }
+  }
   return () => {
+    for (const m of mergedOff) m.visible = true;
     for (const o of hidden) o.visible = true;
     for (const m of extra) m.visible = false;
     applyShown();
@@ -4318,9 +4364,13 @@ export function renderStructureInto(canvas, width, height, id,
    * material rather than the volume one it would otherwise inherit. */
   const look = shown.length === 1 && shown[0] === 'brain' ? specimenBrain() : null;
   const undo = alone
-    ? (id != null ? onlyShow([id])
-                  : (jbones?.size ? onlyMeshes(jbones) : onlyLayers(['skeleton'])))
+    ? (id != null ? onlyShow([id], { merged: false })
+                  : (jbones?.size ? onlyMeshes(jbones, [], { merged: false })
+                                  : onlyLayers(['skeleton'])))
     : onlyLayers(viewLayers(id));
+  /* The un-merged meshes live on the layer the stage's camera does not render — see
+   * `merged.js`. This is the camera that has to see them. */
+  if (alone) cam.layers.enable(PICK_LAYER);
   /* And the wide view is not subject to the stage's peel.
    *
    * Selecting a structure deliberately strips away everything in front of it, which is right

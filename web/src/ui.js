@@ -312,7 +312,7 @@ export function mountUI(ctx) {
                      <button data-depth="complete" aria-pressed="${atlasDepth?.() === 'complete'}">${
                        T('depthComplete')}</button>
                    </div></div>
-                   <p class="chelp">${T(atlasDepth?.() === 'complete'
+                   <p class="chelp" id="depthHelp">${T(atlasDepth?.() === 'complete'
                      ? 'depthCompleteHelp' : 'depthTaughtHelp')}</p>
                    <div id="layerList"></div>` },
     display:   { title: 'popDisplay',  controls: ['controls', 'readControls'] },
@@ -1576,6 +1576,17 @@ export function mountUI(ctx) {
     // the layer list is a panel section now, so it is only in the DOM while open
     for (const b of $('layerList')?.querySelectorAll('.lyr') ?? [])
       b.setAttribute('aria-pressed', app.layers[b.dataset.layer].on);
+    /* The atlas depth is not only set by its own switch. Turning a layer of one
+     * atlas on turns the other atlas off — they are the same anatomy twice and
+     * must never both be drawn, see `setAtlasDepth` — so the segmented control
+     * has to follow, or it reads "Taught body" over a complete-atlas layer list
+     * and the reader is looking at a switch that disagrees with the picture. */
+    const complete = atlasDepth?.() === 'complete';
+    for (const b of $('panelBody').querySelectorAll('[data-depth]'))
+      b.setAttribute('aria-pressed', (b.dataset.depth === 'complete') === complete);
+    const depthHelp = $('depthHelp');
+    if (depthHelp)
+      depthHelp.textContent = T(complete ? 'depthCompleteHelp' : 'depthTaughtHelp');
     renderPathPanel();
   }
 

@@ -43,6 +43,9 @@ npm test              # frame, palette, content, library, skinning, rig and bind
                       # — 130 tests, no browser
 npm run test:smoke    # drives the real app in headless Chromium: clicks the picture,
                       # measures what strays from the body, fails on any console error
+npm run test:panel    # the session panel's contract with the DOM it watches: that it
+                      # settles instead of repainting on its own writing — one browser,
+                      # no application, a few seconds
 npm run poses         # draws all 190 poses as stick figures -> .render/poses.html
 npm run poses:check   # every record and every keyframe of every clip against its class
 npm run skinbench     # skins every mesh in node and reports volume, edge stretch and

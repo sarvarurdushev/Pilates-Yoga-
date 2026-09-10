@@ -118,11 +118,12 @@ All distances in tools and tests are **fractions of a body height**. 0.01 ≈ 1.
 Run these to confirm before you change anything:
 
 ```bash
-npm test                # 144 tests, 144 pass, 0 fail   (~55 s)
+npm test                # 172 tests, 172 pass, 0 fail   (~38 s)
 npm run poses:check     # all poses pass, 0 violations   (~3 s)
 npm run skinbench       # muscles                        (~5 s)
 SKIN_LAYERS=nervous npm run skinbench                    # nerves
 node tools/bindcheck.mjs --all                           # binding   (~14 s)
+npm run test:panel      # the session panel's DOM contract  (~5 s, needs a browser)
 npm run test:smoke      # real browser, ~10 min on swiftshader
 ```
 
@@ -130,14 +131,15 @@ Last measured numbers:
 
 | Check | Result |
 |---|---|
-| `npm test` | **144 / 144** |
+| `npm test` | **172 / 172** |
 | `npm run poses:check` | **0 violations** over 190 records + every longhand keyframe |
 | `npm run joints` | worst limb-joint separation **0.034** of a body height (was 0.086) |
 | skinbench, muscles | distorted 55, worst stretch **4.10**, over 3× **7**, vol err 0.0272, **spanning 177/269** |
 | skinbench, nerves | distorted 57, worst stretch **2.86**, over 3× **0**, vol err 0.3215, spanning **36/37** |
 | `NERVES=1 bindcheck --all` | worst nerve outside the flesh **0.018** (`lumbar plexus|R`), against a ~0.012 floor in a neutral pose — every nerve is inside the flesh at the resolution this measures |
 | `bindcheck --all` | 496 structures × 199 clips, **144** over the 1.5%-of-body-height bar (bulk *or* edge); worst bulk **0.082**, worst edge **0.148** (both `coracobrachialis|L`) |
-| `npm run test:smoke` | **0 console errors**, 0 dead clicks standing, 0 posed, phone layout clean at 390×844 |
+| `npm run test:panel` | settles in **1** observer callback, **1** reading, **1** scene render |
+| `npm run test:smoke` | **0 console errors**, 0 dead clicks standing, 0 posed, phone layout clean at 390×844, **0 structures drawn twice** across the two atlases |
 
 **Read skinbench's four numbers together.** Stretch alone rewards a muscle that has stopped
 deforming; volume alone does too. `spanning` is the guard — it counts meshes that actually
@@ -153,8 +155,9 @@ the skinning has silently stopped happening.
 | Command | What it does | Time |
 |---|---|---|
 | `npm start` | http-server on :8080. No build step. | — |
-| `npm test` | 7 node test files: frame, palette, content, library, skin, rig, bind. | ~25 s |
+| `npm test` | 10 node test files: frame, palette, content, library, skin, rig, bind, bodies, merged, raybvh. | ~38 s |
 | `npm run test:smoke` | Loads the real app in headless Chromium, drives real interactions, fails on any console error. **This is the compiler** — a static site with no build step has nothing else to catch a bad import. Also checks the 390 px phone layout. | ~10 min |
+| `npm run test:panel` | Mounts the session panel over an empty column in a browser and asserts it settles instead of repainting on its own writing — the loop that froze the coach view. No application, no server. | ~5 s |
 | `npm run test:render` / `test:render:diff` | Renders the brain across every fragment-shader branch and byte-compares two runs. Use for shader changes. | minutes |
 
 ### Poses and content
