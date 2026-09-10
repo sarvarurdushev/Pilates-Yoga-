@@ -244,8 +244,67 @@ class TestWhatAStudentMaySee:
     def test_nor_does_a_per_check_note_or_verdict(self):
         out = self._one().to_dict(private=False)
         assert out["checks"] == [{"label": "Its own job", "axis": "job",
-                                  "score": 6}]
+                                  "score": 6, "low": "", "high": "",
+                                  "better": "", "xlabel": ""}]
         assert "still gripping" not in str(out)
+
+    def test_the_axis_names_travel_with_the_scores(self):
+        """What 0 and 10 mean is part of the chart, not coach vocabulary.
+
+        The label already reaches the student -- a line has to be called
+        something -- and the named ends are the same kind of thing: without
+        them a student is shown a 6 out of 10 on a scale nobody defined, which
+        is a number presented as if it meant something. The coach's *note* and
+        *verdict* are the private half and are still dropped, which is what the
+        test above holds.
+        """
+        out = self._one(checks=[{"label": "Does it let go?", "score": 8,
+                                 "low": "holds on", "high": "lets go",
+                                 "better": "high", "verdict": "fine",
+                                 "note": "mine alone"}]).to_dict(private=False)
+        check = out["checks"][0]
+        assert check["low"] == "holds on" and check["high"] == "lets go"
+        assert check["better"] == "high"
+        assert "verdict" not in check and "note" not in check
+        assert "mine alone" not in str(out)
+
+    def test_the_newest_naming_labels_the_whole_line(self):
+        """A coach who names the ends today labels every reading, not the rest.
+
+        The definition rides on each reading because there is nowhere else to
+        put it, but it describes the *axis*, which does not change: readings
+        taken before anyone wrote down what 0 and 10 meant were taken on the
+        same scale. Carrying it forward only would have drawn the same line
+        half-labelled, and left the first months of a record unreadable.
+        """
+        from pilates.structure_eval import history
+        early = self._one(made_on="2026-01-05",
+                          checks=[{"label": "Does it let go?", "score": 3}])
+        late = self._one(made_on="2026-02-05",
+                         checks=[{"label": "Does it let go?", "score": 8,
+                                  "low": "holds on", "high": "lets go",
+                                  "better": "high"}])
+        line = history([early, late])["lines"]["Does it let go?"]
+        assert line["low"] == "holds on" and line["high"] == "lets go"
+        assert line["better"] == "high"
+        assert [p["score"] for p in line["points"]] == [3, 8]
+        assert line["moved"] == 5
+
+    def test_a_scale_with_no_named_better_end_says_so(self):
+        """So the chart can decline to colour it rather than guess.
+
+        Up is not good: eight out of ten on "is the internal oblique taking
+        over?" is bad news. A line whose coach never said which end they
+        wanted carries no direction, and `scoreLines` draws the movement
+        without a colour instead of inventing one.
+        """
+        from pilates.structure_eval import history
+        one = self._one(made_on="2026-01-05",
+                        checks=[{"label": "Taking over?", "score": 2}])
+        two = self._one(made_on="2026-02-05",
+                        checks=[{"label": "Taking over?", "score": 9}])
+        line = history([one, two])["lines"]["Taking over?"]
+        assert line.get("better", "") == ""
 
     def test_the_line_written_for_them_does(self):
         assert self._one().to_dict(private=False)["shared"] == (

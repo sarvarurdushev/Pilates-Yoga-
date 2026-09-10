@@ -40,6 +40,16 @@ from datetime import datetime, timezone
 
 MAX_TEXT = 600
 MAX_LABEL = 90
+#: What the two ends of a coach's own scale mean, in their words. Short on
+#: purpose: this is an axis label, not a sentence, and it is drawn beside a
+#: 46-pixel-high chart.
+MAX_END = 40
+#: Which end of a check is the good one. A score with no direction cannot be
+#: read: 8 out of 10 on "is the internal oblique taking over?" is bad news and
+#: 8 on "does it hold through the set?" is good, and the chart coloured both
+#: green because it assumed up was up. ``""`` means the coach did not say, and
+#: then movement is reported without a colour rather than with a guess.
+BETTER = {"high", "low"}
 MAX_CHECKS = 24
 
 #: Every axis is scored 0 to 10, which is what makes it chartable -- a verdict
@@ -202,10 +212,20 @@ class StructureEval:
                     raise ValueError(f"a score is 0 to {SCALE}, not {score}")
             else:
                 score = None
+            better = str(raw.get("better", "")).strip()
+            if better and better not in BETTER:
+                raise ValueError(f"{better!r} is not one of {sorted(BETTER)}")
             cleaned.append({"label": label,
                             "axis": str(raw.get("axis", "")).strip()[:MAX_LABEL],
                             "score": score, "verdict": verdict,
-                            "note": str(raw.get("note", "")).strip()[:MAX_TEXT]})
+                            "note": str(raw.get("note", "")).strip()[:MAX_TEXT],
+                            # What the coach's own scale means, carried with
+                            # every reading so a chart drawn from any one of
+                            # them can be labelled. See `lines` in `history`.
+                            "low": str(raw.get("low", "")).strip()[:MAX_END],
+                            "high": str(raw.get("high", "")).strip()[:MAX_END],
+                            "better": better,
+                            "xlabel": str(raw.get("xlabel", "")).strip()[:MAX_END]})
         self.checks = cleaned
 
         if not self.note and not self.shared and not self.checks:
@@ -253,7 +273,12 @@ class StructureEval:
                 "made_on": self.made_on, "made_at": self.made_at}
         if not private:
             return {**base, "checks": [
-                {"label": c["label"], "axis": c["axis"], "score": c["score"]}
+                {"label": c["label"], "axis": c["axis"], "score": c["score"],
+                 # The axis labels travel with the scores: a student shown a
+                 # chart of a scale nobody named is being shown a number and
+                 # told it means something.
+                 "low": c["low"], "high": c["high"], "better": c["better"],
+                 "xlabel": c["xlabel"]}
                 for c in self.checks if c["score"] is not None]}
         return {**base, "by": self.by, "note": self.note,
                 "checks": [dict(c) for c in self.checks],
@@ -315,6 +340,12 @@ def history(evaluations: list[StructureEval], private: bool = True) -> dict:
             line = lines.setdefault(key, {"label": check["label"],
                                           "points": []})
             line["label"] = check["label"]
+            # The newest reading that says what the scale means wins, so a
+            # coach who names the ends today labels the whole line back to the
+            # first reading rather than only the readings after it.
+            for field in ("low", "high", "better", "xlabel"):
+                if check.get(field):
+                    line[field] = check[field]
             point = {"date": one.made_on, "score": check["score"]}
             if private:
                 point.update(verdict=check["verdict"], note=check["note"],

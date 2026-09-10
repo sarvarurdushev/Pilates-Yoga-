@@ -173,6 +173,24 @@ body.ss-folded #ss-struct{right:14px}
 #ss-struct .sx-add:hover{color:var(--txt);border-color:var(--acc)}
 #ss-struct .sx-none{font-size:11.5px;color:var(--dim2);line-height:1.65;margin:0}
 
+/* The named ends of a coach's own scale, and which end they call better. Small
+   and quiet: this is a definition typed once, not a question asked every time. */
+#ss-struct .sx-ends{display:flex;flex-wrap:wrap;gap:6px 10px;margin:6px 0 0;
+  align-items:flex-end}
+#ss-struct .sx-ends label{flex:1 1 42%;min-width:120px;margin:0;display:flex;
+  flex-direction:column;gap:3px;font-size:9px;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--dim2)}
+#ss-struct .sx-ends input{width:100%;font-size:11.5px;padding:5px 7px;
+  border-radius:3px;border:1px solid var(--line);background:rgba(255,255,255,.03);
+  color:var(--txt)}
+#ss-struct .sx-better{display:flex;align-items:center;gap:4px;flex:1 1 100%;
+  font-size:9px;letter-spacing:.11em;text-transform:uppercase;color:var(--dim2)}
+#ss-struct .sx-better span{margin-right:2px}
+#ss-struct .sx-better button{min-width:26px;padding:3px 7px;font-size:10.5px;
+  border-radius:3px;border:1px solid var(--line);background:transparent;
+  color:var(--dim);cursor:pointer}
+#ss-struct .sx-better button[aria-pressed=true]{color:#eaf4ff;
+  border-color:rgba(90,169,230,.55);background:rgba(90,169,230,.12)}
 #ss-struct .sx-past{margin:0 0 12px;padding:9px 11px;border-radius:3px;
   border:1px solid var(--line);background:rgba(90,169,230,.05)}
 #ss-struct .sx-past h5{margin:0 0 6px;font-size:9.5px;letter-spacing:.12em;
@@ -569,7 +587,17 @@ function draw(host, form, ctx) {
   }
 
   const list = body.querySelector('[data-checks]');
+  /* What this coach said these checks meant last time. The point of naming a
+   * scale is that it is named *once*: retyping "lets go" and "holds on" at
+   * every class is how a definition drifts until two readings on the same axis
+   * are not comparable, which is the one thing a line across sessions has to
+   * be. Keyed by label, which is also how the server keys the line. */
+  const DEFS = {};
+  for (const line of Object.values(form.history?.lines ?? {}))
+    if (line?.label) DEFS[line.label] = line;
+  const lowHint = 'e.g. holds on', highHint = 'e.g. lets go completely';
   const add = (label = '') => {
+    const def = DEFS[label] ?? {};
     const row = document.createElement('div');
     row.className = 'sx-check';
     row.innerHTML = `<div class="sx-top">
@@ -582,6 +610,23 @@ function draw(host, form, ctx) {
         ${Array.from({ length: SCALE + 1 }, (_, n) =>
           `<button type="button" data-score="${n}" aria-pressed="false">${n}</button>`
         ).join('')}</div>
+      <!-- What the coach's own scale means. A number with no named ends is not
+           a measurement of anything: 8 out of 10 on a question only the person
+           who typed it can interpret is a private note wearing a chart's
+           clothes. Typed once -- these come back filled in the next time this
+           check is used -- and they become the axis labels on the line. -->
+      <div class="sx-ends">
+        <label>0 means<input data-low maxlength="40"
+          value="${esc(def.low ?? '')}" placeholder="${esc(lowHint)}"></label>
+        <label>${SCALE} means<input data-high maxlength="40"
+          value="${esc(def.high ?? '')}" placeholder="${esc(highHint)}"></label>
+        <div class="sx-better" role="group" aria-label="Which end is better">
+          <span>Better is</span>
+          ${[['high', `${SCALE}`], ['low', '0'], ['', '—']].map(([v, t]) =>
+            `<button type="button" data-better="${v}"
+              aria-pressed="${String((def.better ?? '') === v)}">${t}</button>`).join('')}
+        </div>
+      </div>
       <textarea data-cnote placeholder="…because?"></textarea>`;
     list.appendChild(row);
     row.querySelector('[data-drop]').addEventListener('click', () => row.remove());
@@ -593,6 +638,24 @@ function draw(host, form, ctx) {
         }
       });
     }
+    for (const button of row.querySelectorAll('[data-better]')) {
+      button.addEventListener('click', () => {
+        for (const other of row.querySelectorAll('[data-better]'))
+          other.setAttribute('aria-pressed', String(other === button));
+      });
+    }
+    /* Renaming a check re-reads what that name meant last time, so a coach who
+     * types the label of a check they already run gets their own definition
+     * back rather than an empty scale to re-invent. */
+    row.querySelector('[data-label]').addEventListener('change', (e) => {
+      const d = DEFS[e.target.value.trim()];
+      if (!d) return;
+      const low = row.querySelector('[data-low]'), high = row.querySelector('[data-high]');
+      if (low && !low.value) low.value = d.low ?? '';
+      if (high && !high.value) high.value = d.high ?? '';
+      for (const b of row.querySelectorAll('[data-better]'))
+        b.setAttribute('aria-pressed', String(b.dataset.better === (d.better ?? '')));
+    });
     if (!label) row.querySelector('[data-label]').focus();
     return row;
   };
@@ -630,6 +693,10 @@ function draw(host, form, ctx) {
       if (!label) continue;
       const picked = row.querySelector('[data-score][aria-pressed=true]');
       checks.push({ label, axis: '',
+                    low: row.querySelector('[data-low]')?.value.trim() ?? '',
+                    high: row.querySelector('[data-high]')?.value.trim() ?? '',
+                    better: row.querySelector('[data-better][aria-pressed=true]')
+                               ?.dataset.better ?? '',
                     score: picked ? Number(picked.dataset.score) : null,
                     note: row.querySelector('[data-cnote]').value.trim() });
     }

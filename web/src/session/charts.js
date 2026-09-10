@@ -86,6 +86,13 @@ export const CHART_CSS = `
 .ss-sl-head em{flex:none;font-style:normal;font-size:9.5px}
 .ss-sl-head em.ss-up{color:var(--acc)}
 .ss-sl-head em.ss-down{color:var(--gold)}
+/* The two ends of a coach's own scale, in their words, stacked against the
+   chart: the top word is what 10 means and the bottom what 0 means, which is
+   the same way up as the line they label. */
+.ss-sl-ends{margin:1px 0 3px;font-size:9.5px;line-height:1.45;color:var(--dim2)}
+.ss-sl-ends b{font-weight:600;color:var(--dim);font-variant-numeric:tabular-nums}
+.ss-sl-x{font-style:normal;font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--dim2)}
 .ss-sl svg{width:100%;height:46px;overflow:visible}
 .ss-sl-base{stroke:var(--line);stroke-width:1}
 .ss-sl-line{fill:none;stroke:var(--acc);stroke-width:1.6;
@@ -291,6 +298,11 @@ export function scoreLines(history, opts = {}) {
     return `<p class="ss-readout">One reading so far. A line needs two.</p>`;
   }
   const at = new Map(dates.map((d, i) => [d, i]));
+  /* What the across-axis counts. Every line in one panel shares it — they are
+   * drawn on one set of dates — so the first line that names it names it for
+   * all of them, and "Sessions" is the honest default because that is what the
+   * dates are: the classes this person came to. */
+  const xlabel = lines.map(([, l]) => l.xlabel).find(Boolean) ?? 'Sessions';
   const w = 250, h = 46, padL = 2, padR = 26, padT = 5, padB = 5;
   const x = (i) => padL + (w - padL - padR) * (i / (dates.length - 1));
   const y = (v) => padT + (h - padT - padB) * (1 - v / scale);
@@ -304,17 +316,43 @@ export function scoreLines(history, opts = {}) {
         r="1.9"><title>${esc(p.date)} — ${esc(line.label)}: ${p.score}/${scale}${
         p.note ? `\n${esc(p.note)}` : ''}</title></circle>`).join('');
     const moved = line.moved > 0 ? `+${line.moved}` : `${line.moved}`;
+    /* Coloured by the direction the *coach* called good, not by the sign.
+     *
+     * "Is the internal oblique taking over?" going from 3 to 8 is bad news, and
+     * "does it hold through the set?" going 3 to 8 is good, and this drew both
+     * in the same encouraging colour because it read the arithmetic and not the
+     * question. A coach who has not said which end is better gets no colour
+     * rather than a guess. */
+    const good = line.better === 'high' ? 1 : line.better === 'low' ? -1 : 0;
+    const tone = !good || !line.moved ? ''
+               : Math.sign(line.moved) === good ? 'ss-up' : 'ss-down';
+    /* The ends, in the coach's words. A 0-to-10 axis with nothing said about
+     * what 0 and 10 are is a number with the meaning left out — the thing a
+     * reader has to supply from memory, and the thing they get wrong. */
+    /* One line under the title rather than two labels floated beside the plot.
+     * Floated, they sat on top of the line they were labelling and behind the
+     * value: this column is 250 pixels wide and there is no gutter to put them
+     * in. Said as a sentence they always fit, they never collide, and they read
+     * in the order a reader asks the question -- what is a high score, then
+     * what is a low one. */
+    const ends = (line.low || line.high)
+      ? `<p class="ss-sl-ends">${[
+          line.high ? `<b>${scale}</b> ${esc(line.high)}` : '',
+          line.low ? `<b>0</b> ${esc(line.low)}` : ''].filter(Boolean).join(' · ')}</p>`
+      : '';
     return `<div class="ss-sl" style="--n:${n % 5}">
       <p class="ss-sl-head"><b>${esc(line.label)}</b>
         <span>${line.latest}/${scale}</span>
-        <em class="${line.moved > 0 ? 'ss-up' : line.moved < 0 ? 'ss-down' : ''}"
+        <em class="${tone}"
           >${line.points.length > 1
             ? (line.moved === 0 ? 'no change' : `${moved} since ${
                 esc(line.points[0].date.slice(2))}`)
-            : 'first score'}</em></p>
+            : 'first score'}</em></p>${ends}
       <svg viewBox="0 0 ${w} ${h}" role="img"
            aria-label="${esc(line.label)}, ${line.points.length} readings, now ${
-             line.latest} out of ${scale}">
+             line.latest} out of ${scale}${
+             line.high ? `, where ${scale} is ${esc(line.high)}` : ''}${
+             line.low ? ` and 0 is ${esc(line.low)}` : ''}">
         <line class="ss-sl-base" x1="${padL}" y1="${y(0).toFixed(1)}"
           x2="${(w - padR).toFixed(1)}" y2="${y(0).toFixed(1)}"/>
         <path class="ss-sl-line" d="${path}"/>${dots}
@@ -327,6 +365,7 @@ export function scoreLines(history, opts = {}) {
     ${opts.title ? `<p class="ss-lane-head">${esc(opts.title)}</p>` : ''}
     ${rows}
     <p class="ss-lane-dates"><span>${esc(dates[0].slice(2))}</span>
+      ${xlabel ? `<em class="ss-sl-x">${esc(xlabel)} →</em>` : ''}
       <span>${esc(dates[dates.length - 1].slice(2))}</span></p>
     ${opts.note ? `<p class="ss-lane-key"><em>${esc(opts.note)}</em></p>` : ''}
   </div>`;
