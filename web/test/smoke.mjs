@@ -1948,6 +1948,68 @@ console.log('explode:', JSON.stringify(apart));
   await page.click('#rail [data-pop="layers"]');
   await page.waitForTimeout(300);
   console.log('atlas switch:', JSON.stringify(shown));
+
+  /* And every other way of turning a layer on obeys it too.
+   *
+   * The rule lived in one function and was enforced in one function, which is how
+   * both bodies came to be drawn at once in the first place. Three things turn a
+   * layer on: the list, a structure chosen in a layer that is off, and a group.
+   * A filter or a group is not a request to change atlas either — "label every
+   * muscle" walks the registry and used to finish on whichever side it visited
+   * last, replacing the reader's body as a side effect of asking for labels. */
+  const ways = await page.evaluate(async () => {
+    const m = await import('/src/main.js');
+    const S = await import('/src/structures.js');
+    const TAUGHT = ['skeleton', 'muscles_superficial', 'muscles_deep', 'organs'];
+    const FULL = ['bones_full', 'muscles_full', 'organs_full'];
+    const both = () => TAUGHT.some((n) => m.app.layers[n]?.on)
+               && FULL.some((n) => m.app.layers[n]?.on);
+    const was = Object.fromEntries(
+      Object.keys(m.app.layers).map((n) => [n, !!m.app.layers[n].on]));
+    const out = {};
+
+    // a label filter, from the taught body
+    await m.setAtlasDepth('taught');
+    await m.setLabelKind('muscle', true);
+    out.labelKind = { both: both(), depth: m.atlasDepth() };
+    m.clearLabelKinds();
+
+    // a structure that exists only in the complete atlas, chosen from the taught body
+    await m.setAtlasDepth('taught');
+    let only = null;
+    for (const [id, r] of S.registry().byId) if (FULL.includes(r.layer)) { only = id; break; }
+    if (only != null) {
+      m.selectStructure(only);
+      await new Promise((r) => setTimeout(r, 1200));
+      out.select = { both: both(), depth: m.atlasDepth(), shown: !!m.app.layers[
+        S.registry().byId.get(only).layer]?.on };
+      m.selectStructure(null);
+    }
+
+    /* A group, whose layer list is written without knowing which atlas is up.
+     * The one that straddles both sides is the case worth asking about, so it is
+     * preferred over an arbitrary group; failing that, any group at all. */
+    const G = await import('/src/content/groups.js');
+    const all = G.groups().list ?? [];
+    const straddles = all.find((x) => (x.layers ?? []).some((n) => FULL.includes(n))
+                                   && (x.layers ?? []).some((n) => TAUGHT.includes(n)));
+    const g = straddles ?? all[0] ?? null;
+    if (g) {
+      await m.setAtlasDepth('taught');
+      await m.setGroup(g.fma ?? g.id);
+      out.group = { both: both(), depth: m.atlasDepth(),
+                    which: g.fma ?? g.id, straddles: !!straddles };
+      await m.setGroup(null);
+    }
+
+    for (const [n, on] of Object.entries(was)) await m.setLayer(n, on);
+    return out;
+  });
+  console.log('atlas held:', JSON.stringify(ways));
+  for (const [how, r] of Object.entries(ways))
+    if (r.both) errors.push(`${how} drew both atlases at once`);
+  if (ways.select && !ways.select.shown)
+    errors.push('choosing a structure in the complete atlas did not show its layer');
   for (const [what, seen] of [['complete', shown.onFull], ['taught', shown.onTaught]])
     if (seen.lit.join() !== what)
       errors.push(`the atlas switch reads "${seen.lit.join() || 'nothing'}" ` +

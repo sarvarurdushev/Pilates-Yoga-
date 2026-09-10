@@ -3769,7 +3769,14 @@ export function selectStructure(id, { auto = false } = {}) {
   }
   // selecting something in a hidden layer has to reveal it, or the panel describes
   // something the user cannot see
-  if (r && !app.layers[r.layer].on) { app.layers[r.layer].on = true; loadLayer(r.layer); }
+  if (r && !app.layers[r.layer].on) {
+    /* One deliberate act, so this is allowed to change atlas: the alternative is
+     * choosing a structure and being shown nothing, because the body it belongs
+     * to is not the one on the screen. */
+    app.layers[r.layer].on = true;
+    if (holdOneAtlas(r.layer)) relayoutExplode();
+    loadLayer(r.layer);
+  }
   /* No longer forced into x-ray.
    *
    * Choosing something with an inside used to push the x-ray slider to 1, because
@@ -3807,10 +3814,10 @@ export function setLabels(on) { app.labelsOn = on; invalidate(); }
 export async function setLabelKind(kind, on) {
   if (on) app.labelKinds.add(kind); else app.labelKinds.delete(kind);
   if (on) {
-    for (const [id, r] of registry().byId) {
-      void id;
-      if (r.kind === kind && !app.layers[r.layer]?.on) await setLayer(r.layer, true);
-    }
+    const want = new Set();
+    for (const [, r] of registry().byId)
+      if (r.kind === kind && !app.layers[r.layer]?.on) want.add(r.layer);
+    for (const layer of onThisAtlas([...want])) await setLayer(layer, true);
   }
   app.labelsOn = true;
   syncLayers();
@@ -3837,18 +3844,10 @@ export async function setLayer(name, on) {
    * muscle fighting for the same pixels. That is what "why do we have 2 legs"
    * was looking at, and it is a rule that was stated in one place and enforced
    * in one place. */
-  if (on) {
-    const other = FULL_LAYERS.includes(name) ? TAUGHT_LAYERS
-                : TAUGHT_LAYERS.includes(name) ? FULL_LAYERS : null;
-    if (other) {
-      for (const n of other) if (app.layers[n]) app.layers[n].on = false;
-      app.atlasDepth = FULL_LAYERS.includes(name) ? 'complete' : 'taught';
-      /* The catalogue is packed from the structures that are drawn, so switching
-       * sides changes it — the same reason `setAtlasDepth` ends with this. Free
-       * while the body is assembled: it does nothing unless it is open. */
-      relayoutExplode();
-    }
-  }
+  /* The catalogue is packed from the structures that are drawn, so switching sides
+   * changes it — the same reason `setAtlasDepth` ends with a relayout. Free while
+   * the body is assembled: it does nothing unless the body is open. */
+  if (on && holdOneAtlas(name)) relayoutExplode();
   if (on) await loadLayer(name);
   syncLayers();
   /* The reveal clones hang off the layer's own drawables, so a layer arriving or
@@ -4646,9 +4645,9 @@ export async function setGroup(fma) {
   activation.clear();
   palette.clearActivation();
   if (!g) { for (const m of materials) m.userData.sync?.(); syncLayers(); ui.relabel(); return; }
-  for (const layer of g.layers) {
-    if (!hasLayer(layer)) continue;
+  for (const layer of onThisAtlas(g.layers.filter(hasLayer))) {
     app.layers[layer].on = true;
+    holdOneAtlas(layer);
     await loadLayer(layer);
   }
   for (const id of g.members) {
@@ -4973,6 +4972,46 @@ function relayoutExplode() {
  */
 const TAUGHT_LAYERS = ['skeleton', 'muscles_superficial', 'muscles_deep', 'organs'];
 const FULL_LAYERS = ['bones_full', 'muscles_full', 'organs_full'];
+
+/**
+ * Turning one atlas's layer on turns the other atlas off.
+ *
+ * The rule is `setAtlasDepth`'s, and for a long time `setAtlasDepth` was the only
+ * thing that enforced it — so every other way of turning a layer on could draw
+ * both bodies at once, which is 491 structures rendered twice and reads on screen
+ * as a second leg inside the first. There are three such ways: the layer list, a
+ * structure selected in a layer that is off, and an anatomical group. A rule
+ * stated in one place and enforced in one place is how that happened, so it lives
+ * here now and each of them calls it.
+ *
+ * Returns whether `name` belongs to either atlas at all — the vessels, the nerves
+ * and the brain are on neither side and are never touched by this.
+ */
+function holdOneAtlas(name) {
+  const full = FULL_LAYERS.includes(name);
+  const other = full ? TAUGHT_LAYERS : TAUGHT_LAYERS.includes(name) ? FULL_LAYERS : null;
+  if (!other) return false;
+  for (const n of other) if (app.layers[n]) app.layers[n].on = false;
+  app.atlasDepth = full ? 'complete' : 'taught';
+  return true;
+}
+
+/**
+ * The layers of `want` that can be drawn without taking the reader's atlas away.
+ *
+ * A filter or a group is not a request to change atlas. "Label every muscle" walks
+ * the registry and turns on the layer of each one it finds, so with the rule above
+ * in force it would flip between the two bodies as it went and finish on whichever
+ * the registry happened to visit last — the reader asks for labels and their body
+ * is silently replaced. So these prefer the side already being shown, and change
+ * sides only when the answer lies entirely on the other one, where not changing
+ * would mean showing nothing at all.
+ */
+function onThisAtlas(want) {
+  const there = app.atlasDepth === 'complete' ? TAUGHT_LAYERS : FULL_LAYERS;
+  const mine = want.filter(n => !there.includes(n));
+  return mine.length ? mine : want;
+}
 
 export async function setAtlasDepth(which) {
   const full = which === 'complete';
