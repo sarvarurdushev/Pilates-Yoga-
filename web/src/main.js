@@ -5045,6 +5045,25 @@ export async function setAtlasDepth(which) {
 }
 export const atlasDepth = () => app.atlasDepth;
 
+/**
+ * Which layers belong to which atlas, for a list that has to group them.
+ *
+ * The rule that only one atlas is drawn is enforced in `holdOneAtlas`, and until now it was
+ * only *enforced* — nothing said it. A reader ticking "Muscles — every piece" watched three
+ * other switches turn themselves off with no explanation on screen, which is a rule that
+ * looks like a fault. The layer list groups by this instead, and shows one atlas at a time.
+ *
+ * `shared` is everything on neither side: the vessels, the nerves, the airways, the
+ * cartilage, the brain. They exist once and are drawn with either body, so they never
+ * conflict and are never switched off by a change of atlas.
+ */
+export const atlasLayers = () => ({
+  taught: TAUGHT_LAYERS.filter(hasLayer),
+  complete: FULL_LAYERS.filter(hasLayer),
+  shared: LAYER_ORDER.filter(n => hasLayer(n)
+    && !TAUGHT_LAYERS.includes(n) && !FULL_LAYERS.includes(n)),
+});
+
 /** Swap between opening the body and laying it out. Recomputes and keeps the slider where it is. */
 export function setExplodeLayout(which) {
   const next = EXPLODE_LAYOUTS.includes(which) ? which : 'inventory';
@@ -5525,7 +5544,7 @@ const ui = mountUI({
   setExercise, setPathway, captureStage, activationOf, flyTo,
   setGroup, anatomyGroups, groupsForStructure, setIsolate, isolated, setExplode,
   setExplodeLayout, explodeLayout, zoomBy, fitView, explodeLayoutExtent,
-  setAtlasDepth, atlasDepth,
+  setAtlasDepth, atlasDepth, atlasLayers,
   poseFromClip, setPlaying, setShowPaths, setShowMeshes, liveActivationOf, musclePathReport,
   frameRig, setLabelKind, clearLabelKinds,
   // a getter, not the value: the panel mounts before the rig has finished loading

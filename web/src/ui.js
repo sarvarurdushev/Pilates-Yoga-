@@ -33,7 +33,7 @@ export function mountUI(ctx) {
           resetView, setExercise, setPathway, activationOf,
           setGroup, anatomyGroups, groupsForStructure, setIsolate, isolated, setExplode,
           setExplodeLayout, explodeLayout, zoomBy, fitView,
-          setAtlasDepth, atlasDepth,
+          setAtlasDepth, atlasDepth, atlasLayers,
           poseFromClip, setPlaying, setShowPaths, setShowMeshes, liveActivationOf,
           musclePathReport, setLabelKind, clearLabelKinds } = ctx;
 
@@ -220,15 +220,35 @@ export function mountUI(ctx) {
      * reader can select, search for and be told about; counting them as fourteen things would
      * be counting the archive's file list rather than the anatomy. Both numbers are shown, so
      * neither has to be guessed at. */
-    let pieces = 0;
+    const piecesPer = {};
     for (const r of registry().byId.values()) {
       if (r.parts) continue;
       per[r.layer] = (per[r.layer] ?? 0) + 1;
-      pieces += r.pieces ?? 1;
+      piecesPer[r.layer] = (piecesPer[r.layer] ?? 0) + (r.pieces ?? 1);
     }
-    const shown = LAYER_ORDER.filter(n2 => hasLayer(n2));
+    /* Grouped, and one atlas at a time.
+     *
+     * A flat list of sixteen switches held both atlases at once — "Muscles — deep" and
+     * "Muscles — every piece" one above the other, two rows for the same muscles — and
+     * ticking either silently switched the other's group off, because only one of the two
+     * bodies may be drawn. Seen as a flat list that reads as switches turning themselves
+     * off at random. It was reported as exactly that: "if i choose wear one of them other
+     * one turns off?".
+     *
+     * So the list shows the atlas that is up, and the systems that belong to neither, under
+     * headings that say which is which. The other atlas is not a row to be hunted for and
+     * mis-ticked; it is the segmented control at the top of this panel, where choosing
+     * between two whole bodies belongs. */
+    const sets = atlasLayers?.() ?? { taught: [], complete: [], shared: [] };
+    const complete = atlasDepth?.() === 'complete';
+    const body = complete ? sets.complete : sets.taught;
+    const shown = [...body, ...sets.shared];
     const anyOn = shown.some(n2 => app.layers[n2].on);
-    $('layerList').innerHTML = shown.map(name => `
+    /* Counted over what is listed. Totalling every layer meant the foot of a list showing
+     * one atlas reported the size of both — 2,085 structures under a list that could not
+     * add up to more than about half that. */
+    const shownPieces = shown.reduce((a, n2) => a + (piecesPer[n2] ?? 0), 0);
+    const row = (name) => `
       <div class="layerrow">
         <button class="lyr" data-layer="${name}" aria-pressed="${app.layers[name].on}">
           <i style="background:${layerSwatch(name)}"></i>${T(name)}
@@ -236,9 +256,15 @@ export function mountUI(ctx) {
         </button>
         <input type="range" class="lyop" data-layer="${name}" min="0.08" max="1" step="0.01"
                value="${app.layers[name].opacity}" aria-label="${T(name)} opacity">
-      </div>`).join('')
-      + `<div class="layerall"><span>${Object.values(per).reduce((a, b) => a + b, 0)} ${
-          T('structuresWord')} · ${pieces} ${T('piecesWord')}</span>
+      </div>`;
+    const group = (label, names, note) => !names.length ? '' :
+      `<div class="lygroup"><h5>${esc(label)}</h5>${
+        note ? `<p class="lynote">${esc(note)}</p>` : ''}${names.map(row).join('')}</div>`;
+    $('layerList').innerHTML =
+      group(T(complete ? 'depthComplete' : 'depthTaught'), body, T('lyBodyNote'))
+      + group(T('lySystems'), sets.shared, T('lySystemsNote'))
+      + `<div class="layerall"><span>${shown.reduce((a, n2) => a + (per[n2] ?? 0), 0)} ${
+          T('structuresWord')} · ${shownPieces} ${T('piecesWord')}</span>
          <button class="mini" data-layerall="${anyOn ? 'off' : 'on'}">${
           T(anyOn ? 'hideAll' : 'showAll')}</button></div>`;
     for (const b of $('layerList').querySelectorAll('.lyr'))
@@ -1520,6 +1546,7 @@ export function mountUI(ctx) {
    * silently absent. Guarded on the state actually changing: re-rendering on every call would
    * take the caret out of the search box on every frame of a scan. */
   let lastBrainOn = null;
+  let lastDepth = null;
   function syncControls() {
     if (app.layers.brain?.on !== lastBrainOn) {
       const first = lastBrainOn === null;
@@ -1584,6 +1611,12 @@ export function mountUI(ctx) {
     const complete = atlasDepth?.() === 'complete';
     for (const b of $('panelBody').querySelectorAll('[data-depth]'))
       b.setAttribute('aria-pressed', (b.dataset.depth === 'complete') === complete);
+    /* The list holds different rows for each atlas, so a change of atlas is a rebuild rather
+     * than a repaint. It can be changed from outside this panel — choosing a structure that
+     * only the complete atlas has switches to it — and without this the list went on offering
+     * the layers of a body that is no longer drawn. */
+    if (lastDepth !== null && lastDepth !== complete) renderLayerList();
+    lastDepth = complete;
     const depthHelp = $('depthHelp');
     if (depthHelp)
       depthHelp.textContent = T(complete ? 'depthCompleteHelp' : 'depthTaughtHelp');

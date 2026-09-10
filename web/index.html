@@ -289,6 +289,12 @@ body.pop-open #sections,body.pop-open #orient{right:calc(var(--panelw) + 74px)}
 #viewbar button{background:transparent;border:1px solid transparent;color:var(--dim);
  border-radius:3px;padding:4px 9px;font-size:11px;letter-spacing:.02em}
 #viewbar button:hover{color:var(--txt);background:var(--glass2)}
+/* The list is grouped so the two atlases are never side by side -- see renderLayerList. */
+.lygroup{margin:0 0 14px}
+.lygroup+.lygroup{padding-top:12px;border-top:1px solid var(--line)}
+.lygroup h5{margin:0 0 2px;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--acc);font-weight:600}
+.lynote{margin:0 0 7px;font-size:10.5px;line-height:1.5;color:var(--dim2)}
 .layerrow{display:flex;align-items:center;gap:8px;margin-top:5px}
 .lyr{flex:1;display:flex;align-items:center;gap:7px;background:transparent;border:1px solid transparent;
  color:var(--dim);border-radius:3px;padding:3px 6px;font-size:11.5px;text-align:left}

@@ -58,6 +58,14 @@ export const UI = {
                      ko: '이름이 있는 근육·뼈·장기마다 하나의 구조로, 좌우를 함께 다룹니다. 모든 운동과 설명, 한국어 이름이 이 신체를 기준으로 합니다.' },
   depthCompleteHelp: { en: 'BodyParts3D’s own 2,186 pieces: the same body cut finer and sided, so left and right are two things and a trapezius is three. For looking things up rather than for teaching.',
                        ko: 'BodyParts3D의 2,186개 부위 전체입니다. 같은 신체를 더 잘게, 좌우로 나누어 좌·우가 서로 다른 부위이고 승모근은 셋으로 나뉩니다. 수업보다는 찾아보기 위한 것입니다.' },
+  /* The layer list is grouped, because a flat list put the two atlases side by side and a
+   * reader ticking one watched the other's switches turn themselves off. Only one body may
+   * be drawn — see `holdOneAtlas` — so the list shows the one that is up, and says so. */
+  lyBodyNote:   { en: 'The body you are looking at. Switch bodies with Atlas, above.',
+                  ko: '지금 보고 있는 신체입니다. 다른 신체로 바꾸려면 위의 아틀라스를 사용하세요.' },
+  lySystems:    { en: 'Systems', ko: '계통' },
+  lySystemsNote: { en: 'Drawn with either body, so these stay as you set them.',
+                   ko: '어느 신체에서도 함께 그려지므로 설정한 상태가 그대로 유지됩니다.' },
   foldPanel:    { en: 'Close this panel', ko: '이 패널 닫기' },
   unfoldPanel:  { en: 'Open this panel', ko: '이 패널 열기' },
   panelWord:    { en: 'Panel', ko: '패널' },
