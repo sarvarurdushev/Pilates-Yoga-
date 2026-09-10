@@ -1997,6 +1997,23 @@ function revealSelection() {
   for (const name of LAYER_ORDER) {
     const L2 = layers[name];
     if (!L2?.loaded || !app.layers[name]?.on) continue;
+    /* Never the brain. The same rule `syncLayers` states: the cortex is not a
+     * body layer and nothing written for one can describe it.
+     *
+     * `revealMaterial` builds a *structure* material, which displaces each
+     * vertex by an offset looked up from its `_region`. On a body layer those
+     * are structure ids and the offsets are where the catalogue puts them. On
+     * the cortex they are Desikan-Killiany parcel ids, which index that table
+     * as meaningless numbers -- so every vertex of the chosen parcel was thrown
+     * somewhere unrelated and the triangles between them stretched into a
+     * striped slab hanging in the middle of the head. That is what "what the
+     * hell happened to my brain view" was looking at.
+     *
+     * It has nothing to reveal in any case. The reveal pass exists to draw a
+     * structure through the *body* that covers it; a chosen brain region is
+     * already lit by the palette, in whichever of the three looks is up, and
+     * those looks are the brain's own answer to seeing inside it. */
+    if (name === 'brain') continue;
     const mat = revealMaterial(name);
     const u = mat.userData.uniforms;
     if (u?.uOnly) u.uOnly.value = id;
