@@ -1865,60 +1865,6 @@ console.log('explode:', JSON.stringify(apart));
   }
 }
 
-/* The reveal pass never touches the cortex.
- *
- * `revealSelection` draws the chosen structure again, through whatever covers
- * it, using a *structure* material -- one that displaces every vertex by an
- * offset looked up from its `_region`. On a body layer those are structure ids.
- * On the cortex they are parcel ids, which index that table as meaningless
- * numbers: every vertex of the chosen parcel was thrown somewhere unrelated and
- * the triangles between them stretched into a striped slab hanging in the
- * middle of the head. All three brain looks were ruined by it, and it reported
- * as "what the hell happened to my brain view".
- *
- * `syncLayers` has always carried the rule -- the cortex is not a body layer
- * and nothing written for one can describe it -- and this pass was written
- * without it. Counted rather than looked at: a clone is a clone whether or not
- * a screenshot happens to catch it.
- */
-{
-  const brainReveal = await page.evaluate(async () => {
-    const m = await import('/src/main.js');
-    const S = await import('/src/structures.js');
-    const was = Object.fromEntries(
-      Object.keys(m.app.layers).map((n) => [n, !!m.app.layers[n].on]));
-    for (const n of Object.keys(m.app.layers)) await m.setLayer(n, false);
-    await m.setLayer('brain', true);
-    await new Promise((r) => setTimeout(r, 1500));
-    m.setReveal(true);
-    let id = null;
-    for (const [i, r] of S.registry().byId) if (r.layer === 'brain') { id = i; break; }
-    m.selectStructure(id);
-    await new Promise((r) => setTimeout(r, 800));
-    const onBrain = m.revealCount();
-    /* And it still reveals a body structure, so this cannot be passed by
-     * turning the whole pass off. */
-    m.selectStructure(null);
-    for (const n of ['skeleton', 'muscles_superficial']) await m.setLayer(n, true);
-    await m.setLayer('brain', false);
-    await new Promise((r) => setTimeout(r, 1500));
-    let body = null;
-    for (const [i, r] of S.registry().byId)
-      if (r.layer === 'muscles_superficial') { body = i; break; }
-    m.selectStructure(body);
-    await new Promise((r) => setTimeout(r, 800));
-    const onBody = m.revealCount();
-    m.selectStructure(null);
-    for (const [n, on] of Object.entries(was)) await m.setLayer(n, on);
-    return { onBrain, onBody };
-  });
-  console.log('reveal:', JSON.stringify(brainReveal));
-  if (brainReveal.onBrain !== 0)
-    errors.push(`the reveal pass made ${brainReveal.onBrain} clones of the cortex`);
-  if (!(brainReveal.onBody > 0))
-    errors.push('the reveal pass stopped drawing chosen body structures');
-}
-
 /* The taught body and the complete atlas are never drawn together.
  *
  * They are two releases of the same anatomy at two granularities — 449 fused,
@@ -2309,6 +2255,60 @@ await page.evaluate(async () => { (await import('/src/main.js')).setGroup(null);
  *
  * So the check is the cause, not the symptom: at 390 CSS pixels the layout viewport has to
  * *be* 390, and nothing may hang off the edge of it. */
+/* The reveal pass never touches the cortex.
+ *
+ * `revealSelection` draws the chosen structure again, through whatever covers
+ * it, using a *structure* material -- one that displaces every vertex by an
+ * offset looked up from its `_region`. On a body layer those are structure ids.
+ * On the cortex they are parcel ids, which index that table as meaningless
+ * numbers: every vertex of the chosen parcel was thrown somewhere unrelated and
+ * the triangles between them stretched into a striped slab hanging in the
+ * middle of the head. All three brain looks were ruined by it, and it reported
+ * as "what the hell happened to my brain view".
+ *
+ * `syncLayers` has always carried the rule -- the cortex is not a body layer
+ * and nothing written for one can describe it -- and this pass was written
+ * without it. Counted rather than looked at: a clone is a clone whether or not
+ * a screenshot happens to catch it.
+ */
+{
+  const brainReveal = await page.evaluate(async () => {
+    const m = await import('/src/main.js');
+    const S = await import('/src/structures.js');
+    const was = Object.fromEntries(
+      Object.keys(m.app.layers).map((n) => [n, !!m.app.layers[n].on]));
+    for (const n of Object.keys(m.app.layers)) await m.setLayer(n, false);
+    await m.setLayer('brain', true);
+    await new Promise((r) => setTimeout(r, 1500));
+    m.setReveal(true);
+    let id = null;
+    for (const [i, r] of S.registry().byId) if (r.layer === 'brain') { id = i; break; }
+    m.selectStructure(id);
+    await new Promise((r) => setTimeout(r, 800));
+    const onBrain = m.revealCount();
+    /* And it still reveals a body structure, so this cannot be passed by
+     * turning the whole pass off. */
+    m.selectStructure(null);
+    for (const n of ['skeleton', 'muscles_superficial']) await m.setLayer(n, true);
+    await m.setLayer('brain', false);
+    await new Promise((r) => setTimeout(r, 1500));
+    let body = null;
+    for (const [i, r] of S.registry().byId)
+      if (r.layer === 'muscles_superficial') { body = i; break; }
+    m.selectStructure(body);
+    await new Promise((r) => setTimeout(r, 800));
+    const onBody = m.revealCount();
+    m.selectStructure(null);
+    for (const [n, on] of Object.entries(was)) await m.setLayer(n, on);
+    return { onBrain, onBody };
+  });
+  console.log('reveal:', JSON.stringify(brainReveal));
+  if (brainReveal.onBrain !== 0)
+    errors.push(`the reveal pass made ${brainReveal.onBrain} clones of the cortex`);
+  if (!(brainReveal.onBody > 0))
+    errors.push('the reveal pass stopped drawing chosen body structures');
+}
+
 const phone = await browser.newPage({ viewport: { width: 390, height: 844 },
                                       deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 phone.on('console', m => { if (m.type() === 'error') consoleError(m.text(), 'phone: '); });
