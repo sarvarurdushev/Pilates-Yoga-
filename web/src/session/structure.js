@@ -26,8 +26,15 @@ const CSS = `
 /* Its own column, to the left of the explore panel rather than on top of it.
  * Narrow enough that both fit, and it falls back to the panel's slot only when
  * the panel itself has been folded away. */
+/* Clear of the panel *and* of the rail the panel is inset by.
+ *
+ * The panel sits at right:62px, not against the window edge, so offsetting this
+ * card by the panel's own width plus a small margin lands it 38 pixels inside the
+ * panel -- measured, with the structure's name, its layer line and its FMA number
+ * underneath it. The application's own furniture already offsets by the panel
+ * width plus 74 for exactly this reason: 62 for the rail, 12 for the gap. */
 #ss-struct{position:fixed;z-index:8;top:calc(var(--barh) - 6px);bottom:14px;
-  right:calc(var(--panelw) + 24px);width:310px;display:flex;flex-direction:column;
+  right:calc(var(--panelw) + 74px);width:310px;display:flex;flex-direction:column;
   min-height:0;border-radius:3px;border:1px solid var(--line2);
   background:linear-gradient(200deg,rgba(8,15,25,.95) 0%,rgba(4,8,14,.98) 100%);
   box-shadow:0 30px 90px rgba(0,0,0,.66);
