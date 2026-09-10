@@ -1998,7 +1998,10 @@ console.log('explode:', JSON.stringify(apart));
       await m.setAtlasDepth('taught');
       await m.setGroup(g.fma ?? g.id);
       out.group = { both: both(), depth: m.atlasDepth(),
-                    which: g.fma ?? g.id, straddles: !!straddles };
+                    which: g.fma ?? g.id, straddles: !!straddles,
+                    // a group living wholly in the other atlas is allowed to move
+                    otherOnly: (g.layers ?? []).length > 0
+                            && (g.layers ?? []).every((n) => FULL.includes(n)) };
       await m.setGroup(null);
     }
 
@@ -2008,6 +2011,16 @@ console.log('explode:', JSON.stringify(apart));
   console.log('atlas held:', JSON.stringify(ways));
   for (const [how, r] of Object.entries(ways))
     if (r.both) errors.push(`${how} drew both atlases at once`);
+  /* Not drawing both is only half of it, and the weaker half — a filter that
+   * *replaces* one atlas with the other satisfies it while doing the wrong
+   * thing, which is what the first version of this check let through. Labelling
+   * a kind, and choosing a group that has anything on this side, must leave the
+   * reader on the body they were looking at. */
+  if (ways.labelKind && ways.labelKind.depth !== 'taught')
+    errors.push(`labelling a kind moved the reader to the ${ways.labelKind.depth} atlas`);
+  if (ways.group && !ways.group.otherOnly && ways.group.depth !== 'taught')
+    errors.push(`choosing a group moved the reader to the ${ways.group.depth} atlas`);
+  // and a structure deliberately chosen is the one case that may change atlas
   if (ways.select && !ways.select.shown)
     errors.push('choosing a structure in the complete atlas did not show its layer');
   for (const [what, seen] of [['complete', shown.onFull], ['taught', shown.onTaught]])

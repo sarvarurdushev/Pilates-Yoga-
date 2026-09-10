@@ -3815,9 +3815,9 @@ export async function setLabelKind(kind, on) {
   if (on) app.labelKinds.add(kind); else app.labelKinds.delete(kind);
   if (on) {
     const want = new Set();
-    for (const [, r] of registry().byId)
-      if (r.kind === kind && !app.layers[r.layer]?.on) want.add(r.layer);
-    for (const layer of onThisAtlas([...want])) await setLayer(layer, true);
+    for (const [, r] of registry().byId) if (r.kind === kind) want.add(r.layer);
+    for (const layer of onThisAtlas([...want]))
+      if (!app.layers[layer]?.on) await setLayer(layer, true);
   }
   app.labelsOn = true;
   syncLayers();
@@ -5012,6 +5012,17 @@ function onThisAtlas(want) {
   const mine = want.filter(n => !there.includes(n));
   return mine.length ? mine : want;
 }
+
+/* `want` must be every layer that carries the answer, not only the ones that
+ * happen to be switched off.
+ *
+ * Handed the off ones alone, an empty `mine` means "nothing left to turn on over
+ * here" — and the fallback above reads it as "nothing over here at all" and
+ * changes sides. Those are opposites. Asking to label muscles with the taught
+ * body's superficial and deep layers already on left exactly one layer off,
+ * `muscles_full`, so the filter concluded the muscles were all on the other
+ * atlas and swapped the reader's body for it. Measured: it ended on `complete`
+ * having started on `taught`. */
 
 export async function setAtlasDepth(which) {
   const full = which === 'complete';
