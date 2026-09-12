@@ -30,7 +30,7 @@ export function mountUI(ctx) {
           selectStructure, setLang, setAtlas, setXray, setCutaway, setClip, setLabels,
           setReveal, revealOn,
           setRotate, setRegister, setInstruction, setLayer, setLayerOpacity, setView,
-          resetView, setExercise, setPathway, activationOf,
+          resetView, resetBody, setExercise, setPathway, activationOf,
           setGroup, anatomyGroups, groupsForStructure, setIsolate, isolated, setExplode,
           setExplodeLayout, explodeLayout, zoomBy, fitView,
           setAtlasDepth, atlasDepth, atlasLayers,
@@ -177,6 +177,8 @@ export function mountUI(ctx) {
     $('mRot').textContent = T('rotate');
     $('labToggle').textContent = T('labels');
     $('reset').textContent = T('reset');
+    $('resetBody').textContent = T('resetBody');
+    $('resetBody').title = T('resetBodyTip');
     $('registerLab').textContent = T('register');
     $('regPlain').textContent = T('regPlain');
     $('regClinical').textContent = T('regClinical');
@@ -1433,6 +1435,7 @@ export function mountUI(ctx) {
     $(id).onclick = () => setView(k);
   $('labBtn').onclick = () => setLab(!app.labOpen);
   $('reset').onclick = resetView;
+  $('resetBody').onclick = () => resetBody?.();
   $('atlas').oninput = e => setAtlas(+e.target.value);
   $('explode').oninput = e => { setExplode(+e.target.value); syncControls(); };
   /* Fold any panel away and remember it.

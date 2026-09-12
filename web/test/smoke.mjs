@@ -2372,6 +2372,50 @@ await page.evaluate(async () => { (await import('/src/main.js')).setGroup(null);
   }
 }
 
+/* Whole body puts the body back and leaves the layers alone.
+ *
+ * "Reset view" moves the camera and nothing else, so after choosing a group, isolating a
+ * muscle and taking it apart, the only button that undid anything was Hide all -- which threw
+ * away the layers the reader had switched on. Both halves are asserted here, because a reset
+ * that clears the choices *and* the setup would pass a test that only looked at the choices.
+ */
+{
+  const back = await page.evaluate(async () => {
+    const m = await import('/src/main.js');
+    const S = await import('/src/structures.js');
+    const G = await import('/src/content/groups.js');
+    for (const l of ['arteries', 'veins', 'nervous', 'organs']) await m.setLayer(l, true);
+    await new Promise((r) => setTimeout(r, 1500));
+    const on = () => Object.entries(m.app.layers)
+      .filter(([, v]) => v.on).map(([k]) => k).sort().join(',');
+    const g = (G.groups().list ?? []).find((x) => (x.members ?? []).length >= 3);
+    if (g) await m.setGroup(g.fma);
+    let id = null;
+    for (const [i, r] of S.registry().byId)
+      if (r.layer === 'muscles_superficial') { id = i; break; }
+    await m.setIsolate([id]);
+    await m.setExplode(1);
+    await new Promise((r) => setTimeout(r, 1200));
+    const chosen = on();
+    const messy = { group: !!m.app.group, isolate: m.app.isolate?.size ?? 0,
+                    explode: m.app.explode, selected: m.app.selected };
+    await m.resetBody();
+    await new Promise((r) => setTimeout(r, 1500));
+    return { messy, chosen, kept: on(),
+             group: !!m.app.group, isolate: m.app.isolate?.size ?? 0,
+             explode: m.app.explode, selected: m.app.selected };
+  });
+  console.log('whole body:', JSON.stringify(back));
+  if (!(back.messy.isolate && back.messy.explode > 0.5))
+    errors.push('the reset check never got the body into a state worth resetting');
+  if (back.group) errors.push('Whole body left a group chosen');
+  if (back.isolate) errors.push('Whole body left something isolated');
+  if (back.explode > 0.01) errors.push(`Whole body left the body ${back.explode} apart`);
+  if (back.selected != null) errors.push('Whole body left a structure selected');
+  if (back.kept !== back.chosen)
+    errors.push(`Whole body changed the layers: ${back.chosen} -> ${back.kept}`);
+}
+
 const phone = await browser.newPage({ viewport: { width: 390, height: 844 },
                                       deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 phone.on('console', m => { if (m.type() === 'error') consoleError(m.text(), 'phone: '); });

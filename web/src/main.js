@@ -3724,6 +3724,29 @@ export function frameRig(immediate = false, overClip = false) {
   nudgeIdle();
 }
 
+/**
+ * Put the whole body back, and leave the layers alone.
+ *
+ * "Reset view" moves the camera and nothing else, which is the wrong tool after a reader has
+ * chosen a group, isolated a muscle and taken it apart: pressing it framed the body they were
+ * still not looking at. Getting back meant finding the isolate control, the group chip and
+ * the slider and undoing each by hand, and the one thing that did have a button -- Hide all
+ * -- threw away the layers they had switched on, which is the work they wanted to keep.
+ *
+ * So this undoes the *choices* and keeps the *setup*. Selection, isolation, group and the
+ * take-apart slider go; every layer stays exactly as it was, and so do the x-ray, the
+ * cutaway, the labels and the atlas. Then the camera frames the body again, which is what
+ * "reset" meant to the reader all along.
+ */
+export async function resetBody() {
+  await setGroup(null);
+  await setIsolate(null);
+  await setExplode(0);
+  selectStructure(null);
+  resetView();
+  ui?.syncControls?.();
+}
+
 export function resetView(immediate = false) {
   FLIGHT_BY = 'resetView';
   /* Re-derived rather than cached, because the fit is solved against the *aspect* and the
@@ -5691,6 +5714,7 @@ const ui = mountUI({
   selectStructure, setLang, setAtlas, setXray, setCutaway, setClip, setLabels,
   setReveal, revealOn,
   setRotate, setRegister, setInstruction, setLayer, setLayerOpacity, setView, resetView,
+  resetBody,
   setExercise, setPathway, captureStage, activationOf, flyTo,
   setGroup, anatomyGroups, groupsForStructure, setIsolate, isolated, setExplode,
   setExplodeLayout, explodeLayout, zoomBy, fitView, explodeLayoutExtent,
