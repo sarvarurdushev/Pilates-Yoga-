@@ -4731,7 +4731,10 @@ export async function setGroup(fma) {
   app.exercise = null;
   activation.clear();
   palette.clearActivation();
-  if (!g) { for (const m of materials) m.userData.sync?.(); syncLayers(); ui.relabel(); return; }
+  /* The sheet is laid out for whatever is chosen -- see `explodeSubject` -- so choosing or
+   * clearing a group changes what it is a sheet of. Free while the body is together. */
+  if (!g) { relayoutExplode(); for (const m of materials) m.userData.sync?.();
+            syncLayers(); ui.relabel(); return; }
   for (const layer of onThisAtlas(g.layers.filter(hasLayer))) {
     app.layers[layer].on = true;
     holdOneAtlas(layer);
@@ -4741,6 +4744,7 @@ export async function setGroup(fma) {
     activation.set(id, 'group');
     palette.setActivation(id, GROUP_LEVEL);
   }
+  relayoutExplode();
   for (const m of materials) m.userData.sync?.();
   syncLayers();
   flyToGroup(g.members);
@@ -4853,12 +4857,38 @@ export const explodeLayoutExtent = () => explodeExtent;
 export const paletteOffsetOf = (id) => palette.getOffset(+id, new THREE.Vector3());
 
 /** Everything with a mesh of its own, in the order the inventory reads. */
+/**
+ * What the sheet is a sheet *of*.
+ *
+ * Taking the body apart lays out every piece in the atlas, and that is right when the body is
+ * the subject. It is wrong the moment something smaller is: a reader who picks the hamstrings
+ * and then opens them got four muscles scattered to the four corners of a two-thousand-cell
+ * page, each one a speck, with the rest of the body between them. What they asked to take
+ * apart was the hamstrings.
+ *
+ * So the layout has a subject. A chosen group is it; failing that, an isolated set; failing
+ * both, the whole atlas, which is the catalogue this was written for. Aggregates are expanded
+ * to the pieces that are actually drawn, because a group names muscles and some of those are
+ * drawn in parts.
+ */
+function explodeSubject() {
+  const pick = new Set();
+  const take = (id) => { for (const d of drawnIds(id)) if (app.centroids[d]) pick.add(d); };
+  const g = app.group ? groupOf(app.group) : null;
+  if (g?.members?.length) for (const id of g.members) take(id);
+  else if (app.isolate?.size) for (const id of app.isolate) take(id);
+  else return null;
+  return pick.size ? pick : null;
+}
+
 function inventoryOrder() {
   const { byId } = registry();
+  const only = explodeSubject();
   const rows = [];
   for (const [id, r] of byId) {
     // an aggregate has no geometry, so it has nothing to lay out -- its parts do
     if (r.parts || !app.centroids[id]) continue;
+    if (only && !only.has(id)) continue;
     rows.push({ id, layer: r.layer, name: r.name.en });
   }
   const rank = n => { const i = LAYER_ORDER.indexOf(n); return i < 0 ? 99 : i; };
@@ -4885,6 +4915,7 @@ function inventoryOrder() {
  * only in tension if every cell has to be the same size.
  */
 function inventoryOffsets() {
+  const only = explodeSubject();
   const rows = inventoryOrder();
   if (!rows.length) { explodeExtent = null; return; }
 
@@ -4895,7 +4926,12 @@ function inventoryOffsets() {
    * measured, not guessed. Normalised, the same 1,280 pieces are a page you can
    * read, which is what an inventory is for. A cap keeps a sesamoid bone from
    * being blown up to the size of a femur and reading as one. */
-  const cols = Math.max(6, Math.round(Math.sqrt(rows.length * GRID_ASPECT)));
+  /* Six columns is a page width for two thousand pieces and a scatter for four: the
+   * hamstrings came out one per corner with nothing in between. A small subject gets a grid
+   * shaped to it, so four pieces are a square and nine are three across. */
+  const cols = rows.length <= 24
+    ? Math.max(1, Math.round(Math.sqrt(rows.length * GRID_ASPECT)))
+    : Math.max(6, Math.round(Math.sqrt(rows.length * GRID_ASPECT)));
   const lines = Math.ceil(rows.length / cols);
   const cell = CELL;
   const inner = cell * (1 - GUTTER);
@@ -4911,6 +4947,17 @@ function inventoryOffsets() {
   }
   const midY = (lo + hi) / 2;
 
+  /* Everything that is not the subject goes home. The layout only writes the cells it uses,
+   * so without this a reader who laid out the whole atlas and then chose a group left two
+   * thousand pieces standing where the previous sheet had put them. */
+  if (only) {
+    for (const [id] of registry().byId) {
+      if (only.has(id) || !app.centroids[id]) continue;
+      const c = app.centroids[id];
+      palette.setOffset(id, 0, 0, 0);
+      palette.setScale(id, 1, c.x, c.y, c.z);
+    }
+  }
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     const c = app.centroids[r.id];
@@ -4936,10 +4983,26 @@ function inventoryOffsets() {
 
 function openOffsets() {
   const { byId } = registry();
+  const only = explodeSubject();
   const out = new THREE.Vector3();
+  /* Opening a handful of muscles is not opening a body, so the reach is the subject's own.
+   * At the body's reach four hamstrings fly a third of a body height apart and the group
+   * stops being a group. */
+  let spread = EXPLODE_REACH;
+  if (only) {
+    let lo = Infinity, hi = -Infinity, loX = Infinity, hiX = -Infinity;
+    for (const id of only) {
+      const c = app.centroids[id]; if (!c) continue;
+      lo = Math.min(lo, c.y); hi = Math.max(hi, c.y);
+      loX = Math.min(loX, c.x); hiX = Math.max(hiX, c.x);
+    }
+    const reach = Math.max(hi - lo, hiX - loX);
+    if (Number.isFinite(reach)) spread = Math.max(0.02, Math.min(EXPLODE_REACH, reach * 0.55));
+  }
   for (const [id, r] of byId) {
     const c = app.centroids[id];
     if (!c) continue;
+    if (only && !only.has(id)) { palette.setOffset(id, 0, 0, 0); palette.setScale(id, 1, c.x, c.y, c.z); continue; }
     /* Away from the vertical axis at this structure's own height. A structure
      * sitting on the midline -- the sternum, the spine itself, the linea alba --
      * has no radial direction, so it is pushed forward instead of being given an
@@ -4950,7 +5013,7 @@ function openOffsets() {
     /* Deeper layers move less, so the body opens rather than scattering: the
      * skin-side muscles get out of the way and the skeleton stays put. */
     const depth = XRAY_DEPTH[r.layer] ?? 0;
-    const reach = EXPLODE_REACH * (1 - depth / 5);
+    const reach = spread * (1 - depth / 5);
     palette.setOffset(id, out.x * reach, 0, out.z * reach);
     // opened, not catalogued: every structure keeps its own size
     palette.setScale(id, 1, c.x, c.y, c.z);

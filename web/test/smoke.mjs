@@ -2309,6 +2309,69 @@ await page.evaluate(async () => { (await import('/src/main.js')).setGroup(null);
     errors.push('the reveal pass stopped drawing chosen body structures');
 }
 
+/* A group comes apart as a group, not across the whole atlas.
+ *
+ * The sheet lays out every piece that is drawn, which is right when the body is the subject
+ * and wrong the moment something smaller is. A reader who chose the hamstrings and opened
+ * them got four muscles a third of a body height apart on a page of two thousand cells, with
+ * the rest of the body in between -- "they are spread apart very messy. they need to be
+ * close." The layout has a subject now; this measures that it is used.
+ *
+ * Late in the run, like the reveal check above, because it has to take the body apart.
+ */
+{
+  const apart = await page.evaluate(async () => {
+    const m = await import('/src/main.js');
+    const S = await import('/src/structures.js');
+    const G = await import('/src/content/groups.js');
+    const g = (G.groups().list ?? []).find((x) => (x.members ?? []).length >= 3);
+    if (!g) return null;
+    const spread = () => {
+      const pts = [];
+      for (const id of g.members) for (const d of S.drawnIds(id)) {
+        const p = m.drawnPointOf?.(d); if (p) pts.push(p.clone());
+      }
+      let far = 0;
+      for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++)
+        far = Math.max(far, pts[i].distanceTo(pts[j]));
+      return { far, n: pts.length };
+    };
+    m.setExplodeLayout?.('inventory');
+    await m.setGroup(null);
+    await m.setExplode(1);
+    await new Promise((r) => setTimeout(r, 1800));
+    const whole = spread();
+    await m.setGroup(g.fma);
+    await new Promise((r) => setTimeout(r, 1800));
+    await m.setExplode(1);
+    await new Promise((r) => setTimeout(r, 1200));
+    const own = spread();
+    /* And the rest of the body is left where it stands: laying out four muscles is not a
+     * reason to move two thousand other pieces. */
+    let strayed = 0;
+    for (const [id, r] of S.registry().byId) {
+      if (r.parts || !m.app.centroids[id]) continue;
+      if (g.members.some((x) => S.drawnIds(x).includes(id))) continue;
+      const p = m.drawnPointOf?.(id);
+      if (p && p.distanceTo(m.app.centroids[id]) > 0.01) strayed++;
+    }
+    await m.setGroup(null);
+    await m.setExplode(0);
+    return { group: g.name?.en ?? '', members: g.members.length, drawn: own.n,
+             whole: +whole.far.toFixed(3), own: +own.far.toFixed(3), strayed };
+  });
+  console.log('group apart:', JSON.stringify(apart));
+  if (!apart) console.log('  no group with three members, skipped');
+  else {
+    if (!(apart.drawn >= 3)) errors.push(`only ${apart.drawn} of the group was drawn`);
+    if (!(apart.own < apart.whole * 0.6))
+      errors.push(`a chosen group still spreads ${apart.own} against ${apart.whole} `
+        + 'for the whole atlas — the layout is not using its subject');
+    if (apart.strayed)
+      errors.push(`${apart.strayed} pieces outside the group moved when the group opened`);
+  }
+}
+
 const phone = await browser.newPage({ viewport: { width: 390, height: 844 },
                                       deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 phone.on('console', m => { if (m.type() === 'error') consoleError(m.text(), 'phone: '); });
