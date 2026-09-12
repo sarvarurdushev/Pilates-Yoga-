@@ -282,13 +282,16 @@ export function mountUI(ctx) {
       renderLayerList();
     };
   }
-  const SWATCH = { skeleton: '#e8e2d4', muscles_superficial: '#b8544a',
-                   muscles_deep: '#8f3c36', organs: '#c09068', nervous: '#F2D98B',
+  /* The list's swatch is a promise about what the picture will look like, so it tracks
+   * `LAYER_COLOR` and `LOOK`. When the dark layers were lifted to be readable, a swatch left
+   * behind would have been a colour chip for a colour nothing draws. */
+  const SWATCH = { skeleton: '#e8e2d4', muscles_superficial: '#D4817A',
+                   muscles_deep: '#C8635E', organs: '#c09068', nervous: '#F2D98B',
                    brain: '#cfb2a8',
-                   arteries: '#C0392B', veins: '#3D6C9E', airways: '#8FA9B8',
+                   arteries: '#DA6559', veins: '#5C8DC0', airways: '#8FA9B8',
                    connective: '#CFC3A8', nerves_cranial: '#E8C86B',
-                   heart_detail: '#B05A52', detail: '#9E8F7A',
-                   bones_full: '#e8e2d4', muscles_full: '#b04a41',
+                   heart_detail: '#C27F79', detail: '#9E8F7A',
+                   bones_full: '#e8e2d4', muscles_full: '#ca7770',
                    organs_full: '#c09068' };
   const layerSwatch = n => SWATCH[n] ?? '#8b95ab';
 

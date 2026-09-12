@@ -289,8 +289,15 @@ function buildEnvironment() {
   return tex;
 }
 scene.environment = buildEnvironment();
-scene.environmentIntensity = 0.62;
-scene.add(new THREE.HemisphereLight(0xcadff8, 0x181d28, 0.34));
+/* Raised to lift the shadow side, not the highlights.
+ *
+ * With the muscle colours brightened the deep layer still had a sixth of its pixels under 45
+ * out of 255 -- the half of every muscle facing away from the key, which on a dark ground is
+ * black. That is a fill problem: pushing the key or the colour further would have blown out
+ * bone, which was already reading at 153, and closed the gap that tells deep muscle from
+ * superficial. The ambient and the environment light the side the key does not reach. */
+scene.environmentIntensity = 0.78;
+scene.add(new THREE.HemisphereLight(0xcadff8, 0x1d2433, 0.54));
 const L = (c, i, p) => { const d = new THREE.DirectionalLight(c, i); d.position.set(...p); scene.add(d); return d; };
 L(0xf2f7ff, 1.05, [2.6, 2.6, 2.4]);          // key, cooled and brought down
 L(0x8fb0ee, 0.34, [-2.6, -0.4, -2.0]);       // cool fill
@@ -313,23 +320,29 @@ const materials = [];
 /* ------------------------------------------------------------------ layers */
 const LOOK = {
   /* The source meshes carry no colour — BodyParts3D is segmented geometry, not photography —
-   * so every entry here is a choice rather than a measurement. */
+   * so every entry here is a choice rather than a measurement.
+   *
+   * The muscle and vessel entries were chosen for accuracy and were too dark to read: measured
+   * on screen, one layer at a time, the deep muscle layer came back at a mean of 57 out of 255
+   * with a quarter of it under 45, against bone at 153. They are lifted to match
+   * `LAYER_COLOR`, which is the palette these materials are tinted by — the two have to agree
+   * or a structure is one colour and its swatch another. See the note there for the numbers. */
   skeleton:            { color: 0xe8e2d4, roughness: 0.55, clearcoat: 0.18, sheen: 0.12 },
-  muscles_superficial: { color: 0xb8544a, roughness: 0.68, clearcoat: 0.30, sheen: 0.35 },
-  muscles_deep:        { color: 0xa04640, roughness: 0.70, clearcoat: 0.26, sheen: 0.30 },
+  muscles_superficial: { color: 0xd4817a, roughness: 0.68, clearcoat: 0.30, sheen: 0.35 },
+  muscles_deep:        { color: 0xc8635e, roughness: 0.70, clearcoat: 0.26, sheen: 0.30 },
   organs:             { color: 0xc09068, roughness: 0.62, clearcoat: 0.34, sheen: 0.30 },
   nervous:             { color: 0xF2D98B, roughness: 0.42, clearcoat: 0.45, sheen: 0.20 },
   /* The layers built from the 4.0 element archive -- see scripts/build_detail.py. Wet
    * surfaces, because that is what a vessel and an airway are. */
-  arteries:            { color: 0xC0392B, roughness: 0.36, clearcoat: 0.55, sheen: 0.18 },
-  veins:               { color: 0x3D6C9E, roughness: 0.38, clearcoat: 0.50, sheen: 0.18 },
+  arteries:            { color: 0xDA6559, roughness: 0.36, clearcoat: 0.55, sheen: 0.18 },
+  veins:               { color: 0x5C8DC0, roughness: 0.38, clearcoat: 0.50, sheen: 0.18 },
   airways:             { color: 0x8FA9B8, roughness: 0.44, clearcoat: 0.40, sheen: 0.22 },
   connective:          { color: 0xCFC3A8, roughness: 0.66, clearcoat: 0.20, sheen: 0.28 },
   nerves_cranial:      { color: 0xE8C86B, roughness: 0.42, clearcoat: 0.45, sheen: 0.20 },
-  heart_detail:        { color: 0xB05A52, roughness: 0.50, clearcoat: 0.40, sheen: 0.26 },
+  heart_detail:        { color: 0xC27F79, roughness: 0.50, clearcoat: 0.40, sheen: 0.26 },
   detail:              { color: 0x9E8F7A, roughness: 0.58, clearcoat: 0.28, sheen: 0.24 },
   bones_full:          { color: 0xe8e2d4, roughness: 0.55, clearcoat: 0.18, sheen: 0.12 },
-  muscles_full:        { color: 0xb04a41, roughness: 0.68, clearcoat: 0.30, sheen: 0.32 },
+  muscles_full:        { color: 0xca7770, roughness: 0.68, clearcoat: 0.30, sheen: 0.32 },
   organs_full:         { color: 0xc09068, roughness: 0.62, clearcoat: 0.34, sheen: 0.30 },
 };
 

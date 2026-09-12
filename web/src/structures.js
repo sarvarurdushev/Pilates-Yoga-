@@ -24,24 +24,41 @@ export const LAYER_ORDER = ['organs', 'airways', 'arteries', 'veins',
                             'organs_full', 'muscles_full', 'bones_full',
                             'skeleton', 'brain'];
 
-/** Palette colour per layer, used for any structure with no colour of its own. */
+/**
+ * Palette colour per layer, used for any structure with no colour of its own.
+ *
+ * **Lit to be seen, not only to be right.** Measured on screen, one layer at a time against a
+ * plate of the same view with nothing in it, the muscle layers came back at a mean of 57 to 73
+ * out of 255 against bone's 153 -- and a quarter of every pixel of the deep muscle layer was
+ * under 45, which on a dark ground is black. Deep muscle sat at a relative luminance of 0.107
+ * where bone sits at 0.648: six times darker, on the layer a Pilates coach looks at most.
+ *
+ * The dark end is lifted by raising lightness alone, so each keeps its hue and the order they
+ * are read by survives -- deep is still darker than full, which is still darker than
+ * superficial, and an artery is still red where a vein is still blue. Nothing above 0.27 was
+ * touched: bone, cartilage, the nerves and the brain were never the problem.
+ *
+ *   muscles_deep         0.107 -> 0.220      arteries      0.143 -> 0.249
+ *   muscles_full         0.145 -> 0.269      veins         0.142 -> 0.251
+ *   muscles_superficial  0.163 -> 0.311      heart_detail  0.172 -> 0.280
+ */
 export const LAYER_COLOR = {
   /* The vasculature is read by colour before it is read by name, and it is the one
    * place in the body where the convention is universal: arteries red, veins blue. */
-  arteries: '#C0392B',
-  veins: '#3D6C9E',
+  arteries: '#DA6559',
+  veins: '#5C8DC0',
   airways: '#8FA9B8',
   connective: '#CFC3A8',
   nerves_cranial: '#E8C86B',
-  heart_detail: '#B05A52',
+  heart_detail: '#C27F79',
   detail: '#9E8F7A',
   /* The complete atlas draws the same anatomy the taught body does, so it wears the
    * same colours: a bone is bone-coloured whichever set it came out of. */
-  bones_full: '#D9D2C4', muscles_full: '#B04A41', organs_full: '#B08658',
+  bones_full: '#D9D2C4', muscles_full: '#CA7770', organs_full: '#B08658',
   nervous: '#F2D98B',
   skeleton: '#D9D2C4',
-  muscles_superficial: '#C1483F',
-  muscles_deep: '#9E3B36',
+  muscles_superficial: '#D4817A',
+  muscles_deep: '#C8635E',
   organs: '#B08658',
   brain: '#cfb2a8',
 };
