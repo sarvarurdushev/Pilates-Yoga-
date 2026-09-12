@@ -4247,7 +4247,17 @@ function vantageFor(id, aspect, at = null, span = 0.12, orbit = null) {
   const c = side?.centre ?? (id != null ? app.centroids[id] : null) ?? at;
   if (!c) return null;
   const r = id != null ? get(id) : null;
-  const radius = id != null ? Math.max(0.03, (app.radii[id] ?? 0.05) * 1.9) : span;
+  /* The floor is a guard against a degenerate cloud, not a statement about how big a
+   * structure is, and at 0.03 of a body height it was the second: the left colic artery has a
+   * radius of 0.005, so it was framed for a sphere six times its own size and drawn as a
+   * squiggle a few pixels across in the middle of a black panel. Sixty-six of seventy-four
+   * sampled arteries covered under one per cent of the picture, and thirty of thirty-seven
+   * veins. That is what "a lot of them don't have the 3d view" is: the view is there, and the
+   * thing in it was framed too far away to see.
+   *
+   * Low enough now that it binds only where the extent really is degenerate, and the distance
+   * floor below follows the subject instead of sitting at a fixed 0.06. */
+  const radius = id != null ? Math.max(0.006, (app.radii[id] ?? 0.05) * 1.9) : span;
   const bilateral = r?.sides?.length === 2 || Math.abs(c.x) < 0.02;
   let dir = bilateral ? LEFT_VIEW.clone()
           : new THREE.Vector3(c.x, 0, Math.abs(c.z) + 0.25).normalize();
@@ -4257,7 +4267,8 @@ function vantageFor(id, aspect, at = null, span = 0.12, orbit = null) {
     for (const v of [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]])
       pts.push(c.clone().addScaledVector(new THREE.Vector3(...v), radius));
   const { target, distance } =
-    frameFor(pts, dir, radius * 0.45, 0.06, 0, { aspect, inset: false });
+    frameFor(pts, dir, radius * 0.45, Math.max(0.02, radius * 1.2), 0,
+             { aspect, inset: false });
   return { eye: target.clone().addScaledVector(orbited(dir, orbit), distance / zoomOf(orbit)),
            target };
 }
@@ -4462,6 +4473,41 @@ export function renderStageInto(canvas, width, height) {
  * the dark, and the deep end — which is most of this picture — is exactly where the codes have
  * run out. The quad costs a fraction of the scene render it follows.
  */
+/**
+ * A key light that stands where the panel's camera stands.
+ *
+ * The scene's lights are fixed in world space -- key front-right-high, rim behind -- which is
+ * the right rig for a body seen from the front and the wrong one for a panel, whose camera is
+ * put wherever the *structure* is best seen. `facingDir` sends it round to the left for a left
+ * latissimus and behind for a rhomboid, and from there the subject is lit by a 0.34 fill and a
+ * rim it is facing away from. Measured on the serratus posterior inferior: a mean of **5.9 out
+ * of 255** with nothing above 154, which is a black rectangle with a shape faintly in it, and
+ * it is what "a lot of them don't have the 3d view" was looking at.
+ *
+ * So the panel carries its own key, placed at the camera and lifted, plus a soft fill from the
+ * other side to keep the far half from going to pure black. Added for the length of one render
+ * and taken out again: the stage's own look is deliberate and none of this touches it.
+ */
+const panelKey = new THREE.DirectionalLight(0xf4f8ff, 1.25);
+const panelFill = new THREE.DirectionalLight(0x9fc0f0, 0.42);
+const _pk = new THREE.Vector3(), _pu = new THREE.Vector3(), _pr = new THREE.Vector3();
+
+function lightFor(cam, at) {
+  /* Up and to the right of the lens, which is where a photographer puts a key: straight down
+   * the lens is flat and tells you nothing about the shape. */
+  cam.getWorldDirection(_pk);
+  _pu.set(0, 1, 0);
+  _pr.crossVectors(_pk, _pu).normalize();
+  panelKey.position.copy(cam.position)
+    .addScaledVector(_pr, 0.55).addScaledVector(_pu, 0.62);
+  panelFill.position.copy(cam.position)
+    .addScaledVector(_pr, -0.85).addScaledVector(_pu, -0.15);
+  panelKey.target.position.copy(at ?? controls.target);
+  panelFill.target.position.copy(panelKey.target.position);
+  scene.add(panelKey, panelKey.target, panelFill, panelFill.target);
+  return () => scene.remove(panelKey, panelKey.target, panelFill, panelFill.target);
+}
+
 function paintInto(canvas, w, h, cam, aimAt = null) {
   if (!stageTarget || stageTarget.width !== w || stageTarget.height !== h) {
     stageTarget?.dispose(); stageOut?.dispose();
@@ -4493,6 +4539,7 @@ function paintInto(canvas, w, h, cam, aimAt = null) {
    * be drawn before its own `fitFog` runs. */
   const prevFog = { near: scene.fog.near, far: scene.fog.far };
   fitFog(cam, aimAt ?? controls.target);
+  const unlight = lightFor(cam, aimAt);
   renderer.setRenderTarget(stageTarget);
   renderer.autoClear = true;
   renderer.setClearColor(0x060b14, 1);
@@ -4514,6 +4561,7 @@ function paintInto(canvas, w, h, cam, aimAt = null) {
   renderer.autoClear = prevAuto;
   renderer.setClearColor(prevClear, prevAlpha);
   scene.fog.near = prevFog.near; scene.fog.far = prevFog.far;
+  unlight();
 
   const c = canvas.getContext('2d');
   if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; stageImg = null; }
