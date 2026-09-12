@@ -14,6 +14,7 @@ import { REGION_INFO } from './regionData.js';
 import { MUSCLE_INFO } from './content/muscles.js';
 import { KO_NAME } from './content/koreanNames.js';
 import { INTERIOR_IDS } from './deepStructures.js';
+import { ATLAS_FIT, FITTED_LAYERS } from './generated/atlas_fit.js';
 
 /** Layer names, in the order they stack from the outside in. */
 export const LAYER_ORDER = ['organs', 'airways', 'arteries', 'veins',
@@ -152,6 +153,22 @@ let REG = null;
  * @param {{brain?: boolean}} [opts]
  * @returns {{ byId: Map<number, object>, byName: Map<string, object>, meta: object }}
  */
+/**
+ * Put a table centroid into the taught body's frame.
+ *
+ * The geometry is corrected where it is loaded -- see `loadLayer` -- but these numbers come
+ * off the build, and the build is where the two frames diverged. Left alone, a camera asked
+ * to fly to a complete-atlas structure went to where 4.0 thought it was, up to 44 mm from
+ * where it is now drawn, and a group's centre was the mean of members measured in two
+ * different frames.
+ */
+const FIT = ATLAS_FIT;
+const fitPoint = (c) => !c ? c : [
+  FIT[0] * c[0] + FIT[1] * c[1] + FIT[2] * c[2] + FIT[3],
+  FIT[4] * c[0] + FIT[5] * c[1] + FIT[6] * c[2] + FIT[7],
+  FIT[8] * c[0] + FIT[9] * c[1] + FIT[10] * c[2] + FIT[11],
+];
+
 export function buildRegistry(generated, { brain = true } = {}) {
   const byId = new Map(), byName = new Map();
 
@@ -213,7 +230,7 @@ export function buildRegistry(generated, { brain = true } = {}) {
        * layers panel states the total beside the structure count, so a reader comparing this
        * with another atlas's part list is not left to guess at the difference. */
       pieces: s.pieces ?? 1,
-      centroid: s.centroid,
+      centroid: FITTED_LAYERS.includes(s.layer) ? fitPoint(s.centroid) : s.centroid,
       muscle,
     };
     byId.set(s.id, rec);

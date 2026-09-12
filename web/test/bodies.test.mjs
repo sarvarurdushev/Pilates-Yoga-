@@ -177,3 +177,63 @@ test('every model is stamped with its own current hash', async () => {
       `${f} has changed since it was stamped — run \`npm run stamp\``);
   }
 });
+
+/* The two halves of the atlas are in one frame.
+ *
+ * The taught body is BodyParts3D 3.0 and everything else is 4.0, and the two builds never
+ * reconciled their frames: over the 179 bones named in both releases the complete atlas sat
+ * 14 mm low on average and 44 mm low at the foot, which drew a second leg inside the first.
+ * `scripts/fit_atlases.py` solves the correction and writes it here; this holds that what is
+ * shipped is the fit that script would produce today, so a rebuild of either half that moves
+ * one of them cannot quietly leave the correction describing the old one.
+ */
+test('the complete atlas is fitted onto the taught body', async () => {
+  const { ATLAS_FIT, FITTED_LAYERS } = await import('../src/generated/atlas_fit.js');
+  assert.equal(ATLAS_FIT.length, 16, 'the fit is a 4x4 matrix');
+  assert.deepEqual(ATLAS_FIT.slice(12), [0, 0, 0, 1], 'the last row is affine');
+  /* A similarity, so the three axes carry one scale. A fit that came back with three
+   * different ones would mean the two releases disagree about shape and not only placement,
+   * and averaging that into a single number would be hiding it. */
+  const col = (i) => Math.hypot(ATLAS_FIT[i], ATLAS_FIT[4 + i], ATLAS_FIT[8 + i]);
+  const [sx, sy, sz] = [col(0), col(1), col(2)];
+  assert.ok(Math.abs(sx - sy) < 1e-6 && Math.abs(sy - sz) < 1e-6,
+    `scale is not uniform: ${sx}, ${sy}, ${sz}`);
+  assert.ok(sx > 0.8 && sx < 1.25, `implausible scale ${sx}`);
+
+  const { readFile } = await import('node:fs/promises');
+  const table = JSON.parse(await readFile(new URL('../src/generated/structures.json',
+                                                  import.meta.url), 'utf8'));
+  const taught = new Map(), full = new Map();
+  for (const s of table.structures) {
+    for (const [side, c] of Object.entries(s.perSide ?? {})) {
+      const nm = s.name.toLowerCase();
+      if (s.layer === 'skeleton') taught.set(`${nm}|${side}`, c);
+      else if (s.layer === 'bones_full')
+        full.set(`${nm.replace(/^(left|right)\s+/, '')}|${side}`, c);
+    }
+  }
+  const shared = [...taught.keys()].filter((k) => full.has(k));
+  assert.ok(shared.length > 100, `only ${shared.length} bones name-match across the releases`);
+
+  const put = (c) => [0, 1, 2].map((r) =>
+    ATLAS_FIT[r * 4] * c[0] + ATLAS_FIT[r * 4 + 1] * c[1]
+    + ATLAS_FIT[r * 4 + 2] * c[2] + ATLAS_FIT[r * 4 + 3]);
+  const err = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  let before = 0, after = 0, footBefore = 0, footAfter = 0, feet = 0;
+  for (const k of shared) {
+    const t = taught.get(k), f = full.get(k);
+    before += err(f, t); after += err(put(f), t);
+    if (t[1] < -0.45) { feet++; footBefore += err(f, t); footAfter += err(put(f), t); }
+  }
+  before /= shared.length; after /= shared.length;
+  footBefore /= feet; footAfter /= feet;
+  assert.ok(after < before * 0.6,
+    `the fit barely helps: ${(before * 1000).toFixed(1)} mm -> ${(after * 1000).toFixed(1)} mm`);
+  /* The foot is where it showed, so the foot is where the bar is. */
+  assert.ok(footAfter < 0.015,
+    `the foot is still ${(footAfter * 1000).toFixed(1)} mm out across the two releases`);
+  assert.ok(FITTED_LAYERS.includes('arteries') && FITTED_LAYERS.includes('bones_full'),
+    'the fitted set must name every layer build_detail.py emits');
+  assert.ok(!FITTED_LAYERS.includes('skeleton'),
+    'the taught body is the frame; it must not be moved onto itself');
+});

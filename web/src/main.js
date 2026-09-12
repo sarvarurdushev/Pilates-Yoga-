@@ -20,6 +20,7 @@ import { buildRegistry, registry, get, nameOf, LAYER_ORDER, vertebra,
          drawnIds, isAggregate } from './structures.js';
 import { buildGroups, groups, groupOf, groupsOf } from './content/groups.js';
 import { PointerTap, slopFor } from './pointerTap.js';
+import { ATLAS_FIT, FITTED_LAYERS } from './generated/atlas_fit.js';
 import { activeBody, layerUrl, assetUrl } from './bodies.js';
 import { EXERCISE, ROLE_LEVEL } from './content/exercises.js';
 import { MOVEMENT_PATHWAY } from './content/pathways.js';
@@ -891,6 +892,27 @@ function loadLayer(name) {
       // collect first: add() inside traverse() mutates the array being iterated
       const meshes = [];
       gltf.scene.traverse(o => { if (o.isMesh) meshes.push(o); });
+      /* Put the two halves of the atlas in one frame, before anything measures this one.
+       *
+       * The taught body is BodyParts3D 3.0 and everything else is 4.0 -- the same cadaver,
+       * delivered in frames this project's two build paths never reconciled. Over the 179
+       * bones named in both, 4.0 sits 14 mm low on average and **44 mm low at the foot**,
+       * because the error grows down the leg. Drawn together that is a second leg inside the
+       * first: the taught skeleton and the 4.0 arteries, veins and detail at the ankle are
+       * four centimetres apart, which is what "why do we still have 2 feet" was looking at,
+       * and it showed on the taught body too, because the vessels are 4.0 as well.
+       *
+       * Baked into the geometry rather than hung on the group, because everything downstream
+       * measures vertices: the centroids below, the anchors the labels hang from, the radii
+       * the panel frames on, the bone field the binding uses, and the rays that pick. A group
+       * transform would move the picture and leave every one of those describing where the
+       * geometry used to be. `scripts/fit_atlases.py` solves it and prints the residual. */
+      if (FITTED_LAYERS.includes(name)) {
+        const fix = new THREE.Matrix4().set(...ATLAS_FIT);
+        const done = new Set();
+        for (const o of meshes)
+          if (!done.has(o.geometry)) { done.add(o.geometry); o.geometry.applyMatrix4(fix); }
+      }
       for (const o of meshes) {
         o.material = mat;
         o.userData.layer = name;
