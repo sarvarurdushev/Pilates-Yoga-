@@ -2372,6 +2372,51 @@ await page.evaluate(async () => { (await import('/src/main.js')).setGroup(null);
   }
 }
 
+/* Every vertex in the body has a normal that points somewhere.
+ *
+ * A normal of exactly (0,0,0) is normalised in the fragment shader, which is a division by
+ * zero, so the lighting is NaN and the driver writes the pixel black. That is what covered
+ * the thorax, the face and the hands in black speckle at every x-ray setting, worst in x-ray
+ * because the transparent pass shades every layer instead of only the nearest: 6,458 of them
+ * over 318,357 vertices, 6.1% of the deep muscles and 58% of the internal intercostals.
+ * `meshNormals.js` repairs them on load and `scripts/glb_common.py` stops making them.
+ */
+{
+  const nrm = await page.evaluate(async () => {
+    const m = await import('/src/main.js');
+    const S = await import('/src/structures.js');
+    const seen = new Set();
+    let verts = 0, zero = 0, nan = 0;
+    const worst = [];
+    for (const [id, r] of S.registry().byId) {
+      if (r.parts || !m.app.centroids[id]) continue;
+      for (const mesh of m.meshesForId(id)) {
+        if (seen.has(mesh)) continue;
+        seen.add(mesh);
+        const n = mesh.geometry.getAttribute('normal');
+        if (!n) continue;
+        verts += n.count;
+        let bad = 0;
+        for (let i = 0; i < n.count; i++) {
+          const x = n.getX(i), y = n.getY(i), z = n.getZ(i);
+          if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) { nan++; bad++; }
+          else if (x*x + y*y + z*z < 1e-12) { zero++; bad++; }
+        }
+        if (bad && worst.length < 5) worst.push(`${r.name?.en} (${bad})`);
+      }
+    }
+    return { verts, zero, nan, worst, mended: m.app.mendedNormals };
+  });
+  console.log('normals:', JSON.stringify(nrm));
+  if (!(nrm.verts > 100000))
+    errors.push(`only ${nrm.verts} vertices were checked for normals`);
+  if (nrm.zero || nrm.nan)
+    errors.push(`${nrm.zero} zero and ${nrm.nan} NaN normals survived loading — `
+      + `every one of them is a black triangle: ${nrm.worst.join(', ')}`);
+  if (!(nrm.mended > 0))
+    errors.push('nothing was mended, so the repair never ran on these assets');
+}
+
 /* Whole body puts the body back and leaves the layers alone.
  *
  * "Reset view" moves the camera and nothing else, so after choosing a group, isolating a

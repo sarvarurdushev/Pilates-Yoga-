@@ -4,12 +4,86 @@ vertex attributes and what silently corrupts region ids."""
 import numpy as np, json, struct, os
 
 def vertex_normals(P, F):
-    N = np.zeros_like(P, dtype=np.float64)
-    t = P[F]
-    fn = np.cross(t[:,1]-t[:,0], t[:,2]-t[:,0])
-    for k in range(3): np.add.at(N, F[:,k], fn)
-    l = np.linalg.norm(N, axis=1, keepdims=True); l[l==0] = 1
-    return (N/l).astype(np.float32)
+    """A unit normal for every vertex, including the ones the faces cannot answer for.
+
+    The plain area-weighted sum leaves a normal of exactly (0,0,0) in two situations, and
+    both of them are common here:
+
+      * **A vertex no surviving face refers to.** The accumulator starts at zero and nothing
+        adds to it. `weld` above drops collapsed triangles, so this is routine.
+      * **A sheet with no thickness.** An intercostal muscle or the wall of the heart comes
+        out of decimation with its two sides coincident and wound opposite ways, so the face
+        normals meeting at a vertex are exact negatives and cancel. 58% of the internal
+        intercostals' vertices came out this way.
+
+    A zero normal is not a small error downstream: the fragment shader normalises it, which
+    is a division by zero, so the lighting is NaN and the pixel is drawn black. That is the
+    speckle that covered the thorax, the face and the hands at every x-ray setting. Measured
+    on the built atlas before this: 6,458 zero normals of 318,357.
+
+    So a broken vertex is asked again, three ways, in order. Sum the faces *outward* -- each
+    face normal flipped to agree with the direction from the mesh's middle to the vertex --
+    which makes the two sides of a sheet reinforce instead of cancel. Failing that (a flat
+    sheet whose own plane contains that direction, so the flip cannot tell the sides apart),
+    take one adjacent face's normal, which is a true surface normal even if the choice of
+    side is arbitrary. Failing that -- a vertex with no faces at all -- take the outward
+    direction itself, which is always defined.
+
+    Well-behaved vertices are untouched: for a closed surface every face at a vertex already
+    faces outward, so none of this runs and the answer is the one this always gave.
+    """
+    P = np.asarray(P, dtype=np.float64)
+    N = np.zeros_like(P)
+    if len(F):
+        t = P[F]
+        fn = np.cross(t[:, 1] - t[:, 0], t[:, 2] - t[:, 0])
+        for k in range(3):
+            np.add.at(N, F[:, k], fn)
+
+    l = np.linalg.norm(N, axis=1, keepdims=True)
+    bad = (l[:, 0] <= 1e-20) | ~np.isfinite(l[:, 0])
+    if bad.any():
+        # which way is out, from the middle of the mesh; defined for every vertex
+        mid = (P.max(0) + P.min(0)) / 2.0 if len(P) else np.zeros(3)
+        out = P - mid
+        ol = np.linalg.norm(out, axis=1, keepdims=True)
+        out = np.divide(out, np.where(ol == 0, 1.0, ol))
+        out[ol[:, 0] == 0] = (0.0, 1.0, 0.0)
+        rest = bad
+
+        if len(F):
+            # sum again, with every face turned to face outward, so two sides reinforce
+            M = np.zeros_like(P)
+            for k in range(3):
+                v = F[:, k]
+                s = np.sign(np.einsum('ij,ij->i', fn, out[v]))
+                s[s == 0] = 1.0
+                np.add.at(M, v, fn * s[:, None])
+            ml = np.linalg.norm(M, axis=1, keepdims=True)
+            take = bad & (ml[:, 0] > 1e-20)
+            N[take] = M[take] / ml[take]
+            l[take] = 1.0
+            rest = bad & ~take
+
+            # one adjacent face each, for the vertices the outward sum could not separate
+            if rest.any():
+                fl = np.linalg.norm(fn, axis=1, keepdims=True)
+                ok = fl[:, 0] > 1e-20
+                A = np.zeros_like(P)
+                for k in range(3):
+                    A[F[ok][:, k]] = fn[ok] / fl[ok]   # later writes win; any of them will do
+                al = np.linalg.norm(A, axis=1, keepdims=True)
+                one = rest & (al[:, 0] > 1e-20)
+                N[one] = A[one]
+                l[one] = 1.0
+                rest = rest & ~one
+
+        # and a vertex no face could speak for keeps the outward direction itself
+        N[rest] = out[rest]
+        l[rest] = 1.0
+
+    l[l <= 1e-20] = 1.0
+    return (N / l).astype(np.float32)
 
 def weld(P, F, rel=2e-4):
     """Merge vertices that sit at the same point, and re-index the faces onto them.

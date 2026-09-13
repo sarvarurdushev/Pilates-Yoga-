@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { makeStructureMaterial, makeBrainMaterial } from './brainMaterial.js';
+import { mendNormals } from './meshNormals.js';
 import { mergeLayer, mergeByParent, PICK_LAYER } from './merged.js';
 import { accelerate as accelerateRays, setRestTest, warm as warmRays,
          poseChanged as bvhPoseChanged } from './raybvh.js';
@@ -77,6 +78,8 @@ export const app = {
   /* The furthest a structure reaches from its own centroid, where `radii` is the
    * average. The catalogue sizes its cells on this -- see `inventoryOffsets`. */
   extent: {},
+  /** How many zero normals have been repaired on load — see `meshNormals.js`. */
+  mendedNormals: 0,
   /* The laboratory look. `bloom` routes the frame through the composer; `neural` draws the
    * network inside the cortex; `activity` is how awake it is. All three are on by default —
    * this is what the app is, not an effect it can wear. */
@@ -841,6 +844,7 @@ function loadShell() {
       });
       const found = [];
       gltf.scene.traverse(o => { if (o.isMesh) found.push(o); });
+      mendGroup(found);
       for (const o of found) {
         o.material = mat;
         o.frustumCulled = false;
@@ -885,6 +889,23 @@ let pending = 0;
 export const hasLayer = (name) =>
   name === 'brain' ? !!body.brainToBody : body.assets.layers.includes(name);
 
+/**
+ * Repair the loaded geometry's normals before anything shades it.
+ *
+ * Here rather than in the shader because a normal of zero has no meaning to recover at
+ * shading time -- the surface has to be asked again. And before `indexGeometry`, the merge
+ * and the binding, so every copy of the geometry made downstream is made from mended data.
+ * See `meshNormals.js` for what was wrong and how many.
+ */
+function mendGroup(meshes) {
+  const seen = new Set();
+  for (const o of meshes) {
+    if (!o.isMesh || seen.has(o.geometry)) continue;
+    seen.add(o.geometry);
+    app.mendedNormals += mendNormals(o.geometry);
+  }
+}
+
 function loadLayer(name) {
   const L2 = layers[name];
   /* Not every body has every layer, and a missing one is a fact about that person's atlas
@@ -926,6 +947,7 @@ function loadLayer(name) {
         for (const o of meshes)
           if (!done.has(o.geometry)) { done.add(o.geometry); o.geometry.applyMatrix4(fix); }
       }
+      mendGroup(meshes);
       for (const o of meshes) {
         o.material = mat;
         o.userData.layer = name;
@@ -1071,6 +1093,7 @@ function loadBrain(L2) {
       if (--left) return;
       L2.meshes = [];
       holder.traverse(o => { if (o.isMesh) L2.meshes.push(o); });
+      mendGroup(L2.meshes);
       for (const m of L2.meshes) accelerateRays(m);
       L2.loaded = true; L2.loading = false;
       indexGeometry(L2.group);
