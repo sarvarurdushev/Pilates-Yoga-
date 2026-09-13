@@ -25,8 +25,26 @@ import * as THREE from 'three';
 
 export const UNMAPPED = '#6e6a68';
 
-/** Rows in the offset texture: 0 displacement and visibility, 1 catalogue scale. */
-const ROWS = 2;
+/**
+ * Rows in the offset texture.
+ *
+ *  * 0 — displacement, and the visibility flag in alpha.
+ *  * 1 — catalogue scale, and the point it is applied about.
+ *  * 2 — the same displacement for the *far side* of a split structure, with the plane
+ *        that separates the two sides in alpha.
+ *  * 3 — the same scale for the far side. Its scale is 0 when the structure is not split,
+ *        which is how the shader knows there is only one answer to read.
+ *
+ * Rows 2 and 3 exist because a great many structures in this atlas are one structure with
+ * two of it — a femur, a rectus abdominis, a lung. They carry one id, so they get one cell
+ * in the catalogue and one displacement to reach it, and a displacement is a translation:
+ * there is no single one that brings two copies half a body apart into the same cell. What
+ * happened instead was that the cell was sized for one copy and the pair was scaled about
+ * the midline between them, which threw both copies clear of the cell — for a finger bone,
+ * twelve cells to either side, lying across whatever was there. Given a side of its own,
+ * each copy gets a cell of its own and is drawn at the size that cell allows.
+ */
+const ROWS = 4;
 
 export class RegionPalette {
   /** @param {number} capacity initial id capacity; grows by doubling as ids arrive */
@@ -71,10 +89,13 @@ export class RegionPalette {
     for (let i = 0; i < size; i++) offsets[i*4+3] = 1;
     // and drawn at its own size by default, about its own origin
     for (let i = 0; i < size; i++) offsets[(size + i)*4] = 1;
+    /* Row 3's scale is left at 0, which is what says "this structure is not split". It is
+     * the one row whose default is not the identity, because a 1 there would mean every id
+     * in the atlas is two-sided from the moment the texture is made. */
     if (this.offsets) {
       const was = this.offsets.length / (4 * ROWS);
-      offsets.set(this.offsets.subarray(0, was * 4), 0);
-      offsets.set(this.offsets.subarray(was * 4, was * 8), size * 4);
+      for (let r = 0; r < ROWS; r++)
+        offsets.set(this.offsets.subarray(r * was * 4, (r + 1) * was * 4), r * size * 4);
     }
     this.offsets = offsets;
     const oldOffset = this.offsetTexture;
@@ -176,8 +197,63 @@ export class RegionPalette {
       this.offsets[i*4] = 0; this.offsets[i*4+1] = 0; this.offsets[i*4+2] = 0;
       this.offsets[(this.size + i)*4] = 1;
     }
+    this.clearSplits();
     this._offsetDirty = true;
     return this;
+  }
+
+  /**
+   * Give this structure's two sides separate answers, divided at the plane `x = splitX`.
+   *
+   * Vertices at or beyond the plane keep rows 0 and 1; the ones behind it read rows 2 and 3
+   * instead. Both halves are drawn, each in its own cell and at its own size — see `ROWS`
+   * for why one cell cannot hold them.
+   */
+  setSide(id, splitX, offX, offY, offZ, scale, cx, cy, cz) {
+    this._fit(id);
+    const o = (this.size * 2 + id) * 4, s = (this.size * 3 + id) * 4;
+    this.offsets[o] = offX; this.offsets[o+1] = offY; this.offsets[o+2] = offZ;
+    this.offsets[o+3] = splitX;
+    this.offsets[s] = scale;
+    this.offsets[s+1] = cx; this.offsets[s+2] = cy; this.offsets[s+3] = cz;
+    this._offsetDirty = true;
+    return this;
+  }
+
+  /** One answer for the whole structure again. */
+  clearSide(id) {
+    if (id < 0 || id >= this.size) return this;
+    const s = (this.size * 3 + id) * 4;
+    if (this.offsets[s] !== 0) { this.offsets[s] = 0; this._offsetDirty = true; }
+    return this;
+  }
+
+  clearSplits() {
+    for (let i = 0; i < this.size; i++) this.offsets[(this.size * 3 + i) * 4] = 0;
+    this._offsetDirty = true;
+    return this;
+  }
+
+  /** The far side's scale, or 0 when this structure has only one of it. */
+  sideScaleOf(id) {
+    return (id >= 0 && id < this.size) ? this.offsets[(this.size * 3 + id) * 4] : 0;
+  }
+
+  /** The plane, in body x, that divides the two sides. */
+  sideSplitOf(id) {
+    return (id >= 0 && id < this.size) ? this.offsets[(this.size * 2 + id) * 4 + 3] : 0;
+  }
+
+  getSideOffset(id, target = new THREE.Vector3()) {
+    if (id >= this.size || id < 0) return target.set(0, 0, 0);
+    const o = (this.size * 2 + id) * 4;
+    return target.set(this.offsets[o], this.offsets[o+1], this.offsets[o+2]);
+  }
+
+  getSideScaleCentre(id, target = new THREE.Vector3()) {
+    if (id >= this.size || id < 0) return target.set(0, 0, 0);
+    const s = (this.size * 3 + id) * 4;
+    return target.set(this.offsets[s+1], this.offsets[s+2], this.offsets[s+3]);
   }
 
   /**

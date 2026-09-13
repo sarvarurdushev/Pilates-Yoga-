@@ -222,6 +222,32 @@ export function makeStructureMaterial(palette, look = {}, dqTexture = null) {
              * the displacement does: every mesh here has been reparented into the
              * rig, so its own space is some bone's space. */
             vec4 _s = texelFetch(uOffset, ivec2(_oi, 1), 0);
+            /* A structure with two of it reads a second answer for its far side.
+             *
+             * A femur, a rectus abdominis and a lung are each one structure drawn twice,
+             * once on each side of the body, under one id. One id is one cell and one
+             * displacement, and a displacement is a translation -- so there is no value
+             * that brings both copies into the same cell. The cell was sized for one copy
+             * and the pair scaled about the midline between them, which threw both copies
+             * clear of it: for a finger bone, twelve cells to either side, lying across
+             * whatever else was there.
+             *
+             * So rows 2 and 3 carry the far side's own cell, and a vertex picks its side
+             * here. The test is against the dividing plane in *view* space, built from the
+             * body's own x axis (viewMatrix times vec4(1,0,0,0) is that axis seen from the
+             * camera) -- because that is the space this whole block works in and the only
+             * one a skinned vertex is reliably in by now. Row 3's scale is 0 for every
+             * structure that has only one of it, which is the whole of the test. */
+            vec4 _f = texelFetch(uOffset, ivec2(_oi, 3), 0);
+            if (_f.x > 0.0) {
+              vec4 _d = texelFetch(uOffset, ivec2(_oi, 2), 0);
+              vec3 _ax = (viewMatrix * vec4(1.0, 0.0, 0.0, 0.0)).xyz;
+              vec3 _pl = (viewMatrix * vec4(_d.w, 0.0, 0.0, 1.0)).xyz;
+              if (dot(mvPosition.xyz - _pl, _ax) < 0.0) {
+                _o.xyz = _d.xyz;
+                _s = _f;
+              }
+            }
             float _k = mix(1.0, _s.x, uExplode);
             if (abs(_k - 1.0) > 0.001) {
               vec3 _c = (viewMatrix * vec4(_s.yzw, 1.0)).xyz;

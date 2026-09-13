@@ -76,8 +76,12 @@ export const app = {
   layers: {},                // name -> { on, opacity }
   centroids: {}, radii: {}, anchors: {},
   /* The furthest a structure reaches from its own centroid, where `radii` is the
-   * average. The catalogue sizes its cells on this -- see `inventoryOffsets`. */
+   * average. Measured over every vertex -- see `indexGeometry`. */
   extent: {},
+  /* Its exact box, per side of the body, over every vertex and unioned across every mesh
+   * that carries it. The catalogue lays its cells out from these: a cell has to hold a
+   * shape, and a shape is a box, not a radius. See `inventoryOffsets` and `splitPlan`. */
+  sideBox: {},
   /** How many zero normals have been repaired on load — see `meshNormals.js`. */
   mendedNormals: 0,
   /* The laboratory look. `bloom` routes the frame through the composer; `neural` draws the
@@ -1609,10 +1613,21 @@ function done() {
   if (--pending <= 0) { pending = 0; ui?.setBusy?.(false); document.getElementById('loading')?.remove(); }
 }
 
+/**
+ * Where the body's two sides divide, in body x.
+ *
+ * Written down once because three places have to agree on it: the geometry index, which
+ * measures a box per side; the catalogue, which gives each side a cell; and the vertex
+ * shader, which picks a vertex's side. The body stands on the midline, so it is zero -- but
+ * a disagreement here would put half of every paired structure in the wrong cell, silently.
+ */
+const SPLIT_PLANE = 0;
+
 /* ------------------------------------------------- geometry index for labels
  * Per structure: a world-space centroid, an on-screen size proxy, and a spread of surface
  * points to hang a leader rope from. A centroid alone is inside the mesh, and a rope drawn
  * to it points at nothing. */
+const _ixC = new THREE.Vector3();
 function indexGeometry(group) {
   const meshes = [];
   group.traverse(o => { if (o.isMesh) meshes.push(o); });
@@ -1644,7 +1659,7 @@ function indexGeometry(group) {
       let e = byId.get(id);
       if (!e) byId.set(id, e = { sum: new THREE.Vector3(), n: 0, pts: [],
                                  side: [new THREE.Box3(), new THREE.Box3()] });
-      e.side[v.x >= 0 ? 0 : 1].expandByPoint(v);
+      e.side[v.x >= SPLIT_PLANE ? 0 : 1].expandByPoint(v);
       if (i % step) continue;
       e.sum.add(v); e.n++;
       if (e.pts.length < 32 && !e.pts.some(q => q.distanceToSquared(v) < 1e-4)) e.pts.push(v.clone());
@@ -1678,24 +1693,38 @@ function indexGeometry(group) {
       app.anchors[id] = (app.anchors[id] ?? []).concat(e.pts).slice(0, 40);
       if (!meshesOfId.has(id)) meshesOfId.set(id, []);
       meshesOfId.get(id).push(o);
-      let rad = 0, far = 0;
-      for (const p of e.pts) {
-        const d = p.distanceTo(c);
-        rad += d;
-        if (d > far) far = d;
-      }
+      let rad = 0;
+      for (const p of e.pts) rad += p.distanceTo(c);
       app.radii[id] = Math.max(app.radii[id] ?? 0, e.pts.length ? rad / e.pts.length : 0.01);
-      /* The furthest a structure reaches, as well as its average reach.
-       *
-       * `app.radii` is a *mean*, which is the right size proxy for "how big does
-       * this look on screen" and badly wrong for "will this fit in a box". A
-       * fascia sheet or a long strap muscle has a small mean and a long reach, so
-       * a catalogue cell sized from the mean magnified it three times and it
-       * sprawled across a dozen of its neighbours -- the dark shapes lying over
-       * the middle of the sheet. */
-      app.extent[id] = Math.max(app.extent[id] ?? 0, far || 0.01);
+      /* And the exact box, per side, kept for the whole structure rather than for this
+       * mesh: a paired bone is two meshes under one id, and what the catalogue has to fit
+       * in a cell is a side of it, not whichever mesh was indexed last. `e.side` walked
+       * every vertex above, so this is exact. */
+      const box = app.sideBox[id] ?? (app.sideBox[id] = [new THREE.Box3(), new THREE.Box3()]);
+      for (let k = 0; k < 2; k++) if (!e.side[k].isEmpty()) box[k].union(e.side[k]);
     }
     restByMesh.set(o, own);
+  }
+  /* The reach, now that every mesh carrying a structure has been seen.
+   *
+   * It was the furthest of at most thirty-two *sampled* vertices from this mesh's own
+   * centroid, and it sized the catalogue's cells. Both halves of that were wrong. Sampled,
+   * it under-measured a single-mesh piece by up to 57% and the piece was magnified into its
+   * neighbours. Per mesh, it under-measured a paired structure by up to fifty times, because
+   * `app.centroids` for a pair is the midpoint *between* the two copies and neither copy is
+   * anywhere near it. The box walked every vertex and is unioned across every mesh, so the
+   * furthest corner of it is an exact bound on both. */
+  for (const [id, box] of Object.entries(app.sideBox)) {
+    const c = app.centroids[id];
+    if (!c) continue;
+    let far = 0;
+    for (const b of box) {
+      if (b.isEmpty()) continue;
+      for (const sx of [b.min.x, b.max.x]) for (const sy of [b.min.y, b.max.y])
+        for (const sz of [b.min.z, b.max.z])
+          far = Math.max(far, c.distanceTo(_ixC.set(sx, sy, sz)));
+    }
+    app.extent[id] = far || 0.01;
   }
   buildLabelEls();
 }
@@ -2256,23 +2285,59 @@ const _exC = new THREE.Vector3(), _exO = new THREE.Vector3();
  * palette entry is deliberately zeroed so no shader tears the sheet it is painted on, and
  * whose real displacement belongs to the mesh. See `liftWholeMeshes`.
  */
-function explodeFor(id) {
+function explodeFor(id, at = null) {
   const w = wholeById.get(id);
-  const scale = w ? w.scale : palette.getScale(id);
-  if (w) _exC.copy(w.centre), _exO.copy(w.off);
-  else palette.getScaleCentre(id, _exC), palette.getOffset(id, _exO);
+  if (w) {
+    _exC.copy(w.centre); _exO.copy(w.off);
+    _exO.multiplyScalar(app.explode);
+    return 1 + (w.scale - 1) * app.explode;
+  }
+  let scale = palette.getScale(id);
+  /* And which of them, for a structure with two of it. The catalogue gives each side its
+   * own cell -- see `splitPlan` -- so "where is this drawn" has two answers and the point
+   * being asked about decides between them, exactly as the vertex shader does. `at` is a
+   * world point and the plane is in body x, which is the same axis: the rig stands upright
+   * and never rolls. */
+  const far = palette.sideScaleOf(id);
+  if (far > 0 && at && at.x < palette.sideSplitOf(id)) {
+    scale = far;
+    palette.getSideScaleCentre(id, _exC);
+    palette.getSideOffset(id, _exO);
+  } else {
+    palette.getScaleCentre(id, _exC);
+    palette.getOffset(id, _exO);
+  }
   _exO.multiplyScalar(app.explode);
   return 1 + (scale - 1) * app.explode;
 }
 /** Apply it to a point, in place. `explodeFor` must have been called for the same id. */
 const applyExplode = (p, k) => p.sub(_exC).multiplyScalar(k).add(_exC).add(_exO);
+/**
+ * Move a point to where the shader draws it.
+ *
+ * One call per point rather than one per structure, because a structure with two of it has
+ * a different answer for each side and the two are cells apart. The lookup is four reads of
+ * a typed array, so a rope's forty anchors cost nothing worth saving.
+ */
+const drawnAt = (id, p) => applyExplode(p, explodeFor(id, p));
+/**
+ * The displacement the shader is applying to this structure right now, as numbers.
+ *
+ * `k` about `centre`, then `+ offset` — the same two steps, in the same order, that the
+ * vertex shader and `applyExplode` above both take. Exported so a test can measure where a
+ * piece is *drawn* rather than where its geometry says it is, which is the only way to ask
+ * whether two pieces in the catalogue are lying on top of each other.
+ */
+export function explodeTransformOf(id, at = null) {
+  const k = explodeFor(+id, at);
+  return { k, centre: _exC.clone(), offset: _exO.clone() };
+}
 
 function drawnSide(id) {
   const side = posedSide(id);
   if (!side || app.explode <= 0) return side;
-  const k = explodeFor(id);
-  return { centre: applyExplode(side.centre, k),
-           points: side.points.map(p => applyExplode(p, k)) };
+  return { centre: drawnAt(id, side.centre),
+           points: side.points.map(p => drawnAt(id, p)) };
 }
 
 /** The same, for a structure with no mesh of its own to measure — the centroid alone. */
@@ -2281,7 +2346,7 @@ function drawnPoint(id, target = new THREE.Vector3()) {
   if (!c) return null;
   target.copy(c);
   if (app.explode <= 0) return target;
-  return applyExplode(target, explodeFor(id));
+  return drawnAt(id, target);
 }
 
 /* ------------------------------------------------------------------ labels */
@@ -2486,7 +2551,7 @@ const _lp = new THREE.Vector3();
  */
 function labelPoint(id) {
   _lp.copy(app.centroids[id] ?? _ORIGIN);
-  if (app.explode > 0) applyExplode(_lp, explodeFor(id));
+  if (app.explode > 0) drawnAt(id, _lp);
   return _lp;
 }
 const _ORIGIN = new THREE.Vector3();
@@ -2502,16 +2567,15 @@ function anchorFor(id) {
    * to one, and an anchor that only carried the displacement landed a rope at where the piece
    * would have reached at full size — outside its cell, over its neighbours. `explodeFor`
    * loads the same transform `drawnSide` uses, so the rope ends on the shape it names. */
-  const k = app.explode > 0 ? explodeFor(id) : 0;
   const spread = app.explode > 0;
   const owners = meshesOfId.get(id);
   if (!owners?.length) {
     _a.copy(app.centroids[id]);
-    return spread ? applyExplode(_a, k) : _a;
+    return spread ? drawnAt(id, _a) : _a;
   }
   let bestD = Infinity;
   _a.copy(app.centroids[id]);
-  if (spread) applyExplode(_a, k);
+  if (spread) drawnAt(id, _a);
   for (const mesh of owners) {
     const b = bound.get(mesh);
     const m = b ? deltaFor(b.segment) : null;
@@ -2520,7 +2584,7 @@ function anchorFor(id) {
     for (const p of own.pts) {
       _ap.copy(p);
       if (m) _ap.applyMatrix4(m);
-      if (spread) applyExplode(_ap, k);
+      if (spread) drawnAt(id, _ap);
       _pts.push(_ap.x, _ap.y, _ap.z);
       const d = camera.position.distanceToSquared(_ap);
       if (d < bestD) { bestD = d; _a.copy(_ap); }
@@ -3090,7 +3154,7 @@ function pickApart(ev, rect) {
         const c = app.centroids[id];
         if (!c || !get(id)) continue;
         _pp.copy(c);
-        applyExplode(_pp, explodeFor(id));
+        drawnAt(id, _pp);
         _pp.project(camera);
         if (_pp.z > 1) continue;
         const px = (_pp.x + 1) / 2 * rect.width, py = (1 - _pp.y) / 2 * rect.height;
@@ -5072,9 +5136,21 @@ export const EXPLODE_LAYOUTS = ['inventory', 'open'];
 
 /** Where the laid-out grid sits and how big it is, so a camera can be fitted to it. */
 let explodeExtent = null;
+/**
+ * Which structures the current sheet actually gave a cell to.
+ *
+ * The subject decides that — a chosen group is a sheet of fourteen muscles, not of two
+ * thousand pieces — and everything else was sent home. Recorded rather than inferred,
+ * because `liftWholeMeshes` below has to tell "laid out at an offset that happens to be
+ * small" from "not in this sheet at all", and inferring it from the offset got the brain
+ * shrunk in the middle of a body whose hamstrings were the subject.
+ */
+const laidOut = new Set();
 export const explodeLayoutExtent = () => explodeExtent;
 /** Where a structure is displaced to when the body is apart. For diagnosing a piece that stays put. */
 export const paletteOffsetOf = (id) => palette.getOffset(+id, new THREE.Vector3());
+/** Whether the catalogue gave this structure's two sides cells of their own. See `splitPlan`. */
+export const paletteSplitOf = (id) => palette.sideScaleOf(+id) > 0;
 
 /** Everything with a mesh of its own, in the order the inventory reads. */
 /**
@@ -5101,6 +5177,88 @@ function explodeSubject() {
   return pick.size ? pick : null;
 }
 
+/**
+ * How much bigger a pair is than one of it before the two get cells of their own.
+ *
+ * A rectus abdominis is two straps meeting at the midline: together they are a tenth wider
+ * than one of them, they read as the muscle, and splitting them would say there are two
+ * muscles called that. A femur is two femurs a third of a body apart: together they are
+ * twenty times the width of one, so a cell sized to hold both draws each at 5% -- which is
+ * how a finger bone ended up as a speck at the edge of a cell twelve columns from its own.
+ * The line between those is the only judgement here, and it is a measurement: how much of
+ * the cell is spent on the gap rather than on the piece.
+ */
+const SPLIT_GAIN = 1.4;
+/**
+ * And how wide the gap between the two has to be before they count as two things.
+ *
+ * Measured against the piece's own size, because this is the test that keeps a structure
+ * that merely *crosses* the midline from being cut in half and filed in two places. A
+ * mandible, a sacrum, a trapezius and a diaphragm all have a left half and a right half
+ * that touch, and a gain test alone says of every one of them that half is half the size of
+ * the whole -- which is true, and not a reason to saw it in two.
+ */
+const SPLIT_GAP = 0.15;
+const _pgV = new THREE.Vector3();
+/** How much room a box needs, along whichever of its axes needs the most. */
+function pageSize(box) {
+  box.getSize(_pgV);
+  return Math.max(_pgV.x, _pgV.y, _pgV.z);
+}
+
+/**
+ * The two sides of a structure that is worth laying out as two.
+ *
+ * Half the taught body is one structure with two of it -- 177 of 194 -- and one structure
+ * is one id, one cell and one displacement. A displacement is a translation, so no value of
+ * it brings two copies half a body apart into the same cell: the layout sized the cell for
+ * one copy, scaled the pair about the midline between them, and threw *both* copies clear.
+ * That is the debris along the edges of the catalogue and lying across the rows.
+ *
+ * So each side gets a cell. Rows 2 and 3 of the offset texture carry the far side's answer
+ * and the shader picks between them per vertex -- see `regionPalette.js` and the fold in
+ * `brainMaterial.js`. Returns null for the structures that are better whole.
+ */
+function splitPlan(id) {
+  /* Not the brain. Its meshes are placed by their own transforms rather than displaced per
+   * vertex — the cortex because it is one sheet carrying every parcel, the six deep
+   * structures because they wear a plain material with no shader to displace them (see
+   * `brainWhileApart`). A transform has one answer for the whole mesh, so a second cell for
+   * its far side would be a cell nothing ever goes to, and both amygdalae would arrive in
+   * the first one on top of each other. */
+  if (get(id)?.layer === 'brain') return null;
+  const sb = app.sideBox[id];
+  if (!sb) return null;
+  const [a, b] = sb;
+  if (a.isEmpty() || b.isEmpty()) return null;
+  const apart = Math.max(pageSize(a), pageSize(b));
+  if (!(apart > 0)) return null;
+  // `a` is the half at or beyond the plane and `b` the half behind it, so this is the gap
+  if (a.min.x - b.max.x < apart * SPLIT_GAP) return null;
+  return pageSize(a.clone().union(b)) >= apart * SPLIT_GAIN ? [a, b] : null;
+}
+
+/** The exact box the whole structure occupies, both sides together. */
+function wholeBoxOf(id) {
+  const sb = app.sideBox[id];
+  const both = new THREE.Box3();
+  for (const b of sb ?? []) if (!b.isEmpty()) both.union(b);
+  if (!both.isEmpty()) return both;
+  /* Nothing indexed it, which should not happen for anything with a centroid. A box around
+   * the centroid at the recorded reach keeps the layout total rather than dropping a piece. */
+  const c = app.centroids[id];
+  if (!c) return null;
+  const r = app.extent[id] ?? app.radii[id] ?? 0.02;
+  return new THREE.Box3(c.clone().subScalar(r), c.clone().addScalar(r));
+}
+
+/**
+ * One entry per cell the sheet has to hold -- which is not one per structure.
+ *
+ * `side` is 0 for the half at or beyond the dividing plane, 1 for the half behind it, and
+ * -1 for a structure laid out whole. The two halves of a split structure sort adjacent,
+ * because they share a name, so a reader sees the pair as a pair.
+ */
 function inventoryOrder() {
   const { byId } = registry();
   const only = explodeSubject();
@@ -5109,49 +5267,67 @@ function inventoryOrder() {
     // an aggregate has no geometry, so it has nothing to lay out -- its parts do
     if (r.parts || !app.centroids[id]) continue;
     if (only && !only.has(id)) continue;
-    rows.push({ id, layer: r.layer, name: r.name.en });
+    const split = splitPlan(id);
+    if (split) {
+      rows.push({ id, side: 0, box: split[0], layer: r.layer, name: r.name.en });
+      rows.push({ id, side: 1, box: split[1], layer: r.layer, name: r.name.en });
+      continue;
+    }
+    const box = wholeBoxOf(id);
+    if (box) rows.push({ id, side: -1, box, layer: r.layer, name: r.name.en });
   }
   const rank = n => { const i = LAYER_ORDER.indexOf(n); return i < 0 ? 99 : i; };
   for (const r of rows) r.rank = rank(r.layer);
-  rows.sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
+  rows.sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name) || a.side - b.side);
   return rows;
 }
 
 /**
  * Lay every piece out so that no two of them touch.
  *
- * A fixed cell cannot do this. The pieces in this atlas run from a sesamoid bone
- * to a femur, a factor of thirty in size, so a cell sized for the median leaves
- * the long bones lying across four of their neighbours -- which is what the first
- * version drew, and it is the difference between a catalogue and a heap. A cell
- * sized for the femur instead spreads two thousand pieces over a field so wide
- * that everything in it is a speck.
+ * One cell for everything, and every piece fitted into its own cell. The pieces in this
+ * atlas run from a sesamoid bone to a femur, a factor of thirty in size, and at their true
+ * sizes they cover three body heights -- which puts the camera nine body heights back and
+ * turns the sheet into a dark smear. Normalised, the same pieces are a page you can read,
+ * which is what an inventory is for. A cap on magnification keeps a sesamoid from being
+ * blown up to a femur's size and reading as one.
  *
- * So the shelf packs rather than tiles. Pieces are sorted by size, which puts
- * things of a like size beside each other; each row is as tall as its own tallest
- * piece; and within a row each piece advances by its own width. Rows break at a
- * target width chosen so the whole thing comes out roughly as wide as a screen is.
- * Nothing overlaps at any count, and the grid stays dense, because those two are
- * only in tension if every cell has to be the same size.
+ * Nothing can overlap at any count, and that is a property of the arithmetic rather than a
+ * thing to check: a piece is fitted to `inner`, which is the cell less its gutter, and set
+ * down in the middle of its cell. What that turns on is measuring the right thing -- see
+ * the note on the fit below, and `splitPlan` for the structures that need two cells because
+ * there are two of them.
  */
+/**
+ * How many columns to break the sheet into.
+ *
+ * `round(sqrt(n * aspect))` is the obvious answer and it is wrong at small counts, which is
+ * where it shows: four hamstrings came out three across and one below, so half the page was
+ * a single piece with an empty row beside it. What a page wants is both — a shape near the
+ * screen's, and no half-empty last row — and at four pieces those disagree. Scored rather
+ * than computed, so they can be weighed against each other: how far the grid's shape is from
+ * the screen's, in log ratio, plus the share of the cells left empty. Four comes out two by
+ * two, thirteen five by three, and the whole catalogue twenty-three by thirteen.
+ */
+function gridColumns(n) {
+  if (n <= 1) return 1;
+  let best = 1, score = Infinity;
+  for (let c = 1; c <= n; c++) {
+    const lines = Math.ceil(n / c);
+    const s = Math.abs(Math.log((c / lines) / GRID_ASPECT)) + (c * lines - n) / n;
+    if (s < score) { score = s; best = c; }
+  }
+  return best;
+}
+
 function inventoryOffsets() {
   const only = explodeSubject();
   const rows = inventoryOrder();
+  laidOut.clear();
   if (!rows.length) { explodeExtent = null; return; }
+  for (const r of rows) laidOut.add(r.id);
 
-  /* One cell for everything, and every piece scaled into it.
-   *
-   * Laid out at their true sizes these pieces cover three body heights, which puts
-   * the camera nine body heights back and turns the sheet into a dark smear —
-   * measured, not guessed. Normalised, the same 1,280 pieces are a page you can
-   * read, which is what an inventory is for. A cap keeps a sesamoid bone from
-   * being blown up to the size of a femur and reading as one. */
-  /* Six columns is a page width for two thousand pieces and a scatter for four: the
-   * hamstrings came out one per corner with nothing in between. A small subject gets a grid
-   * shaped to it, so four pieces are a square and nine are three across. */
-  const cols = rows.length <= 24
-    ? Math.max(1, Math.round(Math.sqrt(rows.length * GRID_ASPECT)))
-    : Math.max(6, Math.round(Math.sqrt(rows.length * GRID_ASPECT)));
+  const cols = gridColumns(rows.length);
   const lines = Math.ceil(rows.length / cols);
   const cell = CELL;
   const inner = cell * (1 - GUTTER);
@@ -5161,7 +5337,7 @@ function inventoryOffsets() {
    * using it here put the catalogue at the height of somebody's forehead. */
   let lo = Infinity, hi = -Infinity;
   for (const r of rows) {
-    const y = app.centroids[r.id].y;
+    const y = r.box.getCenter(_pgV).y;
     if (y < lo) lo = y;
     if (y > hi) hi = y;
   }
@@ -5176,24 +5352,41 @@ function inventoryOffsets() {
       const c = app.centroids[id];
       palette.setOffset(id, 0, 0, 0);
       palette.setScale(id, 1, c.x, c.y, c.z);
+      palette.clearSide(id);
     }
   }
+  const cen = new THREE.Vector3();
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
-    const c = app.centroids[r.id];
-    /* Sized on the reach, not the average: what has to fit in the cell is the
-     * whole piece. Magnification is still capped, so a sesamoid is not blown up
-     * to read as a femur, but nothing is ever made bigger than its cell. */
-    const reach = Math.max(0.004, app.extent[r.id] ?? app.radii[r.id] ?? 0.02);
-    const k = Math.min(MAX_MAGNIFY, inner / (2 * reach));
+    /* Fitted as a box, about the middle of that box.
+     *
+     * The cell has to hold a shape, and what decides whether two shapes touch is how wide
+     * and how tall they are -- not how far the furthest vertex is from a centroid, which is
+     * what this used to ask. A centroid sits wherever a piece's vertices happen to be dense,
+     * so a hook-shaped bone centred itself off its own middle and hung over a neighbour; and
+     * a radius fitted to a sphere wastes the corners, which is why everything in the sheet
+     * came out smaller than the space it had. Box in, box out: the drawn piece is at most
+     * `inner` across in every direction and sits in the middle of its cell, so no two cells
+     * can touch at any count. Magnification is still capped, or a sesamoid reads as a femur. */
+    r.box.getCenter(cen);
+    const fit = Math.max(0.004, pageSize(r.box));
+    const k = Math.min(MAX_MAGNIFY, inner / fit);
     const col = i % cols, ln = (i / cols) | 0;
-    const x = (col - (cols - 1) / 2) * cell;
+    /* The last row is centred on the ones above it rather than left-aligned against them.
+     * A row of one under a row of three read as a piece that had fallen off the sheet. */
+    const wide = ln === lines - 1 ? rows.length - ln * cols : cols;
+    const x = (col - (wide - 1) / 2) * cell;
     const y = midY - (ln - (lines - 1) / 2) * cell;
-    /* The piece shrinks about its own centroid and then the centroid is moved to
-     * its cell, so the offset is measured from where the centroid ends up rather
-     * than from where the geometry was. */
-    palette.setScale(r.id, k, c.x, c.y, c.z);
-    palette.setOffset(r.id, x - c.x, y - c.y, -c.z);
+    if (r.side === 1) {
+      /* The far half, in a cell of its own. `SPLIT_PLANE` is where the two were divided
+       * when the geometry was indexed, and the shader divides them at the same place. */
+      palette.setSide(r.id, SPLIT_PLANE, x - cen.x, y - cen.y, -cen.z, k, cen.x, cen.y, cen.z);
+      continue;
+    }
+    palette.setScale(r.id, k, cen.x, cen.y, cen.z);
+    palette.setOffset(r.id, x - cen.x, y - cen.y, -cen.z);
+    // laid out whole, so there is no far half to read
+    if (r.side < 0) palette.clearSide(r.id);
   }
   explodeExtent = { width: cols * cell, height: lines * cell,
                     centre: new THREE.Vector3(0, midY, 0),
@@ -5204,6 +5397,7 @@ function inventoryOffsets() {
 function openOffsets() {
   const { byId } = registry();
   const only = explodeSubject();
+  laidOut.clear();
   const out = new THREE.Vector3();
   /* Opening a handful of muscles is not opening a body, so the reach is the subject's own.
    * At the body's reach four hamstrings fly a third of a body height apart and the group
@@ -5222,6 +5416,10 @@ function openOffsets() {
   for (const [id, r] of byId) {
     const c = app.centroids[id];
     if (!c) continue;
+    /* Opening a body pushes each piece out from the midline, and a structure with two of it
+     * is already one on each side: they move apart on their own and stay recognisable. So
+     * nothing is split here -- that is the catalogue's problem, not this layout's. */
+    palette.clearSide(id);
     if (only && !only.has(id)) { palette.setOffset(id, 0, 0, 0); palette.setScale(id, 1, c.x, c.y, c.z); continue; }
     /* Away from the vertical axis at this structure's own height. A structure
      * sitting on the midline -- the sternum, the spine itself, the linea alba --
@@ -5237,6 +5435,7 @@ function openOffsets() {
     palette.setOffset(id, out.x * reach, 0, out.z * reach);
     // opened, not catalogued: every structure keeps its own size
     palette.setScale(id, 1, c.x, c.y, c.z);
+    laidOut.add(id);
   }
   explodeExtent = null;
   palette.upload();
@@ -5283,8 +5482,16 @@ function liftWholeMeshes() {
       if (!own || own.size < 2) continue;
       const ids = [...own.keys()].filter(id => get(id));
       if (ids.length < 2) continue;
+      /* Which of them this sheet actually laid out. A mesh with none of its regions in the
+       * subject is not in the sheet at all, and lifting it anyway shrank the cortex to a
+       * cell's worth in the middle of a body whose subject was four muscles. One is enough:
+       * the mesh goes to that region's cell and every region on it is stopped from
+       * displacing, because a single chosen parcel cannot be cut out of the sheet it is
+       * painted on any more than fifteen can. */
+      const mine = ids.filter(id => laidOut.has(id));
+      if (!mine.length) continue;
       // the first cell the layout gave this mesh's regions; the rest go unused
-      const home = ids.find(id => palette.getOffset(id, _exO).lengthSq() > 0) ?? ids[0];
+      const home = mine.find(id => palette.getOffset(id, _exO).lengthSq() > 0) ?? mine[0];
       const off = palette.getOffset(home, new THREE.Vector3());
       palette.getScaleCentre(home, _wmC);
       mesh.updateWorldMatrix(true, false);
@@ -5299,6 +5506,7 @@ function liftWholeMeshes() {
       for (const id of ids) {
         palette.setOffset(id, 0, 0, 0);
         palette.setScale(id, 1, 0, 0, 0);
+        palette.clearSide(id);
       }
     }
   }
@@ -5562,10 +5770,14 @@ function brainWhileApart() {
   for (const mesh of L2.meshes ?? []) {
     const whole = wholeMesh.get(mesh);
     const id = whole ? null : mesh.userData.regionId;
-    if (!whole && id == null) continue;
     let home = deepHome.get(mesh);
     if (!home) deepHome.set(mesh, home = { p: mesh.position.clone(), s: mesh.scale.clone() });
-    if (!apart) { mesh.position.copy(home.p); mesh.scale.copy(home.s); continue; }
+    /* Home, not left alone. A mesh with no answer is one this sheet has no cell for -- the
+     * cortex while something else is the subject -- and skipping it left it wherever the
+     * *previous* sheet had put it, shrunk into a cell that no longer exists. */
+    if (!apart || (!whole && id == null)) {
+      mesh.position.copy(home.p); mesh.scale.copy(home.s); continue;
+    }
     const parent = mesh.parent;
     if (!parent) continue;
     /* The shader scales a piece about its own centroid and then displaces it. The same
@@ -5607,7 +5819,14 @@ function flyToExtent(ext, immediate = false) {
   /* Straight on, because a grid read at an angle is a grid with its far rows
    * squeezed into a line. */
   const dir = new THREE.Vector3(0, 0, 1);
-  const { target, distance } = frameFor(pts, dir, ext.cell * 1.4, 0.02);
+  /* A third of a cell of air round the outside, not a cell and a half.
+   *
+   * Every piece already sits inside a gutter of its own — `GUTTER` keeps 22% of its cell
+   * empty — so padding the whole sheet by another cell and a half on each side pays for the
+   * same space twice. On the 293-cell catalogue that was invisible; on a group of four it
+   * was most of the picture, and it is the reason opening the hamstrings drew four specks in
+   * the middle of an empty page. */
+  const { target, distance } = frameFor(pts, dir, ext.cell * 0.35, 0.02);
   flyToPose(target.clone().addScaledVector(dir, distance), target, immediate);
 }
 

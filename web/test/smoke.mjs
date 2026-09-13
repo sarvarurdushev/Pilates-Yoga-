@@ -2349,16 +2349,21 @@ await page.evaluate(async () => { (await import('/src/main.js')).setGroup(null);
     /* And the rest of the body is left where it stands: laying out four muscles is not a
      * reason to move two thousand other pieces. */
     let strayed = 0;
+    const who = [];
     for (const [id, r] of S.registry().byId) {
       if (r.parts || !m.app.centroids[id]) continue;
       if (g.members.some((x) => S.drawnIds(x).includes(id))) continue;
       const p = m.drawnPointOf?.(id);
-      if (p && p.distanceTo(m.app.centroids[id]) > 0.01) strayed++;
+      if (p && p.distanceTo(m.app.centroids[id]) > 0.01) {
+        strayed++;
+        // named, because "2 pieces moved" says nothing about which rule let them
+        if (who.length < 6) who.push(`${r.name?.en ?? id} (${r.layer})`);
+      }
     }
     await m.setGroup(null);
     await m.setExplode(0);
     return { group: g.name?.en ?? '', members: g.members.length, drawn: own.n,
-             whole: +whole.far.toFixed(3), own: +own.far.toFixed(3), strayed };
+             whole: +whole.far.toFixed(3), own: +own.far.toFixed(3), strayed, who };
   });
   console.log('group apart:', JSON.stringify(apart));
   if (!apart) console.log('  no group with three members, skipped');
@@ -2368,7 +2373,8 @@ await page.evaluate(async () => { (await import('/src/main.js')).setGroup(null);
       errors.push(`a chosen group still spreads ${apart.own} against ${apart.whole} `
         + 'for the whole atlas — the layout is not using its subject');
     if (apart.strayed)
-      errors.push(`${apart.strayed} pieces outside the group moved when the group opened`);
+      errors.push(`${apart.strayed} pieces outside the group moved when the group opened: `
+        + apart.who.join(', '));
   }
 }
 
@@ -2415,6 +2421,123 @@ await page.evaluate(async () => { (await import('/src/main.js')).setGroup(null);
       + `every one of them is a black triangle: ${nrm.worst.join(', ')}`);
   if (!(nrm.mended > 0))
     errors.push('nothing was mended, so the repair never ran on these assets');
+}
+
+/* Nothing in the catalogue lies on top of anything else.
+ *
+ * Measured where it matters -- on the vertices, through the same transform the vertex shader
+ * applies -- rather than on the layout's own arithmetic, because the layout was never the
+ * part that was wrong. Half the taught body is one structure with two of it under one id, the
+ * cell was sized for one copy and the pair was scaled about the midline between them, and
+ * both copies were thrown clear: 535 overlapping pairs at up to 78% of a cell, with finger
+ * bones lying across rows twelve columns from their own. "some of them are overlapping each
+ * other when i explode them."
+ *
+ * Also that a structure which merely crosses the midline is not sawn in half to achieve it:
+ * the sacrum, the sternum and every vertebra are one piece in one cell.
+ */
+{
+  const sheet = await page.evaluate(async () => {
+    const THREE = await import('three');
+    const m = await import('/src/main.js');
+    const S = await import('/src/structures.js');
+    m.setExplodeLayout?.('inventory');
+    await m.setGroup(null);
+    await m.setExplode(1);
+    await new Promise((r) => setTimeout(r, 2500));
+
+    /* One box per *cell*, so a structure laid out as two is measured as two. The side a
+     * vertex belongs to is the side the layout divided it on, which is body x. */
+    const v = new THREE.Vector3();
+    const cells = [];
+    /* Which meshes carry more than one structure, so the pass below can pool them. Counted
+     * first, because a region does not know how many it shares its mesh with. */
+    const count = new Map();
+    for (const [id, r] of S.registry().byId) {
+      if (r.parts || !m.app.centroids[id]) continue;
+      for (const mesh of m.meshesForId(id)) count.set(mesh, (count.get(mesh) ?? 0) + 1);
+    }
+    const shared = new Map();
+    let nshared = 0;
+    for (const [mesh, n] of count) if (n > 1) shared.set(mesh, `shared mesh ${++nshared}`);
+    const pooled = new Map();
+    for (const [id, r] of S.registry().byId) {
+      if (r.parts || !m.app.centroids[id]) continue;
+      const own = m.meshesForId(id);
+      if (!own.length) continue;
+      const box = [new THREE.Box3(), new THREE.Box3()];
+      for (const mesh of own) {
+        const geo = mesh.geometry, pos = geo.attributes.position, reg = geo.attributes._region;
+        mesh.updateWorldMatrix(true, false);
+        for (let i = 0; i < pos.count; i += 2) {
+          if (reg && Math.round(reg.getX(i)) !== +id) continue;
+          v.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(mesh.matrixWorld);
+          const k = v.x >= 0 ? 0 : 1;
+          const t = m.explodeTransformOf(id, v);
+          v.sub(t.centre).multiplyScalar(t.k).add(t.centre).add(t.offset);
+          box[k].expandByPoint(v);
+        }
+      }
+      const live = box.filter((b) => !b.isEmpty());
+      /* A mesh that carries several regions takes one cell and moves as one object -- see
+       * `liftWholeMeshes`: the cortex is a single folded sheet with fifteen parcels painted
+       * on it, and nothing in a shader can make them separable. So they are collected under
+       * the mesh and counted once, rather than counted as fifteen cells lying on each other. */
+      const key = shared.get(own[0]) ?? null;
+      if (key !== null) {
+        const u = pooled.get(key) ?? pooled.set(key, [key, new THREE.Box3()]).get(key);
+        for (const b of live) u[1].union(b);
+        continue;
+      }
+      // a structure laid out whole is one cell however many sides its vertices are on
+      if (m.paletteSplitOf(id)) for (const b of live) cells.push([r.name?.en ?? id, b]);
+      else {
+        const u = new THREE.Box3();
+        for (const b of live) u.union(b);
+        if (!u.isEmpty()) cells.push([r.name?.en ?? id, u]);
+      }
+    }
+    for (const [, v] of pooled) if (!v[1].isEmpty()) cells.push([v[0], v[1]]);
+    let pairs = 0, worst = 0, wname = '';
+    for (let i = 0; i < cells.length; i++) for (let j = i + 1; j < cells.length; j++) {
+      const A = cells[i][1], B = cells[j][1];
+      const ox = Math.min(A.max.x, B.max.x) - Math.max(A.min.x, B.min.x);
+      const oy = Math.min(A.max.y, B.max.y) - Math.max(A.min.y, B.min.y);
+      if (ox > 0 && oy > 0) {
+        pairs++;
+        const dep = Math.min(ox, oy);
+        if (dep > worst) { worst = dep; wname = `${cells[i][0]} / ${cells[j][0]}`; }
+      }
+    }
+    const named = (rx) => {
+      const out = [];
+      for (const [id, r] of S.registry().byId) {
+        if (r.parts || !m.app.centroids[id] || !rx.test(r.name?.en ?? '')) continue;
+        if (m.paletteSplitOf(id)) out.push(r.name.en);
+      }
+      return out;
+    };
+    const ribs = [];
+    for (const [id, r] of S.registry().byId)
+      if (!r.parts && m.app.centroids[id] && /\brib\b/i.test(r.name?.en ?? '')
+          && m.paletteSplitOf(id)) ribs.push(r.name.en);
+    await m.setExplode(0);
+    return { cells: cells.length, pairs, worst: +worst.toFixed(4), wname,
+             cut: named(/sacrum|sternum|mandible|vertebra|intervertebral|linea alba|diaphragm/i),
+             ribs: ribs.length,
+             cell: m.explodeLayoutExtent()?.cell ?? 0 };
+  });
+  console.log('catalogue packed:', JSON.stringify(sheet));
+  if (!(sheet.cells > 100))
+    errors.push(`the catalogue laid out only ${sheet.cells} cells`);
+  if (sheet.pairs)
+    errors.push(`${sheet.pairs} pieces of the catalogue overlap, the worst by `
+      + `${sheet.worst} (${sheet.wname}) against a cell of ${sheet.cell}`);
+  if (sheet.cut.length)
+    errors.push(`the catalogue cut ${sheet.cut.length} midline structures in two: `
+      + sheet.cut.slice(0, 4).join(', '));
+  if (!(sheet.ribs > 8))
+    errors.push(`only ${sheet.ribs} ribs were given a cell per side`);
 }
 
 /* Whole body puts the body back and leaves the layers alone.
