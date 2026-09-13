@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import NamedTuple
 
 import pytest
 
@@ -44,15 +45,48 @@ def structures() -> list[dict]:
     return json.loads(STRUCTURES.read_text(encoding="utf-8"))["structures"]
 
 
+class Curated(NamedTuple):
+    """One row of `groups.js`'s CURATED table.
+
+    Named rather than positional because it has grown a column once already, and every
+    unpack in this file broke on the day it did.
+    """
+    fma: str
+    region: str
+    ko: str
+    exclude: str          # the name of an exclusion constant, or '' for none
+
+
 @pytest.fixture(scope="module")
-def curated() -> list[tuple[str, str, str]]:
-    """`[concept id, region, Korean]` as `groups.js` lists them."""
+def curated() -> list[Curated]:
+    """`[concept id, region, Korean, English, exclusions?]` as `groups.js` lists them.
+
+    The fifth column is optional and names a constant rather than a literal, so it is
+    captured by name and resolved separately -- see `excluded`.
+    """
     source = CURATION.read_text(encoding="utf-8")
     body = source.split("const CURATED = [", 1)[1].split("\n];", 1)[0]
     rows = re.findall(
-        r"\[\s*'(FMA\d+)'\s*,\s*'(\w+)'\s*,\s*'([^']+)'\s*,\s*(?:'[^']*'|null)\s*\]", body)
+        r"\[\s*'(FMA\d+)'\s*,\s*'(\w+)'\s*,\s*'([^']+)'\s*,\s*(?:'[^']*'|null)\s*"
+        r"(?:,\s*([A-Z][A-Z0-9_]*)\s*)?\]", body)
     assert rows, "the curated list did not parse -- has its shape changed?"
-    return rows
+    return [Curated(*r) for r in rows]
+
+
+@pytest.fixture(scope="module")
+def excluded() -> dict[str, list[str]]:
+    """The exclusion constants `groups.js` defines, by name.
+
+    One group's membership is edited by hand -- "Abdominal muscles" is FMA's closure minus
+    the pelvic floor, the anal sphincter and two structures that are not muscles -- and it is
+    written as a subtraction precisely so that it can be checked rather than believed.
+    """
+    source = CURATION.read_text(encoding="utf-8")
+    out: dict[str, list[str]] = {}
+    for name, body in re.findall(r"^const ([A-Z][A-Z0-9_]*) = \[(.*?)^\];",
+                                 source, re.S | re.M):
+        out[name] = re.findall(r"'([^']+)'", body)
+    return out
 
 
 class TestTheTable:
@@ -107,11 +141,11 @@ class TestTheCuration:
         for g in groups["groups"]:
             known.add(g["id"])
             known.update(a["id"] for a in g["aliases"])
-        missing = [fma for fma, _, _ in curated if fma not in known]
+        missing = [r.fma for r in curated if r.fma not in known]
         assert not missing, f"groups.js names concepts the build did not emit: {missing}"
 
     def test_no_concept_is_curated_twice(self, curated):
-        ids = [fma for fma, _, _ in curated]
+        ids = [r.fma for r in curated]
         assert len(ids) == len(set(ids))
 
     def test_no_two_curated_groups_are_the_same_selection(self, groups, curated):
@@ -124,23 +158,53 @@ class TestTheCuration:
             for a in g["aliases"]:
                 home[a["id"]] = g["id"]
         seen: dict[str, str] = {}
-        for fma, _, _ in curated:
-            key = home[fma]
-            assert key not in seen, f"{fma} and {seen[key]} select the same structures"
-            seen[key] = fma
+        for r in curated:
+            key = home[r.fma]
+            assert key not in seen, f"{r.fma} and {seen[key]} select the same structures"
+            seen[key] = r.fma
 
     def test_every_region_is_one_the_interface_offers(self, curated):
         source = CURATION.read_text(encoding="utf-8")
         offered = set(re.findall(r"\{ id: '(\w+)',\s+en:", source))
         assert offered, "GROUP_REGIONS did not parse"
-        for fma, region, _ in curated:
-            assert region in offered, f"{fma} is filed under an unknown region {region!r}"
+        for r in curated:
+            assert r.region in offered, \
+                f"{r.fma} is filed under an unknown region {r.region!r}"
 
     def test_the_korean_is_written_out(self, curated):
         """Not transliterated, and not left as the English. A Korean reader
         getting `muscle of free lower limb` back is worse than no Korean."""
-        for fma, _, ko in curated:
-            assert re.search(r"[가-힣]", ko), f"{fma} has no Hangul in {ko!r}"
+        for r in curated:
+            assert re.search(r"[가-힣]", r.ko), f"{r.fma} has no Hangul in {r.ko!r}"
+
+    def test_every_exclusion_still_names_a_member_of_its_group(
+            self, groups, structures, curated, excluded):
+        """The one place membership is edited by hand, held against the derived table.
+
+        `groups.js` narrows "Abdominal muscles" by subtracting names -- the pelvic floor,
+        the anal sphincter, and two structures that are not muscles -- rather than by
+        listing the members it wants. The difference matters: a replacement list drifts
+        silently when the atlas renumbers, and a subtraction cannot, *provided somebody
+        checks that each name still hits something*. Nothing checked it until here. An
+        exclusion that matches nothing means the group has quietly grown back the member
+        the curation existed to keep out.
+        """
+        home = {}
+        for g in groups["groups"]:
+            for cid in [g["id"], *(a["id"] for a in g["aliases"])]:
+                home[cid] = g
+        name = {s["id"]: s["name"].lower() for s in structures}
+        for row in curated:
+            if not row.exclude:
+                continue
+            names = excluded.get(row.exclude)
+            assert names, f"{row.fma} excludes {row.exclude}, which groups.js does not define"
+            members = {name.get(m, "") for m in home[row.fma]["members"]}
+            for n in names:
+                assert n.lower() in members, (
+                    f"{row.fma} excludes {n!r}, which is not in "
+                    f"{home[row.fma]['name']!r} any more -- the group has grown back "
+                    f"what the curation kept out")
 
     def test_the_core_a_pilates_studio_teaches_is_covered(self, groups, curated):
         """The groups this application exists for. A curation that quietly
@@ -149,7 +213,7 @@ class TestTheCuration:
         for g in groups["groups"]:
             for cid in [g["id"], *(a["id"] for a in g["aliases"])]:
                 home[cid] = g
-        chosen = {home[fma]["name"] for fma, _, _ in curated}
+        chosen = {home[r.fma]["name"] for r in curated}
         for required in ["pelvic diaphragm", "musculature of abdomen",
                          "muscle of vertebral column", "quadriceps femoris",
                          "medial compartment of thigh", "posterior compartment of thigh",

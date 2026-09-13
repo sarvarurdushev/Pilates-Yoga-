@@ -44,16 +44,52 @@ export const GROUP_REGIONS = [
 ];
 
 /**
- * `[concept id, region, Korean, optional short English]`.
+ * What a studio means by "the abs", written as what the ontology's group is *not*.
+ *
+ * FMA's `musculature of abdomen` closes over part-of, so it is the four wall muscles and
+ * pyramidalis and quadratus lumborum — and also the whole pelvic diaphragm, the external
+ * anal sphincter, and two structures that are not muscles at all. That is correct anatomy
+ * and the wrong answer to a chip labelled "Abdominal muscles": a teacher pressing it got the
+ * anal sphincter.
+ *
+ * The pelvic floor is not lost by this. It has its own chip — `FMA19726`, two rows down —
+ * which is where a coach looks for it, and where it can be cued as the thing it is rather
+ * than as a surprise inside something else.
+ */
+const NOT_THE_ABS = [
+  // the pelvic diaphragm, which is its own group
+  'coccygeus', 'iliococcygeus', 'pubococcygeus', 'puborectalis',
+  'tendinous arch of levator ani',
+  'external anal sphincter',
+  // and two structures a group called "muscles" should not contain
+  'inguinal ligament', 'linea alba',
+];
+
+/**
+ * `[concept id, region, Korean, optional short English, optional exclusions]`.
  *
  * The fourth column is a display label, not a rename: the ontology's own wording
  * stays on the group and is shown as its formal name. It exists because
  * `muscle of free lower limb` is exactly right and nobody says it.
+ *
+ * The fifth is the one place membership is edited, and it is a subtraction by name rather
+ * than a replacement list. That distinction is the whole reason it is allowed here. A
+ * hand-written "the hamstrings are these four" drifts the moment the build renumbers and
+ * nobody notices; a subtraction cannot drift silently, because `buildGroups` treats an
+ * exclusion that matches nothing exactly as it treats a concept id the build did not emit —
+ * as a hard error saying the atlas moved under the curation. So the membership is still the
+ * ontology's, still derived, still checkable; what is written here is the studio's narrower
+ * reading of a name, which is an editorial judgement, in the file where those belong.
  */
 const CURATED = [
   // ---------------------------------------------------------------- core
-  ['FMA86917',  'core',     '복부 근육',        'Abdominal muscles'],
-  ['FMA259054', 'core',     '복벽',             'Abdominal wall'],
+  ['FMA86917',  'core',     '복부 근육',        'Abdominal muscles', NOT_THE_ABS],
+  /* `FMA259054` (`wall of abdomen`) is deliberately not offered. It is the group above plus
+   * the hip bone, the sacrum, piriformis, obturator internus and psoas major — so under the
+   * name it was carrying, "Abdominal wall", a coach pressing it got two bones and the deep
+   * hip rotators. Curating it down would make it a second chip for the row above, and
+   * everything it adds is already reachable: the pelvic floor at `FMA19726`, the rotators at
+   * `FMA64922`, psoas at `FMA64918`, the bony pelvis under Skeletal frame. */
   ['FMA71291',  'core',     '등 근육',          'Back muscles'],
   ['FMA22594',  'core',     '척추 근육',        'Muscles of the spine'],
   ['FMA32515',  'core',     '척추 뒤 근육',     'Behind the spine'],
@@ -161,11 +197,28 @@ export function buildGroups(generated, byId, layerOrder = []) {
   }
 
   const list = [];
-  const missing = [];
-  for (const [fma, region, ko, short] of CURATED) {
+  const missing = [], stale = [];
+  for (const [fma, region, ko, short, except] of CURATED) {
     const g = table.get(fma);
     if (!g) { missing.push(fma); continue; }
-    const members = g.members.filter(id => byId.has(id));
+    let members = g.members.filter(id => byId.has(id));
+    /* The curated subtraction, and the check that makes it safe to have one.
+     *
+     * An exclusion that matches nothing is not a no-op: it means the structure it named was
+     * renumbered, renamed or dropped, and the group has quietly grown back the members the
+     * curation was there to keep out. That is the same failure as a concept id the build did
+     * not emit, and it is reported the same way. */
+    if (except?.length) {
+      const drop = new Set(except.map(n => n.toLowerCase()));
+      const hit = new Set();
+      members = members.filter(id => {
+        const n = (byId.get(id)?.name?.en ?? '').toLowerCase();
+        if (!drop.has(n)) return true;
+        hit.add(n);
+        return false;
+      });
+      for (const n of drop) if (!hit.has(n)) stale.push(`${fma}: ${n}`);
+    }
     list.push({
       fma,
       region,
@@ -182,6 +235,9 @@ export function buildGroups(generated, byId, layerOrder = []) {
   if (missing.length)
     console.error(`groups.js names ${missing.length} concept(s) the build did not emit: ` +
                   missing.join(', '));
+  if (stale.length)
+    console.error(`groups.js excludes ${stale.length} member(s) the group no longer has, so ` +
+                  `it has grown back what the curation kept out: ${stale.join(', ')}`);
 
   const byFma = new Map(list.map(g => [g.fma, g]));
   const forStructure = new Map();

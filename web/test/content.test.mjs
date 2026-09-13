@@ -567,6 +567,49 @@ test('every offered group resolves to structures this atlas has', () => {
   }
 });
 
+test('a curated exclusion still names something the group has', () => {
+  /* The one place a group's membership is edited by hand, and the check that makes that
+   * safe. An exclusion that matches nothing is not harmless: it means the structure it named
+   * was renumbered, renamed or dropped, so the group has quietly grown back the member the
+   * curation existed to keep out — "Abdominal muscles" with the anal sphincter in it again,
+   * and nobody told. `buildGroups` reports it; this fails on it.
+   */
+  const reg = buildRegistry(generated, { brain: true });
+  const said = [];
+  const was = console.error;
+  console.error = (m) => said.push(String(m));
+  try { buildGroups(groupTable, reg.byId, LAYER_ORDER); } finally { console.error = was; }
+  const drifted = said.filter(m => /grown back/.test(m));
+  assert.equal(drifted.length, 0, drifted.join('\n'));
+});
+
+test('the abdominal group is the abdominal wall, not the pelvic floor as well', () => {
+  /* FMA closes `musculature of abdomen` over part-of, so the ontology's group is the wall
+   * muscles *and* the whole pelvic diaphragm, the external anal sphincter, and two
+   * structures that are not muscles. Correct anatomy; the wrong answer to a chip a teacher
+   * presses expecting the abs. The pelvic floor keeps its own chip, which is where it is
+   * looked for.
+   */
+  const reg = buildRegistry(generated, { brain: true });
+  buildGroups(groupTable, reg.byId, LAYER_ORDER);
+  const abs = groups().byFma.get('FMA86917');
+  assert.ok(abs, 'the abdominal group is no longer offered');
+  const names = abs.members.map(id => reg.byId.get(id).name.en.toLowerCase()).sort();
+  for (const want of ['external oblique', 'internal oblique', 'rectus abdominis',
+                      'transversus abdominis'])
+    assert.ok(names.includes(want), `${want} is missing from the abs: ${names.join(', ')}`);
+  for (const nope of ['external anal sphincter', 'coccygeus', 'pubococcygeus',
+                      'puborectalis', 'iliococcygeus', 'linea alba', 'inguinal ligament'])
+    assert.ok(!names.includes(nope), `${nope} is still filed under "Abdominal muscles"`);
+
+  // and not lost: the pelvic floor is a group of its own
+  const floor = groups().byFma.get('FMA19726');
+  assert.ok(floor, 'the pelvic floor group is no longer offered');
+  const onFloor = floor.members.map(id => reg.byId.get(id).name.en.toLowerCase());
+  for (const want of ['coccygeus', 'pubococcygeus', 'puborectalis'])
+    assert.ok(onFloor.includes(want), `${want} is in neither group`);
+});
+
 test('a group named after a muscle family speaks the same Korean as its members', () => {
   /* The atlas names muscles in the Sino-Korean clinical register the studio's
    * own entries use -- 대퇴이두근, 복직근, 요방형근 -- and the groups were first

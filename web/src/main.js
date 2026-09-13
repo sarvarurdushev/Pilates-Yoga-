@@ -5056,7 +5056,7 @@ export async function setGroup(fma) {
   /* Choosing a group *shows* the group.
    *
    * This used to tint the members and fly the camera at them, and leave the other two
-   * thousand pieces drawn on top -- so picking "Abdominal muscles" lit fourteen muscles
+   * thousand pieces drawn on top -- so picking "Abdominal muscles" lit a handful of muscles
    * somewhere inside a whole body and the reader saw no change worth the name. The way to
    * actually see them was a second control, Show this alone, which is a thing to discover
    * rather than a thing that happens: "it does not show me until i click on show this alone.
