@@ -2366,11 +2366,22 @@ it fine.
 ## Tests
 
 ```bash
-python -m pytest
+python -m pytest        # 1,917 tests, ~3m30s
+cd web && npm test      # 181 tests, ~30s
+cd web && npm run test:smoke   # the browser suite: the app, driven
 ```
 
-58 tests, no model weights required — the pose backend is stubbed, so the
-suite runs in about a tenth of a second.
+No model weights are required for the Python suite — the pose backend is
+stubbed — so it needs nothing fetched and no GPU. It is no longer the tenth of
+a second it was at 58 tests: most of the time now goes on the anatomy, the
+accounts and the session layers, which do real work against a temporary SQLite
+store.
+
+`npm run test:smoke` drives the built application in a headless browser and
+checks the picture rather than the state — that nothing in the catalogue
+overlaps, that no vertex has a normal of zero, that a click lands on what is
+under it. It needs a browser; set `CHROMIUM` to one already on the machine if
+Playwright's own is not installed.
 
 ## What is not done yet
 
@@ -2379,13 +2390,26 @@ suite runs in about a tenth of a second.
   the remaining algorithmic options are a learned re-identification embedding
   or motion prediction between frames, and neither looks likely to close a
   3.35-to-1.5 gap. Camera placement remains the answer.
-- **Exercise recognition** (naming which movement is being performed). Needs
-  labelled footage; the movement layer produces the time series it would train
-  on.
-- Student profiles and history across sessions.
-- Natural-language coaching feedback, generated from the movement summaries
-  rather than from video.
-- Teacher and student dashboards.
+- **None of it has met the studio it is for.** The numbers above come from the
+  footage in `examples/` and from the test suite. That is real footage and the
+  hard cases in it are real, but it is not the room, the lighting, the mat
+  spacing or the teaching this is being built for, and no amount of testing
+  substitutes for one class recorded there.
+- **The coaching wording is templated**, filled from structured findings
+  (`pilates/coaching.py`). That is deliberate and should stay that way for the
+  part that decides *whether* a knee was out of line — see the rules at the top
+  of that module. The phrasing itself is the part a model could improve, and
+  has not.
+- **Exercise recognition is trained on what there is.** The recogniser and its
+  evaluation are built (see Exercise recognition), and the honest limit is the
+  labelled footage behind them, not the code. More classes need more labels.
+
+Four things that used to be on this list are built, each with its own tests, and
+each has a section above: exercise recognition (`pilates/recognition.py`,
+`pilates/classifier.py`), student history across sessions
+(`pilates/history.py`), coaching notes generated from movement summaries rather
+than from video (`pilates/coaching.py`), and the teacher and student dashboards
+(`pilates/dashboard.py`).
 
 ## Note on data
 
