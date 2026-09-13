@@ -1601,12 +1601,28 @@ function indexGeometry(group) {
     const byId = new Map();
     const step = Math.max(1, Math.floor(pos.count / 3000));
     const v = new THREE.Vector3();
-    for (let i = 0; i < pos.count; i += step) {
+    /* The box is measured over **every** vertex; the centroid and the rope anchors are still
+     * sampled.
+     *
+     * Sampling is per mesh -- one vertex in every `count/3000` -- and a merged layer is one
+     * mesh standing for hundreds of structures. A small artery inside a 300,000-vertex merge
+     * therefore contributed six sampled vertices, and everything that framed it was working
+     * from six points: the distal perforating artery drew **three lit pixels**. A min/max is
+     * three compares, so it can afford to see them all, and it is exact -- which is what a
+     * picture of one structure has to be framed on.
+     *
+     * Kept per side. A vessel's left and right are two pieces under one id inside one mesh,
+     * so a single box spans the whole body and frames the gap between a reader's thighs
+     * rather than the 9 mm vessel. */
+    for (let i = 0; i < pos.count; i++) {
       const id = reg ? Math.round(reg.getX(i)) : o.userData.regionId;
       if (id == null || id <= 0) continue;
       v.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(o.matrixWorld);
       let e = byId.get(id);
-      if (!e) byId.set(id, e = { sum: new THREE.Vector3(), n: 0, pts: [] });
+      if (!e) byId.set(id, e = { sum: new THREE.Vector3(), n: 0, pts: [],
+                                 side: [new THREE.Box3(), new THREE.Box3()] });
+      e.side[v.x >= 0 ? 0 : 1].expandByPoint(v);
+      if (i % step) continue;
       e.sum.add(v); e.n++;
       if (e.pts.length < 32 && !e.pts.some(q => q.distanceToSquared(v) < 1e-4)) e.pts.push(v.clone());
     }
@@ -1619,7 +1635,7 @@ function indexGeometry(group) {
     const own = new Map();
     for (const [id, e] of byId) {
       const c = e.sum.clone().divideScalar(e.n);
-      own.set(id, { c, pts: e.pts.map(p => p.clone()) });
+      own.set(id, { c, pts: e.pts.map(p => p.clone()), side: e.side });
       const prev = app.centroids[id];
       /* `.clone()` on the single-mesh branch is load-bearing. `c` is the same Vector3 that
        * goes into `own`, which is this mesh's *rest* measurement; `refreshPosed` writes the
@@ -2177,7 +2193,14 @@ function posedSide(id) {
     const d = camera.position.distanceToSquared(c);
     if (d < bestD) {
       bestD = d;
-      best = { centre: c, points: own.pts.map(p => (m ? p.clone().applyMatrix4(m) : p.clone())) };
+      best = { centre: c,
+               points: own.pts.map(p => (m ? p.clone().applyMatrix4(m) : p.clone())),
+               /* The exact box, per side, posed the same way the points are. Eight corners
+                * beat thirty-two sampled vertices for framing, and for a structure the merge
+                * only sampled six times they are the difference between a picture and a
+                * black rectangle. */
+               side: (own.side ?? []).map(b => b.isEmpty() ? null
+                 : (m ? b.clone().applyMatrix4(m) : b.clone())) };
     }
   }
   return best;
@@ -3577,8 +3600,13 @@ const RIGHT_ON_SCREEN = 1;
  *   the picture given away for nothing.
  */
 function frameFor(pts, dir, pad = FLESH, min = 0.02, topBar = TOP_BAR,
-                 { aspect = null, inset = true } = {}) {
-  const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), dir).normalize();
+                 { aspect = null, inset = true, up: upHint = null } = {}) {
+  /* `upHint` lets the caller roll the frame. Everything on a stage is framed with the world's
+   * up, because a body seen sideways is a body lying down; a *panel* is a specimen shot, and a
+   * specimen is turned to suit the plate it is printed on. See `vantageFor`. */
+  const right = upHint
+    ? new THREE.Vector3().crossVectors(upHint, dir).normalize()
+    : new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), dir).normalize();
   const up = new THREE.Vector3().crossVectors(dir, right).normalize();
   const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
   /* The aspect is the *frame's*, and an offscreen panel is not the stage. Overriding the real
@@ -4300,35 +4328,140 @@ const viewLayers = id => {
 
 const BONY_PAD = 0.012;   // body heights: a bone's surface barely leaves its joint centre
 const UP_Y = new THREE.Vector3(0, 1, 0);
+/**
+ * One side of a paired structure, not the gap between them.
+ *
+ * `posedSide` picks the nearest *mesh*, which is one side whenever the two sides are two
+ * meshes. A vessel is not: BodyParts3D ships the left and right of one named artery as two
+ * pieces under one id, and both land in one mesh, so its sample points span the whole body.
+ * The distal perforating artery measured 0.1625 across, which is the distance between a reader's
+ * two thighs -- and the artery itself is 0.009 thick. Framed on that, each copy is a couple of
+ * pixels at opposite edges of the panel with nothing in between: **130 of the 366 arteries and
+ * 50 of the veins drew under a third of one per cent of the picture**, which is a black box.
+ *
+ * So the points are split at the midline when they form two clusters with a real gap, and the
+ * side facing the camera is kept. A structure that genuinely crosses the midline -- the aorta,
+ * the sternum, a spinal level -- has no gap and is left whole.
+ */
+const SIDE_GAP = 0.02;
+function nearerSide(pts) {
+  if (pts.length < 4) return pts;
+  const left = [], right = [];
+  for (const p of pts) (p.x >= 0 ? left : right).push(p);
+  if (left.length < 2 || right.length < 2) return pts;
+  let lo = Infinity, hi = -Infinity;
+  for (const p of left) lo = Math.min(lo, p.x);
+  for (const p of right) hi = Math.max(hi, p.x);
+  if (lo - hi < SIDE_GAP) return pts;        // one thing crossing the midline
+  return camera.position.x >= 0 ? left : right;
+}
+
 function vantageFor(id, aspect, at = null, span = 0.12, orbit = null) {
   const side = id != null ? posedSide(id) : null;
   const c = side?.centre ?? (id != null ? app.centroids[id] : null) ?? at;
   if (!c) return null;
   const r = id != null ? get(id) : null;
-  /* The floor is a guard against a degenerate cloud, not a statement about how big a
-   * structure is, and at 0.03 of a body height it was the second: the left colic artery has a
-   * radius of 0.005, so it was framed for a sphere six times its own size and drawn as a
-   * squiggle a few pixels across in the middle of a black panel. Sixty-six of seventy-four
-   * sampled arteries covered under one per cent of the picture, and thirty of thirty-seven
-   * veins. That is what "a lot of them don't have the 3d view" is: the view is there, and the
-   * thing in it was framed too far away to see.
+  /* Measured off the points that are actually going to be framed.
    *
-   * Low enough now that it binds only where the extent really is degenerate, and the distance
-   * floor below follows the subject instead of sitting at a fixed 0.06. */
-  const radius = id != null ? Math.max(0.006, (app.radii[id] ?? 0.05) * 1.9) : span;
-  const bilateral = r?.sides?.length === 2 || Math.abs(c.x) < 0.02;
+   * `app.radii[id]` is the mean distance from a structure's centroid to its sample points,
+   * and for a structure drawn as a left and a right that centroid is the midpoint *between*
+   * them -- so the radius is half the width of the body, not the size of the thing. The
+   * distal perforating artery is 9 mm thick and its radius reads 0.069, which is the distance
+   * between a reader's two thighs. Everything downstream then scaled off that: a pad six
+   * times the subject, and a camera held 0.16 back from a 9 mm vessel. It drew **three lit
+   * pixels**.
+   *
+   * So the reach is taken from `pts` after the side has been chosen, and `app.radii` is only
+   * the fallback for a structure with too few sample points to measure. The floor is a guard
+   * against a degenerate cloud and nothing more. */
+  /* The box first, because it is exact. The camera is chosen from whichever side of a paired
+   * structure it is already nearer to, so turning the body over turns the panel over with it
+   * rather than cutting to the other hip. */
+  const boxes = (side?.side ?? []).filter(Boolean);
+  let box = null;
+  if (boxes.length === 1) box = boxes[0];
+  else if (boxes.length === 2) {
+    const pick = (b) => camera.position.distanceToSquared(b.getCenter(new THREE.Vector3()));
+    box = pick(boxes[0]) <= pick(boxes[1]) ? boxes[0] : boxes[1];
+  }
+  let pts = [];
+  const mid = new THREE.Vector3();
+  let reach = 0;
+  if (box) {
+    box.getCenter(mid);
+    const lo = box.min, hi = box.max;
+    for (const x of [lo.x, hi.x]) for (const y of [lo.y, hi.y]) for (const z of [lo.z, hi.z])
+      pts.push(new THREE.Vector3(x, y, z));
+    reach = box.getSize(new THREE.Vector3()).length() / 2;
+  } else {
+    pts = (side?.points?.length ?? 0) >= 4 ? nearerSide(side.points) : [];
+    if (pts.length >= 4) {
+      for (const p of pts) mid.add(p);
+      mid.divideScalar(pts.length);
+      for (const p of pts) reach = Math.max(reach, p.distanceTo(mid));
+    } else mid.copy(c);
+  }
+  const radius = id != null
+    ? Math.max(0.0025, reach > 0 ? reach : (app.radii[id] ?? 0.05) * 1.9)
+    : span;
+  const bilateral = pts.length >= 4
+    ? Math.abs(mid.x) < 0.02
+    : (r?.sides?.length === 2 || Math.abs(c.x) < 0.02);
   let dir = bilateral ? LEFT_VIEW.clone()
-          : new THREE.Vector3(c.x, 0, Math.abs(c.z) + 0.25).normalize();
+          : new THREE.Vector3(mid.x, 0, Math.abs(mid.z) + 0.25).normalize();
   if (dir.x < 0.15) { dir.x = 0.5; dir.normalize(); }
-  const pts = (side?.points?.length ?? 0) >= 4 ? side.points.slice() : [];
-  if (pts.length < 4)
+  if (pts.length < 4) {
+    pts = [];
     for (const v of [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]])
       pts.push(c.clone().addScaledVector(new THREE.Vector3(...v), radius));
+  }
+  /* Turned to lie along the panel.
+   *
+   * The panel is landscape and most anatomy is not: a femur, a nerve, a vessel all stand
+   * upright, so a frame built on the world's up fits them to the *height* and leaves two
+   * thirds of the width empty -- and because the fit is height-limited the camera stays far
+   * back, which for a hairline vessel means a one-pixel line in a black rectangle. The
+   * descending branch of the lateral circumflex femoral artery drew 71 lit pixels that way.
+   *
+   * So the specimen is turned, the way a specimen is turned to suit the plate it is printed
+   * on: the subject's own long axis, projected into the camera plane, is rolled onto the
+   * panel's long axis. The fit is then limited by the thing's *thickness*, the camera comes
+   * in, and the vessel is drawn across the picture instead of down a sliver of it. */
+  const roll = panelRoll(pts, dir, aspect);
   const { target, distance } =
-    frameFor(pts, dir, radius * 0.45, Math.max(0.02, radius * 1.2), 0,
-             { aspect, inset: false });
+    frameFor(pts, dir, radius * 0.45, Math.max(0.008, radius * 1.2), 0,
+             { aspect, inset: false, up: roll });
   return { eye: target.clone().addScaledVector(orbited(dir, orbit), distance / zoomOf(orbit)),
-           target };
+           target, up: roll };
+}
+
+/**
+ * The up vector that lays a subject's long axis along the frame's long axis.
+ *
+ * Two principal directions in the camera plane are enough: the spread along `right` against
+ * the spread along `up`. When the subject is taller than it is wide and the frame is wider
+ * than it is tall -- or the other way about -- a quarter turn swaps them. Anything close to
+ * square is left alone, because rolling it would only tilt the picture for nothing.
+ */
+const _prR = new THREE.Vector3(), _prU = new THREE.Vector3(), _prV = new THREE.Vector3();
+function panelRoll(pts, dir, aspect) {
+  if (!pts?.length || !(aspect > 0)) return null;
+  _prR.crossVectors(UP_Y, dir).normalize();
+  _prU.crossVectors(dir, _prR).normalize();
+  let loR = Infinity, hiR = -Infinity, loU = Infinity, hiU = -Infinity;
+  for (const p of pts) {
+    _prV.subVectors(p, pts[0]);
+    const a = _prV.dot(_prR), b = _prV.dot(_prU);
+    if (a < loR) loR = a; if (a > hiR) hiR = a;
+    if (b < loU) loU = b; if (b > hiU) hiU = b;
+  }
+  const w = hiR - loR, h = hiU - loU;
+  if (!(w > 0) || !(h > 0)) return null;
+  const subject = h / w;                       // taller than wide when > 1
+  const frame = 1 / aspect;                    // the frame's own, same convention
+  // already the same way round, or close enough to square that a turn buys nothing
+  if ((subject > 1) === (frame > 1) || Math.max(subject, 1 / subject) < 1.35) return null;
+  return _prR.clone();                         // a quarter turn: up becomes right
 }
 
 /* Turning the specimen. The *fit* is left alone — the target and the distance are still solved
@@ -4430,7 +4563,7 @@ export function renderStructureInto(canvas, width, height, id,
   const cam = camera.clone();
   cam.aspect = w / h;
   cam.position.copy(aim.eye);
-  cam.up.set(0, 1, 0);
+  cam.up.copy(aim.up ?? UP_Y);
   cam.lookAt(aim.target);
   cam.near = Math.max(0.001, aim.eye.distanceTo(aim.target) * 0.02);
   cam.far = aim.eye.distanceTo(aim.target) * 6 + 4;
@@ -4631,6 +4764,12 @@ function paintInto(canvas, w, h, cam, aimAt = null) {
   c.putImageData(stageImg, 0, 0);
   return true;
 }
+
+/** How many rest sample points one structure has, for a test. */
+export const sidePointsOf = id => posedSide(+id)?.points?.length ?? 0;
+
+/** The meshes one structure is drawn as, for a test that has to measure them. */
+export const meshesForId = id => (meshesOfId.get(+id) ?? []).slice();
 
 /** The renderer and the composed pipeline, for tests that have to measure the real frame. */
 export const gfx = {
