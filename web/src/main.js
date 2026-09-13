@@ -4910,8 +4910,12 @@ export async function setGroup(fma) {
   palette.clearActivation();
   /* The sheet is laid out for whatever is chosen -- see `explodeSubject` -- so choosing or
    * clearing a group changes what it is a sheet of. Free while the body is together. */
-  if (!g) { relayoutExplode(); for (const m of materials) m.userData.sync?.();
-            syncLayers(); ui.relabel(); return; }
+  if (!g) {
+    /* Clearing the group puts back whatever it was hiding. */
+    await setIsolate(null);
+    relayoutExplode(); for (const m of materials) m.userData.sync?.();
+    syncLayers(); ui.relabel(); ui?.syncControls?.(); return;
+  }
   for (const layer of onThisAtlas(g.layers.filter(hasLayer))) {
     app.layers[layer].on = true;
     holdOneAtlas(layer);
@@ -4921,11 +4925,27 @@ export async function setGroup(fma) {
     activation.set(id, 'group');
     palette.setActivation(id, GROUP_LEVEL);
   }
+  /* Choosing a group *shows* the group.
+   *
+   * This used to tint the members and fly the camera at them, and leave the other two
+   * thousand pieces drawn on top -- so picking "Abdominal muscles" lit fourteen muscles
+   * somewhere inside a whole body and the reader saw no change worth the name. The way to
+   * actually see them was a second control, Show this alone, which is a thing to discover
+   * rather than a thing that happens: "it does not show me until i click on show this alone.
+   * it needs to show right after i click on any group of muscle."
+   *
+   * Expanded to the pieces that are drawn, because a group names muscles and some of those
+   * are drawn in parts. `setIsolate` closes the body if it was open, which is right: a
+   * catalogue of everything is not how you look at fourteen of them. */
+  const shown = [];
+  for (const id of g.members) for (const d of drawnIds(id)) shown.push(d);
+  await setIsolate(shown.length ? shown : g.members);
   relayoutExplode();
   for (const m of materials) m.userData.sync?.();
   syncLayers();
   flyToGroup(g.members);
   ui.relabel();
+  ui?.syncControls?.();
 }
 
 /**
