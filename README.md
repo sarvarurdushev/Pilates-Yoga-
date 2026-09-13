@@ -2390,11 +2390,13 @@ Playwright's own is not installed.
   the remaining algorithmic options are a learned re-identification embedding
   or motion prediction between frames, and neither looks likely to close a
   3.35-to-1.5 gap. Camera placement remains the answer.
-- **None of it has met the studio it is for.** The numbers above come from the
-  footage in `examples/` and from the test suite. That is real footage and the
-  hard cases in it are real, but it is not the room, the lighting, the mat
-  spacing or the teaching this is being built for, and no amount of testing
-  substitutes for one class recorded there.
+- **None of it has met the studio it is for.** The numbers above come from two
+  recordings that are not in this repository — the 71-second mat class and the
+  2-minute hall shot measured in the sections above — and from the test suite.
+  (`examples/` holds the studio *configs* for those sources, not the video.)
+  That is real footage and the hard cases in it are real, but it is not the
+  room, the lighting, the mat spacing or the teaching this is being built for,
+  and no amount of testing substitutes for one class recorded there.
 - **The coaching wording is templated**, filled from structured findings
   (`pilates/coaching.py`). That is deliberate and should stay that way for the
   part that decides *whether* a knee was out of line — see the rules at the top
