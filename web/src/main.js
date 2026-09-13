@@ -3897,6 +3897,8 @@ export function selectStructure(id, { auto = false } = {}) {
   revealSelection();
   if (id != null && !auto) flyTo(id);
   ui.showStructure(id);
+  /* The way back appears the moment there is something to come back from -- see `vbWhole`. */
+  ui?.syncControls?.();
 }
 
 export function setLang(l) {
@@ -5440,6 +5442,9 @@ export function setExplode(v) {
    * no "round the back" of a catalogue. Left-drag pans while one is open and goes
    * back to turning the body the moment it closes. */
   setDragVerb(!!explodeExtent && next > OPENED);
+  /* Taking the body apart is the commonest way to end up somewhere a reader wants out of, so
+   * the way back has to appear while the slider moves -- see `vbWhole`. */
+  if ((was > 0.01) !== (next > 0.01)) ui?.syncControls?.();
   cullWhileApart(next <= 0);
   /* The skin shell is drawn only while the body is closed -- `syncLayers` decides
    * that from `seeingInside`, which this slider is one of the three inputs to.

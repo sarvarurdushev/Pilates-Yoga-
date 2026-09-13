@@ -130,7 +130,9 @@ export const UI = {
   reset:        { en: 'Reset view', ko: '시점 초기화' },
   /* Two resets, and the difference between them is the whole point: one moves the camera,
    * the other puts the body back. Neither touches which layers are on. */
-  resetBody:    { en: 'Whole body', ko: '전신으로' },
+  /* Not "Whole body": the view bar already has a Whole body *view*, and two controls with
+   * one name in one bar is worse than no control at all. This one is the undo. */
+  resetBody:    { en: 'Put it back', ko: '원래대로' },
   resetBodyTip: { en: 'Put the body back together: clears what is chosen, isolated and taken apart. Your layers stay as they are.',
                   ko: '몸을 원래대로 되돌립니다. 선택·분리·해체를 모두 해제하며, 켜 둔 레이어는 그대로 둡니다.' },
   pathways:     { en: 'Pathways', ko: '경로' },

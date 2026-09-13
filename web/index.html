@@ -295,6 +295,12 @@ body.pop-open #sections,body.pop-open #orient{right:calc(var(--panelw) + 74px)}
 .lygroup h5{margin:0 0 2px;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
   color:var(--acc);font-weight:600}
 .lynote{margin:0 0 7px;font-size:10.5px;line-height:1.5;color:var(--dim2)}
+/* The way back to the whole body, on the stage rather than behind a panel. Accented,
+   because it is the one control a reader hunts for when the picture is not what they
+   expected, and it only exists while there is something to undo. */
+#vbWhole{white-space:nowrap;color:#eaf4ff;border-color:rgba(90,169,230,.55);
+  background:rgba(90,169,230,.16);font-weight:500}
+#vbWhole:hover{background:rgba(90,169,230,.28);border-color:rgba(90,169,230,.8)}
 .layerrow{display:flex;align-items:center;gap:8px;margin-top:5px}
 .lyr{flex:1;display:flex;align-items:center;gap:7px;background:transparent;border:1px solid transparent;
  color:var(--dim);border-radius:3px;padding:3px 6px;font-size:11.5px;text-align:left}
@@ -1118,6 +1124,11 @@ body.sheet #view{cursor:move}
       <button id="zoomOut" title="">−</button>
       <button id="zoomIn" title="">+</button>
       <button id="fitBtn" title="">⤢</button>
+      <!-- The way back. Hidden while the body is whole, because a button that undoes nothing
+           is noise; present the moment anything is chosen, isolated or taken apart, which is
+           the moment a reader needs it. It was in the Display panel and nobody found it. -->
+      <span class="vsep" id="vbWholeSep" hidden></span>
+      <button id="vbWhole" hidden></button>
     </div>
 
     <!-- The section series. Real sections of the model's own surfaces — see sections.js.

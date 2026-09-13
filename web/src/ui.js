@@ -179,6 +179,13 @@ export function mountUI(ctx) {
     $('reset').textContent = T('reset');
     $('resetBody').textContent = T('resetBody');
     $('resetBody').title = T('resetBodyTip');
+    /* Wording only. Whether it is *shown* is state, not language, so it belongs in
+     * `syncControls` -- put here it ran on relabel and answered with whatever the body had
+     * been doing last time somebody changed the language. */
+    if ($('vbWhole')) {
+      $('vbWhole').textContent = T('resetBody');
+      $('vbWhole').title = T('resetBodyTip');
+    }
     $('registerLab').textContent = T('register');
     $('regPlain').textContent = T('regPlain');
     $('regClinical').textContent = T('regClinical');
@@ -1439,6 +1446,7 @@ export function mountUI(ctx) {
   $('labBtn').onclick = () => setLab(!app.labOpen);
   $('reset').onclick = resetView;
   $('resetBody').onclick = () => resetBody?.();
+  $('vbWhole').onclick = () => resetBody?.();
   $('atlas').oninput = e => setAtlas(+e.target.value);
   $('explode').oninput = e => { setExplode(+e.target.value); syncControls(); };
   /* Fold any panel away and remember it.
@@ -1626,6 +1634,13 @@ export function mountUI(ctx) {
     const depthHelp = $('depthHelp');
     if (depthHelp)
       depthHelp.textContent = T(complete ? 'depthCompleteHelp' : 'depthTaughtHelp');
+    /* The way back to the whole body, on the stage, and only while there is something to come
+     * back from. A reader who has chosen a group, isolated a muscle and taken the body apart
+     * should not have to remember which panel the undo lives in: "i dont know how to bring
+     * back the body" is what happens when it is behind one. */
+    const whole = !app.group && !app.isolate?.size
+               && app.selected == null && app.explode <= 0.01;
+    for (const el of [$('vbWhole'), $('vbWholeSep')]) if (el) el.hidden = whole;
     renderPathPanel();
   }
 
