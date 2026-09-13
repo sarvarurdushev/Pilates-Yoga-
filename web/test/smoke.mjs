@@ -2378,6 +2378,91 @@ await page.evaluate(async () => { (await import('/src/main.js')).setGroup(null);
   }
 }
 
+/* The brain answers the pointer only while it is on the screen.
+ *
+ * The network of cells hangs off the brain's holder, and `syncLayers` hides it whenever
+ * something else is the picture -- a muscle isolated, the body laid out as a catalogue, the
+ * layer switched off. The pointer path did not ask that question: it tested the brain layer
+ * and the look and nothing else, so an invisible network went on answering the ray. Isolate
+ * one muscle and click it and the click was taken by a soma inside a skull nobody could see,
+ * which selected a cortical region instead -- "if i click on this it is throwing me onto
+ * brain" -- while a probe left on a cell beforehand stayed pinned over a stage with no brain
+ * on it at all: "why the hell is it showing brain?".
+ *
+ * Both halves are asserted, and so is the half that must keep working: with the brain on the
+ * screen a cell still takes the probe.
+ */
+{
+  const cells = await page.evaluate(async () => {
+    const m = await import('/src/main.js');
+    const S = await import('/src/structures.js');
+    const was = { ...Object.fromEntries(Object.keys(m.app.layers).map((n) => [n, m.app.layers[n].on])) };
+    await m.setGroup(null);
+    await m.setExplode(0);
+    await m.setIsolate(null);
+    for (const n of ['muscles_deep', 'brain']) if (m.app.layers[n]) await m.setLayer(n, true);
+    await new Promise((r) => setTimeout(r, 4000));
+
+    const note = () => {
+      const el = document.getElementById('cellnote');
+      return !!el && !el.hidden;
+    };
+    const cv = document.querySelector('canvas');
+    const box = cv.getBoundingClientRect();
+    const at = (fx, fy) => ({ clientX: box.left + box.width * fx, clientY: box.top + box.height * fy });
+    /* With the brain up close, a cell takes the probe.
+     *
+     * One frame per position, because the hover pick is deliberately coalesced into a frame
+     * -- see `runHover` -- so a burst of moves with no frame between them is one pick at the
+     * last of them and tests one position however many were sent. */
+    m.setView?.('head');
+    await new Promise((r) => setTimeout(r, 2000));
+    let held = false;
+    for (let i = 0; i < 150 && !held; i++) {
+      const p = at(0.30 + 0.42 * ((i % 15) / 14), 0.16 + 0.46 * (Math.floor(i / 15) / 9));
+      cv.dispatchEvent(new PointerEvent('pointermove', { ...p, pointerId: 1, bubbles: true,
+        isPrimary: true, pointerType: 'mouse', buttons: 0 }));
+      await new Promise((r) => requestAnimationFrame(r));
+      held = note();
+    }
+
+    // now isolate a muscle, which is what a reader clicking one in the panel does
+    let muscle = null;
+    for (const [id, r] of S.registry().byId) {
+      if (r.parts || r.layer !== 'muscles_deep' || !m.app.centroids[id]) continue;
+      muscle = id; break;
+    }
+    m.selectStructure(muscle);
+    await m.setIsolate([muscle]);
+    await new Promise((r) => setTimeout(r, 1500));
+    const pinned = note();
+
+    // and a click anywhere on the stage must land on the body or on nothing
+    let onBrain = 0;
+    for (let i = 0; i < 40; i++) {
+      const p = at(0.2 + 0.6 * ((i % 8) / 7), 0.2 + 0.6 * (Math.floor(i / 8) / 4));
+      for (const kind of ['pointerdown', 'pointerup'])
+        cv.dispatchEvent(new PointerEvent(kind, { ...p, pointerId: 1, bubbles: true,
+          isPrimary: true, pointerType: 'mouse', button: 0,
+          buttons: kind === 'pointerdown' ? 1 : 0 }));
+      const r = m.app.selected != null ? S.registry().byId.get(m.app.selected) : null;
+      if (r?.layer === 'brain') onBrain++;
+    }
+    await m.setIsolate(null);
+    m.selectStructure(null);
+    for (const [n, on] of Object.entries(was)) if (m.app.layers[n]) await m.setLayer(n, on);
+    return { held, pinned, onBrain, muscle: S.registry().byId.get(muscle)?.name?.en };
+  });
+  console.log('cells:', JSON.stringify(cells));
+  if (!cells.held)
+    console.log('  no cell took the probe, so the pinning half is untested');
+  if (cells.pinned)
+    errors.push('a cortical cell\u2019s note stayed on the stage after a muscle was isolated');
+  if (cells.onBrain)
+    errors.push(`${cells.onBrain} of 40 clicks landed on a brain region while `
+      + `${cells.muscle} was the only thing drawn`);
+}
+
 /* Every vertex in the body has a normal that points somewhere.
  *
  * A normal of exactly (0,0,0) is normalised in the fragment shader, which is a division by

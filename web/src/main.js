@@ -3254,6 +3254,21 @@ canvas.addEventListener('pointerleave', () => {
  * says what it is, immediately, without taking a click or covering anything.
  */
 let tipEl = null;
+/**
+ * The picture changed while the pointer stood still, so what it was over is no longer known.
+ *
+ * The hover name is written when the pointer *moves*, which is right until something else
+ * changes what is under it. Isolating a muscle does exactly that: the stage is left holding
+ * one structure with the name of a different one floating over it, because nothing asked the
+ * question again. Forgetting is the honest answer -- the next movement will find out.
+ *
+ * The caller syncs: `app.hover` reaches the shader through `syncLayers`, and every caller of
+ * this is already about to run one.
+ */
+function forgetHover() {
+  app.hover = null;
+  if (tipEl) tipEl.hidden = true;
+}
 function showHoverTip(id, x, y) {
   const r = id != null ? get(id) : null;
   if (!r) { if (tipEl) tipEl.hidden = true; return; }
@@ -3271,10 +3286,32 @@ function showHoverTip(id, x, y) {
   tipEl.style.top = `${Math.max(6, y - 30)}px`;
 }
 
+/**
+ * Is the network actually on the screen?
+ *
+ * Asked of the scene rather than of the state it is derived from. `syncLayers` already
+ * decides this — the layer switch, the look, the catalogue and anything isolated all reach
+ * `neuralNet.visible` — but the pointer path was asking the *inputs* again and getting a
+ * different answer: it tested the brain layer and the look and nothing else, so a network
+ * that had been hidden because a muscle was isolated went on answering the ray.
+ *
+ * What that looked like is what it was reported as. Isolate one muscle, click it, and the
+ * click was stolen by a soma inside a skull nobody could see -- "if i click on this it is
+ * throwing me onto brain" -- and a probe left on a cell before the isolate stayed pinned over
+ * a stage with no brain on it: "why the hell is it showing brain?".
+ *
+ * The parent chain is walked because the network hangs off the brain's holder rather than
+ * living in a layer, so its own flag is only half the answer.
+ */
+function networkLive() {
+  if (!neuralNet || !app.neural) return false;
+  for (let o = neuralNet; o; o = o.parent) if (!o.visible) return false;
+  return true;
+}
+
 /** The region of the cell under the pointer, or null. Used by the click path. */
 function cellUnder(ev) {
-  if (!neuralNet || !app.neural || !app.layers.brain.on
-      || app.brainLook === 'anatomical') return null;
+  if (!networkLive()) return null;
   pick(ev);                                   // aims `ray` at this event
   const hit = neuralNet.pickNode(ray);
   return hit && hit.region > 0 ? hit.region : null;
@@ -3288,8 +3325,7 @@ function cellUnder(ev) {
  * probe on something that is not on the screen is worse than no probe.
  */
 function pickCell(ev) {
-  if (!neuralNet || !app.neural || !app.layers.brain.on
-      || app.brainLook === 'anatomical') return dropCell();
+  if (!networkLive()) return dropCell();
   const hit = neuralNet.pickNode(ray);
   if (!hit) return dropCell();
   heldCell = hit;
@@ -3307,7 +3343,12 @@ function dropCell() { heldCell = null; cellNote.hide(); }
  * moment you stop moving is a screenshot of a probe.
  */
 function drawCell() {
-  if (!heldCell || !neuralNet) return;
+  if (!heldCell) return;
+  /* Dropped, not merely hidden, the moment the network stops being part of the picture. A
+   * note is held so it survives the pointer moving on and the brain turning under it; it
+   * must not survive the brain leaving the stage. Isolating a muscle does exactly that, and
+   * this loop went on redrawing a cortical cell's card over a single muscle. */
+  if (!networkLive()) return dropCell();
   const r = canvas.getBoundingClientRect();
   const stageBox = stage.getBoundingClientRect();
   const p = heldCell.point.clone().project(camera);
@@ -5078,6 +5119,8 @@ export async function setIsolate(ids) {
    * It happens before the flight, because the flight is fitted to where the piece is drawn
    * and this is what decides that. */
   if (app.isolate && app.explode > 0) { setExplode(0); ui?.syncControls?.(); }
+  // most of the body has just left the stage, and the pointer has not moved
+  forgetHover();
   syncLayers();
   refreshSections();
   ui?.relabel?.();
