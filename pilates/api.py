@@ -1218,3 +1218,124 @@ def posture_comparison(store, viewer: Viewer | None, payload: dict) -> dict:
     return al.compare(rebuild(before), rebuild(after)).to_dict()
 
 
+
+#: The pose backend, loaded once and kept, because loading it per request would
+#: be ninety megabytes of ONNX graph per photograph set.
+#:
+#: Lazily, and never at import: a viewer serving an exported bundle, a test
+#: suite, and the CLI's non-measuring commands all import this module and none
+#: of them should pay for a model they will not call. The first photograph
+#: intake on a server is therefore slower than the rest, which is the right
+#: trade for a feature a studio uses at the door and not in a loop.
+_BACKEND = None
+
+
+def pose_backend():
+    """The shared pose backend, or a refusal explaining why there is not one.
+
+    Two ways this legitimately fails and both have to reach the person rather
+    than a log: the package is installed without its model dependencies, and
+    the machine has not got the memory. The smallest free hosting tier is 512
+    MB and the graph peaks over four hundred of that, so "the server is too
+    small for this" is a real answer and saying it plainly beats a process that
+    dies mid-request.
+    """
+    global _BACKEND
+    if _BACKEND is None:
+        try:
+            from .pose import RTMOBackend
+            _BACKEND = RTMOBackend(size="m")
+        except MemoryError as exc:
+            raise Refused("this server does not have enough memory to load "
+                          "the pose model; a photograph assessment needs "
+                          "about 512 MB free", 503) from exc
+        except Exception as exc:                     # noqa: BLE001
+            raise Refused(f"the pose model could not be loaded here: {exc}",
+                          503) from exc
+    return _BACKEND
+
+
+def photo_intake(store, viewer: Viewer | None, payload: dict) -> dict:
+    """Four photographs in, one pre-session assessment out.
+
+    The photographs are measured and dropped. What comes back is the landmarks
+    -- so the browser that still holds the originals can draw the overlay
+    without the pictures making a second trip -- together with the readings,
+    the findings and what could not be measured.
+
+    ``photos`` is a list of ``{"view": ..., "image": "data:image/jpeg;base64,..."}``.
+    A photograph that cannot be measured does not fail the request: it comes
+    back marked, with the reason, alongside the ones that could, because three
+    good photographs and one to retake is a useful assessment.
+    """
+    from . import guidance as gd
+    from . import intake as ik
+    from . import photos as ph
+
+    who = str(payload.get("username", "")).strip()
+    if who:
+        guard_subject(store, viewer, who)
+    else:
+        _need(viewer)
+
+    supplied = payload.get("photos")
+    if not isinstance(supplied, list) or not supplied:
+        raise Refused("send a list of photographs, each with a view and an "
+                      "image", 400)
+    if len(supplied) > len(ik.PROTOCOL):
+        raise Refused(f"the protocol is {len(ik.PROTOCOL)} photographs: "
+                      f"{', '.join(v.value for v in ik.PROTOCOL)}", 400)
+
+    seen: set = set()
+    wanted: list[tuple] = []
+    for entry in supplied:
+        if not isinstance(entry, dict):
+            raise Refused("each photograph is an object with a view and an "
+                          "image", 400)
+        asked = str(entry.get("view", "")).strip().lower()
+        try:
+            view = ik.View(asked)
+        except ValueError as exc:
+            raise Refused(
+                f"unknown view {asked!r}; the protocol is "
+                f"{', '.join(v.value for v in ik.PROTOCOL)}", 400) from exc
+        if view not in ik.PROTOCOL:
+            raise Refused(f"{view.value} is not one of the four photographs",
+                          400)
+        if view in seen:
+            # Two photographs claiming the same view would silently replace
+            # each other, and the one that survived would be arbitrary.
+            raise Refused(f"two photographs are both labelled "
+                          f"{view.value}", 400)
+        seen.add(view)
+        wanted.append((view, entry.get("image", ""),
+                       str(entry.get("label", ""))[:80]))
+
+    backend = pose_backend()
+    measured = [ph.photograph(image, view, backend, label=label)
+                for view, image, label in wanted]
+    assessment = ik.assess_photos(
+        measured,
+        person_id=who or str(payload.get("person_id", "")),
+        taken_on=str(payload.get("taken_on", ""))[:10])
+
+    out = gd.report(assessment)
+    # The landmarks travel back so the browser can draw the overlay on the
+    # copy it already has. This is the whole reason the photographs do not
+    # need to be stored or returned.
+    out["landmarks"] = {
+        photo.view.value: {
+            "keypoints": photo.detection.keypoints.round(2).tolist(),
+            "scores": photo.detection.scores.round(3).tolist(),
+            "width": photo.width, "height": photo.height,
+        }
+        for photo in measured if photo.usable
+    }
+    out["protocol"] = [
+        {"view": view.value,
+         "title": ik.instructions(view)[0], "how": ik.instructions(view)[1],
+         "title_ko": ik.instructions(view, "ko")[0],
+         "how_ko": ik.instructions(view, "ko")[1]}
+        for view in ik.PROTOCOL
+    ]
+    return out

@@ -8,6 +8,7 @@ plain static server plus three routes that are not files.
 ``/session.json``   the loaded bundle, served from memory
 ``/capabilities``   what this server can do, so the page can hide what it cannot
 ``/analyse``        a clip, uploaded; returns a job id
+``/intake``         four photographs; returns one pre-session assessment
 ``/job/<id>``       how that job is going, and the bundle when it is done
 ``/note``           one coach observation, written from the body itself
 ``/sheet``          what to read before this person's next class
@@ -388,6 +389,12 @@ class Handler(SimpleHTTPRequestHandler):
                         # Coach mode is offered only where a note has somewhere
                         # to go. Reading a session from a file is a viewer.
                         "coach": bool(self.db),
+                        # Whether the four-photograph pre-session assessment
+                        # can run here. It needs a record to write against and
+                        # a pose model to load; the first is knowable now, the
+                        # second is not without spending ninety megabytes to
+                        # find out, so the route says so if it fails.
+                        "intake": bool(self.db),
                         # Whether the page has to ask for a passcode before it
                         # can upload or write. Saying so is not a leak: the
                         # 401 would say it anyway, one round trip later.
@@ -575,6 +582,11 @@ class Handler(SimpleHTTPRequestHandler):
             store, self._viewer(store), body),
         "/posture/compare": lambda self, store, body: api.posture_comparison(
             store, self._viewer(store), body),
+        # The pre-session assessment: four photographs in, one report out. The
+        # photographs are measured and dropped -- what comes back is landmarks,
+        # so the browser draws the overlay on the copy it already holds.
+        "/intake": lambda self, store, body: api.photo_intake(
+            store, self._viewer(store), body),
         "/roster/end": lambda self, store, body: api.end_assignment(
             store, self._viewer(store), body),
         "/admin/decide": lambda self, store, body: api.decide(
@@ -595,6 +607,15 @@ class Handler(SimpleHTTPRequestHandler):
             store, self._viewer(store), body),
     }
 
+    #: Routes whose body is bigger than a form. One entry, and it is
+    #: photographs: four at the eight megabytes :data:`pilates.photos.MAX_BYTES`
+    #: allows, base64 expands by a third to about 43 MB, plus the envelope.
+    #:
+    #: Per route rather than a higher shared limit, because raising the shared
+    #: one would let *every* endpoint on the server accept forty-six megabytes
+    #: -- a denial-of-service surface bought to solve one route's problem.
+    PAYLOAD_LIMITS = {"/intake": 46 * 1024 * 1024}
+
     def do_POST(self):  # noqa: N802
         route = urlparse(self.path)
         if route.path in ("/auth/signin", "/auth/signout", "/auth/switch"):
@@ -603,7 +624,8 @@ class Handler(SimpleHTTPRequestHandler):
         if route.path in self.WRITES and self.db:
             work = self.WRITES[route.path]
             try:
-                body = self._payload()
+                body = self._payload(
+                    self.PAYLOAD_LIMITS.get(route.path, 64 * 1024))
             except api.Refused as refused:
                 self._json({"error": str(refused)}, refused.status)
                 return

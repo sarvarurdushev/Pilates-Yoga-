@@ -619,6 +619,105 @@ def _view_choices() -> list[str]:
 _VIEW_CHOICES = _view_choices()
 
 
+def cmd_intake(args: argparse.Namespace) -> int:
+    """The pre-session assessment: four photographs, one report.
+
+    The command a studio runs at the door. ``pilates posture`` measures a clip
+    of a class; this measures the four photographs taken before anybody gets on
+    a reformer, which is a different question with different photographs and a
+    different answer.
+
+    Each photograph is named rather than guessed at: a studio knows which way
+    the student was facing, and a label always beats an estimate made from the
+    same landmarks being measured. The estimator still runs as a check, because
+    a set handed over in the wrong order is the one mistake that produces a
+    complete, plausible, mirrored report.
+    """
+    import base64
+
+    import cv2
+
+    from . import guidance as gd
+    from . import intake as ik
+    from . import intakeview as iv
+    from . import photos as ph
+    from .alignment import View
+    from .pose import RTMOBackend
+
+    supplied = [(View.FRONT, args.front), (View.SIDE_LEFT, args.left),
+                (View.SIDE_RIGHT, args.right), (View.REAR, args.back)]
+    given = [(view, path) for view, path in supplied if path]
+    if not given:
+        print("Give at least one photograph: --front, --left, --right, --back.",
+              file=sys.stderr)
+        return 2
+    for _, path in given:
+        if not Path(path).exists():
+            print(f"No such file: {path}", file=sys.stderr)
+            return 2
+
+    backend = RTMOBackend(size=args.model)
+    shots = [ph.photograph(base64.b64encode(Path(path).read_bytes()).decode(),
+                           view, backend, label=Path(path).name)
+             for view, path in given]
+
+    assessment = ik.assess_photos(shots, person_id=args.name,
+                                  taken_on=args.date)
+    report = gd.report(assessment)
+    lang = args.lang
+
+    score = report["score"]
+    print(f"\n{args.name or 'standing assessment'}"
+          + (f" — {args.date}" if args.date else ""))
+    if score["value"] is None:
+        print(f"  no score: {score['withheld_reason']}")
+    else:
+        print(f"  {score['value']:.0f}/100 — {score['band']}"
+              f" ({score['band_ko']}), from {score['checks']} checks covering "
+              f"{score['coverage']:.0%} of what these photographs can show")
+        if score["band_capped"]:
+            print(f"  {score['band_cap_reason']}")
+
+    for finding in report["findings"]:
+        print(f"\n  [{finding['severity']}] {finding['title']}")
+        print(f"      {finding['measurement']}")
+        print(f"      {finding['evidence']}")
+        keys = ", ".join(s["name"] for s in finding["exercises"][:4])
+        if keys:
+            print(f"      work on: {keys}")
+    if not report["findings"]:
+        print("\n  every measurement sits inside its unremarkable range"
+              if not report["findings_note"] else f"\n  {report['findings_note']}")
+
+    if report["refused"]:
+        print("\n  what these photographs cannot measure")
+        for name, reason in report["refused"].items():
+            print(f"      {name.replace('_', ' ')} — {reason}")
+    for warning in report["doubts"]:
+        print(f"  ! {warning}")
+
+    if args.svg:
+        images = {}
+        if args.embed:
+            for view, path in given:
+                frame = cv2.imread(path)
+                if frame is None:
+                    continue
+                ok, buffer = cv2.imencode(".jpg", frame,
+                                          [cv2.IMWRITE_JPEG_QUALITY, 82])
+                if ok:
+                    images[view] = ("data:image/jpeg;base64,"
+                                    + base64.b64encode(buffer.tobytes()).decode())
+        target = Path(args.svg)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(iv.render_report(assessment, images=images, lang=lang),
+                          encoding="utf-8")
+        print(f"\n  drawing: {target}")
+
+    print("\n" + (gd.DISCLAIMER_KO if lang == "ko" else gd.DISCLAIMER))
+    return 0
+
+
 def cmd_posture(args: argparse.Namespace) -> int:
     """Measure standing alignment, per person, from a clip or a single frame.
 
@@ -2606,6 +2705,27 @@ def main(argv: list[str] | None = None) -> int:
     po.add_argument("--svg", default=None, help="write a drawing per student here")
     po.add_argument("--svg-width", type=int, default=720)
     po.set_defaults(func=cmd_posture)
+
+    ik_ = sub.add_parser("intake",
+                         help="the pre-session assessment: four photographs")
+    ik_.add_argument("--front", default=None, help="the front photograph")
+    ik_.add_argument("--left", default=None,
+                     help="the left side photograph (left shoulder to camera)")
+    ik_.add_argument("--right", default=None,
+                     help="the right side photograph")
+    ik_.add_argument("--back", default=None, help="the back photograph")
+    ik_.add_argument("--name", default="", help="whose assessment this is")
+    ik_.add_argument("--date", default="",
+                     help="the day the photographs were taken, YYYY-MM-DD")
+    ik_.add_argument("--model", default="m", choices=("s", "m", "l"),
+                     help="RTMO size; m is the default the pipeline uses")
+    ik_.add_argument("--lang", default="en", choices=("en", "ko"))
+    ik_.add_argument("--svg", default=None, help="write the report here")
+    ik_.add_argument("--embed", action="store_true",
+                     help="put the photographs into the drawing; without this "
+                          "the report carries the skeleton alone, which is "
+                          "what a stored report should keep")
+    ik_.set_defaults(func=cmd_intake)
 
     ld = sub.add_parser("load", help="joint load and the muscle group carrying it")
     ld.add_argument("video")

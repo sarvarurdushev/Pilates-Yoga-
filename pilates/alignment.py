@@ -71,6 +71,33 @@ MIN_BODY_FRACTION = 1 / 12
 #: Shared with the score: a deviation of `ZERO_AT` scores zero, by construction.
 NOTABLE_DEGREES = 3.0
 
+#: Past this, a knee is not tracking off line -- a landmark is wrong.
+#:
+#: Standing knee deviation is a few per cent of leg length; a quarter of it is
+#: a knee somewhere the hip and the ankle are not. This is not a clinical
+#: threshold and is not doing clinical work: it is the point past which the
+#: measurement stops being about the person, and it exists because a pose model
+#: reports full confidence in a landmark it has taken from somebody standing
+#: behind. See :func:`implausible`.
+MAX_KNEE_DEVIATION = 0.25
+
+#: How far apart the feet must be, as a share of hip width, before stance width
+#: can be the denominator of anything.
+#:
+#: Lateral bias is the torso's offset over the base of support, and with the
+#: feet together there is no base to speak of: a two-centimetre offset over a
+#: one-centimetre stance is four hundred per cent of nothing. Below this the
+#: measurement is refused rather than scaled, and the refusal is actionable --
+#: the intake instructions already ask for the feet under the hips.
+MIN_STANCE_OVER_HIPS = 0.33
+
+#: How different two legs may measure before the landmark set is not one body.
+#: Generous, because perspective and a foot turned out really do change the
+#: projected length; it catches a limb that has latched onto another person,
+#: which is the failure that actually happens in a studio with two people in
+#: the frame.
+MAX_LIMB_ASYMMETRY = 0.45
+
 
 #: What counts as unremarkable, per metric. In one table because two places
 #: needed it -- the metric functions and :func:`pilates.api.posture_comparison`,
@@ -316,6 +343,86 @@ def estimate_view(det: Detection, threshold: float = THRESHOLD) -> ViewEstimate:
 #: lateral weight bias, and lateral trunk lean.
 _LEVEL_METRICS_ARE_VIEW_INDEPENDENT = True
 
+def implausible(det: Detection, threshold: float = THRESHOLD) -> list[str]:
+    """Ways this landmark set is not one person standing still.
+
+    Written after running the pipeline on a photograph with two people in it.
+    The pose model put the subject's right knee 180 pixels to the side of the
+    body and their right ankle *above* that knee -- landmarks taken from the
+    person standing behind -- and reported both at confidence 1.00. Every
+    metric downstream then computed cleanly on nonsense and produced a
+    four-hundred-per-cent weight bias, which is the worst kind of wrong number:
+    specific, confident, and about nobody.
+
+    **Confidence cannot catch this and geometry can.** A pose model's score
+    says how sure it is that a knee looks like a knee, not that it belongs to
+    the body it has been attached to. So these checks ask the one question the
+    model never does: *is this arrangement of joints a body?*
+
+    * A standing leg goes hip, knee, ankle, downward. An ankle above its own
+      knee is not a stance, it is a mistake.
+    * Shoulders are above hips.
+    * Two legs of the same person measure roughly the same, allowing for
+      perspective -- see :data:`MAX_LIMB_ASYMMETRY`.
+
+    The ordering checks only run on a body that reads as upright, because a
+    person lying down fails all of them correctly and for the wrong reason;
+    :func:`pilates.geometry.posture` is what decides, so the two modules cannot
+    disagree about what upright means.
+
+    Returns sentences a receptionist can act on, not codes. An empty list means
+    nothing here looks impossible, which is not the same as everything being
+    right.
+    """
+    problems: list[str] = []
+    span = body_height_px(det, threshold)
+    if not span:
+        return problems
+    slack = 0.03 * span                 # noise, not a straightened knee
+
+    if geo.posture(det, threshold) == "upright":
+        if _confident(det, kp.L_SHOULDER, kp.R_SHOULDER, kp.L_HIP, kp.R_HIP,
+                      threshold=threshold):
+            shoulders = _mid(det, kp.L_SHOULDER, kp.R_SHOULDER)
+            hips = _mid(det, kp.L_HIP, kp.R_HIP)
+            if shoulders[1] > hips[1] + slack:
+                problems.append("the shoulders are below the hips; this is not "
+                                "a standing body")
+        for side, (hip, knee, ankle) in (
+                ("left", (kp.L_HIP, kp.L_KNEE, kp.L_ANKLE)),
+                ("right", (kp.R_HIP, kp.R_KNEE, kp.R_ANKLE))):
+            if not _confident(det, hip, knee, ankle, threshold=threshold):
+                continue
+            hy = float(det.keypoints[hip][1])
+            ky = float(det.keypoints[knee][1])
+            ay = float(det.keypoints[ankle][1])
+            if ky < hy + slack:
+                problems.append(f"the {side} knee is level with or above the "
+                                f"{side} hip; the landmark is in the wrong place")
+            if ay < ky + slack:
+                problems.append(f"the {side} ankle is level with or above the "
+                                f"{side} knee: either the foot is not on the "
+                                f"floor, so this is not a standing "
+                                f"photograph, or the landmark has been taken "
+                                f"from another person in the frame")
+
+    for part, (left, right) in (
+            ("thigh", ((kp.L_HIP, kp.L_KNEE), (kp.R_HIP, kp.R_KNEE))),
+            ("shin", ((kp.L_KNEE, kp.L_ANKLE), (kp.R_KNEE, kp.R_ANKLE)))):
+        if not _confident(det, *left, *right, threshold=threshold):
+            continue
+        a = float(np.linalg.norm(det.keypoints[left[0]] - det.keypoints[left[1]]))
+        b = float(np.linalg.norm(det.keypoints[right[0]] - det.keypoints[right[1]]))
+        longer = max(a, b)
+        if longer <= 0:
+            continue
+        if abs(a - b) / longer > MAX_LIMB_ASYMMETRY:
+            problems.append(f"the two {part} landmarks differ in length by "
+                            f"{abs(a - b) / longer:.0%}; one of them is "
+                            f"probably not this person's")
+    return problems
+
+
 def _unavailable(name: str, unit: str, reason: str) -> Metric:
     return Metric(name, None, unit, Availability.UNAVAILABLE, 0.0, reason)
 
@@ -463,7 +570,17 @@ def knee_alignment(det: Detection, view: View, side: str,
     inward = offset if side == "left" else -offset
     if view is View.REAR:
         inward = -inward
-    return Metric(name, _zero(round(inward / leg, 3)), "ratio", Availability.AVAILABLE,
+    value = inward / leg
+    if abs(value) > MAX_KNEE_DEVIATION:
+        # Not a finding. A knee a quarter of a leg length off the hip-ankle
+        # line is a landmark in the wrong place -- most often taken from
+        # somebody standing behind -- and the pose model will have reported it
+        # at full confidence, so confidence cannot catch this and geometry can.
+        return _unavailable(
+            name, "ratio",
+            f"the {side} knee sits {abs(value):.0%} of a leg length off the "
+            f"hip-to-ankle line, which is not a knee: the landmark is wrong")
+    return Metric(name, _zero(round(value, 3)), "ratio", Availability.AVAILABLE,
                   _joint_confidence(det, hip, knee, ankle), normal=NORMAL_BANDS[name])
 
 
@@ -485,8 +602,15 @@ def weight_bias(det: Detection, view: View, threshold: float = THRESHOLD) -> Met
     ankles = _mid(det, kp.L_ANKLE, kp.R_ANKLE)
     shoulders = _mid(det, kp.L_SHOULDER, kp.R_SHOULDER)
     stance = float(abs(det.keypoints[kp.L_ANKLE][0] - det.keypoints[kp.R_ANKLE][0]))
-    if stance < 1.0:
-        return _unavailable(name, "ratio", "the feet are too close together to measure against")
+    hips = float(abs(det.keypoints[kp.L_HIP][0] - det.keypoints[kp.R_HIP][0])) \
+        if _confident(det, kp.L_HIP, kp.R_HIP, threshold=threshold) else 0.0
+    floor = max(1.0, MIN_STANCE_OVER_HIPS * hips)
+    if stance < floor:
+        return _unavailable(
+            name, "ratio",
+            "the feet are too close together for stance width to mean "
+            "anything; ask for the photograph again with the feet under "
+            "the hips")
     offset = float(shoulders[0] - ankles[0])
     if view is View.FRONT:
         offset = -offset                    # image-left is the person's right
@@ -567,6 +691,12 @@ class PostureAssessment:
     person_id: str = ""
     #: Fraction of the frame height the body spanned, for the size gate.
     body_fraction: float | None = None
+    #: What this assessment could have measured, when the caller knows better
+    #: than :data:`VIEW_METRICS` does. A set of photographs covers the union of
+    #: its views, and scoring it against one view's row would charge it for
+    #: nothing or flatter it -- see :func:`pilates.intake.PhotoAssessment.expected`.
+    #: None means "ask the table", which is the case for every single frame.
+    expected_override: tuple[str, ...] | None = None
 
     @property
     def reliable(self) -> bool:
@@ -593,6 +723,8 @@ class PostureAssessment:
     @property
     def expected(self) -> tuple[str, ...]:
         """The metrics this view could have provided. See :data:`VIEW_METRICS`."""
+        if self.expected_override is not None:
+            return self.expected_override
         return VIEW_METRICS.get(self.view.view, ())
 
     def score(self) -> Score:
@@ -691,6 +823,9 @@ def assess(det: Detection, *, view: View | None = None, person_id: str = "",
         warnings.append(f"view not established: {estimate.note}")
     if det.confidence < 0.35:
         warnings.append(f"mean joint confidence {det.confidence:.2f} is too low to build on")
+    # Confidence is not correctness. See :func:`implausible`, which exists
+    # because a model returned 1.00 on a landmark belonging to somebody else.
+    warnings.extend(implausible(det, threshold))
 
     v = estimate.view
     metrics = [

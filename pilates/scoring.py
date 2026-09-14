@@ -91,6 +91,17 @@ class Score:
     #: Quantities that could have been measured and were not.
     missing: list[str] = field(default_factory=list)
     measurable: int = len(MEASURABLE)
+    #: Something wrong with the *inputs*, in words, that makes a headline
+    #: number misleading however many checks were made.
+    #:
+    #: Coverage and check count ask "was enough of the body visible". This asks
+    #: the other question: "was what we were looking at the right thing at
+    #: all". A photograph with somebody else's leg in it, or of a person who is
+    #: not standing, produces a full complement of clean measurements and a
+    #: score that means nothing -- and a score of 100 printed beside a warning
+    #: that the photograph is not usable is the worst thing this system can
+    #: put on a screen, because the number is what gets read.
+    blocked: str = ""
 
     @property
     def checks(self) -> int:
@@ -107,7 +118,8 @@ class Score:
 
     @property
     def reliable(self) -> bool:
-        return self.checks >= MIN_CHECKS and self.coverage >= MIN_COVERAGE
+        return (not self.blocked and self.checks >= MIN_CHECKS
+                and self.coverage >= MIN_COVERAGE)
 
     @property
     def value(self) -> float | None:
@@ -127,6 +139,8 @@ class Score:
     def withheld_reason(self) -> str:
         if self.reliable:
             return ""
+        if self.blocked:
+            return self.blocked
         if self.checks < MIN_CHECKS:
             return (f"only {self.checks} check(s) could be made; a score from "
                     f"that few swings on any one of them")

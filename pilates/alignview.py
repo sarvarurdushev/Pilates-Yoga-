@@ -26,7 +26,7 @@ from __future__ import annotations
 import html
 
 from . import keypoints as kp
-from .alignment import Availability, Metric, PostureAssessment, View
+from .alignment import Availability, Metric, PostureAssessment
 from .types import Detection
 
 #: Ink. Deliberately not a brand palette: this is a measurement drawing, and
@@ -58,7 +58,17 @@ def _confident(det: Detection, joint: int, threshold: float) -> bool:
     return bool(det.scores[joint] >= threshold)
 
 
-def _skeleton(det: Detection, threshold: float) -> list[str]:
+def _skeleton(det: Detection, threshold: float, scale: float = 1.0) -> list[str]:
+    """The body, joined up, in the coordinates the landmarks are already in.
+
+    ``scale`` is the factor the caller's transform applies, and every stroke
+    width and radius here is divided by it so the drawing looks the same at any
+    size. Without it a photograph displayed at a quarter size gets a
+    half-pixel skeleton, which is technically correct and invisible.
+    """
+    weight = 2.5 / scale
+    radius = 4.0 / scale
+
     def real(joint: int) -> bool:
         """Confident *and* somewhere. A landmark at exactly (0, 0) is a slot a
         backend never filled; drawing to it rakes a line to the frame corner."""
@@ -71,18 +81,20 @@ def _skeleton(det: Detection, threshold: float) -> list[str]:
             continue
         (x0, y0), (x1, y1) = det.keypoints[a], det.keypoints[b]
         out.append(f'<line x1="{x0:.1f}" y1="{y0:.1f}" x2="{x1:.1f}" y2="{y1:.1f}" '
-                   f'stroke="{INK["bone"]}" stroke-width="2.5" stroke-linecap="round" '
-                   f'opacity="0.85"/>')
+                   f'stroke="{INK["bone"]}" stroke-width="{weight:.2f}" '
+                   f'stroke-linecap="round" opacity="0.85"/>')
     for joint in range(kp.NUM_KEYPOINTS):
         x, y = det.keypoints[joint]
         if real(joint):
-            out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" '
+            out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{radius:.2f}" '
                        f'fill="{INK["joint"]}" opacity="0.9"/>')
         elif det.scores[joint] > 0.05 and not (x == 0.0 and y == 0.0):
             # found but not trusted: hollow, so the eye can tell the difference
-            out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="none" '
-                       f'stroke="{INK["joint"]}" stroke-width="1.2" '
-                       f'stroke-dasharray="2 2" opacity="0.55"/>')
+            out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{radius:.2f}" '
+                       f'fill="none" stroke="{INK["joint"]}" '
+                       f'stroke-width="{1.2 / scale:.2f}" '
+                       f'stroke-dasharray="{2 / scale:.2f} {2 / scale:.2f}" '
+                       f'opacity="0.55"/>')
     return out
 
 

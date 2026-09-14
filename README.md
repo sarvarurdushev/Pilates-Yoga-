@@ -566,11 +566,138 @@ python -m pilates describe class.mp4 --anatomy --anatomy-file our_library.json
 Bones are derived from the joints when a file does not list them, so the two
 cannot drift apart.
 
+## The pre-session check: four photographs, before anybody gets on a reformer
+
+This is the step at the door, and it is the one a studio actually sells. The
+student stands against a wall, four photographs are taken -- front, left side,
+right side, back -- and the answer is what their standing alignment measures,
+what is outside its usual range, and what a first session should work on.
+Afterwards they move on to a class and the recording half takes over; the two
+answer different questions from different footage and share only a measurement
+engine.
+
+**In the application**: press **Posture check** in the header, next to Record.
+That is the whole route -- upload, analyse, read the report -- and it is the
+answer to "where do I see my body posture analysis", which the first version of
+this feature did not have, because it shipped a CLI and an API and no screen.
+
+**From a terminal**, for a studio running headless:
+
+```bash
+python -m pilates intake --front f.jpg --left l.jpg --right r.jpg --back b.jpg \
+    --name "Anna Park" --date 2026-09-14 --svg report.svg --embed
+```
+
+### Four photographs is a protocol, not an upload limit
+
+Each one exists to see what the others cannot. `pilates/alignment.py`'s
+`VIEW_METRICS` is the table: the **frontal pair** -- front and back -- carry
+every side-to-side measurement (shoulder line, hip line, knee tracking, where
+the body is carried over the feet); the **sagittal pair** carry the two that
+need depth (how far the head sits ahead of the shoulders, how far the trunk
+leans fore or aft).
+
+### Two photographs of one quantity is the point, not redundancy
+
+A COCO model labels landmarks **anatomically** -- the person's left shoulder is
+the left shoulder from in front and from behind alike -- so the front and back
+photographs are two *independent* measurements of the same shoulder line. They
+will not agree exactly, and **how far they disagree is the error bar this
+product would otherwise not have**. One photograph gives a number with no way to
+tell whether it is real. A pair gives a number and a reason to believe it, or a
+reason not to:
+
+> shoulder level **+9.9°** — measured from the front and back photographs,
+> which agreed to within 1.4°
+
+> hip level **+11.3°** — the front and back photographs disagreed by 4.2°, which
+> is more than measurement noise; treat it as indicative
+
+### Confidence is not correctness
+
+Written after running the pipeline on a photograph with two people in it. The
+pose model put the subject's right knee 180 px to the side of their body and
+their right ankle *above* that knee -- landmarks taken from the person standing
+behind -- and reported both at confidence **1.00**. Every metric downstream then
+computed cleanly on nonsense and produced a four-hundred-per-cent weight bias:
+specific, confident, and about nobody.
+
+A model's score says how sure it is that a knee looks like a knee, not that it
+belongs to the body it has been attached to. So `alignment.implausible()` asks
+the question the model never does -- *is this arrangement of joints a body?* A
+standing leg goes hip, knee, ankle, downward. Shoulders are above hips. Two legs
+of one person measure roughly the same. And two denominators that used to
+explode are now guarded: a knee more than a quarter of a leg length off the
+hip-to-ankle line is a landmark in the wrong place, and stance width stops being
+a denominator when the feet are closer together than a third of the hip width.
+
+### A doubt is not a gap, and they are answered differently
+
+"No back photograph" is a **gap**: everything measured is still true, there is
+just less of it, and coverage already says so. "The right ankle is above the
+right knee" is a **doubt**: the numbers came out clean and they are about
+nobody. A gap lowers coverage. A doubt **withholds the headline score** --
+`scoring.Score.blocked` -- because a score of 100 printed beside a warning that
+the photograph is unusable is the worst thing this system can put on a screen:
+the number is what gets read and the warning is what gets skipped.
+
+### What is wrong, and what to do about it
+
+`pilates/guidance.py` turns a signed number into a sentence, and keeps three
+registers apart because they carry different weight:
+
+* **what was measured** is geometry and is checkable;
+* **what that usually means** is general movement principle, is not something
+  the photographs measured, and says so wherever it is shown;
+* **what to work on** is a teaching suggestion drawn from this repository's own
+  repertoire, *by key*, so the application opens the real entry with its cueing,
+  its contraindications and its review status. `tests/test_guidance.py` checks
+  every one of those keys still exists.
+
+Direction is the part that is easy to get backwards, and getting it backwards
+means telling somebody to strengthen the wrong side for six weeks. `DIRECTIONS`
+is the single place a signed number becomes a side, every convention is traced
+back to the metric it came from, and both the English and the Korean are tested
+against the same sign.
+
+Nothing here names a condition. Not scoliosis, not kyphosis, not a
+"misalignment" to be "corrected" -- the vocabulary is positional, because those
+are the words the measurement supports.
+
+### The score, and why the band can disagree with it
+
+The number is a mean, and a mean dilutes: one shoulder twelve degrees off level
+with everything else neutral averages into the eighties, which reads as *Good*
+and is the single most misleading thing the report could say. So the number
+stays a mean, because that is what it is, and the **band is capped by the worst
+single finding**, with the cap stated on the report rather than quietly applied.
+
+Five bands rather than three, because a three-band scale puts most of a normal
+population in the middle one and tells a studio nothing.
+
+### Both languages, all the way down
+
+The studio this is built for teaches in Korean. Every phrase travels in both --
+findings, evidence sentences, refusal reasons, exercise names, habit cards, the
+disclaimer -- and `tests/test_guidance.py` reads every fixed refusal out of
+`alignment.py` and fails if one of them has no Korean. A page that is Korean
+except for the four headings somebody forgot is a page a reader stops trusting.
+
+### The photographs are measured and dropped
+
+They arrive in memory, are decoded, are measured, and the bytes go. Nothing is
+written to disk, nothing is stored, and nothing is sent back: what returns is
+seventeen coordinates and seventeen confidences per photograph -- about half a
+kilobyte against about two megabytes -- which is also what lets the browser draw
+the overlay on the copy it already holds, without the pictures making a second
+trip.
+
 ## Standing posture: alignment, and what one camera cannot see
 
 The movement layer answers "how did that rep go". A studio gets asked another
 question constantly -- *stand still; what does my alignment look like, and has it
-changed since last time* -- and `pilates/alignment.py` answers that one.
+changed since last time* -- and `pilates/alignment.py` answers that one. It is
+the engine underneath the pre-session check above, and it also runs over a clip.
 
 ```bash
 python -m pilates posture CLIP --view front --svg drawings/
@@ -1198,12 +1325,19 @@ with a payment form. Free costs two things beyond the speed: the filesystem is
 wiped on every spin-down (fifteen minutes of quiet), so the studio record goes
 with it, and there is no disk to attach to stop that.
 
-`deploy/huggingface/Dockerfile` is the free deployment that can record. Create a
-Space (Docker SDK, blank, CPU basic), add that one file through the web editor,
-and it builds: it clones this repository, installs, bakes the pose model into
-the image so nobody waits ninety megabytes on their first recording, and serves
-on port 7860. Storage there is not persistent either — that is a paid add-on —
-so a hosted copy is somewhere to *show* the thing.
+`deploy/huggingface/Dockerfile` is the free deployment that can record *and*
+run the posture check. Create a Space (Docker SDK, blank, CPU basic), add that
+one file through the web editor, and it builds: it clones this repository,
+installs, bakes the pose model into the image so nobody waits ninety megabytes
+on their first analysis, and serves on port 7860. Storage there is not
+persistent either — that is a paid add-on — so a hosted copy is somewhere to
+*show* the thing.
+
+**[`docs/deploy-hugging-face.md`](docs/deploy-hugging-face.md) is that in full**:
+every button named, the exact filename to type, what to paste, what the build
+log does for eight minutes, and what to do when it fails. Written because "add
+a Dockerfile to a Space" turned out not to be an instruction anybody could act
+on.
 
 **Hosting the analysis is a real trade, not a free upgrade.** The clip is still
 deleted the moment the job ends, but it travelled to a data centre first, which
