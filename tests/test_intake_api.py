@@ -218,8 +218,30 @@ class TestAPhotographThatWillNotDo:
         stubbed(script_for(View.FRONT))
         _, out = client.post("/intake", {
             "photos": [{"view": "front", "image": png(120, 160)}]})
-        assert any("cannot be measured" in w or "under a" in w
-                   for w in out["warnings"])
+        assert any("too few pixels" in w for w in out["warnings"])
+
+    def test_a_tall_narrow_photograph_is_the_right_shape_not_the_wrong_one(
+            self, coach, stubbed):
+        """The bug this test exists for.
+
+        The size gate tested ``min(height, width)``, so every correctly framed
+        standing photograph was refused: a person standing is tall and narrow,
+        and the width is small *because* the framing is right. The studio's
+        first real set -- 161x361, 166x360, 151x366, 116x360 -- came back with
+        four refusals and an empty report.
+        """
+        client, _, _ = coach
+        stubbed(script_for(*ALL_FOUR))
+        status, out = client.post("/intake", {"photos": [
+            {"view": "front", "image": png(161, 361)},
+            {"view": "side_left", "image": png(166, 360)},
+            {"view": "side_right", "image": png(151, 366)},
+            {"view": "rear", "image": png(116, 360)}]})
+        assert status == 200
+        assert out["assessment"]["supplied"] == [v.value for v in ALL_FOUR]
+        assert out["missing_photos"] == []
+        assert not any("too few pixels" in w for w in out["warnings"])
+        assert out["landmarks"], "and it measured them"
 
     def test_something_that_is_not_an_image_is_refused_with_the_reason(
             self, coach, stubbed):

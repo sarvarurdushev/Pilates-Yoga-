@@ -67,6 +67,25 @@ THRESHOLD = 0.4
 #: worse, unmeasurable in a way that still produces a number.
 MIN_BODY_FRACTION = 1 / 12
 
+#: And the same question in absolute terms: how many pixels of body there are.
+#:
+#: A fraction alone is not enough -- a body filling a 120 px thumbnail passes
+#: the fraction test and is still 120 px of body. This is the number the
+#: arithmetic gives:
+#:
+#: * the finest distinction any of this makes is a normal band edge, and the
+#:   tightest of those is +/-2.0 degrees of shoulder tilt;
+#: * the shoulders span roughly 0.32 of the shoulder-to-ankle height;
+#: * so 2 degrees lifts one shoulder by ``0.32 * span * tan(2deg)``, which is
+#:   ``0.0112 * span`` pixels;
+#: * landmark noise is a pixel or two, so that rise needs to clear 2 px:
+#:   ``span >= 179``.
+#:
+#: Hence 180. Below it a two-degree difference is inside the noise, which is
+#: exactly the size of difference this report is built to notice, so the
+#: assessment says so rather than reporting one.
+MIN_BODY_PIXELS = 180
+
 #: How far from level a line has to be before it is worth a teacher's attention.
 #: Shared with the score: a deviation of `ZERO_AT` scores zero, by construction.
 NOTABLE_DEGREES = 3.0
@@ -406,9 +425,16 @@ def implausible(det: Detection, threshold: float = THRESHOLD) -> list[str]:
                                 f"photograph, or the landmark has been taken "
                                 f"from another person in the frame")
 
-    for part, (left, right) in (
+    # Frontal photographs only. Side-on, one leg is *behind* the other by
+    # construction: the far one is occluded, foreshortened differently, and
+    # placed by a model that is guessing at it. Two thighs measuring half a
+    # thigh apart is then the expected consequence of the camera angle, not
+    # evidence of anything, and flagging it would withhold the score on both
+    # side photographs of every set a studio ever takes.
+    sagittal = estimate_view(det, threshold).view.is_sagittal
+    for part, (left, right) in (() if sagittal else (
             ("thigh", ((kp.L_HIP, kp.L_KNEE), (kp.R_HIP, kp.R_KNEE))),
-            ("shin", ((kp.L_KNEE, kp.L_ANKLE), (kp.R_KNEE, kp.R_ANKLE)))):
+            ("shin", ((kp.L_KNEE, kp.L_ANKLE), (kp.R_KNEE, kp.R_ANKLE))))):
         if not _confident(det, *left, *right, threshold=threshold):
             continue
         a = float(np.linalg.norm(det.keypoints[left[0]] - det.keypoints[left[1]]))
@@ -813,6 +839,13 @@ def assess(det: Detection, *, view: View | None = None, person_id: str = "",
 
     span = body_height_px(det, threshold)
     fraction = None
+    if span and span < MIN_BODY_PIXELS:
+        # The absolute check, which the fractional one cannot make: a body
+        # filling a thumbnail is still a thumbnail's worth of body.
+        warnings.append(
+            f"the body is {span:.0f} px from shoulder to ankle; below "
+            f"{MIN_BODY_PIXELS} px a two-degree difference is inside the "
+            f"landmark noise. Take the photograph closer, or larger")
     if frame_height and span:
         fraction = span / float(frame_height)
         if fraction < MIN_BODY_FRACTION:

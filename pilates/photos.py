@@ -46,9 +46,20 @@ from .types import Detection
 #: server.
 MAX_EDGE = 1600
 
-#: A photograph smaller than this is not worth measuring: at 400 px tall a body
-#: is a few hundred pixels and a degree of shoulder tilt is under a pixel.
-MIN_EDGE = 400
+#: A photograph shorter than this cannot contain a measurable body.
+#:
+#: **On height, not on the smallest side.** The first version of this gate
+#: tested ``min(height, width)`` and refused every correctly framed
+#: photograph in the studio's first real set -- 161x361, 166x360, 151x366,
+#: 116x360, four clean standing shots. A photograph of somebody standing is
+#: tall and narrow, and its width is small *because* the framing is right.
+#: Testing the short side punished the composition the instructions ask for.
+#:
+#: The number is :data:`pilates.alignment.MIN_BODY_PIXELS`, because a body
+#: cannot span more pixels than the picture is tall. This is only the floor:
+#: what actually decides whether a photograph is measurable is how much of it
+#: the *body* fills, and that is checked where the body is found.
+MIN_HEIGHT = 180
 
 #: Refused before decoding. Four photographs at this size is 32 MB of image,
 #: which base64 expands to about 43 MB on the wire -- see
@@ -106,10 +117,10 @@ def decode(data: str) -> np.ndarray:
         raise BadPhoto("this file could not be opened as a photograph; JPEG, "
                        "PNG and WebP are understood")
     height, width = frame.shape[:2]
-    if min(height, width) < MIN_EDGE:
-        raise BadPhoto(f"this photograph is {width}x{height}; below "
-                       f"{MIN_EDGE} px a one-degree difference is under a "
-                       f"pixel and cannot be measured")
+    if height < MIN_HEIGHT:
+        raise BadPhoto(f"this photograph is {width}x{height}; a body in "
+                       f"something less than {MIN_HEIGHT} px tall is too few "
+                       f"pixels to measure an angle from")
     return frame
 
 

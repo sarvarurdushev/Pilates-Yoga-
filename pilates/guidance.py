@@ -1104,6 +1104,39 @@ def band_capped(score: float | None, worst: str) -> bool:
     return band(score, worst) != band(score, WITHIN)
 
 
+def _findings_note(assessment: PhotoAssessment,
+                   found: list[Finding]) -> tuple[str, str]:
+    """Why the findings list is not the whole story, when it is not.
+
+    Two cases, and the second one was shipped wrong. A body whose photographs
+    are in doubt has not been found to be unremarkable, it has not been
+    measured -- that much was handled. But a set where *no* photograph could be
+    used has no doubts at all: the refusals are photograph problems, not
+    landmark problems, so the doubt list is empty, the findings list is empty,
+    and the screen said "every measurement sits inside its usual range" over
+    nothing whatsoever. That is the same lie as printing a score over an
+    unusable photograph, one sentence further down the page.
+
+    So the honest question is not "were there doubts" but "was anything
+    actually measured", asked first.
+    """
+    if not assessment.supplied:
+        return ("nothing was measured: none of the photographs could be used. "
+                "There is no finding here, and no absence of one either",
+                "측정된 항목이 없습니다. 사용할 수 있는 사진이 없어 판단을 내릴 수 "
+                "없으며, 이상이 없다는 뜻도 아닙니다")
+    if not any(r.measured for r in assessment.readings.values()):
+        return ("nothing could be measured from the photographs that were "
+                "supplied",
+                "제출된 사진에서 측정할 수 있는 항목이 없었습니다")
+    if assessment.doubts:
+        return ("these measurements are held back until the photographs above "
+                "are retaken: what they measured may not be this body",
+                "위 사진을 다시 촬영할 때까지 측정 결과를 판단하지 않습니다. "
+                "측정 대상이 이 회원이 아닐 수 있습니다")
+    return ("", "")
+
+
 def _withheld_ko(score) -> str:
     """Korean for the two shapes :class:`pilates.scoring.Score` withholds in.
 
@@ -1167,14 +1200,8 @@ def report(assessment: PhotoAssessment) -> dict:
         # unremarkable; it has not been measured. Saying "everything is inside
         # its usual range" over an unusable photograph is the same failure as
         # printing a score over one, one sentence further down the page.
-        "findings_note": (
-            "these measurements are held back until the photographs above are "
-            "retaken: what they measured may not be this body"
-            if assessment.doubts else ""),
-        "findings_note_ko": (
-            "위 사진을 다시 촬영할 때까지 측정 결과를 판단하지 않습니다. 측정 대상이 "
-            "이 회원이 아닐 수 있습니다"
-            if assessment.doubts else ""),
+        "findings_note": _findings_note(assessment, found)[0],
+        "findings_note_ko": _findings_note(assessment, found)[1],
         "priorities": [f.name for f in priorities(found)],
         "programme": programme(found),
         "habits": habits(found),

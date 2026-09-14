@@ -273,3 +273,67 @@ class TestComparingTwoVisits:
 def test_a_missing_photograph_says_what_it_would_have_measured(view):
     cost = ik._lost(view)
     assert cost and cost[0].islower()
+
+
+class TestNothingMeasuredIsNotAllClear:
+    """The failure the studio saw: four photographs refused, and a report that
+    said every measurement sat inside its usual range. Nothing had been
+    measured. That is the same lie as a score over an unusable photograph, one
+    sentence further down the page."""
+
+    def test_a_set_where_no_photograph_could_be_used_says_so(self):
+        from pilates import guidance as gd
+
+        dead = [ik.Photo(v, None, 0, 0, problem="too small")
+                for v in ik.PROTOCOL]
+        report = gd.report(ik.assess_photos(dead))
+        assert report["findings"] == []
+        assert "nothing was measured" in report["findings_note"]
+        assert report["findings_note_ko"]
+
+    def test_a_body_genuinely_inside_every_band_still_says_all_clear(self):
+        from pilates import guidance as gd
+
+        report = gd.report(ik.assess_photos(four()))
+        assert report["findings"] == []
+        assert report["findings_note"] == "", "nothing is being held back"
+
+
+class TestTheSizeOfTheBody:
+    """A fraction of the frame is not the same question as a number of pixels,
+    and the report needs both answered."""
+
+    def test_a_body_too_few_pixels_across_is_flagged_in_absolute_terms(self):
+        """A body filling a thumbnail passes every fractional test and is
+        still a thumbnail's worth of body."""
+        det = standing(cx=40)
+        tiny = al.Detection(det.keypoints * 0.18, det.scores)
+        out = ik.assess_photos([ik.Photo(View.FRONT, tiny, 30, 100)])
+        assert any("inside the landmark noise" in w for w in out.doubts)
+
+    def test_a_body_of_a_workable_size_is_not_flagged(self):
+        out = ik.assess_photos([photo(View.FRONT, standing(cx=540))])
+        assert not any("landmark noise" in w for w in out.doubts)
+
+
+class TestTheLimbCheckAndTheCameraAngle:
+    def test_two_legs_of_different_lengths_are_flagged_from_the_front(self):
+        det = standing(cx=540)
+        points = det.keypoints.copy()
+        points[al.kp.R_KNEE] = (points[al.kp.R_KNEE][0], 450)
+        out = ik.assess_photos([photo(View.FRONT,
+                                      al.Detection(points, det.scores))])
+        assert any("differ in length" in w for w in out.doubts)
+
+    def test_they_are_not_flagged_from_the_side(self):
+        """Side-on, one leg is behind the other by construction: the far one
+        is occluded and placed by a model that is guessing at it. Flagging
+        that would withhold the score on both side photographs of every set a
+        studio ever takes."""
+        det = side_on(facing_image_left=False, cx=540)
+        points = det.keypoints.copy()
+        points[al.kp.L_KNEE] = (points[al.kp.L_KNEE][0], 470)
+        out = ik.assess_photos([ik.Photo(View.SIDE_LEFT,
+                                         al.Detection(points, det.scores),
+                                         FRAME[0], FRAME[1])])
+        assert not any("differ in length" in w for w in out.doubts)

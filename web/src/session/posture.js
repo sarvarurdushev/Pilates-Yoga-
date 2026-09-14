@@ -211,9 +211,22 @@ const STYLE = `
   grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin:0 0 22px}
 #ss-pos figure{margin:0;border:1px solid var(--line);border-radius:7px;
   overflow:hidden;background:#05070d}
-#ss-pos .ss-frame{position:relative;line-height:0}
-#ss-pos .ss-frame img{width:100%;display:block}
-#ss-pos .ss-frame svg{position:absolute;inset:0;width:100%;height:100%}
+/* A fixed box, so four photographs of four different shapes make four cards
+ * of the same height. The photograph letterboxes inside it with object-fit
+ * contain, and the overlay letterboxes into the same box with xMidYMid meet
+ * -- the two are the same transform, so the skeleton stays on the body
+ * however odd the source aspect is. Stretching either one alone slides the
+ * overlay off the person, which is worse than an unaligned card. */
+/* Both children are taken out of flow, so the frame's own aspect-ratio is
+ * what decides its height. With the image left in flow the browser has a
+ * height from the content and ignores the ratio -- which is how four cards
+ * with an explicit 3/4 box came out 602, 582, 651 and 833 px tall. */
+#ss-pos .ss-frame{position:relative;line-height:0;background:#05070d}
+#ss-pos .ss-frame img,#ss-pos .ss-frame svg{position:absolute;inset:0;
+  width:100%;height:100%}
+#ss-pos .ss-frame img{object-fit:contain}
+#ss-pos figure{display:flex;flex-direction:column}
+#ss-pos .ss-shots figcaption{flex:none}
 #ss-pos figcaption{padding:8px 11px;font-size:12px;font-weight:600;
   background:rgba(255,255,255,.06);display:flex;gap:8px;align-items:center}
 #ss-pos figcaption small{margin-left:auto;font-weight:400;font-size:10px;
@@ -341,7 +354,11 @@ function overlay(land, marks) {
         text-anchor="middle" font-size="${r * 1.15}" font-weight="700"
         fill="#04121f">${mark.n}</text></g>`);
   }
-  return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none"
+  /* `meet`, not `none`: the photograph beside it is fitted with
+   * `object-fit: contain`, and these two are the same transform. Stretching
+   * the overlay to the box while the photograph letterboxes inside it puts
+   * the skeleton next to the body rather than on it. */
+  return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet"
     xmlns="http://www.w3.org/2000/svg">${out.join('')}</svg>`;
 }
 
@@ -727,16 +744,29 @@ function reportHtml(state, lang, identity) {
       <span>${esc(lang === 'ko' ? b.ko : b.en)}</span><em>${b.from}+</em></div>`;
   }).join('');
 
+  /* One box for all four cards, shaped by the narrowest photograph in the set.
+   *
+   * A fixed ratio wastes the thing the report is about: a standing shot
+   * cropped to the body is tall and thin -- 116x360 in the studio's first
+   * real set -- and putting that in a 3:4 box is two thirds black. Taking the
+   * narrowest aspect present means that photograph fills the box, the wider
+   * ones letterbox by a little, and every body is drawn as large as the set
+   * allows. Clamped so one freak crop cannot make four half-metre columns. */
+  const ratio = Math.max(0.28, Math.min(0.9, Math.min(
+    ...Object.values(report.landmarks ?? {})
+      .map((l) => (l.width || 3) / (l.height || 4)), 0.75)));
+  const frame = `style="aspect-ratio:${ratio.toFixed(4)}"`;
+
   const shots = (report.protocol ?? FALLBACK).map((slot) => {
     const shot = state.photos.get(slot.view);
     const land = report.landmarks?.[slot.view];
     const photo = report.assessment.photos?.[slot.view];
     if (!shot) {
-      return `<figure><div class="ss-frame" style="aspect-ratio:3/4;
-        display:flex;align-items:center;justify-content:center">
+      return `<figure><div class="ss-frame" ${frame}><div style="position:absolute;
+        inset:0;display:flex;align-items:center;justify-content:center">
         <span style="font-size:11px;color:var(--dim2);padding:18px;
           text-align:center;line-height:1.7">${esc(howOf(slot, lang))}</span>
-        </div><figcaption>${esc(titleOf(slot, lang))}
+        </div></div><figcaption>${esc(titleOf(slot, lang))}
         <small>${esc(say('notTaken', lang))}</small></figcaption></figure>`;
     }
     const marks = land ? marksFor(report, slot.view, lang) : [];
@@ -748,7 +778,7 @@ function reportHtml(state, lang, identity) {
       <span class="ss-val" style="color:${mark.ink}">${esc(mark.value)}</span>
     </button>`).join('');
     return `<figure>
-      <div class="ss-frame"><img src="${shot.objectUrl}" alt="">
+      <div class="ss-frame" ${frame}><img src="${shot.objectUrl}" alt="">
         ${land ? overlay(land, marks) : ''}</div>
       <figcaption>${esc(titleOf(slot, lang))}
         ${photo?.problem ? `<small>${esc(photo.problem)}</small>` : ''}</figcaption>
