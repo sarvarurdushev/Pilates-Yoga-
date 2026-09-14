@@ -1331,13 +1331,7 @@ def photo_intake(store, viewer: Viewer | None, payload: dict) -> dict:
         }
         for photo in measured if photo.usable
     }
-    out["protocol"] = [
-        {"view": view.value,
-         "title": ik.instructions(view)[0], "how": ik.instructions(view)[1],
-         "title_ko": ik.instructions(view, "ko")[0],
-         "how_ko": ik.instructions(view, "ko")[1]}
-        for view in ik.PROTOCOL
-    ]
+    out["protocol"] = _protocol()
 
     # Filed, so a second visit means something.
     #
@@ -1642,6 +1636,111 @@ def assessment_history(store, viewer: Viewer | None, username: str) -> dict:
     }
 
 
+def _rebuild_assessment(row: dict, *, with_landmarks: bool = False):
+    """Turn a filed row back into the assessment that produced it.
+
+    Rebuilt from the stored *readings* rather than from a stored verdict, so
+    everything downstream -- the findings, the priorities, the score -- is
+    derived by the same code that derived it the first time. A report that
+    replayed a saved verdict would drift from the live one the moment a band
+    or a threshold changed, and nobody would notice until two visits
+    disagreed about a body that had not moved.
+    """
+    from . import alignment as al
+    from . import intake as ik
+
+    out = ik.PhotoAssessment(
+        person_id=row["username"], taken_on=row["taken_on"],
+        warnings=list(row["warnings"]), doubts=list(row["doubts"]))
+    for name, stored in (row.get("readings") or {}).items():
+        metric = al.Metric(
+            name, stored.get("value"), stored.get("unit", "deg"),
+            al.Availability(stored.get("availability", "unavailable")),
+            stored.get("confidence", 0.0), stored.get("reason", ""),
+            normal=al.NORMAL_BANDS.get(name))
+        out.readings[name] = ik.Reading(
+            metric,
+            tuple(al.View(v) for v in stored.get("sources", ())),
+            stored.get("spread"), stored.get("per_view", {}))
+
+    landmarks = row.get("landmarks") or {}
+    for view in row["views"]:
+        detection = _blank_detection()
+        if with_landmarks and view in landmarks:
+            detection = _detection_from(landmarks[view]) or detection
+        stored = landmarks.get(view) or {}
+        out.photos[al.View(view)] = ik.Photo(
+            view=al.View(view), detection=detection,
+            width=int(stored.get("width") or 0),
+            height=int(stored.get("height") or 0))
+    return out
+
+
+def _detection_from(stored: dict):
+    """A Detection from the landmarks as they were filed, or None."""
+    import numpy as np
+
+    from .types import Detection
+
+    try:
+        return Detection(
+            keypoints=np.asarray(stored["keypoints"], dtype=np.float32),
+            scores=np.asarray(stored["scores"], dtype=np.float32))
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def assessment_detail(store, viewer: Viewer | None, assessment_id) -> dict:
+    """One filed assessment, reopened in full.
+
+    The reason the history strip is worth having. Without this an assessment
+    could be *listed* and never read again: a date and a score, with the
+    seventeen measurements behind them reachable only by the person who
+    happened to have the tab open on the day.
+
+    **The photographs are not here and never will be.** They were measured and
+    dropped, which is the promise this product makes. What comes back is the
+    landmarks, so the skeleton, the plumb line and every callout redraw
+    exactly as they were -- over an empty frame rather than over a body. The
+    payload says so in ``from_file`` and the screen prints it, because a
+    reader who expected their photograph back deserves a sentence rather than
+    four black rectangles.
+    """
+    from . import guidance as gd
+
+    try:
+        row = store.assessment(int(assessment_id))
+    except (TypeError, ValueError) as exc:
+        raise Refused("an assessment id is a number", 400) from exc
+    if row is None:
+        raise Refused(f"no assessment {assessment_id}", 404)
+    guard_subject(store, viewer, row["username"])
+
+    assessment = _rebuild_assessment(row, with_landmarks=True)
+    out = gd.report(assessment)
+    out["assessment_id"] = row["id"]
+    out["taken_on"] = row["taken_on"]
+    out["username"] = row["username"]
+    # Redrawn from what was filed, over no photograph.
+    out["from_file"] = True
+    out["landmarks"] = {
+        view: stored for view, stored in (row.get("landmarks") or {}).items()
+        if stored.get("keypoints")}
+    out["protocol"] = _protocol()
+    return out
+
+
+def _protocol() -> list[dict]:
+    """The four photographs, named and explained, in both languages."""
+    from . import intake as ik
+
+    return [{"view": view.value,
+             "title": ik.instructions(view)[0], "how": ik.instructions(view)[1],
+             "title_ko": ik.instructions(view, "ko")[0],
+             "how_ko": ik.instructions(view, "ko")[1]}
+            for view in ik.PROTOCOL]
+
+
 def assessment_change(store, viewer: Viewer | None, payload: dict) -> dict:
     """Two filed assessments, compared.
 
@@ -1650,7 +1749,6 @@ def assessment_change(store, viewer: Viewer | None, payload: dict) -> dict:
     only when both visits measured it, and a percentage is withheld when the
     earlier value was near zero.
     """
-    from . import alignment as al
     from . import guidance as gd
     from . import intake as ik
 
@@ -1672,28 +1770,10 @@ def assessment_change(store, viewer: Viewer | None, payload: dict) -> dict:
         # worst thing this endpoint could produce, and it would look right.
         raise Refused("those two assessments are of different people", 400)
 
-    def rebuild(row: dict) -> ik.PhotoAssessment:
-        out = ik.PhotoAssessment(
-            person_id=row["username"], taken_on=row["taken_on"],
-            warnings=list(row["warnings"]), doubts=list(row["doubts"]))
-        for name, stored in row["readings"].items():
-            metric = al.Metric(
-                name, stored.get("value"), stored.get("unit", "deg"),
-                al.Availability(stored.get("availability", "unavailable")),
-                stored.get("confidence", 0.0), stored.get("reason", ""),
-                normal=al.NORMAL_BANDS.get(name))
-            out.readings[name] = ik.Reading(
-                metric,
-                tuple(al.View(v) for v in stored.get("sources", ())),
-                stored.get("spread"), stored.get("per_view", {}))
-        for view in row["views"]:
-            out.photos[al.View(view)] = ik.Photo(
-                view=al.View(view),
-                detection=_blank_detection(),
-                width=0, height=0)
-        return out
-
-    before, after = rebuild(rows[0]), rebuild(rows[1])
+    # The landmarks are not loaded: a comparison is arithmetic over readings,
+    # and a second copy of somebody's skeleton has no part in it.
+    before = _rebuild_assessment(rows[0])
+    after = _rebuild_assessment(rows[1])
     comparison = ik.compare(before, after)
     out = comparison.to_dict()
     out["before_id"], out["after_id"] = rows[0]["id"], rows[1]["id"]

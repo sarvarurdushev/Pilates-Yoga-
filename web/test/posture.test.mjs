@@ -542,3 +542,112 @@ test('the words on the button come from the measurement layer', () => {
   assert.match(py, /"action": "relabel"/);
   assert.match(py, /label_ko/);
 });
+
+/* ---------------------------------------------------------------------------
+ * Opening an assessment that is already on file.
+ *
+ * The strip listed them and nothing more: a date, a score, and seventeen
+ * measurements behind them that nobody could ever read again once the tab was
+ * closed. These pin that a row is a control, that it says so, and that the
+ * report it opens admits the photographs are gone rather than drawing four
+ * black rectangles.
+ * ------------------------------------------------------------------------- */
+
+const { historyHtml: hist } = _internals;
+
+const FILED = {
+  assessments: [
+    { id: 7, taken_on: '2026-09-14', made_at: '2026-09-14T09:00:00',
+      score: 100, band: 'Excellent', views: ['front', 'side_left',
+                                             'side_right', 'rear'] },
+    { id: 3, taken_on: '2026-08-01', made_at: '2026-08-01T09:00:00',
+      score: null, band: '', views: ['front', 'side_left', 'side_right', 'rear'] },
+  ],
+  trend: [{ id: 7, on: '2026-09-14', score: 100, band: 'Excellent' }],
+};
+
+test('every filed assessment is something you can press', () => {
+  const html = hist({ history: FILED }, 'en');
+  assert.match(html, /data-open="7"/);
+  assert.match(html, /data-open="3"/);
+  assert.match(html, /<button/);
+});
+
+test('a row says it opens, rather than looking like a line of text', () => {
+  const html = hist({ history: FILED }, 'en');
+  assert.match(html, /Open/);
+});
+
+test('the one being read is marked as the one being read', () => {
+  const html = hist({ history: FILED, report: { assessment_id: 7 } }, 'en');
+  assert.match(html, /data-open="7"[^>]*aria-current="true"/);
+  assert.match(html, /Showing/);
+});
+
+test('a withheld score is named on the strip, never drawn as zero', () => {
+  const html = hist({ history: FILED }, 'en');
+  assert.match(html, /No score/);
+  assert.ok(!/>0 ·/.test(html));
+});
+
+test('the rows are dead while something else is loading', () => {
+  /* Two assessments opening at once would race, and the one that answered
+   * second would win whichever the reader asked for first. */
+  const html = hist({ history: FILED, busy: true }, 'en');
+  assert.match(html, /disabled/);
+});
+
+test('the strip reads in Korean', () => {
+  const html = hist({ history: FILED }, 'ko');
+  assert.match(html, /열기/);
+  assert.match(html, /기록된 분석/);
+});
+
+/** The whole payload a report page needs, not just the slice a panel does. */
+function whole(over = {}) {
+  return {
+    ...report(),
+    assessment_id: 7,
+    score: { value: 88, band: 'Good', band_ko: '우수', worst_finding: 'watch',
+             band_capped: false, band_cap_reason: '', band_cap_reason_ko: '',
+             withheld_reason: '', withheld_reason_ko: '',
+             note: 'measured 14 things', note_ko: '14개 항목 측정',
+             coverage: 0.82, checks: 14,
+             bands: [[90, 'Excellent', '매우 우수'], [80, 'Good', '우수'],
+                     [60, 'Fair', '보통'], [40, 'Needs attention', '주의'],
+                     [0, 'Needs work', '관리 필요']]
+               .map(([f, e, k]) => ({ from: f, en: e, ko: k })) },
+    findings_note: '', findings_note_ko: '',
+    priorities: [], programme: [], habits: [], regions: [],
+    refused_detail: [], unremarkable_detail: [], missing_photos: [],
+    warnings: [], doubts: [], protocol: [],
+    disclaimer: 'not a medical assessment', disclaimer_ko: '의학적 진단이 아니며',
+    ...over,
+  };
+}
+
+test('a reopened report says the photographs are not coming back', () => {
+  /* They were measured and dropped. A reader who expected their photograph
+   * deserves a sentence rather than four black rectangles. */
+  const html = _internals.reportHtml(
+    { report: whole({ from_file: true }), photos: new Map(),
+      taken: '2026-09-14', who: '' }, 'en', () => ({}));
+  assert.match(html, /Reopened from the record/);
+  assert.match(html, /measured and dropped/);
+});
+
+test('a fresh report says nothing of the kind', () => {
+  const html = _internals.reportHtml(
+    { report: whole(), photos: new Map(), taken: '2026-09-14', who: '' },
+    'en', () => ({}));
+  assert.ok(!/Reopened from the record/.test(html));
+});
+
+test('a report offers the way back to every other assessment on file', () => {
+  /* Reading one and then wanting the one before it is the whole of what a
+   * studio does with these, and it used to mean starting again. */
+  const html = _internals.reportHtml(
+    { report: whole(), photos: new Map(), taken: '2026-09-14', who: '',
+      history: FILED }, 'en', () => ({}));
+  assert.match(html, /data-open="3"/);
+});

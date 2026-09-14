@@ -548,6 +548,18 @@ class Handler(SimpleHTTPRequestHandler):
 
             self._answer(history)
             return
+        if route.path == "/assessment" and self.db:
+            # One filed assessment, reopened in full. Without this the history
+            # strip could only ever *list* what had been measured: a date and
+            # a score, with the seventeen numbers behind them reachable by
+            # nobody once the tab was closed.
+            asked = parse_qs(route.query).get("id", [""])[0]
+
+            def one(store, asked=asked):
+                return api.assessment_detail(store, self._viewer(store), asked)
+
+            self._answer(one)
+            return
         if route.path == "/screens":
             # The screening catalogue, so a page can offer the choice and the
             # instruction without holding its own copy of either. Held in

@@ -517,3 +517,112 @@ class TestComparingTwoVisits:
                                   {"before": mine,
                                    "after": theirs["assessment_id"]})
         assert status == 400 and "different people" in out["error"]
+
+
+class TestReopeningAFiledAssessment:
+    """The reason filing them is worth anything.
+
+    Without this an assessment could be listed and never read again: a date
+    and a score on a strip, with the seventeen measurements behind them
+    reachable only by whoever had the tab open on the day.
+    """
+
+    def _filed(self, client, names, stubbed):
+        stubbed(script_for(*ALL_FOUR))
+        status, out = client.post("/intake", {
+            "photos": shots(*ALL_FOUR), "username": names["ann"],
+            "taken_on": "2026-09-14"})
+        assert status == 200 and out["assessment_id"]
+        return out
+
+    def test_a_filed_assessment_opens_again_in_full(self, coach, stubbed):
+        client, names, _ = coach
+        assert client.post("/roster/add", {"student": names["ann"]})[0] == 200
+        first = self._filed(client, names, stubbed)
+
+        status, again = client.get(f"/assessment?id={first['assessment_id']}")
+        assert status == 200
+        assert again["assessment"]["readings"]
+        assert set(again["assessment"]["readings"]) == set(
+            first["assessment"]["readings"])
+
+    def test_it_carries_the_findings_and_the_plan_not_only_the_numbers(
+            self, coach, stubbed):
+        client, names, _ = coach
+        assert client.post("/roster/add", {"student": names["ann"]})[0] == 200
+        first = self._filed(client, names, stubbed)
+        _, again = client.get(f"/assessment?id={first['assessment_id']}")
+        assert again["findings"]
+        assert again["priorities"]
+        assert again["disclaimer"]
+
+    def test_the_score_is_recomputed_rather_than_replayed(self, coach, stubbed):
+        """A saved verdict would drift from the live one the moment a band
+        moved, and two visits would disagree about a body that had not."""
+        client, names, _ = coach
+        assert client.post("/roster/add", {"student": names["ann"]})[0] == 200
+        first = self._filed(client, names, stubbed)
+        _, again = client.get(f"/assessment?id={first['assessment_id']}")
+        assert again["score"]["value"] == first["score"]["value"]
+        assert again["score"]["band"] == first["score"]["band"]
+
+    def test_the_landmarks_come_back_so_the_outlines_redraw(self, coach, stubbed):
+        client, names, _ = coach
+        assert client.post("/roster/add", {"student": names["ann"]})[0] == 200
+        first = self._filed(client, names, stubbed)
+        _, again = client.get(f"/assessment?id={first['assessment_id']}")
+        assert set(again["landmarks"]) == set(first["landmarks"])
+        for view, stored in again["landmarks"].items():
+            assert len(stored["keypoints"]) == 17
+
+    def test_the_photographs_do_not_come_back_and_it_says_so(self, coach,
+                                                             stubbed):
+        """They were measured and dropped. A reader who expected their
+        photograph deserves a sentence, not four black rectangles."""
+        client, names, _ = coach
+        assert client.post("/roster/add", {"student": names["ann"]})[0] == 200
+        first = self._filed(client, names, stubbed)
+        _, again = client.get(f"/assessment?id={first['assessment_id']}")
+        assert again["from_file"] is True
+        assert "image" not in repr(again)
+        assert "base64" not in repr(again)
+
+    def test_the_day_it_was_taken_comes_back_not_the_day_it_is_read(
+            self, coach, stubbed):
+        client, names, _ = coach
+        assert client.post("/roster/add", {"student": names["ann"]})[0] == 200
+        first = self._filed(client, names, stubbed)
+        _, again = client.get(f"/assessment?id={first['assessment_id']}")
+        assert again["taken_on"] == "2026-09-14"
+
+    def test_an_assessment_that_is_not_there(self, coach):
+        client, _, _ = coach
+        assert client.get("/assessment?id=99999")[0] == 404
+
+    def test_an_id_that_is_not_a_number(self, coach):
+        client, _, _ = coach
+        assert client.get("/assessment?id=banana")[0] == 400
+
+    def test_somebody_else_s_assessment_is_refused(self, studio, stubbed):  # noqa: F811
+        """Being at the same studio is not permission to read a body."""
+        base, names, _ = studio
+        coach_client = Client(base)
+        coach_client.sign_in("coach@b.co")
+        assert coach_client.post("/roster/add", {"student": names["ann"]})[0] == 200
+        stubbed(script_for(View.FRONT))
+        _, filed = coach_client.post("/intake", {
+            "photos": shots(View.FRONT), "username": names["ann"]})
+
+        student = Client(base)
+        student.sign_in("ben@b.co")
+        assert student.get(f"/assessment?id={filed['assessment_id']}")[0] == 403
+
+    def test_a_stranger_is_refused(self, studio, stubbed):  # noqa: F811
+        base, names, _ = studio
+        coach_client = Client(base)
+        coach_client.sign_in("coach@b.co")
+        assert coach_client.post("/roster/add", {"student": names["ann"]})[0] == 200
+        stubbed(script_for(View.FRONT))
+        _, filed = coach_client.post("/intake", {
+            "photos": shots(View.FRONT), "username": names["ann"]})
+        assert Client(base).get(f"/assessment?id={filed['assessment_id']}")[0] == 401

@@ -86,6 +86,11 @@ const T = {
   disputed:   { en: 'the two photographs disagreed', ko: '두 사진이 어긋났습니다' },
   onFile:     { en: 'Already on file', ko: '기록된 분석' },
   trend:      { en: 'Score over time', ko: '점수 변화' },
+  openIt:     { en: 'Open', ko: '열기' },
+  showing:    { en: 'Showing', ko: '보는 중' },
+  opening:    { en: 'Opening…', ko: '여는 중…' },
+  fromFile:   { en: 'Reopened from the record. The measurements, the findings and the plan are all here. The photographs are not: they were measured and dropped, so the outlines below are drawn over an empty frame.',
+                ko: '기록에서 다시 불러온 분석입니다. 측정값과 결과, 권장 사항은 모두 그대로입니다. 사진은 저장하지 않으므로 아래 외곽선은 빈 화면 위에 그려집니다.' },
   changed:    { en: 'What has changed since', ko: '지난 분석 이후 변화' },
   since:      { en: 'since', ko: '이후' },
   toward:     { en: 'closer to level', ko: '수평에 가까워짐' },
@@ -309,12 +314,26 @@ const STYLE = `
   align-items:center;margin:0 0 22px}
 @media(max-width:720px){#ss-pos .ss-hist{grid-template-columns:1fr}}
 #ss-pos .ss-past{display:grid;gap:1px}
-#ss-pos .ss-past div{display:flex;gap:10px;align-items:baseline;
-  padding:5px 0;font-size:11.5px;color:var(--dim);
-  border-top:1px solid var(--line)}
-#ss-pos .ss-past div:first-child{border-top:0}
+/* A row is a button, because an assessment you cannot open is a date and a
+   number with seventeen measurements behind it that nobody can ever read
+   again. It looked like a list for one release and that was the bug. */
+#ss-pos .ss-past button{display:flex;gap:10px;align-items:baseline;width:100%;
+  text-align:left;padding:8px 10px;font:inherit;font-size:11.5px;
+  color:var(--dim);cursor:pointer;background:transparent;border:0;
+  border-top:1px solid var(--line);border-radius:4px}
+#ss-pos .ss-past button:first-child{border-top:0}
+#ss-pos .ss-past button:hover{background:rgba(90,169,230,.1);color:var(--txt)}
+#ss-pos .ss-past button[aria-current=true]{background:rgba(90,169,230,.16);
+  color:var(--txt)}
+#ss-pos .ss-past button:disabled{opacity:.55;cursor:default;background:none}
 #ss-pos .ss-past b{font-weight:600;color:var(--txt);font-variant-numeric:tabular-nums}
 #ss-pos .ss-past em{margin-left:auto;font-style:normal;font-size:10.5px}
+#ss-pos .ss-past i{font-style:normal;font-size:10.5px;color:var(--acc)}
+/* Reopened from the record: the photographs are gone by design, and a line
+   saying so beats four black rectangles. */
+#ss-pos .ss-fromfile{margin:0 0 18px;padding:12px 16px;border-radius:8px;
+  border:1px solid var(--line2);background:rgba(255,255,255,.02);
+  font-size:11.5px;color:var(--dim);line-height:1.75}
 #ss-pos .ss-spark{width:100%;height:88px;display:block}
 #ss-pos .ss-chg{display:grid;gap:1px;margin:10px 0 0}
 #ss-pos .ss-chg div{display:flex;gap:10px;align-items:baseline;padding:7px 0;
@@ -494,12 +513,17 @@ function historyHtml(state, lang) {
   const rows = state.history?.assessments ?? [];
   if (!rows.length) return '';
   const trend = state.history?.trend ?? [];
-  const listed = rows.slice(0, 5).map((row) => `<div>
+  const showing = state.report?.assessment_id ?? null;
+  const listed = rows.slice(0, 8).map((row) => `<button type="button"
+    data-open="${row.id}" ${row.id === showing ? 'aria-current="true"' : ''}
+    ${state.busy ? 'disabled' : ''}>
     <b>${esc(row.taken_on || row.made_at.slice(0, 10))}</b>
     <span style="color:${row.score == null ? 'var(--dim2)' : bandInk(row.band)}">
       ${row.score == null ? esc(say('noScore', lang))
         : `${Math.round(row.score)} · ${esc(lang === 'ko' ? bandKo(row.band) : row.band)}`}</span>
-    <em>${row.views.length}/4</em></div>`).join('');
+    <em>${row.views.length}/4</em>
+    <i>${esc(row.id === showing ? say('showing', lang) : say('openIt', lang))}</i>
+  </button>`).join('');
   return `<div class="ss-card ss-hist">
     <div><h2>${esc(say('onFile', lang))}</h2>
       <div class="ss-past">${listed}</div></div>
@@ -748,6 +772,52 @@ async function loadHistory(state, draw) {
     state.history = body;
     draw();
   } catch { /* no server behind this copy; the screen says so already */ }
+}
+
+/**
+ * Reopen one filed assessment.
+ *
+ * The whole point of filing them. The report is rebuilt on the server from
+ * the readings that were stored, not from a saved verdict, so an assessment
+ * opened today is scored by today's rules rather than by a frozen answer that
+ * would quietly disagree with the live one after any threshold moved.
+ *
+ * The photographs do not come back -- they were measured and dropped -- so the
+ * screen draws the outlines over an empty frame and says why. Any photographs
+ * the reader had loaded are released first: they belong to a different
+ * assessment, and drawing this one's landmarks over them would put one body's
+ * skeleton on another body's picture.
+ */
+async function openFiled(state, draw, id) {
+  if (state.busy) return;
+  state.busy = true;
+  state.error = '';
+  draw();
+  try {
+    const response = await fetch(`/assessment?id=${encodeURIComponent(id)}`);
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      state.error = body.error || `${response.status} ${response.statusText}`;
+    } else {
+      for (const shot of state.photos.values()) URL.revokeObjectURL(shot.objectUrl);
+      state.photos.clear();
+      state.report = body;
+      state.protocol = body.protocol ?? state.protocol;
+      state.taken = body.taken_on || state.taken;
+      state.change = null;
+      /* Against the one before it on file, so a reopened assessment answers
+       * "what changed" as readily as a fresh one does. */
+      const rows = state.history?.assessments ?? [];
+      const here = rows.findIndex((row) => row.id === body.assessment_id);
+      const previous = here >= 0 ? rows[here + 1] : null;
+      if (previous?.id) await compareWith(state, previous.id, body.assessment_id);
+    }
+  } catch (error) {
+    state.error = String(error?.message ?? error);
+  } finally {
+    state.busy = false;
+    draw();
+  }
 }
 
 /* ------------------------------------------------------------------- intake */
@@ -1003,6 +1073,8 @@ function reportHtml(state, lang, identity) {
       </div>
     </header>
     ${fixHtml(state, lang)}
+    ${report.from_file ? `<p class="ss-fromfile">${
+      esc(say('fromFile', lang))}</p>` : ''}
     <div class="ss-shots">${shots}</div>
     <div class="ss-grid">
       <div>
@@ -1032,6 +1104,7 @@ function reportHtml(state, lang, identity) {
           <h2>${esc(say('habits', lang))}</h2>
           <ul class="ss-habits">${habits}</ul></div>` : ''}
         ${changeHtml(state, lang)}
+        ${historyHtml(state, lang)}
       </div>
     </div>
     <div class="ss-limits">
@@ -1176,6 +1249,14 @@ function wire(host, state, nw, served, identity, draw, shut) {
   host.querySelector('[data-run]')?.addEventListener('click',
     () => run(state, draw, identity));
 
+  for (const row of host.querySelectorAll('[data-open]')) {
+    row.addEventListener('click', () => {
+      const id = Number(row.dataset.open);
+      if (!id || id === state.report?.assessment_id) return;
+      openFiled(state, draw, id);
+    });
+  }
+
   host.querySelector('[data-fix]')?.addEventListener('click', () => {
     /* Straight back through the same measurement, rather than trying to
      * mirror the report in place. Every left/right correction in it was
@@ -1316,5 +1397,5 @@ async function compareWith(state, before, after) {
 export const _internals = { overlay, marksFor, anchorOf, dial, spark,
                             historyHtml, changeHtml, patternHtml,
                             regionsHtml, evennessHtml, planHeadHtml,
-                            formatValue, peek, fixHtml, applyFix,
+                            formatValue, peek, fixHtml, applyFix, reportHtml,
                             INK, ANCHOR, CHIP: T };
