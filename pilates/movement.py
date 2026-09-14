@@ -20,8 +20,40 @@ import statistics
 from dataclasses import dataclass, field
 
 from . import keypoints as kp
-from .geometry import STANDARD_ANGLES, standard_angles, trunk_angle, whole_body
+from .geometry import (STANDARD_ANGLES, body_height_px, standard_angles,
+                       trunk_angle, whole_body)
 from .types import Detection
+
+
+def _centre(det: Detection, threshold: float) -> tuple[float, float] | None:
+    """Midpoint of the hips, or None when they were not both found.
+
+    The hips rather than the bounding box or the shoulders: it is the part of
+    a standing body that moves least for reasons other than the body moving,
+    so a drift in it is a drift of the person.
+    """
+    if det.scores[kp.L_HIP] < threshold or det.scores[kp.R_HIP] < threshold:
+        return None
+    mid = (det.keypoints[kp.L_HIP] + det.keypoints[kp.R_HIP]) / 2.0
+    return (float(mid[0]), float(mid[1]))
+
+
+def _ankle_offset(det: Detection, threshold: float) -> float | None:
+    """Vertical gap between the ankles as a share of body height.
+
+    Positive when the left foot is the raised one. Normalised by the body so
+    the same lift reads the same whether the camera was near or far, and
+    signed so the standing leg is recoverable rather than merely the fact that
+    one of them was up.
+    """
+    if det.scores[kp.L_ANKLE] < threshold or det.scores[kp.R_ANKLE] < threshold:
+        return None
+    span = body_height_px(det, threshold)
+    if not span:
+        return None
+    # Image y grows downward, so the higher foot has the smaller y: the right
+    # ankle minus the left is positive exactly when the left one is up.
+    return float(det.keypoints[kp.R_ANKLE][1] - det.keypoints[kp.L_ANKLE][1]) / span
 
 
 #: Which keypoints each candidate signal is computed from.
@@ -45,6 +77,26 @@ class Sample:
     #: Mean keypoint confidence of the joints each angle was computed from.
     #: An angle is only as trustworthy as the joints behind it.
     angle_confidence: dict[str, float] = field(default_factory=dict)
+    #: Where the body was, in pixels: the midpoint of the hips.
+    #:
+    #: Angles cannot answer every question. "Did the body stay still?" is one
+    #: of them -- a student wobbling on one leg drifts sideways without any
+    #: joint angle changing much, and the whole of a balance screen is that
+    #: drift. Recorded here rather than derived later because the video is not
+    #: kept: a position not taken at capture is gone with the frame.
+    centre: tuple[float, float] | None = None
+    #: Shoulder-to-ankle span in pixels, so a drift can be expressed as a share
+    #: of the body rather than in pixels, which depend on where the camera was.
+    scale: float | None = None
+    #: How far apart the two ankles are vertically, as a share of body height,
+    #: and which one is up: positive means the left foot is the raised one.
+    #:
+    #: One number for a question no joint angle answers -- *is this body on one
+    #: leg or two* -- which is the whole of a balance screen and half of the
+    #: single-leg work in a mat class. Standing square, the two ankles sit
+    #: within a percent or two of each other; a foot lifted even to mid-calf is
+    #: a tenth of a body height clear.
+    ankle_offset: float | None = None
 
 
 @dataclass
@@ -67,8 +119,30 @@ class TrackHistory:
                     signal: float(sum(detection.scores[j] for j in joints) / len(joints))
                     for signal, joints in SIGNAL_JOINTS.items()
                 },
+                centre=_centre(detection, threshold),
+                scale=body_height_px(detection, threshold),
+                ankle_offset=_ankle_offset(detection, threshold),
             )
         )
+
+    def path(self) -> tuple[list[float], list[tuple[float, float]], list[float]]:
+        """Timestamps, hip positions and body scales, skipping lost frames.
+
+        The positional counterpart to :meth:`series`. Frames where the hips or
+        the body scale were not found are dropped rather than interpolated: a
+        gap in a path is a gap, and filling it invents a movement that was
+        never seen.
+        """
+        times: list[float] = []
+        centres: list[tuple[float, float]] = []
+        scales: list[float] = []
+        for sample in self.samples:
+            if sample.centre is None or not sample.scale:
+                continue
+            times.append(sample.timestamp)
+            centres.append(sample.centre)
+            scales.append(sample.scale)
+        return times, centres, scales
 
     def confidence(self, signal: str) -> float:
         """Mean confidence of the joints behind one signal, across the clip."""

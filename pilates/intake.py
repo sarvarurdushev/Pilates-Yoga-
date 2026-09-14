@@ -333,6 +333,11 @@ class PhotoAssessment:
     #: the worst thing this system can put on a screen -- the number is what
     #: gets read and the warning is what gets skipped.
     doubts: list[str] = field(default_factory=list)
+    #: Photographs whose landmarks do not look like the view they were
+    #: labelled with. Held as data alongside the sentence in ``doubts``,
+    #: because this is the one warning here that comes with an action -- see
+    #: :attr:`swap`.
+    mismatches: list[Mismatch] = field(default_factory=list)
     person_id: str = ""
     #: The day the photographs were taken, ISO-8601, supplied by the caller.
     #: Not defaulted to today: a set photographed last week and uploaded now
@@ -374,6 +379,92 @@ class PhotoAssessment:
     @property
     def reliable(self) -> bool:
         return not self.doubts and bool(self.supplied)
+
+    # ------------------------------------------------------------- the fix
+
+    @property
+    def swapped_pair(self) -> tuple[View, View] | None:
+        """Two photographs that each look like the other, in protocol order.
+
+        Mutual disagreement is what makes this safe to offer. One photograph
+        flagged on its own is ambiguous -- it might be the labelling that is
+        wrong, or the student who turned too far -- and exchanging it with a
+        neighbour that nothing is wrong with would take a correct photograph
+        and put it in the wrong slot. Two photographs that each look like the
+        other is a different claim: there is one arrangement of these two files
+        that both estimates agree with, and it is not the one that was
+        uploaded.
+        """
+        for first in self.mismatches:
+            if not first.fixable_by_swapping:
+                continue
+            for second in self.mismatches:
+                if second is first or not second.fixable_by_swapping:
+                    continue
+                if (first.looks_like is second.view
+                        and second.looks_like is first.view):
+                    pair = sorted((first.view, second.view), key=PROTOCOL.index)
+                    return (pair[0], pair[1])
+        return None
+
+    @property
+    def mislabelled(self) -> tuple[View, View] | None:
+        """One photograph that looks like a view nothing was supplied for.
+
+        The single-photograph case the swap deliberately will not touch. If
+        the only side photograph in the set is labelled left and looks like a
+        right, there is nothing to exchange it with, and the correction is to
+        change what it is called -- which also fills the gap that was being
+        reported as a missing photograph.
+        """
+        loose = [m for m in self.mismatches if m.fixable_by_swapping
+                 and m.looks_like not in self.photos]
+        if len(loose) != 1:
+            return None
+        return (loose[0].view, loose[0].looks_like)
+
+    def fix(self) -> dict | None:
+        """The correction the mismatches point at, ready to put on a button.
+
+        One shape for both cases so a screen has a single thing to look for,
+        and None when the disagreement is real but the remedy is a camera
+        rather than a click.
+        """
+        pair = self.swapped_pair
+        if pair is not None:
+            one, two = (instructions(v)[0].lower() for v in pair)
+            one_ko, two_ko = (instructions(v, "ko")[0] for v in pair)
+            return {
+                "action": "swap",
+                "views": [v.value for v in pair],
+                "label": f"Exchange the {one} and {two} photographs",
+                "label_ko": f"{one_ko}과 {two_ko} 사진 바꾸기",
+                "why": (f"the {one} photograph looks like the {two} and the "
+                        f"{two} looks like the {one}, which is what a set "
+                        f"uploaded the wrong way round looks like"),
+                "why_ko": (f"{one_ko} 사진은 {two_ko}처럼, {two_ko} 사진은 "
+                           f"{one_ko}처럼 보입니다. 두 장이 서로 바뀌어 "
+                           f"업로드된 경우에 나타나는 모습입니다"),
+            }
+        single = self.mislabelled
+        if single is not None:
+            was, is_really = single
+            return {
+                "action": "relabel",
+                "views": [was.value, is_really.value],
+                "label": (f"Call the {instructions(was)[0].lower()} photograph "
+                          f"the {instructions(is_really)[0].lower()}"),
+                "label_ko": (f"{instructions(was, 'ko')[0]} 사진을 "
+                             f"{instructions(is_really, 'ko')[0]}으로 변경"),
+                "why": (f"it looks like a "
+                        f"{instructions(is_really)[0].lower()} view, and no "
+                        f"{instructions(is_really)[0].lower()} photograph was "
+                        f"supplied"),
+                "why_ko": (f"{instructions(is_really, 'ko')[0]}처럼 보이고, "
+                           f"{instructions(is_really, 'ko')[0]} 사진은 "
+                           f"제출되지 않았습니다"),
+            }
+        return None
 
     # ---------------------------------------------------------------- score
 
@@ -456,6 +547,9 @@ class PhotoAssessment:
             "refused": {r.name: r.metric.reason for r in self.refusals()},
             "warnings": list(self.warnings),
             "doubts": list(self.doubts),
+            "mismatches": [m.to_dict() for m in self.mismatches],
+            # The one warning in this payload with a button attached.
+            "fix": self.fix(),
             "reliable": self.reliable,
             "photos": {v.value: {"title": p.title, "width": p.width,
                                  "height": p.height, "label": p.label,
@@ -468,7 +562,66 @@ class PhotoAssessment:
         }
 
 
-def _view_mismatch(photo: Photo) -> str:
+#: How sure the view estimator has to be before it is allowed to contradict
+#: the label the studio typed. Below this it is guessing, and a guess that
+#: argues with a person who was in the room is noise.
+MIN_MISMATCH_CONFIDENCE = 0.6
+
+
+@dataclass(frozen=True)
+class Mismatch:
+    """The estimator disagreeing with the label a photograph was given.
+
+    Kept as data rather than as a sentence because it is the one warning in
+    this system with a *fix* attached. "The left side photograph looks like a
+    right side view" is not something to read and sigh at: if the other side
+    photograph looks like this one, the two are simply the wrong way round, and
+    the whole report can be made correct by exchanging them. A sentence cannot
+    carry that offer; a screen would have to match text against a phrase to
+    find it, and the phrase would change.
+    """
+
+    #: What the photograph was labelled.
+    view: View
+    #: What the landmarks in it look like.
+    looks_like: View
+    #: The estimator's own confidence, so a reader can weigh the disagreement.
+    confidence: float
+    #: ``mirrored`` -- the guess is the label's opposite within the same plane
+    #: (left for right, front for back), which is what an out-of-order upload
+    #: looks like and is fixable by exchanging photographs. ``off_square`` --
+    #: the guess crosses planes, which is a student who did not turn far
+    #: enough and is only fixable by taking the photograph again.
+    kind: str
+
+    @property
+    def fixable_by_swapping(self) -> bool:
+        return self.kind == "mirrored"
+
+    def text(self, lang: str = "en") -> str:
+        mine = instructions(self.view, lang)[0]
+        theirs = instructions(self.looks_like, lang)[0]
+        if lang == "ko":
+            if self.kind == "off_square":
+                return (f"{mine} 사진이 {theirs}처럼 보입니다. 카메라를 정면으로 "
+                        f"보고 다시 촬영하세요")
+            return (f"{mine} 사진이 {theirs}처럼 보입니다. 순서가 바뀌어 "
+                    f"업로드되었다면 아래의 좌우가 모두 반대입니다")
+        if self.kind == "off_square":
+            return (f"the {mine.lower()} photograph looks like a "
+                    f"{theirs.lower()} view -- ask for it again with the "
+                    f"student square to the camera")
+        return (f"the {mine.lower()} photograph looks like a "
+                f"{theirs.lower()} view; if the set was uploaded out of order "
+                f"every left and right below is reversed")
+
+    def to_dict(self) -> dict:
+        return {"view": self.view.value, "looks_like": self.looks_like.value,
+                "kind": self.kind, "confidence": round(self.confidence, 3),
+                "text": self.text(), "text_ko": self.text("ko")}
+
+
+def _view_mismatch(photo: Photo) -> Mismatch | None:
     """Whether the photograph shows what the studio said it shows.
 
     The caller names each photograph, and that name is trusted for the
@@ -479,22 +632,20 @@ def _view_mismatch(photo: Photo) -> str:
     disagree: it is not allowed to override the label, only to say the label
     looks wrong.
     """
+    if photo.detection is None:
+        return None
     guess = al.estimate_view(photo.detection)
-    if guess.view is View.UNKNOWN or guess.confidence < 0.6:
-        return ""
+    if guess.view is View.UNKNOWN or guess.confidence < MIN_MISMATCH_CONFIDENCE:
+        return None
     if guess.view is photo.view:
-        return ""
+        return None
     # Front against back is the mistake that mirrors a report; left against
     # right is the same mistake in the sagittal pair. Confusing a side for a
     # front is a student who did not turn far enough, which is a different
     # problem and gets its own words.
-    if guess.view.is_frontal is not photo.view.is_frontal:
-        return (f"the {photo.title.lower()} photograph looks like a "
-                f"{guess.view.value.replace('_', ' ')} view -- ask for it again "
-                f"with the student square to the camera")
-    return (f"the {photo.title.lower()} photograph looks like a "
-            f"{guess.view.value.replace('_', ' ')} view; if the set was "
-            f"uploaded out of order every left and right below is reversed")
+    kind = ("off_square" if guess.view.is_frontal is not photo.view.is_frontal
+            else "mirrored")
+    return Mismatch(photo.view, guess.view, guess.confidence, kind)
 
 
 def assess_photos(photos: list[Photo], *, person_id: str = "",
@@ -533,9 +684,10 @@ def assess_photos(photos: list[Photo], *, person_id: str = "",
             out.warnings.append(f"{photo.title}: {warning}")
             out.doubts.append(f"{photo.title}: {warning}")
         mismatch = _view_mismatch(photo)
-        if mismatch:
-            out.warnings.append(mismatch)
-            out.doubts.append(mismatch)
+        if mismatch is not None:
+            out.mismatches.append(mismatch)
+            out.warnings.append(mismatch.text())
+            out.doubts.append(mismatch.text())
 
     for view in PROTOCOL:
         if view not in out.photos:

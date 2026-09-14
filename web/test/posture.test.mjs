@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import { _internals } from '../src/session/posture.js';
 import { EXERCISE } from '../src/content/exercises.js';
 
-const { overlay, marksFor, anchorOf, formatValue, peek, INK, ANCHOR } = _internals;
+const { overlay, marksFor, anchorOf, formatValue, peek, fixHtml, applyFix,
+        INK, ANCHOR } = _internals;
 
 /* The screen draws over a photograph the browser already holds, from landmarks
  * the server sent back, and every one of these tests is about one of the three
@@ -413,4 +414,131 @@ test('the way back is labelled in Korean when the application is', () => {
     const back = peek(host, { app: { lang: 'ko' } });
     assert.match(back.textContent, /분석으로 돌아가기/);
   } finally { globalThis.document = prior; }
+});
+
+/* ---------------------------------------------------------------------------
+ * Putting two photographs back in the right slots.
+ *
+ * The estimator has always been able to say "this left side photograph looks
+ * like a right side view". Until now that was a sentence at the bottom of the
+ * report and nothing else -- correct, unactionable, and printed twice because
+ * both photographs said it about each other. These pin the offer: that the
+ * screen finds it as data rather than by matching the sentence, that pressing
+ * it moves the files the browser already holds instead of asking for them
+ * again, and that it refuses in the cases where moving them would lose one.
+ * ------------------------------------------------------------------------- */
+
+const SWAP = {
+  action: 'swap',
+  views: ['side_left', 'side_right'],
+  label: 'Exchange the left side and right side photographs',
+  label_ko: '좌측면과 우측면 사진 바꾸기',
+  why: 'the left side photograph looks like the right side and the right side looks like the left side',
+  why_ko: '좌측면 사진은 우측면처럼, 우측면 사진은 좌측면처럼 보입니다',
+};
+
+const RELABEL = {
+  action: 'relabel',
+  views: ['side_left', 'side_right'],
+  label: 'Call the left side photograph the right side',
+  label_ko: '좌측면 사진을 우측면으로 변경',
+  why: 'it looks like a right side view, and no right side photograph was supplied',
+  why_ko: '우측면처럼 보이고, 우측면 사진은 제출되지 않았습니다',
+};
+
+const shot = (name) => ({ file: { name }, dataUrl: `data:,${name}`,
+                          objectUrl: `blob:${name}` });
+
+function bothSides() {
+  return new Map([['side_left', shot('a.jpg')], ['side_right', shot('b.jpg')]]);
+}
+
+test('the swap is offered from data, not from the warning sentence', () => {
+  /* A screen that reads the offer out of prose stops offering it the first
+   * time somebody edits the prose. */
+  const html = fixHtml({ report: { fix: SWAP }, photos: bothSides() }, 'en');
+  assert.match(html, /data-fix/);
+  assert.match(html, /Exchange the left side and right side photographs/);
+  assert.match(html, /wrong slots/);
+});
+
+test('the offer reads in Korean', () => {
+  const html = fixHtml({ report: { fix: SWAP }, photos: bothSides() }, 'ko');
+  assert.match(html, /좌측면과 우측면 사진 바꾸기/);
+  assert.match(html, /사진을 다시 올리지 않습니다/);
+  assert.ok(!/Exchange/.test(html), 'and only in Korean');
+});
+
+test('a report with nothing wrong offers nothing', () => {
+  assert.equal(fixHtml({ report: { fix: null }, photos: bothSides() }, 'en'), '');
+  assert.equal(fixHtml({ report: {}, photos: bothSides() }, 'en'), '');
+});
+
+test('the offer is withheld when the photographs are no longer in hand', () => {
+  /* A report restored from history has the numbers and not the files. A
+   * button that cannot do what it says is worse than no button. */
+  const html = fixHtml({ report: { fix: SWAP }, photos: new Map() }, 'en');
+  assert.equal(html, '');
+});
+
+test('the button says what it is doing while it does it', () => {
+  const html = fixHtml({ report: { fix: SWAP }, photos: bothSides(),
+                         busy: true }, 'en');
+  assert.match(html, /disabled/);
+  assert.match(html, /Measuring again/);
+});
+
+test('applying the swap exchanges the two files in place', () => {
+  const photos = bothSides();
+  assert.equal(applyFix(photos, SWAP), true);
+  assert.equal(photos.get('side_left').file.name, 'b.jpg');
+  assert.equal(photos.get('side_right').file.name, 'a.jpg');
+  assert.equal(photos.size, 2, 'nothing was lost');
+});
+
+test('the swap sends the same bytes, it does not ask for them again', () => {
+  const photos = bothSides();
+  const before = [...photos.values()];
+  applyFix(photos, SWAP);
+  assert.deepEqual(new Set(photos.values()), new Set(before));
+});
+
+test('a relabel moves the photograph into the empty slot', () => {
+  const photos = new Map([['side_left', shot('a.jpg')]]);
+  assert.equal(applyFix(photos, RELABEL), true);
+  assert.equal(photos.has('side_left'), false);
+  assert.equal(photos.get('side_right').file.name, 'a.jpg');
+});
+
+test('a relabel never writes over a photograph that is already there', () => {
+  /* It would drop one the studio supplied, and the set would come back a
+   * photograph short with nothing on screen saying why. */
+  const photos = bothSides();
+  assert.equal(applyFix(photos, RELABEL), false);
+  assert.equal(photos.size, 2);
+  assert.equal(photos.get('side_left').file.name, 'a.jpg');
+});
+
+test('a swap with a photograph missing changes nothing', () => {
+  const photos = new Map([['side_left', shot('a.jpg')]]);
+  assert.equal(applyFix(photos, SWAP), false);
+  assert.equal(photos.get('side_left').file.name, 'a.jpg');
+});
+
+test('a malformed or absent offer is refused rather than guessed at', () => {
+  for (const bad of [null, undefined, {}, { action: 'swap' },
+                     { action: 'swap', views: ['side_left'] },
+                     { action: 'burn', views: ['side_left', 'side_right'] }]) {
+    assert.equal(applyFix(bothSides(), bad), false);
+  }
+});
+
+test('the words on the button come from the measurement layer', () => {
+  /* Both halves of the offer are generated where the views are known, so the
+   * button names the two photographs it is actually going to move -- front
+   * and back as readily as the two sides. */
+  const py = PY('intake.py');
+  assert.match(py, /"action": "swap"/);
+  assert.match(py, /"action": "relabel"/);
+  assert.match(py, /label_ko/);
 });

@@ -1822,6 +1822,11 @@ def report(assessment: PhotoAssessment) -> dict:
                          if r.measured and severity(r) is WITHIN],
         "warnings": list(assessment.warnings),
         "doubts": list(assessment.doubts),
+        # Carried up to the top level because it is the only item in this
+        # payload a reader can *act* on without leaving the screen, and a
+        # screen should not have to dig through the assessment for it.
+        "mismatches": [m.to_dict() for m in assessment.mismatches],
+        "fix": assessment.fix(),
         "missing_photos": [{"view": v.value,
                             "title": ik.instructions(v)[0],
                             "how": ik.instructions(v)[1],

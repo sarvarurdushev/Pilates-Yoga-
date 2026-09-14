@@ -52,6 +52,11 @@ const T = {
   print:      { en: 'Print', ko: '인쇄' },
   close:      { en: 'Close', ko: '닫기' },
   back:       { en: '\u2190  Back to the analysis', ko: '\u2190  분석으로 돌아가기' },
+  fixTitle:   { en: 'These photographs may be in the wrong slots',
+                ko: '사진이 잘못된 칸에 들어간 것 같습니다' },
+  fixNote:    { en: 'Nothing is uploaded again. The same photographs are measured a second time, corrected.',
+                ko: '사진을 다시 올리지 않습니다. 같은 사진을 바로잡아 다시 측정합니다.' },
+  fixBusy:    { en: 'Measuring again…', ko: '다시 측정하는 중…' },
   other:      { en: '한국어', ko: 'English' },
   need:       { en: 'Add at least one photograph.', ko: '사진을 한 장 이상 추가하세요.' },
   privacy:    { en: 'The photographs are measured and then dropped. They are not stored, and they are not sent back. What is kept is the numbers.',
@@ -226,6 +231,21 @@ const STYLE = `
 #ss-pos .ss-ladder div.ss-now{color:var(--txt);font-weight:600}
 #ss-pos .ss-ladder i{width:9px;height:9px;border-radius:2px;flex:none}
 #ss-pos .ss-ladder em{margin-left:auto;font-style:normal;color:var(--dim2)}
+/* The one warning on this screen with a remedy attached, so it is built like
+   an offer and not like a note: across the sheet, above the photographs it is
+   about, with the action as a real button rather than a sentence. */
+#ss-pos .ss-fix{margin:0 0 20px;padding:16px 18px;border-radius:12px;
+  border:1px solid #6b4a12;background:#1c1408;display:flex;gap:16px;
+  align-items:center;flex-wrap:wrap}
+#ss-pos .ss-fix h2{margin:0 0 5px;font-size:13px;color:#e8b25a;
+  letter-spacing:.02em}
+#ss-pos .ss-fix p{margin:0;font-size:11.5px;color:var(--dim);line-height:1.7}
+#ss-pos .ss-fix .ss-fixbody{flex:1 1 320px;min-width:0}
+#ss-pos .ss-fix button{flex:none;padding:11px 18px;border-radius:9px;border:0;
+  font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;
+  background:#e8b25a;color:#1c1408}
+#ss-pos .ss-fix button:hover:not(:disabled){filter:brightness(1.08)}
+#ss-pos .ss-fix button:disabled{opacity:.5;cursor:default}
 #ss-pos .ss-shots{display:grid;gap:18px;
   grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin:0 0 22px}
 #ss-pos figure{margin:0;border:1px solid var(--line);border-radius:7px;
@@ -982,6 +1002,7 @@ function reportHtml(state, lang, identity) {
         <button type="button" class="ss-b" data-close>${esc(say('close', lang))}</button>
       </div>
     </header>
+    ${fixHtml(state, lang)}
     <div class="ss-shots">${shots}</div>
     <div class="ss-grid">
       <div>
@@ -1031,6 +1052,70 @@ function reportHtml(state, lang, identity) {
     <p class="ss-disc">${esc(lang === 'ko' ? report.disclaimer_ko
                                         : report.disclaimer)}</p>
   </div>`;
+}
+
+/**
+ * The offer to put two photographs back where they belong.
+ *
+ * Drawn from `report.fix`, which the measurement layer produces as data --
+ * an action, the two views it applies to, and the words for both languages.
+ * The alternative was for this screen to match the warning text against a
+ * phrase to work out whether a swap was on offer, which would have quietly
+ * stopped working the first time somebody edited the sentence.
+ */
+function fixHtml(state, lang) {
+  const fix = state.report?.fix;
+  if (!fix) return '';
+  const label = (lang === 'ko' && fix.label_ko) || fix.label || '';
+  const why = (lang === 'ko' && fix.why_ko) || fix.why || '';
+  /* Only offered when both photographs are still in hand. A report restored
+   * from history has the numbers but not the files, and a button that cannot
+   * do what it says is worse than no button. */
+  const ready = fix.views?.every?.(
+    (v, i) => (fix.action === 'relabel' && i === 1
+      ? !state.photos.has(v) : state.photos.has(v)));
+  if (!ready) return '';
+  return `<div class="ss-fix">
+    <div class="ss-fixbody">
+      <h2>${esc(say('fixTitle', lang))}</h2>
+      <p>${esc(why)}</p>
+      <p style="margin-top:7px">${esc(say('fixNote', lang))}</p>
+    </div>
+    <button type="button" data-fix ${state.busy ? 'disabled' : ''}>${
+      esc(state.busy ? say('fixBusy', lang) : label)}</button>
+  </div>`;
+}
+
+/**
+ * Move the photographs into the slots the estimator says they belong in.
+ *
+ * Works on the map of files the browser is already holding, so nothing is
+ * uploaded twice: the same bytes are sent again under corrected labels. Pure
+ * apart from the map it is handed, and returns whether it changed anything,
+ * so a stale offer cannot trigger a pointless round trip.
+ */
+function applyFix(photos, fix) {
+  const views = fix?.views;
+  if (!Array.isArray(views) || views.length !== 2) return false;
+  const [from, to] = views;
+  if (fix.action === 'swap') {
+    const one = photos.get(from);
+    const two = photos.get(to);
+    if (!one || !two) return false;
+    photos.set(from, two);
+    photos.set(to, one);
+    return true;
+  }
+  if (fix.action === 'relabel') {
+    const one = photos.get(from);
+    /* Never over an occupied slot: that would drop a photograph the studio
+     * supplied, and the set would come back one short with no explanation. */
+    if (!one || photos.has(to)) return false;
+    photos.delete(from);
+    photos.set(to, one);
+    return true;
+  }
+  return false;
 }
 
 /* ---------------------------------------------------------------- behaviour */
@@ -1090,6 +1175,16 @@ function wire(host, state, nw, served, identity, draw, shut) {
   }
   host.querySelector('[data-run]')?.addEventListener('click',
     () => run(state, draw, identity));
+
+  host.querySelector('[data-fix]')?.addEventListener('click', () => {
+    /* Straight back through the same measurement, rather than trying to
+     * mirror the report in place. Every left/right correction in it was
+     * applied under the old labels, and re-deriving them here would be a
+     * second implementation of the alignment layer living in a browser. */
+    if (state.busy) return;
+    if (!applyFix(state.photos, state.report?.fix)) return;
+    run(state, draw, identity);
+  });
 
   /* A row in the legend pulses its own dot on the photograph. The dot carries
    * a number and the row carries the same number, so the link survives the
@@ -1221,4 +1316,5 @@ async function compareWith(state, before, after) {
 export const _internals = { overlay, marksFor, anchorOf, dial, spark,
                             historyHtml, changeHtml, patternHtml,
                             regionsHtml, evennessHtml, planHeadHtml,
-                            formatValue, peek, INK, ANCHOR, CHIP: T };
+                            formatValue, peek, fixHtml, applyFix,
+                            INK, ANCHOR, CHIP: T };

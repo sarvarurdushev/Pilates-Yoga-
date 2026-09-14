@@ -696,6 +696,26 @@ def cmd_intake(args: argparse.Namespace) -> int:
     for warning in report["doubts"]:
         print(f"  ! {warning}")
 
+    # The one warning above that has a remedy rather than only a cause. The
+    # corrected flags are printed rather than described, because the mistake
+    # this catches is a typing mistake and the fix for a typing mistake is a
+    # line that can be pasted.
+    fix = report.get("fix")
+    if fix:
+        flag = {View.FRONT: "--front", View.SIDE_LEFT: "--left",
+                View.SIDE_RIGHT: "--right", View.REAR: "--back"}
+        corrected = dict(given)
+        first, second = (View(v) for v in fix["views"])
+        if fix["action"] == "swap":
+            corrected[first], corrected[second] = (corrected[second],
+                                                   corrected[first])
+        else:
+            corrected[second] = corrected.pop(first)
+        line = " ".join(f"{flag[v]} {corrected[v]}"
+                        for v in ik.PROTOCOL if v in corrected)
+        print(f"\n  {fix['label']} — {fix['why']}")
+        print(f"      pilates intake {line}")
+
     if args.db and args.name:
         # Filed, so a second visit means something. Only against a name: an
         # assessment with nobody attached cannot be compared with anything.

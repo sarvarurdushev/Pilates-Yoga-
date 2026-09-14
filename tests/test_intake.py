@@ -201,7 +201,9 @@ class TestTheSetInTheWrongOrder:
         number is plausible."""
         out = ik.assess_photos([photo(View.FRONT, standing(facing="rear",
                                                            cx=540))])
-        assert any("looks like a rear view" in w for w in out.warnings)
+        # Named the way the screen names the slot -- "back", not the enum's
+        # "rear" -- because the reader has to find the photograph to fix it.
+        assert any("looks like a back view" in w for w in out.warnings)
 
     def test_a_side_photograph_labelled_front_says_so_differently(self):
         out = ik.assess_photos([photo(View.FRONT, side_on(cx=540))])
@@ -217,6 +219,114 @@ class TestTheSetInTheWrongOrder:
                                                           cx=540))])
         assert out.per_view[View.REAR].view.view is View.REAR
         assert out.per_view[View.REAR].view.confidence == 1.0
+
+
+def swapped() -> list[ik.Photo]:
+    """The complete set with the two side photographs exchanged.
+
+    The mistake this whole class is about: the files are fine, the body is
+    fine, and the only thing wrong is which slot each one went into.
+    """
+    photos = four()
+    photos[1] = photo(View.SIDE_LEFT, side_on(facing_image_left=True, cx=540))
+    photos[2] = photo(View.SIDE_RIGHT, side_on(facing_image_left=False, cx=540))
+    return photos
+
+
+class TestOfferingTheFix:
+    """A warning with a remedy attached, rather than a sentence to sigh at."""
+
+    def test_both_side_photographs_are_flagged_when_they_are_exchanged(self):
+        out = ik.assess_photos(swapped())
+        flagged = {m.view: m.looks_like for m in out.mismatches}
+        assert flagged == {View.SIDE_LEFT: View.SIDE_RIGHT,
+                           View.SIDE_RIGHT: View.SIDE_LEFT}
+
+    def test_the_mismatch_is_data_and_not_only_a_sentence(self):
+        """A screen that has to match text against a phrase to find the offer
+        loses the offer the first time the phrase is edited."""
+        out = ik.assess_photos(swapped())
+        first = out.mismatches[0]
+        assert first.kind == "mirrored"
+        assert first.fixable_by_swapping
+        assert 0.0 < first.confidence <= 1.0
+
+    def test_two_photographs_that_each_look_like_the_other_can_be_swapped(self):
+        out = ik.assess_photos(swapped())
+        assert out.swapped_pair == (View.SIDE_LEFT, View.SIDE_RIGHT)
+        fix = out.fix()
+        assert fix["action"] == "swap"
+        assert fix["views"] == ["side_left", "side_right"]
+
+    def test_the_offer_names_both_photographs_in_both_languages(self):
+        fix = ik.assess_photos(swapped()).fix()
+        assert "left side" in fix["label"] and "right side" in fix["label"]
+        assert "좌측면" in fix["label_ko"] and "우측면" in fix["label_ko"]
+        assert fix["why"] and fix["why_ko"]
+
+    def test_a_front_and_back_pair_the_wrong_way_round_is_offered_too(self):
+        """The mistake that mirrors every number in the report, and the one
+        the protocol docstring calls out as the worst."""
+        photos = [photo(View.FRONT, standing(facing="rear", cx=540)),
+                  photo(View.REAR, standing(cx=540))]
+        out = ik.assess_photos(photos)
+        assert out.swapped_pair == (View.FRONT, View.REAR)
+        assert out.fix()["action"] == "swap"
+
+    def test_the_pair_comes_back_in_protocol_order(self):
+        """So the two sides of the offer are not exchanged between runs."""
+        photos = swapped()
+        photos.reverse()
+        assert ik.assess_photos(photos).swapped_pair == (View.SIDE_LEFT,
+                                                         View.SIDE_RIGHT)
+
+    def test_one_photograph_flagged_alone_is_never_swapped(self):
+        """Exchanging it would take the neighbour, which nothing is wrong
+        with, and put it in the wrong slot."""
+        photos = four()
+        photos[1] = photo(View.SIDE_LEFT, side_on(facing_image_left=True,
+                                                  cx=540))
+        out = ik.assess_photos(photos)
+        assert len(out.mismatches) == 1
+        assert out.swapped_pair is None
+        assert out.fix() is None
+
+    def test_a_lone_side_photograph_is_offered_a_new_label_instead(self):
+        """Nothing to exchange it with, and the slot it belongs in is empty."""
+        out = ik.assess_photos([photo(View.FRONT, standing(cx=540)),
+                                photo(View.SIDE_LEFT,
+                                      side_on(facing_image_left=True, cx=540))])
+        assert out.swapped_pair is None
+        assert out.mislabelled == (View.SIDE_LEFT, View.SIDE_RIGHT)
+        fix = out.fix()
+        assert fix["action"] == "relabel"
+        assert fix["views"] == ["side_left", "side_right"]
+        assert "우측면" in fix["label_ko"]
+
+    def test_a_student_who_did_not_turn_far_enough_gets_no_button(self):
+        """Off-square is fixed with a camera, not with a click."""
+        out = ik.assess_photos([photo(View.FRONT, side_on(cx=540))])
+        assert out.mismatches[0].kind == "off_square"
+        assert not out.mismatches[0].fixable_by_swapping
+        assert out.fix() is None
+
+    def test_a_correctly_ordered_set_is_offered_nothing(self):
+        out = ik.assess_photos(four())
+        assert out.mismatches == []
+        assert out.fix() is None
+
+    def test_the_offer_survives_the_trip_to_the_browser(self):
+        payload = ik.assess_photos(swapped()).to_dict()
+        assert payload["fix"]["action"] == "swap"
+        assert len(payload["mismatches"]) == 2
+        assert payload["mismatches"][0]["text_ko"]
+
+    def test_an_exchanged_set_still_withholds_the_score(self):
+        """The offer is a shortcut to a correct report, not a reason to print
+        the mirrored one."""
+        out = ik.assess_photos(swapped())
+        assert not out.reliable
+        assert out.score().value is None
 
 
 class TestTheScore:

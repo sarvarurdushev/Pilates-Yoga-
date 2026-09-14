@@ -51,6 +51,10 @@ import numpy as np
 
 from . import geometry as geo
 from . import keypoints as kp
+# Lives in the geometry layer, where it is pure keypoint arithmetic and
+# has no scoring underneath it. Re-exported because it reads as an
+# alignment concept and every caller here spells it that way.
+from .geometry import body_height_px  # noqa: F401
 from .scoring import ZERO_AT, Component, Score
 from .types import Detection
 
@@ -262,33 +266,6 @@ def _confident(det: Detection, *joints: int, threshold: float = THRESHOLD) -> bo
 
 def _mid(det: Detection, left: int, right: int) -> np.ndarray:
     return (det.keypoints[left] + det.keypoints[right]) / 2.0
-
-
-def body_height_px(det: Detection, threshold: float = THRESHOLD) -> float | None:
-    """Shoulder-to-ankle span in pixels, the scale every ratio is taken against.
-
-    Not the bounding box: an overhead reach makes the box half as tall again
-    while the body is the same size, and a ratio normalised by that would
-    shrink every deviation exactly when the arms move.
-    """
-    if not _confident(det, kp.L_SHOULDER, kp.R_SHOULDER, threshold=threshold):
-        return None
-    shoulders = _mid(det, kp.L_SHOULDER, kp.R_SHOULDER)
-    feet = []
-    for ankle in (kp.L_ANKLE, kp.R_ANKLE):
-        if det.scores[ankle] >= threshold:
-            feet.append(det.keypoints[ankle])
-    if not feet:
-        # fall back to the hips and scale up by a typical shoulder-hip share of
-        # standing height; marked by the caller as an estimate, never as fact
-        if not _confident(det, kp.L_HIP, kp.R_HIP, threshold=threshold):
-            return None
-        hips = _mid(det, kp.L_HIP, kp.R_HIP)
-        trunk = float(abs(hips[1] - shoulders[1]))
-        return trunk / 0.30 if trunk > 0 else None
-    ankle_y = float(np.mean([f[1] for f in feet]))
-    span = abs(ankle_y - float(shoulders[1]))
-    return span if span > 0 else None
 
 
 def estimate_view(det: Detection, threshold: float = THRESHOLD) -> ViewEstimate:

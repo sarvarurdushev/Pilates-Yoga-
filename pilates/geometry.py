@@ -50,6 +50,33 @@ def _midpoint(det: Detection, left: int, right: int) -> np.ndarray:
     return (det.keypoints[left] + det.keypoints[right]) / 2.0
 
 
+def body_height_px(det: Detection, threshold: float = 0.4) -> float | None:
+    """Shoulder-to-ankle span in pixels, the scale every ratio is taken against.
+
+    Not the bounding box: an overhead reach makes the box half as tall again
+    while the body is the same size, and a ratio normalised by that would
+    shrink every deviation exactly when the arms move.
+    """
+    if det.scores[kp.L_SHOULDER] < threshold or det.scores[kp.R_SHOULDER] < threshold:
+        return None
+    shoulders = _midpoint(det, kp.L_SHOULDER, kp.R_SHOULDER)
+    feet = []
+    for ankle in (kp.L_ANKLE, kp.R_ANKLE):
+        if det.scores[ankle] >= threshold:
+            feet.append(det.keypoints[ankle])
+    if not feet:
+        # fall back to the hips and scale up by a typical shoulder-hip share of
+        # standing height; marked by the caller as an estimate, never as fact
+        if det.scores[kp.L_HIP] < threshold or det.scores[kp.R_HIP] < threshold:
+            return None
+        hips = _midpoint(det, kp.L_HIP, kp.R_HIP)
+        trunk = float(abs(hips[1] - shoulders[1]))
+        return trunk / 0.30 if trunk > 0 else None
+    ankle_y = float(np.mean([f[1] for f in feet]))
+    span = abs(ankle_y - float(shoulders[1]))
+    return span if span > 0 else None
+
+
 def trunk_angle(det: Detection, threshold: float = 0.4) -> float | None:
     """Angle of the torso against horizontal, in degrees.
 
