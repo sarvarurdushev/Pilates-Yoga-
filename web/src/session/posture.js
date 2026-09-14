@@ -1002,6 +1002,12 @@ export function measurementsHtml(report, lang) {
   if (!names.length) return '';
   const severity = new Map(
     (report.findings ?? []).map((f) => [f.metric, f.severity]));
+  /* The Korean wording for a refusal lives on refused_detail, not on the
+     reading -- the reading carries the reason the measurement layer wrote,
+     which is English. Without this lookup the one row on the page that
+     explains itself explained itself in the wrong language. */
+  const whyNot = new Map((report.refused_detail ?? []).map(
+    (e) => [e.metric, lang === 'ko' ? e.reason_ko : e.reason]));
 
   const rows = names.map((metric) => {
     const reading = readings[metric];
@@ -1012,7 +1018,8 @@ export function measurementsHtml(report, lang) {
       return `<tr><th>${esc(label)}</th>
         <td class="ss-mval" style="color:${INK.none}">—</td>
         <td class="ss-mtrack" colspan="2"><span class="ss-mwhy">${
-          esc(reading.reason || say('notMeasuredRegion', lang))}</span></td></tr>`;
+          esc(whyNot.get(metric) || reading.reason
+              || say('notMeasuredRegion', lang))}</span></td></tr>`;
     }
     const value = formatValue(metric, reading);
     const band = reading.normal;

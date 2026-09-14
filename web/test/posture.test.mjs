@@ -917,6 +917,24 @@ test('a refusal is shown with its reason, not as a blank row', () => {
   assert.match(html, /ASIS and PSIS/);
 });
 
+test('a refusal is explained in the language the page is in', () => {
+  /* The reading carries the reason the measurement layer wrote, which is
+     English. The Korean wording is on refused_detail, and without the lookup
+     the one row on the page that explains itself did so in the wrong
+     language. */
+  const payload = { ...report(),
+    assessment: { readings: { sagittal_pelvic_tilt: {
+      name: 'sagittal_pelvic_tilt', value: null, unit: 'deg', sources: [],
+      contested: false, reason: 'needs the ASIS and PSIS landmarks' } } },
+    refused_detail: [{ metric: 'sagittal_pelvic_tilt',
+      name: 'pelvic tilt', name_ko: '골반 전후 경사',
+      reason: 'needs the ASIS and PSIS landmarks',
+      reason_ko: '위앞엉덩뼈가시 지점이 필요합니다' }] };
+  assert.match(measurementsHtml(payload, 'ko'), /위앞엉덩뼈가시/);
+  assert.ok(!/ASIS and PSIS/.test(measurementsHtml(payload, 'ko')));
+  assert.match(measurementsHtml(payload, 'en'), /ASIS and PSIS/);
+});
+
 test('nothing is drawn when nothing was measured at all', () => {
   assert.equal(measurementsHtml({ assessment: { readings: {} } }, 'en'), '');
 });
