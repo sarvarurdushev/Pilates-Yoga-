@@ -41,6 +41,23 @@ def build() -> dict:
     ]
     assessment = ik.assess_photos(photos, person_id="demo", taken_on="2026-09-14")
     report = gd.report(assessment)
+    # The same body eight weeks earlier, further out on everything, so the
+    # then-and-now drawing has two genuinely different shapes to overlay
+    # rather than one shape and a copy of it pushed sideways.
+    earlier = [
+        shot(View.FRONT, standing(shoulder_tilt=13.0, hip_tilt=9.0, cx=380)),
+        shot(View.SIDE_LEFT, side_on(facing_image_left=False, ear_ahead=86.0,
+                                     cx=380)),
+        shot(View.SIDE_RIGHT, side_on(facing_image_left=True, ear_ahead=82.0,
+                                      cx=380)),
+        shot(View.REAR, standing(facing="rear", shoulder_tilt=12.0,
+                                 hip_tilt=8.0, cx=380)),
+    ]
+    report["earlier_landmarks"] = {
+        p.view.value: {"keypoints": p.detection.keypoints.round(2).tolist(),
+                       "scores": p.detection.scores.round(3).tolist(),
+                       "width": p.width, "height": p.height}
+        for p in earlier if p.usable}
     report["landmarks"] = {
         p.view.value: {"keypoints": p.detection.keypoints.round(2).tolist(),
                        "scores": p.detection.scores.round(3).tolist(),

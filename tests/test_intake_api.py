@@ -626,3 +626,57 @@ class TestReopeningAFiledAssessment:
         _, filed = coach_client.post("/intake", {
             "photos": shots(View.FRONT), "username": names["ann"]})
         assert Client(base).get(f"/assessment?id={filed['assessment_id']}")[0] == 401
+
+
+class TestDrawingTwoVisitsTogether:
+    """The comparison returns both skeletons, so the two can be drawn on top
+    of each other. A table of differences cannot be a picture."""
+
+    def _two(self, client, names, stubbed):
+        stubbed(script_for(*ALL_FOUR))
+        _, first = client.post("/intake", {
+            "photos": shots(*ALL_FOUR), "username": names["ann"],
+            "taken_on": "2026-08-01"})
+        stubbed(script_for(*ALL_FOUR))
+        _, second = client.post("/intake", {
+            "photos": shots(*ALL_FOUR), "username": names["ann"],
+            "taken_on": "2026-09-14"})
+        return first, second
+
+    def test_both_skeletons_come_back(self, coach, stubbed):
+        client, names, _ = coach
+        assert client.post("/roster/add", {"student": names["ann"]})[0] == 200
+        first, second = self._two(client, names, stubbed)
+        status, out = client.post("/assessment/compare", {
+            "before": first["assessment_id"], "after": second["assessment_id"]})
+        assert status == 200
+        assert out["outlines"]
+        for view, pair in out["outlines"].items():
+            assert len(pair["before"]["keypoints"]) == 17
+            assert len(pair["after"]["keypoints"]) == 17
+
+    def test_only_views_both_visits_supplied(self, coach, stubbed):
+        """A shoulder line photographed from the front in March and the back
+        in May is two measurements of one thing and two different pictures."""
+        client, names, _ = coach
+        assert client.post("/roster/add", {"student": names["ann"]})[0] == 200
+        stubbed(script_for(View.FRONT, View.REAR))
+        _, first = client.post("/intake", {
+            "photos": shots(View.FRONT, View.REAR), "username": names["ann"],
+            "taken_on": "2026-08-01"})
+        stubbed(script_for(View.FRONT))
+        _, second = client.post("/intake", {
+            "photos": shots(View.FRONT), "username": names["ann"],
+            "taken_on": "2026-09-14"})
+        _, out = client.post("/assessment/compare", {
+            "before": first["assessment_id"], "after": second["assessment_id"]})
+        assert set(out["outlines"]) == {"front"}
+
+    def test_no_photograph_is_returned_with_them(self, coach, stubbed):
+        client, names, _ = coach
+        assert client.post("/roster/add", {"student": names["ann"]})[0] == 200
+        first, second = self._two(client, names, stubbed)
+        _, out = client.post("/assessment/compare", {
+            "before": first["assessment_id"], "after": second["assessment_id"]})
+        assert "image" not in repr(out)
+        assert "base64" not in repr(out)

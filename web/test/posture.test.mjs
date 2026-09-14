@@ -972,3 +972,126 @@ test('a measurement with no usual range gets no shading to sit inside', () => {
   assert.match(html, /ss-noband/);
   assert.ok(!/<i /.test(html), 'and nothing shaded');
 });
+
+/* ---------------------------------------------------- the two visits, drawn */
+
+const { outlinesHtml, normalise, fitBox, furthestMove } = _internals;
+
+function pair(shift = 0) {
+  const make = (dx) => {
+    const keypoints = Array.from({ length: 17 }, () => [500, 1000]);
+    const scores = Array.from({ length: 17 }, () => 0.95);
+    keypoints[5] = [420 + dx, 500]; keypoints[6] = [580 + dx, 520];
+    keypoints[11] = [450, 1000]; keypoints[12] = [550, 1010];
+    keypoints[15] = [440, 1800]; keypoints[16] = [560, 1810];
+    return { keypoints, scores, width: 1000, height: 2000 };
+  };
+  return { before: make(shift), after: make(0) };
+}
+
+test('both visits are drawn, in different inks', () => {
+  const html = outlinesHtml({ outlines: { front: pair(60) } }, 'en');
+  assert.match(html, /Then and now/);
+  assert.ok(html.includes('#6d8298'), 'the earlier one');
+  assert.ok(html.includes(INK.within_band), 'and the later one');
+});
+
+test('the earlier visit is dashed in body units, not pixel units', () => {
+  /* A dash pattern copied out of a pixel-space drawing is longer than the
+   * whole figure here and renders solid, so the two visits came out drawn
+   * identically. */
+  const html = outlinesHtml({ outlines: { front: pair(60) } }, 'en');
+  const dash = html.match(/stroke-dasharray="([\d. ]+)"/)[1];
+  for (const n of dash.split(' ').map(Number)) {
+    assert.ok(n > 0 && n < 0.3, `${n} is not a body-unit dash`);
+  }
+});
+
+test('both are put in the same body units before either is drawn', () => {
+  /* Two photographs eight weeks apart are two distances from a camera. Drawn
+   * raw, the nearer visit is simply bigger and every joint has "moved". */
+  const near = normalise({
+    keypoints: [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [100, 100], [200, 100],
+                [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0],
+                [100, 500], [200, 500]],
+    scores: Array.from({ length: 17 }, () => 0.9) });
+  const far = normalise({
+    keypoints: [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [50, 50], [100, 50],
+                [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0],
+                [50, 250], [100, 250]],
+    scores: Array.from({ length: 17 }, () => 0.9) });
+  /* The same body at half the distance: identical once normalised. */
+  assert.ok(Math.abs(near.points[5][0] - far.points[5][0]) < 1e-9);
+  assert.ok(Math.abs(near.points[5][1] - far.points[5][1]) < 1e-9);
+});
+
+test('the feet are the anchor, so both stand on the same line', () => {
+  const body = normalise(pair().after);
+  const ankles = [(body.points[15][0] + body.points[16][0]) / 2,
+                  (body.points[15][1] + body.points[16][1]) / 2];
+  assert.ok(Math.abs(ankles[0]) < 1e-9);
+  assert.ok(Math.abs(ankles[1]) < 1e-9);
+});
+
+test('a body with no ankles or no shoulders cannot be normalised', () => {
+  /* No scale and no anchor: a drawing made without either is a drawing of
+   * wherever the person happened to stand. */
+  const lost = pair().after;
+  lost.scores = lost.scores.map((s, i) => (i === 15 || i === 16 ? 0.05 : s));
+  assert.equal(normalise(lost), null);
+  assert.equal(normalise(null), null);
+});
+
+test('the frame is fitted to the bodies, not guessed in advance', () => {
+  /* An arm carried forward in a side view reaches nearly a body height ahead
+   * of the spine, and a hardcoded frame drew it off the corner. */
+  const wide = normalise(pair().after);
+  wide.points[9] = [-0.9, -0.8];
+  const right = Math.max(...wide.points
+    .filter((p, i) => wide.scores[i] >= 0.3).map((p) => p[0]));
+  const [x0, , w] = fitBox(wide).split(' ').map(Number);
+  assert.ok(x0 <= -0.9, `frame starts at ${x0}, past the furthest point`);
+  assert.ok(x0 + w >= right, 'and reaches the rightmost joint');
+});
+
+test('an empty body falls back to a frame rather than to NaN', () => {
+  const box = fitBox({ points: [], scores: [] });
+  for (const n of box.split(' ').map(Number)) assert.ok(Number.isFinite(n));
+});
+
+test('how far the furthest joint moved is measured and shown', () => {
+  /* Two visits that barely differ draw as one shape, because the earlier
+   * outline is underneath the later one. A number turns "only one body here"
+   * into a finding. */
+  const html = outlinesHtml({ outlines: { front: pair(60) } }, 'en');
+  assert.match(html, /furthest a joint moved/);
+  assert.match(html, /\d+\.\d%/);
+});
+
+test('a joint one visit lost is not counted as having moved', () => {
+  /* It has not moved, it has gone, and counting it reports the estimator
+   * rather than the body. */
+  const one = normalise(pair().after);
+  const two = normalise(pair().after);
+  two.points[9] = [9, 9];
+  two.scores = two.scores.map((s, i) => (i === 9 ? 0.05 : s));
+  assert.ok(furthestMove(one, two) < 1e-9);
+});
+
+test('a view only one visit supplied is not compared', () => {
+  /* A shoulder line photographed from the front in March and the back in May
+   * is two measurements of one thing and two different pictures. */
+  const only = { outlines: { front: { before: pair().before, after: null } } };
+  assert.equal(outlinesHtml(only, 'en'), '');
+});
+
+test('no comparison draws nothing', () => {
+  assert.equal(outlinesHtml(null, 'en'), '');
+  assert.equal(outlinesHtml({ outlines: {} }, 'en'), '');
+});
+
+test('the drawing explains itself in Korean', () => {
+  const html = outlinesHtml({ outlines: { front: pair(60) } }, 'ko');
+  assert.match(html, /이전과 현재 겹쳐 보기/);
+  assert.match(html, /카메라 거리가 아니라/);
+});

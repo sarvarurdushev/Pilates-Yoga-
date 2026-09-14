@@ -100,6 +100,12 @@ const T = {
   offRegion:  { en: 'Off', ko: '불균형' },
   notMeasuredRegion: { en: 'Not measured', ko: '측정 안 됨' },
   actsHere:   { en: 'Muscles that act here', ko: '이 부위에 작용하는 근육' },
+  thenNow:    { en: 'Then and now, drawn together', ko: '이전과 현재 겹쳐 보기' },
+  thenNowNote:{ en: 'Both outlines are scaled to the same body height and lined up at the feet, so what differs is the body and not how far away the camera was.',
+                ko: '두 윤곽선은 같은 신장으로 맞추고 발 위치를 기준으로 정렬했습니다. 따라서 차이는 카메라 거리가 아니라 신체의 변화입니다.' },
+  before:     { en: 'Before', ko: '이전' },
+  ofHeight:   { en: 'furthest a joint moved', ko: '가장 많이 이동한 관절' },
+  after:      { en: 'After', ko: '현재' },
   everyMeasure:{ en: 'Every measurement', ko: '전체 측정값' },
   everyMeasureNote: { en: 'The shaded part of each track is the range that counts as unremarkable. The marker is where this body landed.',
                       ko: '각 막대의 음영 구간이 정상으로 보는 범위이며, 표시된 점이 이번 측정값입니다.' },
@@ -399,6 +405,26 @@ const STYLE = `
   box-shadow:0 0 0 2px rgba(0,0,0,.45)}
 #ss-pos .ss-scaleends{display:flex;justify-content:space-between;
   margin:5px 0 0;font-size:9.5px;color:var(--dim2)}
+#ss-pos .ss-outlines{display:grid;gap:14px;
+  grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin:0 0 10px}
+#ss-pos .ss-outline{margin:0}
+/* One box for every panel, whatever shape the body in it is.
+   Each drawing is fitted to its own points -- a fixed frame clipped an arm
+   carried forward -- so without a shared box a narrow front view and a wide
+   side view came out as two panels of wildly different heights. The ratio
+   here, with xMidYMid meet inside, letterboxes each one into the same
+   rectangle. (No backticks in this comment: it lives inside a template
+   literal, and one would end the stylesheet here.) */
+#ss-pos .ss-outline svg{width:100%;aspect-ratio:3/4;height:auto;display:block;
+  background:#070c14;border-radius:6px}
+#ss-pos .ss-outline figcaption{margin:5px 0 0;font-size:10.5px;
+  color:var(--dim2);text-align:center}
+#ss-pos .ss-outline figcaption small{display:block;font-size:9.5px;
+  color:var(--dim2);opacity:.8;margin-top:2px}
+#ss-pos .ss-key{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;
+  margin:0 0 10px;font-size:10.5px;color:var(--dim)}
+#ss-pos .ss-key span{display:inline-flex;gap:6px;align-items:center}
+#ss-pos .ss-key i{width:14px;height:3px;border-radius:2px;flex:none}
 #ss-pos .ss-measures{margin:0 0 24px}
 #ss-pos .ss-measures table{width:100%;border-collapse:collapse}
 #ss-pos .ss-measures tr{border-top:1px solid var(--line)}
@@ -1066,6 +1092,159 @@ export function trackHtml(value, band, ink) {
     <b style="left:${at.toFixed(1)}%;background:${ink}"></b></span>`;
 }
 
+/**
+ * The two visits drawn on top of each other.
+ *
+ * The panel a table of differences cannot be. "+9.6 then, +4.1 now" read
+ * against sixteen other rows is arithmetic; two outlines over one another is
+ * the same fact as a picture, and it is the picture a studio shows the person
+ * whose body it is.
+ *
+ * **Both are normalised before anything is drawn, and that is the whole
+ * trick.** Two photographs taken eight weeks apart are two distances from a
+ * camera, so the same body is a different number of pixels tall in each. Drawn
+ * raw, the nearer visit is simply bigger and every joint has "moved". So each
+ * outline is divided by its own shoulder-to-ankle span and translated to put
+ * the ankles at a common point: what is left on the screen is the shape of the
+ * body, with the camera taken out of it.
+ *
+ * The feet are the anchor rather than the head or the centre, because the feet
+ * are where a standing body actually meets the world. Aligning on the head
+ * would draw a body that grew downward out of its skull.
+ */
+export function outlinesHtml(change, lang) {
+  const views = change?.outlines ?? {};
+  const shown = FALLBACK.map((slot) => slot.view)
+    .filter((view) => views[view]?.before && views[view]?.after)
+    .slice(0, 2);
+  if (!shown.length) return '';
+
+  const panels = shown.map((view) => {
+    const then = normalise(views[view].before);
+    const now = normalise(views[view].after);
+    if (!then || !now) return '';
+    const slot = FALLBACK.find((s) => s.view === view);
+    const moved = furthestMove(then, now);
+    /* Said, not left to be inferred from the picture. Two visits that barely
+     * differ draw as one shape, because the earlier outline is underneath the
+     * later one -- which is the truth and reads as a rendering fault. A number
+     * under the drawing turns "only one body here" into "nothing moved more
+     * than a hundredth of a body height here", which is a finding. */
+    const note = moved == null ? ''
+      : `${(moved * 100).toFixed(1)}% ${say('ofHeight', lang)}`;
+    return `<figure class="ss-outline">
+      <svg viewBox="${fitBox(then, now)}" preserveAspectRatio="xMidYMid meet"
+        xmlns="http://www.w3.org/2000/svg">
+        ${boneLines(then, '#6d8298', 0.013, '0.035 0.028')}
+        ${boneLines(now, INK.within_band, 0.016, '')}
+      </svg>
+      <figcaption>${esc(titleOf(slot, lang))}${
+        note ? `<small>${esc(note)}</small>` : ''}</figcaption>
+    </figure>`;
+  }).join('');
+
+  return `<div class="ss-card" style="margin-top:16px">
+    <h2>${esc(say('thenNow', lang))}</h2>
+    <div class="ss-outlines">${panels}</div>
+    <div class="ss-key">
+      <span><i style="background:#6d8298"></i>${esc(change.before_on
+        || say('before', lang))}</span>
+      <span><i style="background:${INK.within_band}"></i>${esc(change.after_on
+        || say('after', lang))}</span>
+    </div>
+    <p class="ss-why">${esc(say('thenNowNote', lang))}</p>
+  </div>`;
+}
+
+/**
+ * One set of landmarks in body units: ankles at the origin, one unit tall.
+ *
+ * Returns null when the shoulders or the ankles were not both found, because
+ * without them there is no scale and no anchor -- and a drawing made without
+ * either is a drawing of wherever the person happened to stand.
+ */
+export function normalise(land) {
+  const k = land?.keypoints;
+  const s = land?.scores;
+  if (!Array.isArray(k) || !Array.isArray(s)) return null;
+  const mid = (a, b) => (real(k[a], s[a]) && real(k[b], s[b])
+    ? [(k[a][0] + k[b][0]) / 2, (k[a][1] + k[b][1]) / 2] : null);
+  const shoulders = mid(5, 6);
+  const ankles = mid(15, 16);
+  if (!shoulders || !ankles) return null;
+  const span = Math.abs(ankles[1] - shoulders[1]);
+  if (!(span > 0)) return null;
+  return {
+    points: k.map(([x, y]) => [(x - ankles[0]) / span, (y - ankles[1]) / span]),
+    scores: s,
+  };
+}
+
+/**
+ * A box that holds both outlines, rather than one guessed in advance.
+ *
+ * A fixed box fits the body it was measured against and clips every other: an
+ * arm carried forward in a side view reaches nearly a body height ahead of the
+ * spine, and a hardcoded frame drew it off the top-left corner. Fitting to the
+ * points that are actually there costs one pass over thirty-four joints and
+ * cannot be wrong.
+ */
+export function fitBox(...bodies) {
+  const xs = [];
+  const ys = [];
+  for (const body of bodies) {
+    body.points.forEach((point, i) => {
+      if (!real(point, body.scores[i])) return;
+      xs.push(point[0]);
+      ys.push(point[1]);
+    });
+  }
+  if (!xs.length) return '-0.55 -1.25 1.1 1.45';
+  const pad = 0.06;
+  const x0 = Math.min(...xs) - pad;
+  const y0 = Math.min(...ys) - pad;
+  const width = Math.max(...xs) - Math.min(...xs) + pad * 2;
+  const height = Math.max(...ys) - Math.min(...ys) + pad * 2;
+  return `${x0.toFixed(3)} ${y0.toFixed(3)} ${width.toFixed(3)} ${height.toFixed(3)}`;
+}
+
+/**
+ * How far the joint that moved most has moved, in body heights.
+ *
+ * Only joints both visits found confidently: a joint the camera lost in one of
+ * them has not moved, it has gone, and counting it would report the estimator
+ * rather than the body.
+ */
+export function furthestMove(then, now) {
+  let most = null;
+  then.points.forEach((point, i) => {
+    if (!real(point, then.scores[i]) || !real(now.points[i], now.scores[i])) return;
+    const moved = Math.hypot(point[0] - now.points[i][0],
+                             point[1] - now.points[i][1]);
+    if (most == null || moved > most) most = moved;
+  });
+  return most;
+}
+
+/**
+ * The skeleton of one normalised outline, as line segments.
+ *
+ * ``dash`` is in the same units as everything else here -- body heights, not
+ * pixels. A dash pattern copied out of a pixel-space drawing is longer than
+ * the whole figure and renders as a solid line, which is how the earlier
+ * visit and the later one came to be drawn identically.
+ */
+function boneLines(body, ink, width, dash) {
+  const { points, scores } = body;
+  return BONES.map(([a, b]) => {
+    if (!real(points[a], scores[a]) || !real(points[b], scores[b])) return '';
+    return `<line x1="${points[a][0].toFixed(4)}" y1="${points[a][1].toFixed(4)}"
+      x2="${points[b][0].toFixed(4)}" y2="${points[b][1].toFixed(4)}"
+      stroke="${ink}" stroke-width="${width}" stroke-linecap="round"
+      ${dash ? `stroke-dasharray="${dash}"` : ''} opacity=".9"/>`;
+  }).join('');
+}
+
 function planHeadHtml(report, lang) {
   const pri = report.priorities ?? [];
   const review = report.review ?? {};
@@ -1597,6 +1776,7 @@ function reportHtml(state, lang, identity) {
         ${patternHtml(report, lang)}
         ${regionsHtml(report, lang)}
         ${changeHtml(state, lang)}
+        ${outlinesHtml(state.change, lang)}
         ${historyHtml(state, lang)}
       </div>
       <div>
@@ -1934,5 +2114,6 @@ export const _internals = { overlay, marksFor, anchorOf, dial, spark,
                             formatValue, peek, fixHtml, applyFix, reportHtml,
                             bodyMapHtml, regionInk, callouts, scaleHtml,
                             musclesHtml, showMuscle, measurementsHtml,
-                            trackHtml,
+                            trackHtml, outlinesHtml, normalise, fitBox,
+                            furthestMove,
                             INK, ANCHOR, CHIP: T };

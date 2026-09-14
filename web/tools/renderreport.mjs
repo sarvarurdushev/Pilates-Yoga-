@@ -71,9 +71,28 @@ const filed = page === 'posture'
       { id: 1, taken_on: '2026-08-01', score: 64,
         screens: ['shoulder_flexion'] }] };
 
+/* A comparison too, for the panels that only exist once there are two visits
+   on file: the differences and the two outlines drawn together. The earlier
+   body is a genuinely different measurement, not this one pushed sideways --
+   a shape nudged in pixel space stops being a body the moment the view is
+   sagittal, and draws limbs shooting off the top of the frame. */
+const change = page === 'posture' ? {
+  before_on: '2026-08-01', after_on: '2026-09-14',
+  before_score: 74, after_score: report.score?.value,
+  changes: [], names: {},
+  note: 'A smaller deviation is a smaller deviation. Whether it is an '
+      + 'improvement is a judgement for the person teaching.',
+  note_ko: '차이가 줄어든 것은 차이가 줄어든 것입니다. 그것이 개선인지는 지도하는 '
+         + '사람이 판단할 일입니다.',
+  outlines: Object.fromEntries(Object.entries(report.landmarks ?? {})
+    .map(([view, land]) => [view,
+      { before: report.earlier_landmarks?.[view], after: land }])
+    .filter(([, pair]) => pair.before)),
+} : null;
+
 const state = {
   report, photos: new Map(), taken: '2026-09-14', who: 'Kim Jihyun',
-  history: filed, change: null, clips: new Map(),
+  history: filed, change, clips: new Map(),
   catalogue: _internals.CATALOGUE ?? [], chosen: 'shoulder_flexion',
 };
 

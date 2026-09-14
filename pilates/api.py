@@ -1770,8 +1770,6 @@ def assessment_change(store, viewer: Viewer | None, payload: dict) -> dict:
         # worst thing this endpoint could produce, and it would look right.
         raise Refused("those two assessments are of different people", 400)
 
-    # The landmarks are not loaded: a comparison is arithmetic over readings,
-    # and a second copy of somebody's skeleton has no part in it.
     before = _rebuild_assessment(rows[0])
     after = _rebuild_assessment(rows[1])
     comparison = ik.compare(before, after)
@@ -1786,6 +1784,25 @@ def assessment_change(store, viewer: Viewer | None, payload: dict) -> dict:
                    "an improvement is a judgement for the person teaching.")
     out["note_ko"] = ("차이가 줄어든 것은 차이가 줄어든 것입니다. 그것이 개선인지는 "
                       "지도하는 사람이 판단할 일입니다.")
+
+    # The landmarks of both, for the one thing a table of differences cannot
+    # do: draw them. A reader comparing "+9.6 then, +4.1 now" against sixteen
+    # other rows is reading arithmetic; two outlines on top of each other is
+    # the same fact as a picture, and it is the picture a studio shows the
+    # person whose body it is.
+    #
+    # Only the views both visits supplied. A shoulder line photographed from
+    # the front in March and from the back in May is two measurements of the
+    # same thing and two entirely different pictures, and overlaying them
+    # would draw a change that is the camera moving.
+    shared = [v for v in rows[0]["views"] if v in rows[1]["views"]]
+    out["outlines"] = {
+        view: {"before": (rows[0].get("landmarks") or {}).get(view),
+               "after": (rows[1].get("landmarks") or {}).get(view)}
+        for view in shared
+        if (rows[0].get("landmarks") or {}).get(view)
+        and (rows[1].get("landmarks") or {}).get(view)
+    }
     return out
 
 
