@@ -528,3 +528,122 @@ test('the comparison reads in Korean', () => {
 test('no comparison draws nothing', () => {
   assert.equal(changeHtml(setup({ change: null }), 'en'), '');
 });
+
+/* ------------------------------------------------ every range on one chart */
+
+const { radarHtml } = _internals;
+
+function screened(over = {}) {
+  const one = (key, name, lo, hi, ceiling) => [key, {
+    screen: key, name, name_ko: name, kind: 'range', unit: 'deg',
+    reference: [0, ceiling], reference_kind: 'clinical',
+    reference_source: 'AAOS', views: ['side_left'],
+    left: { peak: { value: lo, availability: 'available' } },
+    right: { peak: { value: hi, availability: 'available' } },
+    both: null,
+    asymmetry: { value: Math.abs(hi - lo), unit: 'deg',
+                 availability: 'available', reason: '', tolerance: 10 },
+    shorter_side: lo < hi ? 'left' : 'right',
+  }];
+  return {
+    attempted: ['shoulder_flexion', 'hip_flexion', 'knee_flexion'],
+    results: Object.fromEntries([
+      one('shoulder_flexion', 'Shoulder flexion', 126, 162, 180),
+      one('hip_flexion', 'Hip flexion', 95, 103, 120),
+      one('knee_flexion', 'Knee flexion', 123, 126, 135),
+    ]),
+    ...over,
+  };
+}
+
+test('every screen measured gets a spoke', () => {
+  const html = radarHtml(screened(), 'en');
+  for (const name of ['Shoulder flexion', 'Hip flexion', 'Knee flexion']) {
+    assert.ok(html.includes(name), name);
+  }
+});
+
+test('each spoke shows what was reached against what was expected', () => {
+  const html = radarHtml(screened(), 'en');
+  assert.match(html, /126° \/ 180°/);
+  assert.match(html, /95° \/ 120°/);
+});
+
+test('a spoke is the side that went less far, never the average of the two', () => {
+  /* A shoulder that goes to 180 on one side and 120 on the other is a body
+   * with a 120-degree shoulder. Averaging it to 150 draws a person who does
+   * not exist. */
+  const html = radarHtml(screened(), 'en');
+  assert.match(html, /126° \/ 180°/);
+  assert.ok(!/144°/.test(html), 'the mean of 126 and 162 is nowhere on it');
+});
+
+test('fewer than three ranges is not a shape and is not drawn', () => {
+  const one = screened();
+  one.attempted = ['shoulder_flexion'];
+  assert.equal(radarHtml(one, 'en'), '');
+});
+
+test('a screen nothing measured is left off rather than drawn at zero', () => {
+  const some = screened();
+  some.results.hip_flexion.left = { peak: { value: null } };
+  some.results.hip_flexion.right = { peak: { value: null } };
+  const html = radarHtml(some, 'en');
+  assert.ok(!/Hip flexion/.test(html));
+});
+
+test('the chart says what its outer ring is', () => {
+  const html = radarHtml(screened(), 'en');
+  assert.match(html, /outer ring is the published reference/);
+});
+
+test('the chart reads in Korean', () => {
+  const html = radarHtml(screened(), 'ko');
+  assert.match(html, /관절 가동 범위 비교/);
+  assert.match(html, /바깥 원은 공개된 기준 범위입니다/);
+});
+
+test('no spoke can reach past the outer ring', () => {
+  /* A squat below parallel reaches more than the benchmark. The spoke stops
+   * at the edge rather than spilling out of the chart. */
+  const deep = screened();
+  deep.results.knee_flexion.left = { peak: { value: 200, availability: 'available' } };
+  deep.results.knee_flexion.right = { peak: { value: 210, availability: 'available' } };
+  const shape = radarHtml(deep, 'en').match(/<polygon points="([^"]+)" fill="#/)[1];
+  for (const point of shape.trim().split(/\s+/)) {
+    const [x, y] = point.split(',').map(Number);
+    assert.ok(Math.hypot(x, y) <= 79, `${point} is outside the ring`);
+  }
+});
+
+test('the score card counts its checks in the reader’s language', () => {
+  const state = { report: { ...report(), checks: 15 }, photos: new Map(),
+                  taken: '2026-09-14', who: '', catalogue: CATALOGUE };
+  assert.match(_internals.reportHtml(state, 'en'), /15 checks/);
+  assert.match(_internals.reportHtml(state, 'ko'), /15개 항목/);
+});
+
+test('an earlier screening is listed by name, not by its key', () => {
+  /* A filed row stores what was screened, not what it is called this month,
+   * so the strip has to look the names up -- which is how "shoulder_flexion"
+   * came to be printed on a Korean page. */
+  const state = setup({
+    report: report({ screening_id: 9,
+      catalogue_detail: [{ key: 'shoulder_flexion', name: 'Shoulder flexion',
+                           name_ko: '어깨 굽힘' }] }),
+    history: { screenings: [{ id: 2, taken_on: '2026-08-01', score: 64,
+                              screens: ['shoulder_flexion'] }] } });
+  assert.match(historyHtml(state, 'ko'), /어깨 굽힘/);
+  assert.ok(!/shoulder_flexion/.test(historyHtml(state, 'ko')));
+  assert.match(historyHtml(state, 'en'), /Shoulder flexion/);
+});
+
+test('a screen the page has never heard of is still readable', () => {
+  const state = setup({ report: report({ catalogue_detail: [] }),
+    catalogue: [],
+    history: { screenings: [{ id: 2, taken_on: '2026-08-01', score: 64,
+                              screens: ['something_new'] }] } });
+  const html = historyHtml(state, 'en');
+  assert.match(html, /something new/);
+  assert.ok(!/something_new/.test(html), 'and not as a key');
+});

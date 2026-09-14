@@ -33,6 +33,14 @@
  * of product is asked for most and the one four photographs cannot give.
  */
 import { EXERCISE } from '../content/exercises.js';
+/* The atlas the body behind this screen is already drawn from. The muscle
+   names on a finding are looked up in it rather than kept here again. */
+import { MUSCLE_INFO } from '../content/muscles.js';
+/* And the registry that maps a muscle's name to the piece of geometry drawn
+   for it, so a chip on a finding can light that muscle on the body. Imported
+   the same way boot.js imports it; it is built during the application's own
+   start-up and is simply empty until then, which the caller checks. */
+import { registry } from '../structures.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g,
   (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -67,6 +75,8 @@ const T = {
   findings:   { en: 'What the photographs measured', ko: '사진에서 측정한 내용' },
   clear:      { en: 'Every measurement sits inside its usual range.', ko: '측정한 모든 항목이 정상 범위 안에 있습니다.' },
   plan:       { en: 'Where a first session could start', ko: '첫 세션 시작 지점' },
+  doseNote:   { en: 'A place to start, not a prescription. The frequency follows how far out the finding was; adjust it in the room.',
+                ko: '시작점이며 처방이 아닙니다. 빈도는 측정된 편차에 따라 정한 것이므로 현장에서 조정하세요.' },
   habits:     { en: 'Between sessions', ko: '세션 사이에 할 일' },
   cannot:     { en: 'What these photographs cannot measure', ko: '이 사진으로 측정할 수 없는 것' },
   notTaken:   { en: 'Photographs not supplied', ko: '촬영되지 않은 사진' },
@@ -84,6 +94,14 @@ const T = {
   signIn:     { en: 'Sign in first — an assessment belongs to somebody.',
                 ko: '먼저 로그인하세요. 분석 결과는 특정 회원에게 속합니다.' },
   disputed:   { en: 'the two photographs disagreed', ko: '두 사진이 어긋났습니다' },
+  whereItIs:  { en: 'Where it is', ko: '부위별 상태' },
+  even:       { en: 'Even', ko: '정상' },
+  watchRegion:{ en: 'Watch', ko: '주의' },
+  offRegion:  { en: 'Off', ko: '불균형' },
+  notMeasuredRegion: { en: 'Not measured', ko: '측정 안 됨' },
+  actsHere:   { en: 'Muscles that act here', ko: '이 부위에 작용하는 근육' },
+  onThePhotos:{ en: 'What was measured, on the photographs', ko: '사진에서 측정한 항목' },
+  noPhoto:    { en: 'Photograph not kept', ko: '사진 미보관' },
   onFile:     { en: 'Already on file', ko: '기록된 분석' },
   trend:      { en: 'Score over time', ko: '점수 변화' },
   openIt:     { en: 'Open', ko: '열기' },
@@ -220,9 +238,19 @@ const STYLE = `
 #ss-pos .ss-go{margin:22px 0 0;display:flex;gap:12px;align-items:center;
   flex-wrap:wrap}
 #ss-pos .ss-bad{color:var(--gold);font-size:12px}
-#ss-pos .ss-grid{display:grid;gap:22px;grid-template-columns:260px 1fr;
+/* Two equal columns, not a 260px ribbon beside a wide one. The findings used
+   to live in the narrow side, which is where the substance of the report was:
+   four words to a line, under a heading twice the width of its own text. */
+#ss-pos .ss-grid{display:grid;gap:22px;grid-template-columns:1fr 1fr;
   align-items:start;margin:8px 0 0}
 @media(max-width:820px){#ss-pos .ss-grid{grid-template-columns:1fr}}
+/* The findings across the sheet, as cards. They are what the report is for,
+   and a column cannot hold them. */
+#ss-pos .ss-findings{display:grid;gap:14px;margin:0 0 24px;
+  grid-template-columns:repeat(auto-fit,minmax(310px,1fr));align-items:start}
+#ss-pos .ss-findings > .ss-find{border:1px solid var(--line);
+  border-left-width:3px;border-radius:7px;padding:14px 16px;margin:0;
+  background:rgba(255,255,255,.02)}
 #ss-pos .ss-card{border:1px solid var(--line);border-radius:7px;padding:16px 17px;
   background:rgba(255,255,255,.02)}
 #ss-pos .ss-card h2{margin:0 0 12px;font-size:12px;font-weight:600;
@@ -251,8 +279,12 @@ const STYLE = `
   background:#e8b25a;color:#1c1408}
 #ss-pos .ss-fix button:hover:not(:disabled){filter:brightness(1.08)}
 #ss-pos .ss-fix button:disabled{opacity:.5;cursor:default}
+/* Two across, not four. Every finding is now named on the photograph it was
+   measured from, and a name needs room: at a quarter of the sheet the labels
+   were legible only to somebody who already knew what they said. */
 #ss-pos .ss-shots{display:grid;gap:18px;
-  grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin:0 0 22px}
+  grid-template-columns:repeat(auto-fit,minmax(330px,1fr));margin:0 0 10px}
+@media(min-width:900px){#ss-pos .ss-shots{grid-template-columns:repeat(2,1fr)}}
 #ss-pos figure{margin:0;border:1px solid var(--line);border-radius:7px;
   overflow:hidden;background:#05070d}
 /* A fixed box, so four photographs of four different shapes make four cards
@@ -266,6 +298,12 @@ const STYLE = `
  * height from the content and ignores the ratio -- which is how four cards
  * with an explicit 3/4 box came out 602, 582, 651 and 833 px tall. */
 #ss-pos .ss-frame{position:relative;line-height:0;background:#05070d}
+/* Nothing underneath, so the outline needs ground of its own: without it the
+   skeleton floats in black and reads as a rendering fault rather than as a
+   measurement of a body that was photographed and not kept. */
+#ss-pos .ss-frame.ss-noshot{background:
+  repeating-linear-gradient(0deg,#0a121c 0 1px,transparent 1px 34px),
+  repeating-linear-gradient(90deg,#0a121c 0 1px,transparent 1px 34px),#070c14}
 #ss-pos .ss-frame img,#ss-pos .ss-frame svg{position:absolute;inset:0;
   width:100%;height:100%}
 #ss-pos .ss-frame img{object-fit:contain}
@@ -335,6 +373,50 @@ const STYLE = `
   border:1px solid var(--line2);background:rgba(255,255,255,.02);
   font-size:11.5px;color:var(--dim);line-height:1.75}
 #ss-pos .ss-spark{width:100%;height:88px;display:block}
+/* Three panels across the top: how this body is, where the problem is, and
+   what is being done about it. Everything below is the working. */
+#ss-pos .ss-summary{display:grid;gap:16px;margin:0 0 24px;
+  grid-template-columns:repeat(auto-fit,minmax(270px,1fr));align-items:start}
+@media(min-width:980px){#ss-pos .ss-summary{grid-template-columns:1fr 1fr 1.1fr}}
+/* Several panels carry their own top margin so they stack under a sibling.
+   The first one in any column has nothing to stack under, and a column that
+   starts 16px lower than the one beside it reads as a misalignment. */
+#ss-pos .ss-summary > div > .ss-card:first-child,
+#ss-pos .ss-grid > div > .ss-card:first-child{margin-top:0}
+#ss-pos h2.ss-section{margin:0 0 12px;font-size:12px;font-weight:600;
+  color:var(--dim);letter-spacing:.08em;text-transform:uppercase}
+#ss-pos .ss-scale{margin:14px 0 4px}
+#ss-pos .ss-scalebar{position:relative;display:flex;height:8px;
+  border-radius:4px;overflow:hidden}
+#ss-pos .ss-scalebar i{display:block;height:100%}
+#ss-pos .ss-scalebar b{position:absolute;top:-4px;width:3px;height:16px;
+  border-radius:2px;background:#fff;transform:translateX(-1.5px);
+  box-shadow:0 0 0 2px rgba(0,0,0,.45)}
+#ss-pos .ss-scaleends{display:flex;justify-content:space-between;
+  margin:5px 0 0;font-size:9.5px;color:var(--dim2)}
+#ss-pos .ss-muscles{margin:12px 0 0;padding:11px 0 0;
+  border-top:1px solid var(--line)}
+#ss-pos .ss-muscles h4{margin:0 0 9px;font-size:10.5px;font-weight:600;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--dim2)}
+#ss-pos .ss-acts{margin:0 0 9px}
+#ss-pos .ss-acts small{display:block;font-size:10.5px;color:var(--dim);
+  margin:0 0 5px}
+#ss-pos .ss-muscle{padding:3px 9px;border-radius:11px;font:inherit;
+  font-size:10.5px;cursor:pointer;background:var(--glass);
+  border:1px solid var(--line2);color:var(--dim)}
+#ss-pos .ss-muscle:hover{color:var(--txt);border-color:var(--acc)}
+#ss-pos .ss-dose{display:inline-block;margin-left:8px;padding:1px 8px;
+  border-radius:9px;font-size:10px;font-weight:600;letter-spacing:.02em;
+  border:1px solid currentColor;white-space:nowrap}
+#ss-pos .ss-dosenote{margin:12px 0 0;font-size:10.5px;color:var(--dim2);
+  line-height:1.7}
+#ss-pos .ss-bodymap{text-align:center}
+#ss-pos .ss-body{width:100%;max-width:340px;height:auto;display:block;
+  margin:2px auto 12px}
+#ss-pos .ss-legend{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;
+  font-size:10.5px;color:var(--dim)}
+#ss-pos .ss-legend span{display:inline-flex;gap:6px;align-items:center}
+#ss-pos .ss-legend i{width:9px;height:9px;border-radius:2px;flex:none}
 #ss-pos .ss-chg{display:grid;gap:1px;margin:10px 0 0}
 #ss-pos .ss-chg div{display:flex;gap:10px;align-items:baseline;padding:7px 0;
   font-size:11.5px;border-top:1px solid var(--line);color:var(--dim)}
@@ -436,12 +518,98 @@ function overlay(land, marks) {
         text-anchor="middle" font-size="${r * 1.15}" font-weight="700"
         fill="#04121f">${mark.n}</text></g>`);
   }
+  out.push(...callouts(land, marks));
   /* `meet`, not `none`: the photograph beside it is fitted with
    * `object-fit: contain`, and these two are the same transform. Stretching
    * the overlay to the box while the photograph letterboxes inside it puts
    * the skeleton next to the body rather than on it. */
   return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet"
     xmlns="http://www.w3.org/2000/svg">${out.join('')}</svg>`;
+}
+
+/**
+ * Name each finding where it is, on the photograph.
+ *
+ * A numbered dot and a legend underneath makes a reader hold a number in
+ * their head, look away, find the row, and look back. Six times. The name
+ * belongs beside the thing it is about -- which is how every posture report a
+ * studio has ever handed a client is laid out, and the reason this screen
+ * read as a table of numbers next to a picture rather than as an analysis of
+ * a body.
+ *
+ * Labels go on the wall either side of the body, never over it: a caption
+ * across somebody's ribs hides the thing it is captioning. Which side is
+ * decided by which side of the body the point is on, so the leader line runs
+ * outward rather than across. They are then pushed apart vertically until
+ * none overlaps its neighbour, because two labels on one line is worse than
+ * no labels at all.
+ */
+export function callouts(land, marks) {
+  const { keypoints: k, scores: s, width, height } = land;
+  const labelled = marks.filter((m) => m.at && m.name);
+  if (!labelled.length) return [];
+
+  /* Sized against the photograph rather than the screen: the viewBox is the
+     photograph's own pixels, and the card scales the whole thing. A twelfth
+     of the width is about eleven readable pixels in a half-sheet card. */
+  const size = Math.max(width, height) / 46;
+  const gap = size * 2.15;
+  const hips = [11, 12].filter((j) => real(k[j], s[j]));
+  const spine = hips.length
+    ? hips.reduce((a, j) => a + k[j][0], 0) / hips.length : width / 2;
+
+  const sides = { left: [], right: [] };
+  for (const mark of labelled) {
+    /* A point on the body's own midline -- the plumb chain -- has no side of
+       its own, so it takes whichever column is emptier and the two stay
+       balanced rather than stacking into one tall run. */
+    const off = mark.at[0] - spine;
+    const side = Math.abs(off) < width * 0.04
+      ? (sides.left.length <= sides.right.length ? 'left' : 'right')
+      : (off < 0 ? 'left' : 'right');
+    sides[side].push(mark);
+  }
+
+  const out = [];
+  for (const [side, group] of Object.entries(sides)) {
+    if (!group.length) continue;
+    const rows = [...group].sort((a, b) => a.at[1] - b.at[1]);
+    /* Pushed down until nothing overlaps, then lifted as one if the run has
+       walked off the bottom. Both passes are needed: the first guarantees the
+       spacing and the second guarantees it stays on the photograph. */
+    let y = size;
+    const at = rows.map((mark) => {
+      y = Math.max(y + (y === size ? 0 : gap), mark.at[1]);
+      return y;
+    });
+    const overflow = at.length ? at[at.length - 1] - (height - size) : 0;
+    if (overflow > 0) for (let i = 0; i < at.length; i += 1) at[i] -= overflow;
+
+    const edge = side === 'left' ? width * 0.015 : width * 0.985;
+    const anchor = side === 'left' ? 'start' : 'end';
+    rows.forEach((mark, i) => {
+      const ly = Math.max(size, at[i]);
+      const elbow = side === 'left' ? width * 0.13 : width * 0.87;
+      out.push(`<path d="M ${mark.at[0]} ${mark.at[1]} L ${elbow} ${ly}
+        L ${edge + (side === 'left' ? size * 0.3 : -size * 0.3)} ${ly}"
+        fill="none" stroke="${mark.ink}" stroke-width="1.5" opacity=".8"
+        vector-effect="non-scaling-stroke"/>`);
+      out.push(`<text x="${edge}" y="${ly - size * 0.25}"
+        text-anchor="${anchor}" font-size="${size}" font-weight="600"
+        fill="${mark.ink}" stroke="#04070c" stroke-width="${size * 0.24}"
+        paint-order="stroke" stroke-linejoin="round"
+        >${esc(mark.name)}</text>`);
+      const detail = [mark.value, mark.way].filter(Boolean).join('  ');
+      if (detail) {
+        out.push(`<text x="${edge}" y="${ly + size * 0.92}"
+          text-anchor="${anchor}" font-size="${size * 0.82}"
+          fill="#c9d6e4" stroke="#04070c" stroke-width="${size * 0.2}"
+          paint-order="stroke" stroke-linejoin="round"
+          >${esc(detail)}</text>`);
+      }
+    });
+  }
+  return out;
 }
 
 /** The score as an arc, so the number has a scale behind it. */
@@ -559,6 +727,113 @@ function patternHtml(report, lang) {
 }
 
 /** The score broken down by part of the body, which was computed and never shown. */
+/* The body, as five regions that can each be coloured on their own.
+ *
+ * Drawn by hand rather than taken from the anatomy atlas next door: that model
+ * is a quarter of a million triangles and needs WebGL, and this has to print,
+ * appear beside a score, and load on a phone in a studio. A silhouette is the
+ * right amount of body for the question "which part of me is the problem".
+ *
+ * Every path is a region in `pilates.alignment.REGIONS`, and the two are
+ * checked against each other in the tests: a region added there and not here
+ * would simply never be coloured, and nobody would notice. */
+const BODY = {
+  head: 'M50 4 C57 4 61 9 61 16 C61 23 57 29 50 29 C43 29 39 23 39 16 '
+      + 'C39 9 43 4 50 4 Z M46 29 L54 29 L54 36 L46 36 Z',
+  shoulders: 'M46 36 L54 36 C66 36 76 41 79 48 L82 60 L74 62 L70 52 '
+           + 'L70 66 L30 66 L30 52 L26 62 L18 60 L21 48 C24 41 34 36 46 36 Z',
+  trunk: 'M30 66 L70 66 L70 96 C70 100 66 103 60 104 L40 104 '
+       + 'C34 103 30 100 30 96 Z',
+  pelvis: 'M30 104 L70 104 L72 122 C72 128 68 132 62 132 L38 132 '
+        + 'C32 132 28 128 28 122 Z',
+  lower_body: 'M38 132 L48 132 L48 176 L50 196 L44 196 L40 176 Z '
+            + 'M52 132 L62 132 L60 176 L56 196 L50 196 L52 176 Z',
+};
+
+/** The arms, which carry no measurement, so they are drawn and never lit. */
+const BODY_ARMS = 'M18 60 L26 62 L24 92 L17 92 Z M82 60 L74 62 L76 92 L83 92 Z';
+
+/** Where a region's label sits, and which way its leader line runs. */
+const BODY_LABEL = {
+  head: [16, 'left'], shoulders: [50, 'right'], trunk: [84, 'left'],
+  pelvis: [118, 'right'], lower_body: [162, 'left'],
+};
+
+/** The three states a region can be in, named the way a studio names them. */
+const STATUS = [
+  { from: 85, key: 'even', ink: INK.within_band },
+  { from: 65, key: 'watchRegion', ink: INK.watch },
+  { from: 0, key: 'offRegion', ink: INK.marked },
+];
+
+export function regionInk(score) {
+  if (score == null) return 'var(--dim2)';
+  return (STATUS.find((band) => score >= band.from) ?? STATUS[2]).ink;
+}
+
+function regionStatus(score) {
+  if (score == null) return 'notMeasuredRegion';
+  return (STATUS.find((band) => score >= band.from) ?? STATUS[2]).key;
+}
+
+/**
+ * Which part of this body is the problem, answered as a picture.
+ *
+ * The panel every posture report opens with, and the one thing a list of
+ * seventeen numbers cannot do: show a reader where to look before they have
+ * read anything. Each region is filled with the colour its own score earns,
+ * so "the pelvis" stops being a row in a table and becomes a part that is lit
+ * up on a body.
+ */
+export function bodyMapHtml(report, lang) {
+  const rows = report.regions ?? [];
+  if (!rows.length) return '';
+  const byKey = new Map(rows.map((r) => [r.region, r]));
+  const shapes = Object.entries(BODY).map(([key, path]) => {
+    const row = byKey.get(key);
+    const ink = regionInk(row ? row.score : null);
+    const known = row && row.score != null;
+    return `<path d="${path}" fill="${ink}" fill-opacity="${known ? 0.68 : 0.14}"
+      stroke="${ink}" stroke-width="1" stroke-opacity="${known ? 0.9 : 0.35}"
+      data-region="${esc(key)}"/>`;
+  }).join('');
+
+  const leaders = Object.entries(BODY_LABEL).map(([key, [y, side]]) => {
+    const row = byKey.get(key);
+    if (!row) return '';
+    const ink = regionInk(row.score);
+    const x = side === 'left' ? 26 : 74;
+    const to = side === 'left' ? 2 : 98;
+    const anchor = side === 'left' ? 'end' : 'start';
+    const name = lang === 'ko' ? row.name_ko : row.name;
+    return `<line x1="${x}" y1="${y}" x2="${to}" y2="${y}" stroke="${ink}"
+        stroke-width=".7" opacity=".65"/>
+      <text x="${to + (side === 'left' ? -3 : 3)}" y="${y - 1}"
+        text-anchor="${anchor}" font-size="6.4" font-weight="600"
+        fill="${ink}">${esc(name)}</text>
+      <text x="${to + (side === 'left' ? -3 : 3)}" y="${y + 6.4}"
+        text-anchor="${anchor}" font-size="5.6" fill="#8ea3b8"
+        >${row.score == null ? esc(say('notMeasuredRegion', lang))
+                             : `${Math.round(row.score)} / 100`}</text>`;
+  }).join('');
+
+  const legend = STATUS.map((band) => `<span><i style="background:${
+    band.ink}"></i>${esc(say(band.key, lang))}</span>`).join('');
+
+  return `<div class="ss-card ss-bodymap">
+    <h2>${esc(say('whereItIs', lang))}</h2>
+    <!-- Room either side for the names. A box drawn to the body alone clipped
+         "head and neck" to "ad and neck", which is the kind of fault that
+         survives every test that checks the markup and none that looks. -->
+    <svg viewBox="-64 -4 228 212" class="ss-body" xmlns="http://www.w3.org/2000/svg">
+      <path d="${BODY_ARMS}" fill="#2a3a4c" fill-opacity=".5"
+        stroke="#3b4f65" stroke-width=".8"/>
+      ${shapes}${leaders}
+    </svg>
+    <div class="ss-legend">${legend}</div>
+  </div>`;
+}
+
 function regionsHtml(report, lang) {
   const rows = report.regions ?? [];
   if (!rows.length) return '';
@@ -599,6 +874,85 @@ function evennessHtml(report, lang) {
 }
 
 /** The order to work in, and when to photograph again. */
+/**
+ * Where this score sits on the whole scale, rather than only what it is called.
+ *
+ * A number with a word beside it says nothing about how far it is from the
+ * next word along. Eighty-nine and ninety are one point apart and two band
+ * names apart, and a reader shown only "Good" cannot tell which kind of good
+ * they got. The whole scale, with a marker on it, answers that in one look.
+ */
+export function scaleHtml(score, lang) {
+  const bands = score.bands ?? [];
+  if (!bands.length) return '';
+  /* Lowest first, so the bar reads left to right the way a scale does. */
+  const ordered = [...bands].sort((a, b) => a.from - b.from);
+  const stops = ordered.map((band, i) => {
+    const upper = i + 1 < ordered.length ? ordered[i + 1].from : 100;
+    return { ...band, upper, width: upper - band.from };
+  });
+  const segments = stops.map((band) => `<i style="flex:${band.width};
+    background:${bandInk(band.en)}" title="${esc(
+      lang === 'ko' ? band.ko : band.en)}"></i>`).join('');
+  const at = score.value == null ? null : Math.max(0, Math.min(100, score.value));
+  return `<div class="ss-scalebar">${segments}
+    ${at == null ? '' : `<b style="left:${at}%"></b>`}</div>
+    <div class="ss-scaleends"><span>0</span>
+      <span>${esc(lang === 'ko' ? ordered[0].ko : ordered[0].en)}</span>
+      <span>${esc(lang === 'ko' ? ordered[ordered.length - 1].ko
+                                : ordered[ordered.length - 1].en)}</span>
+      <span>100</span></div>`;
+}
+
+/**
+ * The muscles that act where this was measured, each one openable on the body.
+ *
+ * The panel every posture product prints, and the one where it is easiest to
+ * sound authoritative and be wrong. The industry version labels each muscle
+ * overactive or underactive beside a photograph. A photograph cannot know
+ * that: muscle activity is measured with electrodes on a body, and two people
+ * with an identical shoulder line can arrive there by opposite routes. So the
+ * two lists here are named by what the muscles *do* -- raise it, lower it --
+ * and the note under them says in as many words that which one is short is
+ * not something this measured.
+ *
+ * The names are the atlas's own, so each is a chip that lights that muscle on
+ * the three-dimensional body already loaded behind this screen. That is the
+ * part a flat diagram in a PDF cannot do.
+ */
+export function musclesHtml(finding, lang) {
+  const groups = finding.acts_here;
+  if (!Array.isArray(groups) || !groups.length) return '';
+  const rows = groups.map((group) => {
+    const chips = group.muscles.map((name) => `<button type="button"
+      class="ss-muscle" data-muscle="${esc(name)}">${esc(muscleName(name, lang))}
+      </button>`).join('');
+    return `<div class="ss-acts">
+      <small>${esc(lang === 'ko' ? group.action_ko : group.action)}</small>
+      <div class="ss-pills">${chips}</div></div>`;
+  }).join('');
+  const note = lang === 'ko' ? finding.acts_note_ko : finding.acts_note;
+  return `<div class="ss-muscles">
+    <h4>${esc(say('actsHere', lang))}</h4>
+    ${rows}
+    ${note ? `<p class="ss-why">${esc(note)}</p>` : ''}
+  </div>`;
+}
+
+/**
+ * What to call a muscle, in the reader's language.
+ *
+ * Read out of the atlas the application already ships rather than kept in a
+ * second table here: 116 muscles with Korean names are already loaded for the
+ * body behind this screen, and a copy of forty of them in this file is forty
+ * names that stop matching.
+ */
+function muscleName(name, lang) {
+  const entry = MUSCLE_INFO?.[name];
+  const shown = lang === 'ko' ? entry?.ko?.name : entry?.en?.name;
+  return shown || name;
+}
+
 function planHeadHtml(report, lang) {
   const pri = report.priorities ?? [];
   const review = report.review ?? {};
@@ -981,7 +1335,15 @@ function reportHtml(state, lang, identity) {
     const shot = state.photos.get(slot.view);
     const land = report.landmarks?.[slot.view];
     const photo = report.assessment.photos?.[slot.view];
-    if (!shot) {
+    /* Three states, and the middle one is the one that was missing.
+     *
+     * A photograph the studio never took is an empty card with the
+     * instruction on it. A photograph that was taken, measured and dropped --
+     * every assessment reopened from the record -- still has its landmarks,
+     * and drawing them over an empty frame is the whole of what that record
+     * is. Treating the two the same printed the instruction for a photograph
+     * that had already been taken, over the measurements it produced. */
+    if (!shot && !land) {
       return `<figure><div class="ss-frame" ${frame}><div style="position:absolute;
         inset:0;display:flex;align-items:center;justify-content:center">
         <span style="font-size:11px;color:var(--dim2);padding:18px;
@@ -998,10 +1360,12 @@ function reportHtml(state, lang, identity) {
       <span class="ss-val" style="color:${mark.ink}">${esc(mark.value)}</span>
     </button>`).join('');
     return `<figure>
-      <div class="ss-frame" ${frame}><img src="${shot.objectUrl}" alt="">
+      <div class="ss-frame ${shot ? '' : 'ss-noshot'}" ${frame}>
+        ${shot ? `<img src="${shot.objectUrl}" alt="">` : ''}
         ${land ? overlay(land, marks) : ''}</div>
       <figcaption>${esc(titleOf(slot, lang))}
-        ${photo?.problem ? `<small>${esc(photo.problem)}</small>` : ''}</figcaption>
+        ${photo?.problem ? `<small>${esc(photo.problem)}</small>`
+          : (shot ? '' : `<small>${esc(say('noPhoto', lang))}</small>`)}</figcaption>
       <div class="ss-marks">${rows}</div>
     </figure>`;
   }).join('');
@@ -1013,6 +1377,7 @@ function reportHtml(state, lang, identity) {
         title="${esc(lang === 'ko' ? e.why_ko : e.why)}">${esc(
           (lang === 'ko' && e.name_ko) || e.name || e.key)}</button>`).join('');
     const usually = lang === 'ko' ? f.usually_ko : f.usually;
+    const acts = musclesHtml(f, lang);
     return `<div class="ss-find" style="border-left-color:${colour}">
       <h3>${esc((lang === 'ko' && f.title_ko) || f.title)}</h3>
       <div class="ss-num" style="color:${colour}">${esc(
@@ -1022,6 +1387,7 @@ function reportHtml(state, lang, identity) {
       <p>${esc((lang === 'ko' && f.means_ko) || f.means)}</p>
       <p class="ss-ev">${esc((lang === 'ko' && f.evidence_ko) || f.evidence)}</p>
       ${usually ? `<p class="ss-why">${esc(say('usually', lang))}: ${esc(usually)}</p>` : ''}
+      ${acts}
       ${pills ? `<div class="ss-pills">${pills}</div>` : ''}
     </div>`;
   }).join('');
@@ -1029,7 +1395,14 @@ function reportHtml(state, lang, identity) {
   const plan = (report.programme ?? []).map((entry) => {
     const name = (lang === 'ko' && entry.name_ko) || entry.name || entry.key;
     const why = (lang === 'ko' ? entry.why_ko?.[0] : entry.why?.[0]) ?? '';
-    return `<li><b>${esc(name)}</b> — ${esc(why)}
+    /* How much of it, beside what it is. A plan without a dose is a list of
+       exercise names, and a studio reading one has to invent the frequency
+       itself -- differently for each student, and differently again next
+       week. */
+    const dose = lang === 'ko' ? entry.dose?.ko : entry.dose?.en;
+    return `<li><b>${esc(name)}</b>${dose ? `<span class="ss-dose"
+      style="color:${INK[entry.dose.severity] ?? INK.within_band}">${
+        esc(dose)}</span>` : ''} — ${esc(why)}
       ${EXERCISE[entry.key] ? `<div class="ss-pills"><button type="button"
         data-ex="${esc(entry.key)}">${esc(say('showOn', lang))}</button></div>`
         : ''}</li>`;
@@ -1075,36 +1448,50 @@ function reportHtml(state, lang, identity) {
     ${fixHtml(state, lang)}
     ${report.from_file ? `<p class="ss-fromfile">${
       esc(say('fromFile', lang))}</p>` : ''}
+
+    <!-- The summary band. Three questions, answered before anything is read:
+         how is this body overall, which part of it is the problem, and what
+         is being done about it. A reader who stops here has the report. -->
+    <div class="ss-summary">
+      <div class="ss-card" style="color:${ink}">
+        ${dial(score.value, ink, lang)}
+        <div class="ss-band">${esc(lang === 'ko' ? score.band_ko : score.band)}</div>
+        <div class="ss-bandnote">${esc(lang === 'ko' ? score.note_ko : score.note)}</div>
+        <div class="ss-scale">${scaleHtml(score, lang)}</div>
+        <div class="ss-ladder">${ladder}</div>
+      </div>
+      ${bodyMapHtml(report, lang)}
+      <div>
+        ${planHeadHtml(report, lang)}
+        ${evennessHtml(report, lang)}
+      </div>
+    </div>
+
+    <h2 class="ss-section">${esc(say('onThePhotos', lang))}</h2>
     <div class="ss-shots">${shots}</div>
+
+    <h2 class="ss-section">${esc(say('findings', lang))}</h2>
+    ${held ? `<p style="margin:0 0 14px;font-size:12px;
+      color:${INK.notable};line-height:1.7">${esc(held)}</p>` : ''}
+    ${findings ? `<div class="ss-findings">${findings}</div>`
+      : (held ? '' : `<p class="ss-card" style="margin:0 0 24px;font-size:12px;
+        color:${INK.within_band}">${esc(say('clear', lang))}</p>`)}
+
     <div class="ss-grid">
       <div>
-        <div class="ss-card" style="color:${ink}">
-          ${dial(score.value, ink, lang)}
-          <div class="ss-band">${esc(lang === 'ko' ? score.band_ko : score.band)}</div>
-          <div class="ss-bandnote">${esc(lang === 'ko' ? score.note_ko : score.note)}</div>
-          <div class="ss-ladder">${ladder}</div>
-        </div>
-        ${evennessHtml(report, lang)}
+        ${patternHtml(report, lang)}
         ${regionsHtml(report, lang)}
+        ${changeHtml(state, lang)}
+        ${historyHtml(state, lang)}
       </div>
       <div>
-        ${patternHtml(report, lang)}
-        <div class="ss-card" style="margin-top:16px">
-          <h2>${esc(say('findings', lang))}</h2>
-          ${held ? `<p style="margin:0 0 14px;font-size:12px;
-            color:${INK.notable};line-height:1.7">${esc(held)}</p>` : ''}
-          ${findings || (held ? '' : `<p style="margin:0;font-size:12px;
-            color:${INK.within_band}">${esc(say('clear', lang))}</p>`)}
-        </div>
-        ${planHeadHtml(report, lang)}
-        ${plan ? `<div class="ss-card" style="margin-top:16px">
+        ${plan ? `<div class="ss-card">
           <h2>${esc(say('plan', lang))}</h2>
-          <ol class="ss-plan">${plan}</ol></div>` : ''}
+          <ol class="ss-plan">${plan}</ol>
+          <p class="ss-dosenote">${esc(say('doseNote', lang))}</p></div>` : ''}
         ${habits ? `<div class="ss-card" style="margin-top:16px">
           <h2>${esc(say('habits', lang))}</h2>
           <ul class="ss-habits">${habits}</ul></div>` : ''}
-        ${changeHtml(state, lang)}
-        ${historyHtml(state, lang)}
       </div>
     </div>
     <div class="ss-limits">
@@ -1290,6 +1677,16 @@ function wire(host, state, nw, served, identity, draw, shut) {
     row.addEventListener('blur', () => set(false));
   }
 
+  for (const chip of host.querySelectorAll('[data-muscle]')) {
+    chip.addEventListener('click', () => {
+      /* Onto the body, and hidden rather than closed -- the same rule the
+       * exercise pills follow, and for the same reason: there is no way back
+       * to a report built from photographs that have already been dropped. */
+      if (!showMuscle(nw, chip.dataset.muscle)) return;
+      peek(host, nw);
+    });
+  }
+
   for (const pill of host.querySelectorAll('[data-ex]')) {
     pill.addEventListener('click', () => {
       /* Into the anatomy application underneath: the exercise's muscles light
@@ -1329,6 +1726,28 @@ function peek(host, nw) {
   });
   document.body.appendChild(back);
   return back;
+}
+
+/**
+ * Light one named muscle on the body behind this screen.
+ *
+ * Returns whether it found it. A chip that silently does nothing is worse
+ * than a chip that is not there, so the caller only hides the report when
+ * there is something underneath to look at -- on a copy of the site with no
+ * anatomy loaded, or before the registry has finished building, the press is
+ * simply ignored and the reader keeps their report.
+ */
+export function showMuscle(nw, name) {
+  let found = null;
+  try {
+    const reg = registry();
+    found = reg?.byName?.get(name) ?? null;
+  } catch {
+    return false;     // the registry is not built yet
+  }
+  if (!found || typeof nw?.selectStructure !== 'function') return false;
+  nw.selectStructure(found.id);
+  return true;
 }
 
 function readAsDataUrl(file) {
@@ -1398,4 +1817,6 @@ export const _internals = { overlay, marksFor, anchorOf, dial, spark,
                             historyHtml, changeHtml, patternHtml,
                             regionsHtml, evennessHtml, planHeadHtml,
                             formatValue, peek, fixHtml, applyFix, reportHtml,
+                            bodyMapHtml, regionInk, callouts, scaleHtml,
+                            musclesHtml, showMuscle,
                             INK, ANCHOR, CHIP: T };

@@ -78,6 +78,9 @@ const T = {
                 ko: '임상 정상 범위가 아닌 기능 기준입니다' },
   estimated:  { en: 'estimated', ko: '추정' },
   plan:       { en: 'What to work on', ko: '추천 운동' },
+  radar:      { en: 'Range measured against range expected', ko: '관절 가동 범위 비교' },
+  radarNote:  { en: 'The outer ring is the published reference. Each spoke is the side that travelled less, because a body with one stiff shoulder is a body with a stiff shoulder.',
+                ko: '바깥 원은 공개된 기준 범위입니다. 각 축은 덜 움직인 쪽을 표시합니다. 한쪽이 뻣뻣하면 그 몸은 뻣뻣한 쪽을 기준으로 봐야 하기 때문입니다.' },
   showOn:     { en: 'Show on the body', ko: '신체에서 보기' },
   history:    { en: 'Earlier screenings', ko: '이전 검사' },
   change:     { en: 'Against the last one', ko: '이전 검사와 비교' },
@@ -87,6 +90,7 @@ const T = {
   offline:    { en: 'This copy of the site cannot measure a clip. It needs the analysis half of the project running behind it.',
                 ko: '이 사이트에서는 영상을 측정할 수 없습니다. 분석 서버가 함께 실행되어야 합니다.' },
   loading:    { en: 'Fetching how to film this…', ko: '촬영 방법을 불러오는 중…' },
+  checksN:    { en: '{n} checks', ko: '{n}개 항목' },
   back:       { en: '\u2190  Back to the screening', ko: '\u2190  검사 결과로 돌아가기' },
 };
 
@@ -192,6 +196,10 @@ const STYLE = `
   font:inherit;font-size:11px;cursor:pointer;background:var(--glass);
   border:1px solid var(--line2);color:var(--dim)}
 #ss-mv .ss-plan button:hover{color:var(--txt);border-color:var(--acc)}
+#ss-mv .ss-radar{width:100%;max-width:430px;height:auto;display:block;
+  margin:0 auto 10px}
+#ss-mv .ss-radarnote{margin:0;font-size:10.5px;color:var(--dim2);
+  line-height:1.7}
 #ss-mv .ss-grid{display:grid;gap:16px;
   grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
 #ss-mv .ss-disc{margin:26px 0 0;font-size:10.5px;color:var(--dim2);
@@ -316,6 +324,21 @@ const SIDE_NAME = {
 };
 
 const named = (entry, lang) => (lang === 'ko' && entry?.name_ko) || entry?.name || '';
+
+/**
+ * What to call a screen, from whichever list knows it.
+ *
+ * The history strip is given keys, not names -- a filed row stores what was
+ * screened, not what it is called this month -- so it has to look them up.
+ * The report's own catalogue first, then the page's, then the key itself,
+ * which is how "shoulder_flexion" ended up printed on a Korean page.
+ */
+function screenName(state, key, lang) {
+  const entry = (state.report?.catalogue_detail ?? [])
+      .find((s) => s.key === key)
+    ?? (state.catalogue ?? []).find((s) => s.key === key);
+  return named(entry, lang) || key.replace(/_/g, ' ');
+}
 
 export function screenOf(state) {
   return state.catalogue.find((s) => s.key === state.chosen) ?? state.catalogue[0];
@@ -510,6 +533,102 @@ export function programmeHtml(report, lang) {
   </div>`;
 }
 
+/**
+ * Every range measured, on one chart, against the range that was expected.
+ *
+ * A list of six screens with two numbers each is six comparisons a reader has
+ * to hold at once. The same six drawn as a web is one shape: a body short in
+ * one direction has a dent in it, and a body short everywhere is a small
+ * polygon inside a large one. Nothing is said that the numbers do not say --
+ * each spoke is that screen's reached-over-reference, which is the same
+ * arithmetic the score uses and is printed beside it.
+ *
+ * The outer ring is the published reference, not a best-ever or a studio
+ * average: a spoke touching the edge means the joint did what a body is
+ * documented as doing, and there is no room beyond it to earn.
+ */
+export function radarHtml(report, lang) {
+  const rows = (report.attempted ?? [])
+    .map((key) => {
+      const payload = report.results[key];
+      const ceiling = payload.reference?.[1] ?? 0;
+      const sides = ['left', 'right', 'both']
+        .map((side) => payload[side]?.peak?.value)
+        .filter((v) => v !== null && v !== undefined);
+      if (!sides.length || !ceiling) return null;
+      /* The *lesser* side, not the mean. A shoulder that goes to 180 on one
+         side and 120 on the other is a body with a 120-degree shoulder, and
+         averaging it to 150 draws a chart of a person who does not exist. */
+      const reached = Math.min(...sides);
+      return {
+        key,
+        name: lang === 'ko' ? payload.name_ko : payload.name,
+        reached,
+        ceiling,
+        unit: payload.unit,
+        share: Math.max(0, Math.min(1, reached / ceiling)),
+      };
+    })
+    .filter(Boolean);
+  if (rows.length < 3) return '';
+
+  const R = 78;
+  const cx = 0;
+  const cy = 0;
+  const at = (i, r) => {
+    const angle = (Math.PI * 2 * i) / rows.length - Math.PI / 2;
+    return [cx + Math.cos(angle) * r, cy + Math.sin(angle) * r];
+  };
+
+  const rings = [0.25, 0.5, 0.75, 1].map((f) => {
+    const points = rows.map((_, i) => at(i, R * f).map((n) => n.toFixed(1)).join(','));
+    return `<polygon points="${points.join(' ')}" fill="none"
+      stroke="#2a3a4c" stroke-width="${f === 1 ? 1.2 : 0.6}"/>`;
+  }).join('');
+
+  const spokes = rows.map((_, i) => {
+    const [x, y] = at(i, R);
+    return `<line x1="0" y1="0" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"
+      stroke="#2a3a4c" stroke-width=".6"/>`;
+  }).join('');
+
+  const shape = rows.map((row, i) =>
+    at(i, R * row.share).map((n) => n.toFixed(1)).join(',')).join(' ');
+
+  const dots = rows.map((row, i) => {
+    const [x, y] = at(i, R * row.share);
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.4"
+      fill="${INK.within_band}"/>`;
+  }).join('');
+
+  const names = rows.map((row, i) => {
+    const [x, y] = at(i, R + 15);
+    const anchor = Math.abs(x) < 8 ? 'middle' : (x > 0 ? 'start' : 'end');
+    const unit = row.unit === 's' ? 's' : '\u00b0';
+    return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}"
+        text-anchor="${anchor}" font-size="7" font-weight="600"
+        fill="#c9d6e4">${esc(row.name)}</text>
+      <text x="${x.toFixed(1)}" y="${(y + 8).toFixed(1)}"
+        text-anchor="${anchor}" font-size="6.4" fill="#7d8ea4"
+        >${Math.round(row.reached)}${unit} / ${Math.round(row.ceiling)}${unit}</text>`;
+  }).join('');
+
+  return `<div class="ss-card">
+    <h2>${esc(say('radar', lang))}</h2>
+    <!-- Wide enough for the longest name in the catalogue. Drawn to the web
+         alone it clipped "Shoulder abduction" to "Shoulder ab", which every
+         test that checks the markup passes and every reader notices. -->
+    <svg viewBox="-172 -112 344 224" class="ss-radar"
+      xmlns="http://www.w3.org/2000/svg">
+      ${rings}${spokes}
+      <polygon points="${shape}" fill="${INK.within_band}" fill-opacity=".22"
+        stroke="${INK.within_band}" stroke-width="1.4"/>
+      ${dots}${names}
+    </svg>
+    <p class="ss-radarnote">${esc(say('radarNote', lang))}</p>
+  </div>`;
+}
+
 export function findingsHtml(report, lang) {
   const found = report.findings ?? [];
   if (!found.length) {
@@ -547,7 +666,8 @@ export function historyHtml(state, lang) {
       ${row.score === null || row.score === undefined
         ? esc(say('noScore', lang))
         : `${Math.round(row.score)}/100`}
-      <span style="color:var(--dim2)"> · ${esc(row.screens.join(', '))}</span>
+      <span style="color:var(--dim2)"> · ${esc(row.screens.map(
+        (key) => screenName(state, key, lang)).join(', '))}</span>
     </p>`).join('')}
   </div>`;
 }
@@ -599,7 +719,7 @@ function reportHtml(state, lang) {
         esc(report.score_withheld_reason ?? '')}</p>`
       : `<div><span class="ss-num" style="font-size:32px">${Math.round(score)}</span>
          <span class="ss-detail" style="margin-left:8px">/ 100 · ${
-           report.checks} checks</span></div>`}
+           esc(say('checksN', lang).replace('{n}', report.checks))}</span></div>`}
   </div>`;
 
   const refused = (report.refused ?? []).map((r) => `<p class="ss-detail">
@@ -621,6 +741,7 @@ function reportHtml(state, lang) {
     <div class="ss-grid">
       <div>${blocks}</div>
       <div>
+        ${radarHtml(report, lang)}
         ${scoreCard}
         <div class="ss-card">
           <h2>${esc(say('findings', lang))}</h2>
@@ -913,5 +1034,5 @@ async function compareWith(state, before, after) {
 export const _internals = { setupHtml, reportHtml, sideHtml, asymmetryHtml,
                             findingsHtml, barHtml, longestTrack, screenOf,
                             sidesOf, howOf, programmeHtml, peek,
-                            historyHtml, changeHtml,
+                            historyHtml, changeHtml, radarHtml,
                             INK, CHIP: T, CATALOGUE };

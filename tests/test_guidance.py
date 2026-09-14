@@ -465,3 +465,114 @@ class TestPrioritiesAreDistinct:
     def test_the_list_is_not_padded_to_a_fixed_length(self):
         out = report_for(shoulder_tilt=14.0)
         assert len(out["priorities"]) == 1
+
+
+class TestTheDose:
+    """How much of an exercise, beside what it is.
+
+    A plan without one is a list of exercise names, and a studio reading it
+    invents the frequency itself -- differently for each student, and
+    differently again next week.
+    """
+
+    def test_every_exercise_carries_how_often_and_for_how_long(self):
+        found = gd.findings(ik.assess_photos(four(shoulder_tilt=13.0,
+                                                  hip_tilt=9.0)))
+        plan = gd.programme(found)
+        assert plan
+        for entry in plan:
+            assert entry["dose"]["times_per_week"] >= 1
+            assert entry["dose"]["weeks"] >= 1
+            assert entry["dose"]["en"] and entry["dose"]["ko"]
+
+    def test_something_further_out_is_worked_more_often(self):
+        marked = gd.dose(gd.MARKED)["times_per_week"]
+        watch = gd.dose(gd.WATCH)["times_per_week"]
+        assert marked > watch, "the same plan for both is not a plan"
+
+    def test_the_programme_runs_until_the_next_assessment(self):
+        """A six-week programme with a ten-week review date is two plans."""
+        for severity in (gd.MARKED, gd.NOTABLE, gd.WATCH, gd.WITHIN):
+            assert gd.dose(severity)["weeks"] == gd.REVIEW_WEEKS[severity]
+
+    def test_an_exercise_answering_two_findings_takes_the_worse_dose(self):
+        """It is the same movement either way; what changes is how much of it
+        the body in front of you needs."""
+        found = gd.findings(ik.assess_photos(four(shoulder_tilt=14.0,
+                                                  hip_tilt=14.0)))
+        plan = gd.programme(found)
+        shared = [e for e in plan if len(e["for"]) > 1]
+        for entry in shared:
+            assert entry["severity"] == gd.MARKED
+
+    def test_the_dose_reads_in_both_languages(self):
+        out = gd.dose(gd.NOTABLE)
+        assert "week" in out["en"]
+        assert "주" in out["ko"]
+
+
+class TestWhereToLook:
+    """The muscle panel, and the claim it is careful not to make.
+
+    Every posture product prints "right upper trapezius overactive" beside a
+    photograph. A photograph cannot know that: muscle activity is measured
+    with electrodes on a body, and two people with an identical shoulder line
+    can arrive there by opposite routes. These tests are mostly about what is
+    absent.
+    """
+
+    def test_every_finding_a_report_can_make_names_its_muscles(self):
+        """A finding with no muscles is a card with a gap where the useful
+        half goes."""
+        banded = [name for name, band in al.NORMAL_BANDS.items() if band]
+        for name in banded:
+            assert gd.acts_here(name), f"{name} names no muscles"
+
+    def test_a_metric_with_no_band_is_not_given_muscles(self):
+        """It is never a finding, so it never has a card to put them on."""
+        assert al.NORMAL_BANDS.get("torso_rotation_index") is None
+        assert gd.acts_here("torso_rotation_index") is None
+
+    def test_both_directions_are_named_as_actions(self):
+        """Not as states. "Raises it" is anatomy; "is overactive" is a
+        measurement nobody took."""
+        for name in gd.ACTS_HERE:
+            groups = gd.acts_here(name)
+            assert len(groups) == 2
+            for group in groups:
+                assert group["action"] and group["action_ko"]
+                assert group["muscles"]
+
+    def test_nothing_claims_a_muscle_is_tight_or_weak(self):
+        forbidden = ("overactive", "underactive", "tight", "weak", "inhibited",
+                     "과활성", "저활성")
+        text = repr(gd.ACTS_HERE).lower()
+        for word in forbidden:
+            assert word.lower() not in text, f"{word!r} is a claim from EMG"
+
+    def test_the_note_that_says_so_travels_with_every_finding(self):
+        report = report_for(shoulder_tilt=12.0)
+        for finding in report["findings"]:
+            if not finding["acts_here"]:
+                continue
+            assert "not something a photograph can tell you" in finding["acts_note"]
+            assert "사진으로 알 수 없으며" in finding["acts_note_ko"]
+
+    def test_the_muscles_reach_the_report(self):
+        report = report_for(shoulder_tilt=12.0)
+        shoulder = [f for f in report["findings"]
+                    if f["metric"] == "shoulder_tilt"][0]
+        names = [m for g in shoulder["acts_here"] for m in g["muscles"]]
+        assert "descending part of trapezius" in names
+        assert "serratus anterior" in names
+
+    def test_every_muscle_is_one_the_atlas_can_show(self):
+        """A colloquial name is a chip that opens nothing. The atlas spells
+        them its own way and this table follows it."""
+        atlas = (ROOT / "web" / "src" / "content" / "muscles.js").read_text()
+        atlas += (ROOT / "web" / "src" / "content" / "muscleAtlas.js").read_text()
+        named = {m for entry in gd.ACTS_HERE.values()
+                 for key in ("up", "down") for m in entry[key][2]}
+        assert len(named) > 30
+        for muscle in sorted(named):
+            assert f"'{muscle}'" in atlas, f"{muscle} is not in the atlas"

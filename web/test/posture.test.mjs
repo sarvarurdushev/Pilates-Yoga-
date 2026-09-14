@@ -651,3 +651,230 @@ test('a report offers the way back to every other assessment on file', () => {
       history: FILED }, 'en', () => ({}));
   assert.match(html, /data-open="3"/);
 });
+
+/* ---------------------------------------------------------------------------
+ * The report as a page somebody reads, rather than a table beside a picture.
+ * ------------------------------------------------------------------------- */
+
+const { bodyMapHtml, scaleHtml, callouts, regionInk } = _internals;
+
+const REGIONS = [
+  { region: 'head', name: 'Head and neck', name_ko: '머리·목', score: 67,
+    checks: 4, weakest: 'forward_head', weakest_name: 'head carried forward',
+    weakest_name_ko: '머리 전방 이동' },
+  { region: 'shoulders', name: 'Shoulders', name_ko: '어깨', score: 91,
+    checks: 3, weakest: 'shoulder_tilt', weakest_name: 'shoulder level',
+    weakest_name_ko: '어깨 수평' },
+  { region: 'pelvis', name: 'Pelvis', name_ko: '골반', score: 92, checks: 3,
+    weakest: '', weakest_name: '', weakest_name_ko: '' },
+  { region: 'trunk', name: 'Trunk', name_ko: '몸통', score: 100, checks: 2,
+    weakest: '', weakest_name: '', weakest_name_ko: '' },
+  { region: 'lower_body', name: 'Legs and feet', name_ko: '다리·발',
+    score: null, checks: 0, weakest: '', weakest_name: '',
+    weakest_name_ko: '' },
+];
+
+test('the body map names every region and scores it', () => {
+  const html = bodyMapHtml({ regions: REGIONS }, 'en');
+  for (const row of REGIONS) assert.ok(html.includes(row.name), row.name);
+  assert.match(html, /67 \/ 100/);
+});
+
+test('a region nothing measured says so rather than showing a zero', () => {
+  const html = bodyMapHtml({ regions: REGIONS }, 'en');
+  assert.match(html, /Not measured/);
+  /* Anchored, because "100 / 100" ends in "0 / 100" and a loose match here
+     would pass on a region that scored full marks. */
+  assert.ok(!/>\s*0 \/ 100/.test(html));
+});
+
+test('every region the measurement layer scores can be drawn', () => {
+  /* A region added in Python and not here would simply never be coloured,
+   * and the map would quietly be about four fifths of a body. */
+  const py = PY('alignment.py');
+  const block = py.split('REGIONS: dict[str, tuple[str, ...]] = {')[1]
+    .split('\n}')[0];
+  const keys = [...block.matchAll(/^\s{4}"([a-z_]+)":/gm)].map((m) => m[1]);
+  assert.ok(keys.length >= 5, `found ${keys.length} regions`);
+  const src = readFileSync(
+    new URL('../src/session/posture.js', import.meta.url), 'utf8');
+  const drawn = src.split('const BODY = {')[1].split('\n};')[0];
+  for (const key of keys) {
+    assert.ok(drawn.includes(`${key}:`), `${key} has no shape on the map`);
+  }
+});
+
+test('a region is coloured by what was measured in it, not by a default', () => {
+  assert.equal(regionInk(95), INK.within_band);
+  assert.equal(regionInk(70), INK.watch);
+  assert.equal(regionInk(30), INK.marked);
+  assert.notEqual(regionInk(null), regionInk(95));
+});
+
+test('the map reads in Korean', () => {
+  const html = bodyMapHtml({ regions: REGIONS }, 'ko');
+  assert.match(html, /머리·목/);
+  assert.match(html, /정상/);
+  assert.ok(!/Head and neck/.test(html));
+});
+
+test('nothing is drawn when nothing was measured', () => {
+  assert.equal(bodyMapHtml({ regions: [] }, 'en'), '');
+});
+
+const SCORE = {
+  value: 88,
+  bands: [{ from: 90, en: 'Excellent', ko: '매우 우수' },
+          { from: 80, en: 'Good', ko: '우수' },
+          { from: 60, en: 'Fair', ko: '보통' },
+          { from: 40, en: 'Needs attention', ko: '주의' },
+          { from: 0, en: 'Needs work', ko: '관리 필요' }],
+};
+
+test('the scale shows where the score sits, not only what it is called', () => {
+  /* Eighty-nine and ninety are one point apart and two band names apart. */
+  const html = scaleHtml(SCORE, 'en');
+  assert.match(html, /left:88%/);
+});
+
+test('the scale runs low to high whatever order the bands arrived in', () => {
+  const html = scaleHtml(SCORE, 'en');
+  const first = html.indexOf('Needs work');
+  const last = html.indexOf('Excellent');
+  assert.ok(first < last, 'the low band is drawn before the high one');
+});
+
+test('a withheld score puts no marker on the scale', () => {
+  const html = scaleHtml({ ...SCORE, value: null }, 'en');
+  assert.ok(!/left:/.test(html));
+  assert.match(html, /ss-scalebar/, 'the scale is still drawn');
+});
+
+test('a finding is named on the photograph, not only in a legend', () => {
+  /* A numbered dot and a list underneath makes a reader hold a number in
+   * their head, look away, find the row, and look back. Six times. */
+  const land = landmarks();
+  const marks = [
+    { metric: 'shoulder_tilt', at: [420, 500], ink: INK.marked,
+      name: 'shoulder level', value: '+9.1°', way: 'left higher' },
+    { metric: 'pelvic_obliquity', at: [550, 1010], ink: INK.within_band,
+      name: 'pelvis level', value: '-1.2°', way: '' },
+  ];
+  const drawn = callouts(land, marks).join('');
+  assert.match(drawn, /shoulder level/);
+  assert.match(drawn, /pelvis level/);
+  assert.match(drawn, /\+9\.1°/);
+  assert.match(drawn, /left higher/);
+});
+
+test('two callouts never land on the same line', () => {
+  /* Two labels on one line is worse than no labels. */
+  const land = landmarks();
+  const marks = [0, 1, 2, 3].map((i) => ({
+    metric: `m${i}`, at: [400, 500 + i], ink: '#fff',
+    name: `finding ${i}`, value: '0', way: '' }));
+  const ys = callouts(land, marks).join('')
+    .match(/<text[^>]*y="([\d.-]+)"/g)
+    .map((t) => Number(t.match(/y="([\d.-]+)"/)[1]));
+  const sorted = [...new Set(ys)].sort((a, b) => a - b);
+  assert.equal(sorted.length, ys.length, 'every label has its own line');
+});
+
+test('a callout is never drawn off the bottom of the photograph', () => {
+  const land = landmarks();
+  const marks = [0, 1, 2, 3, 4, 5].map((i) => ({
+    metric: `m${i}`, at: [400, 1900 + i], ink: '#fff',
+    name: `finding ${i}`, value: '0', way: '' }));
+  const ys = callouts(land, marks).join('')
+    .match(/<text[^>]*y="([\d.-]+)"/g)
+    .map((t) => Number(t.match(/y="([\d.-]+)"/)[1]));
+  for (const y of ys) {
+    assert.ok(y > 0 && y < land.height, `label at ${y} is outside 0..${land.height}`);
+  }
+});
+
+test('nothing is labelled when nothing was measured', () => {
+  assert.deepEqual(callouts(landmarks(), []), []);
+});
+
+test('a plan item says how much of it, not only what it is', () => {
+  const html = _internals.reportHtml({
+    report: whole({ programme: [{ key: 'headNods', name: 'Head Nods',
+      name_ko: '헤드 노드', why: ['the deep neck flexors'],
+      why_ko: ['목 심부 굽힘근'], for: ['forward_head'], severity: 'marked',
+      dose: { severity: 'marked', times_per_week: 4, weeks: 6,
+              en: '4x a week for 6 weeks', ko: '주 4회 · 6주' } }] }),
+    photos: new Map(), taken: '2026-09-14', who: '' }, 'en', () => ({}));
+  assert.match(html, /4x a week for 6 weeks/);
+  assert.match(html, /not a prescription/);
+});
+
+/* ------------------------------------------------------- where to look next */
+
+const { musclesHtml, showMuscle } = _internals;
+
+const ACTS = {
+  metric: 'shoulder_tilt',
+  acts_here: [
+    { action: 'raise the shoulder blade', action_ko: '어깨뼈를 올리는 근육',
+      muscles: ['descending part of trapezius', 'levator scapulae'] },
+    { action: 'lower and settle it', action_ko: '어깨뼈를 내리고 안정시키는 근육',
+      muscles: ['ascending part of trapezius', 'serratus anterior'] },
+  ],
+  acts_note: 'Which of them is short and which is long is not something a photograph can tell you.',
+  acts_note_ko: '어느 것이 짧고 어느 것이 늘어났는지는 사진으로 알 수 없습니다.',
+};
+
+test('a finding names the muscles that act where it was measured', () => {
+  const html = musclesHtml(ACTS, 'en');
+  assert.match(html, /raise the shoulder blade/);
+  assert.match(html, /lower and settle it/);
+});
+
+test('each muscle is a control that can light it on the body', () => {
+  const html = musclesHtml(ACTS, 'en');
+  assert.match(html, /data-muscle="descending part of trapezius"/);
+  assert.match(html, /data-muscle="serratus anterior"/);
+});
+
+test('a muscle is shown by the name the atlas gives it', () => {
+  /* The key is precise so the geometry resolves; the label is what a person
+   * would say out loud. */
+  const html = musclesHtml(ACTS, 'en');
+  assert.match(html, /Upper trapezius/);
+  assert.ok(!/>descending part of trapezius</.test(html));
+});
+
+test('the muscles read in Korean, from the atlas rather than a second table', () => {
+  const html = musclesHtml(ACTS, 'ko');
+  assert.match(html, /어깨뼈를 올리는 근육/);
+  assert.match(html, /등세모근|승모근/);
+});
+
+test('nothing claims a muscle is tight or weak', () => {
+  /* A photograph measured a position. Muscle activity is measured with
+   * electrodes, on a body. */
+  const html = musclesHtml(ACTS, 'en') + musclesHtml(ACTS, 'ko');
+  for (const word of ['overactive', 'underactive', 'inhibited', 'tight',
+                      '과활성', '저활성']) {
+    assert.ok(!html.toLowerCase().includes(word.toLowerCase()), word);
+  }
+});
+
+test('the sentence that says so is printed with them', () => {
+  assert.match(musclesHtml(ACTS, 'en'), /not something a photograph can tell you/);
+  assert.match(musclesHtml(ACTS, 'ko'), /사진으로 알 수 없습니다/);
+});
+
+test('a finding with no muscles draws no panel', () => {
+  assert.equal(musclesHtml({ metric: 'torso_rotation_index' }, 'en'), '');
+  assert.equal(musclesHtml({ metric: 'x', acts_here: [] }, 'en'), '');
+});
+
+test('a muscle the body cannot show is not pretended to be shown', () => {
+  /* A chip that silently does nothing is worse than a chip that is not
+   * there, so the caller only hides the report when the press worked. */
+  assert.equal(showMuscle({}, 'descending part of trapezius'), false);
+  assert.equal(showMuscle({ selectStructure: () => {} }, 'nothing at all'),
+               false);
+});

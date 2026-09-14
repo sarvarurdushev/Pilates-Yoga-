@@ -1204,6 +1204,10 @@ class Finding:
             "means_ko": advice.means_ko if advice else "",
             "usually": advice.usually if advice else "",
             "usually_ko": advice.usually_ko if advice else "",
+            # Where to look, not what to conclude. See ACTS_HERE.
+            "acts_here": acts_here(self.name),
+            "acts_note": ACTS_NOTE,
+            "acts_note_ko": ACTS_NOTE_KO,
             "exercises": [s.to_dict() for s in (advice.exercises if advice else ())],
             "habits": [{"en": a, "ko": b} for a, b in (advice.habits if advice else ())],
             "caution": advice.caution if advice else "",
@@ -1271,6 +1275,33 @@ def priorities(found: list[Finding], limit: int = 4) -> list[Finding]:
     return chosen
 
 
+#: How often to do an exercise, by the worst finding it answers.
+#:
+#: A dose, not a prescription, and the difference is written into the report:
+#: this is the frequency a teacher would *start* from and adjust in the room
+#: after watching somebody do it once. It is graded rather than fixed because
+#: a plan that asks the same of a shoulder two degrees out and one twenty
+#: degrees out is not a plan.
+#:
+#: The weeks are :data:`REVIEW_WEEKS` and not a second table: the programme
+#: runs until the next assessment by construction, so a studio cannot end up
+#: with a six-week programme and a ten-week review date for the same finding.
+SESSIONS_PER_WEEK = {MARKED: 4, NOTABLE: 3, WATCH: 2, WITHIN: 2}
+
+
+def dose(severity: str) -> dict:
+    """How often and for how long, for a finding of this severity."""
+    times = SESSIONS_PER_WEEK.get(severity, 2)
+    weeks = REVIEW_WEEKS.get(severity, REVIEW_WEEKS[WITHIN])
+    return {
+        "severity": severity,
+        "times_per_week": times,
+        "weeks": weeks,
+        "en": f"{times}x a week for {weeks} weeks",
+        "ko": f"주 {times}회 · {weeks}주",
+    }
+
+
 def programme(found: list[Finding], limit: int = 8) -> list[dict]:
     """One session's worth of exercises, drawn from the findings.
 
@@ -1301,7 +1332,8 @@ def programme(found: list[Finding], limit: int = 8) -> list[dict]:
                          "discipline": suggestion.discipline,
                          "name": exercise_name(suggestion.key),
                          "name_ko": exercise_name(suggestion.key, "ko"),
-                         "why": [], "why_ko": [], "for": []}
+                         "why": [], "why_ko": [], "for": [],
+                         "severity": WITHIN}
                 entries[suggestion.key] = entry
                 order.append(suggestion.key)
             if suggestion.why not in entry["why"]:
@@ -1309,8 +1341,16 @@ def programme(found: list[Finding], limit: int = 8) -> list[dict]:
                 entry["why_ko"].append(suggestion.why_ko)
             if finding.name not in entry["for"]:
                 entry["for"].append(finding.name)
+            # An exercise answering two findings takes the dose of the worse
+            # of them. It is the same movement either way; what changes is how
+            # much of it the body in front of you needs.
+            if SEVERITIES.index(finding.severity) > SEVERITIES.index(entry["severity"]):
+                entry["severity"] = finding.severity
     ranked = sorted(order, key=lambda k: (-len(entries[k]["for"]), order.index(k)))
-    return [entries[k] for k in ranked[:limit]]
+    out = [entries[k] for k in ranked[:limit]]
+    for entry in out:
+        entry["dose"] = dose(entry["severity"])
+    return out
 
 
 def habits(found: list[Finding], limit: int = 6) -> list[dict]:
@@ -1357,6 +1397,157 @@ METRIC_NAME: dict[str, tuple[str, str]] = {
     "lateral_shoulder_shift": ("shoulders over the midline", "어깨 좌우 중심"),
     "lateral_pelvis_shift": ("pelvis over the midline", "골반 좌우 중심"),
 }
+
+
+#: The muscles that act where each measurement was taken, named by what they
+#: *do* rather than by what they are assumed to be doing.
+#:
+#: This table is the one place in the project where it would be easiest to
+#: sound authoritative and be wrong, so it is worth writing down exactly what
+#: it does and does not claim.
+#:
+#: **It does not say which muscle is tight and which is weak.** Every posture
+#: report in the industry prints "right upper trapezius overactive, left lower
+#: trapezius underactive" beside a photograph, and a photograph cannot know
+#: that. Muscle activity is measured with EMG, on the body, with electrodes.
+#: What a camera measured is where a landmark was. Two people with an
+#: identical shoulder line can arrive there by opposite routes, and a report
+#: that picks one and prints it has invented the half a teacher actually needs.
+#:
+#: **What it does say is anatomy.** These are the muscles that raise and lower
+#: that shoulder, that draw that head forward and back. Pairing them with a
+#: measured position tells a teacher where to *look*, which is the honest use
+#: of this and is genuinely useful: it turns "the left shoulder is 10 degrees
+#: high" into a short list of things to put hands on and test.
+#:
+#: Each entry is ``(what one direction is called, muscles, the other, muscles)``
+#: with both directions named as actions. Names are the standard anatomical
+#: ones, matching :mod:`pilates.anatomy` so a muscle named here is a muscle the
+#: atlas next door can show.
+ACTS_HERE: dict[str, dict] = {
+    "shoulder_tilt": {
+        "up": ("raise the shoulder blade", "어깨뼈를 올리는 근육",
+               ("descending part of trapezius", "levator scapulae", "rhomboid major")),
+        "down": ("lower and settle it", "어깨뼈를 내리고 안정시키는 근육",
+                 ("ascending part of trapezius", "serratus anterior", "latissimus dorsi")),
+    },
+    "lateral_shoulder_shift": {
+        "up": ("draw the shoulder girdle sideways", "어깨를 옆으로 당기는 근육",
+               ("descending part of trapezius", "latissimus dorsi")),
+        "down": ("hold it over the ribs", "몸통 위에 어깨를 유지하는 근육",
+                 ("serratus anterior", "ascending part of trapezius")),
+    },
+    "forward_head": {
+        "up": ("draw the head forward", "머리를 앞으로 당기는 근육",
+               ("sternocleidomastoid", "scalenus anterior", "scalenus medius", "rectus capitis posterior major",
+                       "obliquus capitis inferior")),
+        "down": ("carry it back over the shoulders",
+                 "머리를 어깨 위로 되돌리는 근육",
+                 ("longus colli", "longus capitis", "ascending part of trapezius")),
+    },
+    "sagittal_ear_offset": {
+        "up": ("draw the head forward", "머리를 앞으로 당기는 근육",
+               ("sternocleidomastoid", "scalenus anterior", "scalenus medius", "rectus capitis posterior major",
+                       "obliquus capitis inferior")),
+        "down": ("carry it back over the shoulders",
+                 "머리를 어깨 위로 되돌리는 근육",
+                 ("longus colli", "longus capitis", "ascending part of trapezius")),
+    },
+    "head_lateral_tilt": {
+        "up": ("side-bend the neck", "목을 옆으로 굽히는 근육",
+               ("sternocleidomastoid", "scalenus anterior", "scalenus medius", "descending part of trapezius")),
+        "down": ("hold the head level", "머리를 수평으로 유지하는 근육",
+                 ("longus colli", "levator scapulae")),
+    },
+    "lateral_head_shift": {
+        "up": ("side-bend the neck", "목을 옆으로 굽히는 근육",
+               ("sternocleidomastoid", "scalenus anterior", "scalenus medius", "descending part of trapezius")),
+        "down": ("hold the head over the midline", "머리를 중심에 유지하는 근육",
+                 ("longus colli", "longus capitis")),
+    },
+    "pelvic_obliquity": {
+        "up": ("hitch that side of the pelvis", "골반 한쪽을 올리는 근육",
+               ("quadratus lumborum", "longissimus thoracis", "iliocostalis lumborum", "external oblique", "internal oblique")),
+        "down": ("hold the pelvis level in stance",
+                 "한 발 지지에서 골반을 수평으로 유지하는 근육",
+                 ("gluteus medius", "gluteus minimus", "tensor fasciae latae")),
+    },
+    "lateral_pelvis_shift": {
+        "up": ("carry the pelvis sideways", "골반을 옆으로 이동시키는 근육",
+               ("quadratus lumborum", "tensor fasciae latae")),
+        "down": ("hold it over the feet", "골반을 발 위에 유지하는 근육",
+                 ("gluteus medius", "external oblique", "internal oblique")),
+    },
+    "lateral_weight_bias": {
+        "up": ("shift the weight sideways", "체중을 옆으로 옮기는 근육",
+               ("quadratus lumborum", "tensor fasciae latae", "fibularis longus")),
+        "down": ("centre it over both feet", "체중을 양발 중앙에 유지하는 근육",
+                 ("gluteus medius", "tibialis posterior")),
+    },
+    "trunk_lean_lateral": {
+        "up": ("side-bend the trunk", "몸통을 옆으로 굽히는 근육",
+               ("quadratus lumborum", "external oblique", "internal oblique", "latissimus dorsi")),
+        "down": ("hold it upright", "몸통을 세우는 근육",
+                 ("longissimus thoracis", "iliocostalis lumborum", "multifidus", "transversus abdominis")),
+    },
+    "trunk_lean_sagittal": {
+        "up": ("lean the trunk forward", "몸통을 앞으로 기울이는 근육",
+               ("rectus abdominis", "psoas major", "iliacus")),
+        "down": ("carry it back upright", "몸통을 뒤로 세우는 근육",
+                 ("longissimus thoracis", "iliocostalis lumborum", "multifidus", "gluteus maximus")),
+    },
+    "sagittal_shoulder_offset": {
+        "up": ("round the upper back forward", "등을 앞으로 말리게 하는 근육",
+               ("pectoralis major", "pectoralis minor", "clavicular part of deltoid")),
+        "down": ("open it back", "등을 펴는 근육",
+                 ("ascending part of trapezius", "rhomboid major", "longissimus thoracis", "iliocostalis lumborum")),
+    },
+    "sagittal_hip_offset": {
+        "up": ("carry the hips forward", "골반을 앞으로 보내는 근육",
+               ("gluteus maximus", "biceps femoris", "semitendinosus")),
+        "down": ("hold them over the ankles", "골반을 발목 위에 유지하는 근육",
+                 ("psoas major", "iliacus", "rectus femoris")),
+    },
+    "sagittal_knee_offset": {
+        "up": ("push the knees forward", "무릎을 앞으로 보내는 근육",
+               ("rectus femoris", "vastus lateralis", "soleus")),
+        "down": ("hold them back over the ankles",
+                 "무릎을 발목 위에 유지하는 근육",
+                 ("biceps femoris", "semitendinosus", "gastrocnemius", "tibialis anterior")),
+    },
+    "left_knee_deviation": {
+        "up": ("draw the knee inward", "무릎을 안쪽으로 당기는 근육",
+               ("adductor magnus", "adductor longus", "tensor fasciae latae")),
+        "down": ("hold it out over the foot", "무릎을 발 위에 유지하는 근육",
+                 ("gluteus medius", "gluteus maximus", "vastus medialis")),
+    },
+    "right_knee_deviation": {
+        "up": ("draw the knee inward", "무릎을 안쪽으로 당기는 근육",
+               ("adductor magnus", "adductor longus", "tensor fasciae latae")),
+        "down": ("hold it out over the foot", "무릎을 발 위에 유지하는 근육",
+                 ("gluteus medius", "gluteus maximus", "vastus medialis")),
+    },
+}
+
+#: The sentence that keeps the table above honest, printed with it every time.
+ACTS_NOTE = ("These are the muscles that act here. Which of them is short and "
+             "which is long is not something a photograph can tell you -- that "
+             "is what hands and a movement test are for. The measurement says "
+             "where the position is; this says where to look.")
+ACTS_NOTE_KO = ("해당 부위에서 작용하는 근육입니다. 그중 어느 것이 짧고 어느 것이 "
+                "늘어났는지는 사진으로 알 수 없으며, 촉진과 움직임 검사로 확인해야 "
+                "합니다. 측정값은 자세의 위치를 말해 주고, 이 목록은 어디를 살펴볼지 "
+                "말해 줍니다.")
+
+
+def acts_here(metric: str) -> list[dict] | None:
+    """The muscles that act where one metric was measured, or None."""
+    entry = ACTS_HERE.get(metric)
+    if entry is None:
+        return None
+    return [{"action": entry[key][0], "action_ko": entry[key][1],
+             "muscles": list(entry[key][2])}
+            for key in ("up", "down")]
 
 
 #: The parts of the body the score is broken down by.

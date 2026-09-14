@@ -27,7 +27,9 @@
     "joints": "node tools/fitjoints.mjs",
     "build:nerves": "python3 scripts/build_nervous.py",
     "build:shell": "python3 scripts/build_shell.py",
-    "bloomsweep": "node tools/bloomsweep.mjs"
+    "bloomsweep": "node tools/bloomsweep.mjs",
+    "report": "node tools/renderreport.mjs",
+    "report:shot": "node tools/shot.mjs"
   },
   "dependencies": {
     "three": "^0.169.0"
