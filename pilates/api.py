@@ -1490,7 +1490,8 @@ def movement_screening(store, viewer: Viewer | None, payload: dict) -> dict:
          "sided": s.sided, "kind": s.kind, "unit": s.unit,
          "reference": list(s.reference), "reference_kind": s.reference_kind,
          "reference_source": s.reference_source,
-         "views": [v.value for v in s.views]}
+         "views": [v.value for v in s.views],
+         "works": list(s.works)}
         for s in sc.SCREENS.values()
     ]
     out["disclaimer"] = sc.DISCLAIMER

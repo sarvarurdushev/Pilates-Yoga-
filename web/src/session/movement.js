@@ -77,11 +77,17 @@ const T = {
   functional: { en: 'a functional benchmark, not a clinical normal range',
                 ko: '임상 정상 범위가 아닌 기능 기준입니다' },
   estimated:  { en: 'estimated', ko: '추정' },
+  plan:       { en: 'What to work on', ko: '추천 운동' },
+  showOn:     { en: 'Show on the body', ko: '신체에서 보기' },
   history:    { en: 'Earlier screenings', ko: '이전 검사' },
   change:     { en: 'Against the last one', ko: '이전 검사와 비교' },
+  noEarlier:  { en: 'Nothing earlier on file. This one is the starting point.',
+                ko: '이전 기록이 없습니다. 이번 검사가 기준점이 됩니다.' },
+  notCompared:{ en: 'Not compared', ko: '비교 불가' },
   offline:    { en: 'This copy of the site cannot measure a clip. It needs the analysis half of the project running behind it.',
                 ko: '이 사이트에서는 영상을 측정할 수 없습니다. 분석 서버가 함께 실행되어야 합니다.' },
   loading:    { en: 'Fetching how to film this…', ko: '촬영 방법을 불러오는 중…' },
+  back:       { en: '\u2190  Back to the screening', ko: '\u2190  검사 결과로 돌아가기' },
 };
 
 const say = (key, lang) => (T[key] ?? {})[lang] ?? (T[key] ?? {}).en ?? key;
@@ -178,11 +184,24 @@ const STYLE = `
 #ss-mv .ss-find b{display:block;font-size:12.5px;font-weight:600;
   margin:0 0 3px}
 #ss-mv .ss-find p{margin:0;font-size:11.5px;color:var(--dim2);line-height:1.7}
+#ss-mv .ss-plan{margin:0;padding:0 0 0 18px;font-size:12.5px;line-height:1.8}
+#ss-mv .ss-plan li{margin:0 0 12px}
+#ss-mv .ss-plan b{font-weight:600;color:var(--txt)}
+#ss-mv .ss-plan small{display:block;font-size:10.5px;color:var(--dim2)}
+#ss-mv .ss-plan button{margin:5px 0 0;padding:5px 11px;border-radius:4px;
+  font:inherit;font-size:11px;cursor:pointer;background:var(--glass);
+  border:1px solid var(--line2);color:var(--dim)}
+#ss-mv .ss-plan button:hover{color:var(--txt);border-color:var(--acc)}
 #ss-mv .ss-grid{display:grid;gap:16px;
   grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
 #ss-mv .ss-disc{margin:26px 0 0;font-size:10.5px;color:var(--dim2);
   line-height:1.8;max-width:76ch}
 #ss-mv[hidden]{display:none}
+#ss-mv-back{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;
+  z-index:140;padding:10px 20px;border-radius:22px;font:inherit;font-size:13px;
+  font-weight:600;cursor:pointer;background:var(--acc);border:0;color:#04121f;
+  box-shadow:0 8px 28px rgba(0,0,0,.5)}
+#ss-mv-back:hover{filter:brightness(1.1)}
 @media print{
   #ss-mv{position:static;background:#fff;color:#000}
   #ss-mv .ss-acts,#ss-mv .ss-go,#ss-mv .ss-screens{display:none}
@@ -220,6 +239,7 @@ export function mount(nw, served, who) {
 
 function screen(nw, served, identity) {
   document.getElementById('ss-mv')?.remove();
+  document.getElementById('ss-mv-back')?.remove();
   const host = document.createElement('div');
   host.id = 'ss-mv';
   document.body.appendChild(host);
@@ -234,9 +254,14 @@ function screen(nw, served, identity) {
     who: '',
     taken: new Date().toISOString().slice(0, 10),
     report: null,
+    history: null,     // what is already on file, newest first
+    change: null,      // this screening against the one before it
   };
   const lang = () => nw?.app?.lang ?? 'en';
-  const shut = () => host.remove();
+  const shut = () => {
+    document.getElementById('ss-mv-back')?.remove();
+    host.remove();
+  };
   host.addEventListener('keydown', (e) => { if (e.key === 'Escape') shut(); });
 
   const draw = () => {
@@ -462,6 +487,29 @@ export function asymmetryHtml(payload, lang) {
   </div>`;
 }
 
+/**
+ * The exercises the measurement points at, from the studio's own library.
+ *
+ * Only for what came back short: a joint already at the published range needs
+ * nothing suggested for it, and a list with a row for every screen filmed is a
+ * list nobody reads. The names come from the server, which reads them from the
+ * library the application already ships, so renaming an exercise renames it
+ * once rather than in three places.
+ */
+export function programmeHtml(report, lang) {
+  const plan = report.programme ?? [];
+  if (!plan.length) return '';
+  return `<div class="ss-card">
+    <h2>${esc(say('plan', lang))}</h2>
+    <ol class="ss-plan">${plan.map((row) => `<li>
+      <b>${esc(lang === 'ko' ? row.name_ko : row.name)}</b>
+      <small>${esc(lang === 'ko' ? row.screen_name_ko : row.screen_name)}</small>
+      <div><button type="button" data-ex="${esc(row.key)}">${
+        esc(say('showOn', lang))}</button></div>
+    </li>`).join('')}</ol>
+  </div>`;
+}
+
 export function findingsHtml(report, lang) {
   const found = report.findings ?? [];
   if (!found.length) {
@@ -474,6 +522,50 @@ export function findingsHtml(report, lang) {
       esc(lang === 'ko' ? f.title_ko : f.title)}</b>
     <p>${esc(lang === 'ko' ? f.measurement_ko : f.measurement)}</p>
   </div>`).join('');
+}
+
+/**
+ * What is already on file, and what changed since the last time.
+ *
+ * The whole reason a screening is filed. A single reading of a shoulder is a
+ * number; two readings eight weeks apart is the thing a studio is actually
+ * selling. Withheld scores are left off the strip rather than drawn as zero,
+ * because a chart with a cliff in it where there was no measurement invents a
+ * collapse that did not happen.
+ */
+export function historyHtml(state, lang) {
+  const rows = state.history?.screenings ?? [];
+  const earlier = rows.filter((r) => r.id !== state.report?.screening_id);
+  if (!state.history) return '';
+  if (!earlier.length) {
+    return `<div class="ss-card"><h2>${esc(say('history', lang))}</h2>
+      <p class="ss-detail">${esc(say('noEarlier', lang))}</p></div>`;
+  }
+  return `<div class="ss-card"><h2>${esc(say('history', lang))}</h2>
+    ${earlier.slice(0, 8).map((row) => `<p class="ss-detail">
+      <b>${esc(row.taken_on)}</b> —
+      ${row.score === null || row.score === undefined
+        ? esc(say('noScore', lang))
+        : `${Math.round(row.score)}/100`}
+      <span style="color:var(--dim2)"> · ${esc(row.screens.join(', '))}</span>
+    </p>`).join('')}
+  </div>`;
+}
+
+export function changeHtml(state, lang) {
+  const change = state.change;
+  if (!change) return '';
+  const comparable = (change.changes ?? []).filter((c) => c.comparable);
+  const refused = (change.changes ?? []).filter((c) => !c.comparable);
+  if (!comparable.length && !refused.length) return '';
+  return `<div class="ss-card"><h2>${esc(say('change', lang))}</h2>
+    ${comparable.map((c) => `<p class="ss-detail">${
+      esc(lang === 'ko' ? c.sentence_ko : c.sentence)}</p>`).join('')}
+    ${refused.map((c) => `<p class="ss-detail" style="color:${INK.none}">${
+      esc(say('notCompared', lang))}: ${esc(c.reason)}</p>`).join('')}
+    <p class="ss-detail" style="margin-top:10px">${
+      esc(lang === 'ko' ? change.judgement_ko : change.judgement)}</p>
+  </div>`;
 }
 
 function reportHtml(state, lang) {
@@ -534,6 +626,9 @@ function reportHtml(state, lang) {
           <h2>${esc(say('findings', lang))}</h2>
           ${findingsHtml(report, lang)}
         </div>
+        ${programmeHtml(report, lang)}
+        ${changeHtml(state, lang)}
+        ${historyHtml(state, lang)}
         ${refused ? `<div class="ss-card">
           <h2>${esc(say('notMeasured', lang))}</h2>${refused}</div>` : ''}
       </div>
@@ -604,6 +699,39 @@ function wire(host, state, nw, served, identity, draw, shut) {
   }
   host.querySelector('[data-run]')?.addEventListener('click',
     () => run(state, draw, identity, nw?.app?.lang ?? 'en'));
+
+  for (const pill of host.querySelectorAll('[data-ex]')) {
+    pill.addEventListener('click', () => {
+      /* Hidden, never closed -- the same rule the posture screen learned the
+       * hard way. Tearing this down to look at an exercise would cost the
+       * reader the measurement that suggested it, and there is no way back to
+       * a report built from a clip that has already been deleted. */
+      nw?.setExercise?.(pill.dataset.ex);
+      peek(host, nw);
+    });
+  }
+}
+
+/**
+ * Step out to the body, with a way back.
+ *
+ * The screen is hidden rather than removed, so the measurement, the findings
+ * and the scroll position are all still there when the button is pressed.
+ */
+export function peek(host, nw) {
+  host.hidden = true;
+  const lang = nw?.app?.lang ?? 'en';
+  document.getElementById('ss-mv-back')?.remove();
+  const back = document.createElement('button');
+  back.id = 'ss-mv-back';
+  back.type = 'button';
+  back.textContent = say('back', lang);
+  back.addEventListener('click', () => {
+    host.hidden = false;
+    back.remove();
+  });
+  document.body.appendChild(back);
+  return back;
 }
 
 /**
@@ -734,6 +862,16 @@ async function run(state, draw, identity, lang = 'en') {
     } else {
       state.report = body;
       state.progress = '';
+      state.change = null;
+      /* Against the one before it, automatically. A studio filming a second
+       * screening wants the difference, and asking them to go and find the
+       * first one is asking them to do a comparison this already has both
+       * halves of. */
+      const previous = state.history?.screenings?.[0];
+      if (body.screening_id && previous?.id) {
+        await compareWith(state, previous.id, body.screening_id);
+      }
+      loadHistory(state, draw);
     }
   } catch (error) {
     state.error = String(error?.message ?? error);
@@ -744,6 +882,36 @@ async function run(state, draw, identity, lang = 'en') {
   void identity;
 }
 
+/** What is on file for whoever this screening is about. */
+async function loadHistory(state, draw) {
+  if (!state.who) { state.history = { screenings: [] }; draw(); return; }
+  try {
+    const response = await fetch(
+      `screenings?username=${encodeURIComponent(state.who)}`);
+    if (!response.ok) return;
+    state.history = await response.json();
+    draw();
+  } catch {
+    /* A report without a history is still a report. */
+  }
+}
+
+async function compareWith(state, before, after) {
+  try {
+    const response = await fetch('movement/compare', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ before, after }),
+    });
+    if (!response.ok) return;
+    state.change = await response.json();
+  } catch {
+    /* The comparison is an extra. Losing it does not lose the screening. */
+  }
+}
+
 export const _internals = { setupHtml, reportHtml, sideHtml, asymmetryHtml,
                             findingsHtml, barHtml, longestTrack, screenOf,
-                            sidesOf, howOf, INK, CHIP: T, CATALOGUE };
+                            sidesOf, howOf, programmeHtml, peek,
+                            historyHtml, changeHtml,
+                            INK, CHIP: T, CATALOGUE };

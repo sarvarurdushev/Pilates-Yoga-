@@ -737,3 +737,68 @@ class TestThePayload:
     def test_an_unknown_screen_is_refused_rather_than_measured(self):
         with pytest.raises(KeyError):
             sc.screen_all({"backflip": {"left": raises(90.0)}})
+
+
+class TestWhatToWorkOn:
+    """A measurement a studio can act on, from the library it already has."""
+
+    def test_a_shortfall_suggests_exercises_for_that_range(self):
+        plan = sc.programme(session(shoulder_flexion=(110.0, 110.0)))
+        assert plan
+        assert all(row["screen"] == "shoulder_flexion" for row in plan)
+
+    def test_a_body_at_the_reference_is_suggested_nothing(self):
+        """Reaching the published range needs no exercises prescribed for it."""
+        assert sc.programme(session(shoulder_flexion=(180.0, 180.0))) == []
+
+    def test_two_short_screens_are_both_worked_before_either_is_twice(self):
+        """Five shoulder exercises for a body whose shoulder and knee were both
+        short is a plan that ignores half of what was measured."""
+        plan = sc.programme(session(shoulder_flexion=(110.0, 110.0),
+                                    knee_flexion=(70.0, 70.0)))
+        assert [row["screen"] for row in plan[:2]] == ["shoulder_flexion",
+                                                       "knee_flexion"]
+
+    def test_the_worst_screen_is_worked_first(self):
+        plan = sc.programme(session(shoulder_flexion=(60.0, 60.0),
+                                    knee_flexion=(128.0, 128.0)))
+        assert plan[0]["screen"] == "shoulder_flexion"
+
+    def test_it_stops_where_it_is_told_to(self):
+        plan = sc.programme(session(shoulder_flexion=(60.0, 60.0),
+                                    knee_flexion=(40.0, 40.0)), limit=3)
+        assert len(plan) == 3
+
+    def test_no_exercise_is_named_twice(self):
+        plan = sc.programme(session(shoulder_flexion=(60.0, 60.0),
+                                    knee_flexion=(40.0, 40.0)), limit=10)
+        assert len({row["key"] for row in plan}) == len(plan)
+
+    def test_every_exercise_named_is_one_the_studio_actually_has(self):
+        """A key nothing matches is a button that opens nothing."""
+        from pilates import guidance as gd
+
+        library = gd.repertoire()
+        for screen in sc.SCREENS.values():
+            assert screen.works, f"{screen.key} points at no exercise"
+            for key in screen.works:
+                assert key in library, f"{screen.key} names {key}, which is not there"
+
+    def test_the_names_are_read_from_the_library_not_typed_here(self):
+        """A studio that renames an exercise renames it once."""
+        plan = sc.programme(session(shoulder_flexion=(110.0, 110.0)))
+        source = (pytest.importorskip("pathlib").Path(sc.__file__).read_text())
+        for row in plan:
+            assert row["name"] not in source
+            assert row["name_ko"] not in source
+
+    def test_the_plan_reads_in_both_languages(self):
+        plan = sc.programme(session(shoulder_flexion=(110.0, 110.0)))
+        for row in plan:
+            assert row["name"] and row["name_ko"]
+            assert row["screen_name"] and row["screen_name_ko"]
+
+    def test_the_plan_travels_with_the_measurement(self):
+        payload = session(shoulder_flexion=(110.0, 110.0)).to_dict()
+        assert payload["programme"]
+        assert payload["programme"][0]["key"]

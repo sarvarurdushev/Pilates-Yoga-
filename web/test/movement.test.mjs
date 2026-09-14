@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import { _internals } from '../src/session/movement.js';
 
 const { setupHtml, reportHtml, sideHtml, asymmetryHtml, findingsHtml, barHtml,
-        longestTrack, screenOf, sidesOf, howOf, CATALOGUE } = _internals;
+        longestTrack, screenOf, sidesOf, howOf, programmeHtml,
+        CATALOGUE } = _internals;
 
 /* The screening screen draws numbers it did not compute, against references it
  * did not choose, in two languages. Every test here is about one of the ways
@@ -351,4 +352,179 @@ test('every phrase on this screen exists in both languages', () => {
     assert.ok(entry.ko, `${key} has no Korean`);
     assert.notEqual(entry.en, entry.ko, `${key} is the same in both`);
   }
+});
+
+/* -------------------------------------------------------- what to work on */
+
+const PLAN = [
+  { key: 'urdhvaHastasana', name: 'Upward Salute', name_ko: '위로 인사하는 자세',
+    screen: 'shoulder_flexion', screen_name: 'Shoulder flexion',
+    screen_name_ko: '어깨 굽힘', severity: 'notable' },
+  { key: 'virasana', name: 'Hero Pose', name_ko: '영웅 자세',
+    screen: 'knee_flexion', screen_name: 'Knee flexion',
+    screen_name_ko: '무릎 굽힘', severity: 'watch' },
+];
+
+test('a shortfall opens onto something to do about it', () => {
+  const html = programmeHtml(report({ programme: PLAN }), 'en');
+  assert.match(html, /Upward Salute/);
+  assert.match(html, /Shoulder flexion/);
+  assert.match(html, /data-ex="urdhvaHastasana"/);
+});
+
+test('nothing short suggests nothing, rather than an empty card', () => {
+  assert.equal(programmeHtml(report({ programme: [] }), 'en'), '');
+  assert.equal(programmeHtml(report({ programme: undefined }), 'en'), '');
+});
+
+test('the exercise names come from the server, in whichever language', () => {
+  const html = programmeHtml(report({ programme: PLAN }), 'ko');
+  assert.match(html, /위로 인사하는 자세/);
+  assert.match(html, /어깨 굽힘/);
+  assert.ok(!/Upward Salute/.test(html));
+});
+
+test('the exercises named here are keys the library actually has', () => {
+  /* A key nothing matches is a button that opens nothing. Checked against the
+   * Python catalogue, which is checked against the library in its own tests. */
+  const py = PY('screening.py');
+  const works = [...py.matchAll(/works=\(([^)]*)\)/g)]
+    .flatMap((m) => [...m[1].matchAll(/"([A-Za-z0-9]+)"/g)].map((k) => k[1]));
+  assert.ok(works.length >= 30, `found ${works.length} exercise keys`);
+  const library = readFileSync(
+    new URL('../src/content/library/pilates.js', import.meta.url), 'utf8')
+    + readFileSync(
+      new URL('../src/content/library/yoga.js', import.meta.url), 'utf8');
+  for (const key of works) {
+    assert.ok(library.includes(`${key}:`) || library.includes(`'${key}'`)
+      || library.includes(`"${key}"`), `${key} is not in the library`);
+  }
+});
+
+test('the report shows the plan beside the findings', () => {
+  const html = reportHtml(setup({ report: report({ programme: PLAN }) }), 'en');
+  assert.match(html, /What to work on/);
+  assert.match(html, /Upward Salute/);
+});
+
+/* ------------------------------------------------- stepping out to the body */
+
+function fakeDom() {
+  const byId = new Map();
+  const mk = () => {
+    const el = {
+      id: '', type: '', textContent: '', hidden: false, _attached: false,
+      _handlers: new Map(),
+      addEventListener(n, fn) { el._handlers.set(n, fn); },
+      click() { el._handlers.get('click')?.(); },
+      remove() { el._attached = false; if (el.id) byId.delete(el.id); },
+    };
+    return el;
+  };
+  return {
+    mk,
+    document: {
+      createElement: mk,
+      getElementById: (id) => byId.get(id) ?? null,
+      body: { appendChild(el) { el._attached = true; if (el.id) byId.set(el.id, el); } },
+    },
+  };
+}
+
+test('looking at an exercise hides the screening, it does not destroy it', () => {
+  /* There is no way back to a report built from a clip that has already been
+   * deleted, which is why this screen may never be torn down to show one. */
+  const { document, mk } = fakeDom();
+  const prior = globalThis.document;
+  globalThis.document = document;
+  try {
+    const host = mk();
+    host.id = 'ss-mv';
+    document.body.appendChild(host);
+    const back = _internals.peek(host, { app: { lang: 'en' } });
+    assert.equal(host.hidden, true);
+    assert.equal(host._attached, true);
+    assert.match(back.textContent, /Back to the screening/);
+    back.click();
+    assert.equal(host.hidden, false);
+    assert.equal(back._attached, false);
+  } finally { globalThis.document = prior; }
+});
+
+/* --------------------------------------------------- what is already on file */
+
+const { historyHtml, changeHtml } = _internals;
+
+test('the first screening says so rather than showing an empty strip', () => {
+  const state = setup({ report: report({ screening_id: 4 }),
+                        history: { screenings: [{ id: 4, taken_on: '2026-09-14',
+                                                  score: 78, screens: ['shoulder_flexion'] }] } });
+  assert.match(historyHtml(state, 'en'), /starting point/);
+});
+
+test('earlier screenings are listed, this one is not listed as earlier', () => {
+  const state = setup({ report: report({ screening_id: 4 }),
+    history: { screenings: [
+      { id: 4, taken_on: '2026-09-14', score: 78, screens: ['shoulder_flexion'] },
+      { id: 1, taken_on: '2026-08-01', score: 61, screens: ['shoulder_flexion'] },
+    ] } });
+  const html = historyHtml(state, 'en');
+  assert.match(html, /2026-08-01/);
+  assert.ok(!/2026-09-14/.test(html), 'today is the report, not the history');
+});
+
+test('a withheld score is named, never plotted as zero', () => {
+  const state = setup({ report: report({ screening_id: 9 }),
+    history: { screenings: [
+      { id: 1, taken_on: '2026-08-01', score: null, screens: ['knee_flexion'] }] } });
+  const html = historyHtml(state, 'en');
+  assert.match(html, /No score/);
+  assert.ok(!/0\/100/.test(html));
+});
+
+test('nothing is drawn before the history has been fetched', () => {
+  assert.equal(historyHtml(setup({ report: report() }), 'en'), '');
+});
+
+const CHANGE = {
+  changes: [
+    { screen: 'shoulder_flexion', side: 'left', before: 120, after: 150,
+      unit: 'deg', comparable: true, reason: '', difference: 30,
+      sentence: 'Shoulder flexion (left): 120° → 150° (30° further)',
+      sentence_ko: '어깨 굽힘 (왼쪽): 120° → 150° (30° 더 멀리)' },
+    { screen: 'knee_flexion', side: 'right', before: null, after: null,
+      unit: 'deg', comparable: false, difference: null,
+      reason: 'filmed from a different plane the second time',
+      sentence: 'Knee flexion: not compared', sentence_ko: '무릎 굽힘: 비교 불가' },
+  ],
+  judgement: 'A joint that travelled further travelled further. Whether that is progress is a judgement for the person teaching.',
+  judgement_ko: '더 멀리 움직였다는 것은 더 멀리 움직였다는 뜻입니다.',
+};
+
+test('the change against the last screening is shown', () => {
+  const html = changeHtml(setup({ change: CHANGE }), 'en');
+  assert.match(html, /120° → 150°/);
+  assert.match(html, /30° further/);
+});
+
+test('a screen that cannot be compared says why instead of showing a number', () => {
+  const html = changeHtml(setup({ change: CHANGE }), 'en');
+  assert.match(html, /Not compared/);
+  assert.match(html, /different plane/);
+});
+
+test('nothing calls a larger range an improvement', () => {
+  const html = changeHtml(setup({ change: CHANGE }), 'en');
+  assert.match(html, /judgement for the person teaching/);
+  assert.ok(!/improve/i.test(html));
+});
+
+test('the comparison reads in Korean', () => {
+  const html = changeHtml(setup({ change: CHANGE }), 'ko');
+  assert.match(html, /어깨 굽힘/);
+  assert.match(html, /더 멀리/);
+});
+
+test('no comparison draws nothing', () => {
+  assert.equal(changeHtml(setup({ change: null }), 'en'), '');
 });

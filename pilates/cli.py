@@ -989,6 +989,13 @@ def cmd_movement(args: argparse.Namespace) -> int:
     if not found and any(s.measured for s in result.sides):
         print("\n  nothing outside the reference range")
 
+    plan = sc.programme(assessment)
+    if plan:
+        print("\n  work on")
+        for row in plan:
+            name = row["name_ko"] if lang == "ko" else row["name"]
+            print(f"      {name}")
+
     score = assessment.score()
     if score.value is None:
         print(f"\n  no score: {score.withheld_reason}")

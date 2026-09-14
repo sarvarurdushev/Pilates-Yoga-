@@ -130,6 +130,11 @@ class Screen:
     #: Whether the reference is a clinical normal or a functional benchmark.
     #: Printed beside the number, because they are not the same kind of claim.
     reference_kind: str = "clinical"
+    #: Exercises from the studio's own library that work this range, by the
+    #: key the browser uses, so a shortfall opens onto something to do about
+    #: it. Keys only: the names are the library's and are read from it, so a
+    #: renamed exercise does not become two different names in one report.
+    works: tuple[str, ...] = ()
 
     @property
     def sided(self) -> bool:
@@ -180,6 +185,11 @@ SCREENS: dict[str, Screen] = {
             "AAOS normal active range, as tabulated in Norkin & White, "
             "Measurement of Joint Motion: A Guide to Goniometry"),
         views=(View.FRONT, View.REAR),
+        works=("urdhvaHastasana",
+                 "cadillacArmSprings",
+                 "reformerKneelingArms",
+                 "shoulderPlacement",
+                 "gomukhasana"),
     ),
     "shoulder_flexion": Screen(
         key="shoulder_flexion",
@@ -198,6 +208,11 @@ SCREENS: dict[str, Screen] = {
             "AAOS normal active range, as tabulated in Norkin & White, "
             "Measurement of Joint Motion: A Guide to Goniometry"),
         views=(View.SIDE_LEFT, View.SIDE_RIGHT),
+        works=("urdhvaHastasana",
+                 "anahatasana",
+                 "adhoMukhaSvanasana",
+                 "cadillacPushThrough",
+                 "shoulderPlacement"),
     ),
     "hip_flexion": Screen(
         key="hip_flexion",
@@ -216,6 +231,11 @@ SCREENS: dict[str, Screen] = {
             "AAOS normal active range with the knee flexed, as tabulated in "
             "Norkin & White, Measurement of Joint Motion"),
         views=(View.SIDE_LEFT, View.SIDE_RIGHT),
+        works=("suptaPadangusthasana",
+                 "singleLegStretch",
+                 "doubleLegStretch",
+                 "kneeFolds",
+                 "utthitaHastaPadangusthasana"),
     ),
     "knee_flexion": Screen(
         key="knee_flexion",
@@ -234,6 +254,11 @@ SCREENS: dict[str, Screen] = {
             "AAOS normal active range, as tabulated in Norkin & White, "
             "Measurement of Joint Motion"),
         views=(View.SIDE_LEFT, View.SIDE_RIGHT),
+        works=("virasana",
+                 "suptaVirasana",
+                 "singleLegKick",
+                 "dhanurasana",
+                 "natarajasana"),
     ),
     "squat_depth": Screen(
         key="squat_depth",
@@ -258,6 +283,11 @@ SCREENS: dict[str, Screen] = {
             "degrees of hip flexion. Not a clinical normal range"),
         reference_kind="functional",
         views=(View.SIDE_LEFT, View.SIDE_RIGHT),
+        works=("malasana",
+                 "utkatasana",
+                 "chairFootwork",
+                 "reformerFootworkParallel",
+                 "skandasana"),
     ),
     "single_leg_balance": Screen(
         key="single_leg_balance",
@@ -281,6 +311,11 @@ SCREENS: dict[str, Screen] = {
         kind="hold",
         unit="s",
         reference_kind="functional",
+        works=("vrksasana",
+                 "virabhadrasana3",
+                 "utthitaPadangusthaBalance",
+                 "garudasana",
+                 "ardhaChandrasana"),
     ),
 }
 
@@ -892,6 +927,56 @@ class Finding:
 
 # ------------------------------------------------------------- the assessment
 
+def programme(assessment: "ScreeningAssessment", limit: int = 6) -> list[dict]:
+    """What to work on, drawn from the studio's own library.
+
+    Only for screens that came back short. A joint already at the published
+    range does not need exercises suggested for it, and a list that suggested
+    something for every screen filmed would be a list nobody reads.
+
+    Worst first, and one pass round the screens before a second exercise is
+    taken from any of them: a programme of five shoulder exercises for a body
+    whose shoulder and squat were both short is a programme that ignores half
+    of what was measured.
+
+    The names come from the library rather than from this module. A studio
+    that renames an exercise renames it once.
+    """
+    from . import guidance as gd
+
+    ranked: list[tuple[str, str]] = []
+    for finding in assessment.findings():
+        screen = SCREENS[finding.screen]
+        if not screen.works or finding.severity == WITHIN:
+            continue
+        if finding.screen not in [key for key, _ in ranked]:
+            ranked.append((finding.screen, finding.severity))
+
+    out: list[dict] = []
+    depth = 0
+    while len(out) < limit and ranked:
+        added = False
+        for key, severity in ranked:
+            works = SCREENS[key].works
+            if depth >= len(works) or len(out) >= limit:
+                continue
+            exercise = works[depth]
+            out.append({
+                "key": exercise,
+                "name": gd.exercise_name(exercise),
+                "name_ko": gd.exercise_name(exercise, "ko"),
+                "screen": key,
+                "screen_name": SCREENS[key].name,
+                "screen_name_ko": SCREENS[key].name_ko,
+                "severity": severity,
+            })
+            added = True
+        if not added:
+            break
+        depth += 1
+    return out
+
+
 @dataclass
 class ScreeningAssessment:
     """Everything one screening session found, for one student."""
@@ -1074,6 +1159,10 @@ class ScreeningAssessment:
                            for n, c in score.components.items()},
             "results": {k: r.to_dict() for k, r in self.results.items()},
             "findings": [f.to_dict() for f in found],
+            # What to do about them, from the studio's own repertoire. Empty
+            # when nothing came back short, which is the right answer: a body
+            # at the published range needs no exercises suggested for it.
+            "programme": programme(self),
             "doubts": list(self.doubts),
             "reliable": self.reliable,
             "refused": [{"screen": s.screen, "side": s.side,
