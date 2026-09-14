@@ -227,3 +227,30 @@ what it cannot support.
   muscles wearing an electrode.
 - **Nothing** moves brain function into range. That one is not a hardware
   problem.
+
+## Standing alignment (added with `pilates/alignment.py`)
+
+The posture layer keeps the same rule and adds three cases of its own.
+
+**Sagittal pelvic tilt is not computed at all.** Anterior/posterior pelvic tilt
+needs the angle of a line between the anterior and posterior superior iliac
+spines. No COCO-17 model marks either, and no arithmetic on a single hip point
+recovers them. Approximating it from the hip-knee-trunk angle produces a number
+that moves with hip flexion, which is a different thing that would be read as if
+it were the same. It is returned as an explicit refusal with that reason
+attached, so a report shows the gap rather than having one.
+
+**Weight distribution is not measured; torso position is.** A camera sees where
+the body is, not where the load goes, and the two part company the moment
+somebody leans without shifting their feet. `lateral_weight_bias` is marked
+ESTIMATED and says so. A force plate measures weight distribution.
+
+**Rotation about the long axis is an index, not an angle.** Shoulders really are
+wider than hips, by an amount that differs between people, so the span ratio only
+means rotation once a baseline for that student exists. Useful against their own
+earlier assessment; not useful as an absolute, and marked ESTIMATED.
+
+And the one that governs all of it: **a measurement is refused when the view
+cannot support it.** Shoulder level from a side view and forward-head from a
+frontal one are not imprecise, they are unavailable, and the module returns them
+as unavailable with the reason rather than returning a number nobody should use.

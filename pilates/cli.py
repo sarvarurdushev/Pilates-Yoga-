@@ -607,6 +607,89 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+
+#: The views `pilates posture --view` accepts. Built from the enum rather than
+#: retyped, so a view added there appears here without anyone remembering to.
+def _view_choices() -> list[str]:
+    from .alignment import View
+
+    return [v.value for v in View if v is not View.UNKNOWN]
+
+
+_VIEW_CHOICES = _view_choices()
+
+
+def cmd_posture(args: argparse.Namespace) -> int:
+    """Measure standing alignment, per person, from a clip or a single frame.
+
+    Every student in the shot is assessed separately -- averaging alignment
+    across a class produces a number describing nobody -- and the answer for
+    each is the median across the frames they were tracked in, so it does not
+    rest on whichever frame happened to be sampled.
+    """
+    from . import alignment as al
+    from . import alignview
+
+    config = _load_config(args.config)
+    if args.stride is not None:
+        config.frame_stride = args.stride
+    view = al.View(args.view) if args.view else None
+
+    pipeline = Pipeline(config)
+    per_track: dict[int, list[al.PostureAssessment]] = {}
+    last_frame: dict[int, object] = {}
+    height = 0
+    with VideoSource(args.video, stride=config.frame_stride,
+                     start_frame=args.start, end_frame=args.end) as source:
+        for result in pipeline.run(source):
+            for person in result.people:
+                height = height or getattr(result, "height", 0) or 0
+                assessment = al.assess(
+                    person.detection, view=view, person_id=str(person.track_id),
+                    frame_height=height or None,
+                    threshold=config.keypoint_threshold)
+                per_track.setdefault(person.track_id, []).append(assessment)
+                last_frame[person.track_id] = person.detection
+
+    if not per_track:
+        print("Nobody was tracked in that clip.", file=sys.stderr)
+        return 1
+
+    shown = 0
+    for track_id, frames in sorted(per_track.items()):
+        merged = al.aggregate(frames, min_frames=args.min_frames)
+        if merged is None:
+            print(f"\nstudent {track_id}: seen in {len(frames)} frame(s), too few "
+                  f"or too inconsistent to assess (needs {args.min_frames})")
+            continue
+        shown += 1
+        score = merged.score()
+        print(f"\nstudent {track_id} — {merged.view.describe()}")
+        print("  " + (score.describe().replace("\n", "\n  ")))
+        for metric in merged.attention():
+            print(f"  ! {metric.describe()}")
+        for name, metric in merged.metrics.items():
+            if not metric.measured:
+                print(f"  · {name.replace('_', ' ')}: not measured — {metric.reason}")
+        for warning in merged.warnings:
+            print(f"  ! {warning}")
+
+        if args.svg:
+            target = Path(args.svg)
+            path = (target / f"student-{track_id}.svg" if target.is_dir()
+                    else target.with_name(f"{target.stem}-{track_id}.svg"))
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(alignview.render(
+                merged, last_frame[track_id],
+                width=args.svg_width, height=height or 720,
+                threshold=config.keypoint_threshold), encoding="utf-8")
+            print(f"  drawing: {path}")
+
+    if not shown:
+        return 1
+    print("\nMeasured alignment from one camera. Not a medical assessment.")
+    return 0
+
 def cmd_load(args: argparse.Namespace) -> int:
     """Report mechanical load at each joint, and which muscle group carries it."""
     import statistics
@@ -2509,6 +2592,20 @@ def main(argv: list[str] | None = None) -> int:
     pr.add_argument("--store", required=True, help="history file")
     pr.add_argument("--exercise", default=None, help="default: every exercise recorded")
     pr.set_defaults(func=cmd_progress)
+
+    po = sub.add_parser("posture", help="standing alignment, measured per person")
+    po.add_argument("video")
+    po.add_argument("--config", default=None)
+    po.add_argument("--stride", type=int, default=None)
+    po.add_argument("--start", type=int, default=None)
+    po.add_argument("--end", type=int, default=None)
+    po.add_argument("--view", default=None, choices=_VIEW_CHOICES,
+                    help="override the estimator when you know where the camera points")
+    po.add_argument("--min-frames", type=int, default=5,
+                    help="frames a student must be seen in before they are assessed")
+    po.add_argument("--svg", default=None, help="write a drawing per student here")
+    po.add_argument("--svg-width", type=int, default=720)
+    po.set_defaults(func=cmd_posture)
 
     ld = sub.add_parser("load", help="joint load and the muscle group carrying it")
     ld.add_argument("video")

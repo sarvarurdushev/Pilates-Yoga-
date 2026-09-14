@@ -1131,3 +1131,90 @@ def register(store, payload: dict, base: str = "") -> dict:
             # A mail server that is down must not stop somebody joining.
             out["verification_sent"] = False
     return out
+
+
+# ------------------------------------------------------- standing alignment
+
+def posture_assessment(store, viewer: Viewer | None, payload: dict) -> dict:
+    """Measure one student's standing alignment from landmarks already extracted.
+
+    Takes keypoints rather than a video. The analysis pipeline produces
+    :class:`~pilates.types.Detection` objects and the store keeps measurements,
+    not footage -- so the honest boundary for this endpoint is the same one the
+    rest of the system keeps: the clip is analysed where it was recorded, and
+    what travels is the numbers.
+
+    ``keypoints`` is 17 ``[x, y]`` pairs in COCO order with 17 ``scores``; see
+    :mod:`pilates.keypoints`. ``view`` may be supplied when the studio knows
+    where its camera points, which beats any estimator.
+    """
+    import numpy as np
+
+    from . import alignment as al
+    from .types import Detection
+
+    who = str(payload.get("username", "")).strip()
+    if who:
+        guard_subject(store, viewer, who)
+    else:
+        _need(viewer)
+
+    try:
+        points = np.asarray(payload["keypoints"], dtype=np.float32)
+        scores = np.asarray(payload["scores"], dtype=np.float32)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise Refused("send 17 keypoints and 17 scores", 400) from exc
+    try:
+        detection = Detection(keypoints=points, scores=scores)
+    except ValueError as exc:
+        raise Refused(str(exc), 400) from exc
+
+    asked = str(payload.get("view", "")).strip().lower()
+    view = None
+    if asked:
+        try:
+            view = al.View(asked)
+        except ValueError as exc:
+            raise Refused(
+                f"unknown view {asked!r}; use one of "
+                f"{', '.join(v.value for v in al.View if v is not al.View.UNKNOWN)}",
+                400) from exc
+
+    frame_height = payload.get("frame_height")
+    return al.assess(
+        detection, view=view, person_id=str(payload.get("person_id", "")),
+        frame_height=int(frame_height) if frame_height else None,
+    ).to_dict()
+
+
+def posture_comparison(store, viewer: Viewer | None, payload: dict) -> dict:
+    """Two assessments of one student, side by side.
+
+    Both are re-measured here from their landmarks rather than trusted as
+    numbers, so a comparison cannot be assembled out of two payloads that were
+    never assessed the same way.
+    """
+    before = posture_assessment(store, viewer, {**payload.get("before", {}),
+                                                "username": payload.get("username", "")})
+    after = posture_assessment(store, viewer, {**payload.get("after", {}),
+                                               "username": payload.get("username", "")})
+
+    from . import alignment as al
+
+    def rebuild(raw: dict) -> "al.PostureAssessment":
+        """Back into the dataclass, so `compare` applies its own rules."""
+        view = al.ViewEstimate(al.View(raw["view"]), raw["view_confidence"])
+        metrics = {}
+        for name, value in raw["metrics"].items():
+            availability = al.Availability(raw["availability"][name])
+            metrics[name] = al.Metric(
+                name, value, raw["units"][name], availability,
+                raw["confidence"].get(name, 0.0), raw["reasons"].get(name, ""),
+                normal=al.NORMAL_BANDS.get(name))
+        return al.PostureAssessment(view=view, metrics=metrics,
+                                    warnings=list(raw["warnings"]),
+                                    person_id=raw["person_id"])
+
+    return al.compare(rebuild(before), rebuild(after)).to_dict()
+
+

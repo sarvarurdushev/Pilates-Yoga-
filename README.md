@@ -566,6 +566,104 @@ python -m pilates describe class.mp4 --anatomy --anatomy-file our_library.json
 Bones are derived from the joints when a file does not list them, so the two
 cannot drift apart.
 
+## Standing posture: alignment, and what one camera cannot see
+
+The movement layer answers "how did that rep go". A studio gets asked another
+question constantly -- *stand still; what does my alignment look like, and has it
+changed since last time* -- and `pilates/alignment.py` answers that one.
+
+```bash
+python -m pilates posture CLIP --view front --svg drawings/
+```
+
+Every student in the shot is measured **separately**. Averaging alignment across
+a class produces a number describing nobody, and a class is exactly where the
+temptation arises. The answer for each is the median across the frames they were
+tracked in, so it does not rest on whichever frame happened to be sampled.
+
+### The division of labour
+
+The pose model produces landmarks and per-joint confidence. **Nothing else.**
+Every number is deterministic geometry over those landmarks -- an angle, a
+distance, a ratio, a difference between two sides -- so each one is checkable by
+a teacher with a protractor. No model judges alignment and no language model
+invents a measurement. `alignment.py` imports `geometry.py` rather than growing
+maths of its own, because the trunk, shoulder, pelvis and neck angles were
+already written and already tested there.
+
+### A single camera cannot see every plane
+
+Shoulder level is measurable from the front and meaningless from the side;
+forward-head is the reverse. Pretending otherwise is the characteristic failure
+of posture software, so every metric declares itself **AVAILABLE**, **ESTIMATED**
+or **UNAVAILABLE** for the view it was asked in, and an unavailable metric
+carries the reason instead of a number:
+
+| Metric | Front / rear | Side | Note |
+|---|---|---|---|
+| head lateral tilt | available | — | ear line against level |
+| shoulder tilt | available | — | |
+| pelvic **obliquity** | available | — | named for what it is; not the sagittal one |
+| trunk lean | available (lateral) | available (sagittal) | same measurement, whichever plane faces the lens |
+| knee deviation, per side | available | — | from the side this offset is knee flexion, a different quantity |
+| lateral weight bias | **estimated** | — | where the torso stands, not where the load goes |
+| torso rotation index | **estimated** | — | needs this student's own baseline to mean rotation |
+| forward head | — | available | as a share of torso height; centimetres need a scale the camera lacks |
+| **sagittal pelvic tilt** | **unavailable** | **unavailable** | needs the ASIS and PSIS landmarks, which a 17-point model does not mark |
+
+That last row is the measurement every posture product is asked for. It is
+listed rather than omitted so a report shows the gap instead of quietly having
+one. `docs/pose-model-survey.md` describes the anatomical-marker model that
+would be the honest route to it.
+
+The view is estimated from the landmarks -- shoulder span against torso height
+separates frontal from sagittal, and the anatomical labelling of the keypoints
+separates front from rear -- and a body turned part-way is **refused**, because
+neither plane faces the lens. `--view` overrides the estimator, which is always
+the better answer when a studio knows where its camera points.
+
+### The score
+
+0-100, on the same machinery every other score here uses, which means it
+inherits the coverage rule: a headline number is withheld when too little of the
+body was visible, and it never travels without how many checks it came from.
+Components are the regions a teacher would name.
+
+```
+92 out of 100, from 7 checks covering 8 of 8 measurable quantities
+  shoulders: 64 from 1 check(s), weakest shoulder tilt at 64
+  pelvis: 76 from 1 check(s)
+  head: 100 from 1 check(s)
+  lower_body: 100 from 3 check(s)
+  trunk: 100 from 1 check(s)
+```
+
+Coverage is measured against **what this view could have shown**, not against
+every metric in the module -- charging a frontal assessment for forward-head
+would report a body in full view as two-thirds covered.
+
+### Before and after
+
+`pilates/alignment.py: compare()` puts two assessments side by side under two
+rules that stop it inventing progress. A metric is compared **only when both
+sides measured it** -- absence is not improvement. And **two different views are
+never compared**, because shoulder tilt from the front and from the rear differ
+by construction, so a camera moved between visits would otherwise read as a
+transformation. A percentage is withheld when the earlier value was near zero:
+0.1° to 0.4° is not a 300% deterioration, it is noise.
+
+Nothing here calls a smaller deviation an improvement. That is a clinical
+judgement, and it belongs to the person teaching.
+
+### Not a medical assessment
+
+This measures geometry: an angle between two landmarks, a difference between two
+sides. It does not diagnose scoliosis, leg-length discrepancy, or any other
+condition. The wording throughout -- "measured asymmetry", "estimated
+alignment", "joint-angle deviation" -- is chosen so a report cannot be read as a
+diagnosis, and every drawing carries the disclaimer in a `<desc>` element where
+a text wrap cannot break it in half.
+
 ## Who is this? The identity problem
 
 Everything long-term rests on one question, and it is not a computer-vision

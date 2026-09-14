@@ -569,6 +569,12 @@ class Handler(SimpleHTTPRequestHandler):
             store, self._viewer(store), body),
         "/roster/remove": lambda self, store, body: api.end_assignment(
             store, self._viewer(store), body),
+        # Landmarks in, alignment out. No video crosses this boundary: the clip
+        # is analysed where it was recorded and what travels is the numbers.
+        "/posture": lambda self, store, body: api.posture_assessment(
+            store, self._viewer(store), body),
+        "/posture/compare": lambda self, store, body: api.posture_comparison(
+            store, self._viewer(store), body),
         "/roster/end": lambda self, store, body: api.end_assignment(
             store, self._viewer(store), body),
         "/admin/decide": lambda self, store, body: api.decide(
