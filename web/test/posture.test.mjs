@@ -33,7 +33,8 @@ function landmarks(over = {}) {
 }
 
 function reading(name, value, sources, extra = {}) {
-  return { name, value, unit: 'deg', sources, contested: false, ...extra };
+  return { name, value, unit: 'deg', sources, contested: false,
+           normal: [-2, 2], ...extra };
 }
 
 function report(over = {}) {
@@ -42,6 +43,7 @@ function report(over = {}) {
       shoulder_tilt: reading('shoulder_tilt', 9.1, ['front', 'rear']),
       pelvic_obliquity: reading('pelvic_obliquity', -1.2, ['front', 'rear']),
       forward_head: { name: 'forward_head', value: 0.31, unit: 'ratio',
+                      normal: [-0.05, 0.15],
                       sources: ['side_left', 'side_right'], contested: false },
     } },
     findings: [{ metric: 'shoulder_tilt', severity: 'marked', display: '+9.1°',
@@ -877,4 +879,78 @@ test('a muscle the body cannot show is not pretended to be shown', () => {
   assert.equal(showMuscle({}, 'descending part of trapezius'), false);
   assert.equal(showMuscle({ selectStructure: () => {} }, 'nothing at all'),
                false);
+});
+
+/* --------------------------------------------------- every measurement shown */
+
+const { measurementsHtml, trackHtml } = _internals;
+
+test('a body with nothing wrong still gets a report with something in it', () => {
+  /* The whole failure this answers: a score of 100, an empty findings
+   * section, and seventeen measurements summarised as a list of their names
+   * at the bottom. The work was done and none of it was shown. */
+  const html = measurementsHtml({ ...report(), findings: [] }, 'en');
+  assert.match(html, /shoulder level/);
+  assert.match(html, /pelvis level/);
+  assert.match(html, /head carried forward/);
+});
+
+test('every measurement shows its number and its range', () => {
+  const html = measurementsHtml(report(), 'en');
+  assert.match(html, /\+9\.1°/);
+  assert.match(html, /-2\.0° to \+2\.0°/);
+});
+
+test('a measurement is marked by how much of a finding it is', () => {
+  const html = measurementsHtml(report(), 'en');
+  /* shoulder_tilt is the marked finding in the fixture; pelvic_obliquity is
+     inside its band. The two must not be drawn the same. */
+  assert.ok(html.includes(INK.marked), 'the finding is coloured as one');
+  assert.ok(html.includes(INK.within_band), 'and the unremarkable one is not');
+});
+
+test('a refusal is shown with its reason, not as a blank row', () => {
+  const html = measurementsHtml({ ...report(), assessment: { readings: {
+    sagittal_pelvic_tilt: { name: 'sagittal_pelvic_tilt', value: null,
+      unit: 'deg', sources: [], contested: false,
+      reason: 'needs the ASIS and PSIS landmarks' } } } }, 'en');
+  assert.match(html, /ASIS and PSIS/);
+});
+
+test('nothing is drawn when nothing was measured at all', () => {
+  assert.equal(measurementsHtml({ assessment: { readings: {} } }, 'en'), '');
+});
+
+test('the table reads in Korean', () => {
+  const html = measurementsHtml(report(), 'ko');
+  assert.match(html, /전체 측정값/);
+  assert.match(html, /어깨 수평/);
+});
+
+test('the band is drawn as the middle of the track, not the whole of it', () => {
+  /* A track that *is* the band cannot show a value outside it: everything out
+   * of range pins to an edge and reads the same however far out it is. */
+  const html = trackHtml(0, [-2, 2], '#fff');
+  const shade = html.match(/left:([\d.]+)%;width:([\d.]+)%/);
+  assert.ok(Number(shade[1]) > 30 && Number(shade[1]) < 36, 'band starts a third in');
+  assert.ok(Number(shade[2]) > 30 && Number(shade[2]) < 36, 'and is a third wide');
+});
+
+test('a value outside its range is drawn outside the shading', () => {
+  const inside = Number(trackHtml(0, [-2, 2], '#fff').match(/b style="left:([\d.]+)%/)[1]);
+  const outside = Number(trackHtml(5, [-2, 2], '#fff').match(/b style="left:([\d.]+)%/)[1]);
+  assert.ok(outside > 66, `${outside}% should be past the band`);
+  assert.ok(inside > 45 && inside < 55, 'and the centred one in the middle');
+});
+
+test('a value far outside is held on the track rather than off it', () => {
+  const far = Number(trackHtml(500, [-2, 2], '#fff').match(/b style="left:([\d.]+)%/)[1]);
+  assert.ok(far <= 100, `${far}% is off the track`);
+});
+
+test('a measurement with no usual range gets no shading to sit inside', () => {
+  /* Pretending otherwise is how a number with no meaning acquires one. */
+  const html = trackHtml(1.6, null, '#fff');
+  assert.match(html, /ss-noband/);
+  assert.ok(!/<i /.test(html), 'and nothing shaded');
 });

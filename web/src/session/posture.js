@@ -100,6 +100,11 @@ const T = {
   offRegion:  { en: 'Off', ko: '불균형' },
   notMeasuredRegion: { en: 'Not measured', ko: '측정 안 됨' },
   actsHere:   { en: 'Muscles that act here', ko: '이 부위에 작용하는 근육' },
+  everyMeasure:{ en: 'Every measurement', ko: '전체 측정값' },
+  everyMeasureNote: { en: 'The shaded part of each track is the range that counts as unremarkable. The marker is where this body landed.',
+                      ko: '각 막대의 음영 구간이 정상으로 보는 범위이며, 표시된 점이 이번 측정값입니다.' },
+  toRange:    { en: 'to', ko: '~' },
+  noRange:    { en: 'no usual range', ko: '정상 범위 없음' },
   onThePhotos:{ en: 'What was measured, on the photographs', ko: '사진에서 측정한 항목' },
   noPhoto:    { en: 'Photograph not kept', ko: '사진 미보관' },
   onFile:     { en: 'Already on file', ko: '기록된 분석' },
@@ -394,6 +399,28 @@ const STYLE = `
   box-shadow:0 0 0 2px rgba(0,0,0,.45)}
 #ss-pos .ss-scaleends{display:flex;justify-content:space-between;
   margin:5px 0 0;font-size:9.5px;color:var(--dim2)}
+#ss-pos .ss-measures{margin:0 0 24px}
+#ss-pos .ss-measures table{width:100%;border-collapse:collapse}
+#ss-pos .ss-measures tr{border-top:1px solid var(--line)}
+#ss-pos .ss-measures tr:first-child{border-top:0}
+#ss-pos .ss-measures th{text-align:left;font-weight:500;font-size:11.5px;
+  color:var(--dim);padding:7px 12px 7px 0;white-space:nowrap}
+#ss-pos .ss-mval{font-size:12.5px;font-weight:600;text-align:right;
+  padding:7px 14px 7px 0;white-space:nowrap;font-variant-numeric:tabular-nums}
+#ss-pos .ss-mtrack{width:46%;padding:7px 14px 7px 0}
+#ss-pos .ss-mband{font-size:10.5px;color:var(--dim2);white-space:nowrap;
+  text-align:right;padding:7px 0}
+#ss-pos .ss-mwhy{font-size:10.5px;color:var(--dim2);line-height:1.6}
+#ss-pos .ss-track{position:relative;display:block;height:7px;border-radius:4px;
+  background:rgba(255,255,255,.05)}
+#ss-pos .ss-track i{position:absolute;top:0;bottom:0;border-radius:4px;
+  background:rgba(95,185,138,.22);border-left:1px solid rgba(95,185,138,.5);
+  border-right:1px solid rgba(95,185,138,.5)}
+#ss-pos .ss-track b{position:absolute;top:-3px;width:3px;height:13px;
+  border-radius:2px;transform:translateX(-1.5px);
+  box-shadow:0 0 0 1.5px rgba(0,0,0,.5)}
+#ss-pos .ss-track.ss-noband{background:repeating-linear-gradient(90deg,
+  rgba(255,255,255,.05) 0 5px,transparent 5px 10px)}
 #ss-pos .ss-muscles{margin:12px 0 0;padding:11px 0 0;
   border-top:1px solid var(--line)}
 #ss-pos .ss-muscles h4{margin:0 0 9px;font-size:10.5px;font-weight:600;
@@ -953,6 +980,85 @@ function muscleName(name, lang) {
   return shown || name;
 }
 
+/**
+ * Every measurement, with its value and where it sits in its own range.
+ *
+ * Without this a body with nothing wrong got a report with nothing in it: a
+ * score of 100, an empty findings section, and seventeen measurements
+ * summarised as a comma-separated list of their names at the bottom of the
+ * page. The work had all been done and none of it was shown, which reads as a
+ * product that measured nothing rather than one that found nothing.
+ *
+ * Each row is the name, the number, and a track with the normal range shaded
+ * on it and a marker where this body landed. The track is drawn a full range
+ * wide either side of the band, so a value outside it is visibly outside
+ * rather than pinned to an edge, and a reader can see at a glance whether
+ * something unremarkable was comfortably unremarkable or a hair inside the
+ * line.
+ */
+export function measurementsHtml(report, lang) {
+  const readings = report.assessment?.readings ?? {};
+  const names = Object.keys(readings);
+  if (!names.length) return '';
+  const severity = new Map(
+    (report.findings ?? []).map((f) => [f.metric, f.severity]));
+
+  const rows = names.map((metric) => {
+    const reading = readings[metric];
+    const grade = severity.get(metric) ?? 'within_band';
+    const ink = reading.value == null ? INK.none : (INK[grade] ?? INK.within_band);
+    const label = nameOf(report, metric, lang);
+    if (reading.value == null) {
+      return `<tr><th>${esc(label)}</th>
+        <td class="ss-mval" style="color:${INK.none}">—</td>
+        <td class="ss-mtrack" colspan="2"><span class="ss-mwhy">${
+          esc(reading.reason || say('notMeasuredRegion', lang))}</span></td></tr>`;
+    }
+    const value = formatValue(metric, reading);
+    const band = reading.normal;
+    return `<tr><th>${esc(label)}</th>
+      <td class="ss-mval" style="color:${ink}">${esc(value)}</td>
+      <td class="ss-mtrack">${trackHtml(reading.value, band, ink)}</td>
+      <td class="ss-mband">${band
+        ? esc(`${formatValue(metric, { ...reading, value: band[0] })} `
+              + `${say('toRange', lang)} `
+              + `${formatValue(metric, { ...reading, value: band[1] })}`)
+        : esc(say('noRange', lang))}</td></tr>`;
+  }).join('');
+
+  return `<div class="ss-card ss-measures">
+    <h2>${esc(say('everyMeasure', lang))}</h2>
+    <table><tbody>${rows}</tbody></table>
+    <p class="ss-why">${esc(say('everyMeasureNote', lang))}</p>
+  </div>`;
+}
+
+/**
+ * Where one value sits against its normal range.
+ *
+ * The band is drawn as the shaded middle third and the track runs a full
+ * range either side of it, so a value outside the band is drawn outside the
+ * shading instead of stopped at its edge. A metric with no band gets a track
+ * with no shading -- there is nothing for it to be inside or outside of, and
+ * pretending otherwise is how a number with no meaning acquires one.
+ */
+export function trackHtml(value, band, ink) {
+  if (!band) {
+    return `<span class="ss-track ss-noband"><b style="left:50%;
+      background:${ink}"></b></span>`;
+  }
+  const [low, high] = band;
+  const span = Math.max(high - low, 1e-6);
+  const from = low - span;
+  const width = span * 3;
+  const at = Math.max(0, Math.min(100, ((value - from) / width) * 100));
+  const shadeFrom = ((low - from) / width) * 100;
+  const shadeWidth = (span / width) * 100;
+  return `<span class="ss-track">
+    <i style="left:${shadeFrom.toFixed(1)}%;width:${shadeWidth.toFixed(1)}%"></i>
+    <b style="left:${at.toFixed(1)}%;background:${ink}"></b></span>`;
+}
+
 function planHeadHtml(report, lang) {
   const pri = report.priorities ?? [];
   const review = report.review ?? {};
@@ -1477,6 +1583,8 @@ function reportHtml(state, lang, identity) {
       : (held ? '' : `<p class="ss-card" style="margin:0 0 24px;font-size:12px;
         color:${INK.within_band}">${esc(say('clear', lang))}</p>`)}
 
+    ${measurementsHtml(report, lang)}
+
     <div class="ss-grid">
       <div>
         ${patternHtml(report, lang)}
@@ -1818,5 +1926,6 @@ export const _internals = { overlay, marksFor, anchorOf, dial, spark,
                             regionsHtml, evennessHtml, planHeadHtml,
                             formatValue, peek, fixHtml, applyFix, reportHtml,
                             bodyMapHtml, regionInk, callouts, scaleHtml,
-                            musclesHtml, showMuscle,
+                            musclesHtml, showMuscle, measurementsHtml,
+                            trackHtml,
                             INK, ANCHOR, CHIP: T };
