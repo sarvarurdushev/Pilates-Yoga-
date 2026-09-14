@@ -24,6 +24,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+from pilates import alignment as al  # noqa: E402
 from pilates import api  # noqa: E402
 from pilates import photos as ph  # noqa: E402
 from pilates.alignment import View  # noqa: E402
@@ -123,6 +124,22 @@ ALL_FOUR = (View.FRONT, View.SIDE_LEFT, View.SIDE_RIGHT, View.REAR)
 
 def script_for(*views) -> list:
     return [BODIES[v]() for v in views]
+
+
+def sparse(view) -> "object":
+    """A body with its head lost, so too few checks can be made to score.
+
+    One side photograph now measures six things -- the plumb chain took it
+    from two -- which is enough to clear the minimum, so a set that used to be
+    unscoreable for lack of checks no longer is. Losing the ear costs the two
+    measurements that need it and drops the count back under the bar, which is
+    the condition this test is actually about.
+    """
+    det = BODIES[view]()
+    scores = det.scores.copy()
+    scores[al.kp.L_EAR] = scores[al.kp.R_EAR] = 0.05
+    scores[al.kp.NOSE] = 0.05
+    return type(det)(det.keypoints, scores)
 
 
 class TestTheIntake:
@@ -399,9 +416,9 @@ class TestWhatIsKept:
             self, coach, stubbed):
         """A chart with a cliff where there was no measurement invents one."""
         client, _, _ = coach
-        stubbed(script_for(View.SIDE_LEFT))
+        stubbed([sparse(View.SIDE_LEFT)])
         _, out = client.post("/intake", {"photos": shots(View.SIDE_LEFT)})
-        assert out["score"]["value"] is None
+        assert out["score"]["value"] is None, out["score"]["withheld_reason"]
         _, history = client.get("/assessments")
         assert history["assessments"][0]["score"] is None
         assert history["trend"] == []

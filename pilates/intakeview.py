@@ -97,6 +97,12 @@ CHIP: dict[str, tuple[str, str]] = {
 TEXT: dict[str, tuple[str, str]] = {
     "title": ("Standing assessment", "체형 분석 결과"),
     "measured": ("What the photographs measured", "사진에서 측정한 내용"),
+    "pattern": ("What the measurements add up to", "측정값이 말하는 것"),
+    "regions": ("By part of the body", "부위별 결과"),
+    "priorities": ("What to work on first", "개선 우선순위"),
+    "evenness": ("Left against right", "좌우 균형"),
+    "comeBack": ("Photograph again", "다음 촬영"),
+    "checksN": ("{n} checks", "{n}개 항목"),
     "all_clear": ("every measurement sits inside its unremarkable range",
                   "측정한 모든 항목이 정상 범위 안에 있습니다"),
     "usually": ("usually seen with: ", "함께 나타나는 경우가 많음: "),
@@ -689,6 +695,40 @@ def _score_column(report: dict, x: float, top: float, w: float,
                      f'{_e(line)}</text>')
         y += 11
     y += 8
+    balance = report.get("balance") or {}
+    if balance.get("evenness") is not None:
+        parts.append(_heading(say("evenness", lang), x, y))
+        y += 18
+        ink = (_BAND_INK["Excellent"] if balance["evenness"] >= 90
+               else (_BAND_INK["Fair"] if balance["evenness"] >= 75
+                     else _BAND_INK["Needs attention"]))
+        parts.append(f'<text x="{x:.0f}" y="{y:.1f}" font-size="19" '
+                     f'font-weight="700" fill="{ink}">'
+                     f'{balance["evenness"]:.0f}</text>')
+        parts.append(f'<text x="{x + 34:.0f}" y="{y:.1f}" font-size="9" '
+                     f'fill="{INK["refused"]}">'
+                     f'{balance["from_checks"]} sided checks</text>')
+        y += 18
+    for region in report.get("regions") or ():
+        score_value = region["score"]
+        ink = (INK["refused"] if score_value is None
+               else (_BAND_INK["Excellent"] if score_value >= 85
+                     else (_BAND_INK["Fair"] if score_value >= 65
+                           else _BAND_INK["Needs attention"])))
+        label = region["name_ko"] if lang == "ko" else region["name"]
+        parts.append(f'<text x="{x:.0f}" y="{y:.1f}" font-size="10" '
+                     f'fill="{INK["text"]}">{_e(label)}</text>')
+        parts.append(f'<text x="{x + w:.0f}" y="{y:.1f}" font-size="10" '
+                     f'text-anchor="end" font-weight="700" fill="{ink}">'
+                     f'{"—" if score_value is None else round(score_value)}</text>')
+        y += 5
+        parts.append(f'<rect x="{x:.0f}" y="{y:.1f}" width="{w:.0f}" height="3" '
+                     f'rx="1.5" fill="#e6eaee"/>')
+        parts.append(f'<rect x="{x:.0f}" y="{y:.1f}" '
+                     f'width="{max(2.0, w * (score_value or 0) / 100):.1f}" '
+                     f'height="3" rx="1.5" fill="{ink}"/>')
+        y += 13
+    y += 8
     for floor, english, korean in gd.SCORE_BANDS:
         current = english == score["band"]
         ink = _BAND_INK.get(english, INK["refused"])
@@ -708,8 +748,28 @@ def _score_column(report: dict, x: float, top: float, w: float,
 def _findings_column(report: dict, x: float, top: float, w: float,
                      lang: str) -> dict:
     findings = report["findings"]
-    parts = [_heading(say("measured", lang), x, top)]
-    y = top + 22.0
+    parts: list[str] = []
+    y = top
+    shape = report.get("pattern") or {}
+    if shape.get("shape"):
+        # Above the findings, because it is what they add up to and a reader
+        # who takes only the first line should take this one.
+        parts.append(_heading(say("pattern", lang), x, y, INK["joint"]))
+        y += 20
+        for line in _fit(shape["shape_ko"] if lang == "ko" else shape["shape"],
+                         w, 12.0):
+            parts.append(f'<text x="{x:.0f}" y="{y:.1f}" font-size="12" '
+                         f'font-weight="600" fill="{INK["text"]}">'
+                         f'{_e(line)}</text>')
+            y += 15
+        note = shape["start_at_ko"] if lang == "ko" else shape["start_at"]
+        for line in _fit(note, w, 9.5):
+            parts.append(f'<text x="{x:.0f}" y="{y:.1f}" font-size="9.5" '
+                         f'fill="{INK["refused"]}">{_e(line)}</text>')
+            y += 11
+        y += 16
+    parts.append(_heading(say("measured", lang), x, y))
+    y += 22.0
     if not findings:
         for line in _fit(say("all_clear", lang), w, 11.0):
             parts.append(f'<text x="{x:.0f}" y="{y:.1f}" font-size="11" '
@@ -749,8 +809,43 @@ def _findings_column(report: dict, x: float, top: float, w: float,
 
 def _plan_column(report: dict, x: float, top: float, w: float,
                  lang: str) -> dict:
-    parts = [_heading(say("plan", lang), x, top)]
-    y = top + 22.0
+    parts: list[str] = []
+    y = top
+    ranked = report.get("priorities") or ()
+    if ranked:
+        parts.append(_heading(say("priorities", lang), x, y))
+        y += 20
+        for index, entry in enumerate(ranked, 1):
+            ink = SEVERITY_INK.get(entry["severity"], INK["text"])
+            parts.append(f'<text x="{x:.0f}" y="{y:.1f}" font-size="10" '
+                         f'font-weight="700" fill="{ink}">{index}</text>')
+            title = entry["title_ko"] if lang == "ko" else entry["title"]
+            for offset, line in enumerate(_fit(title, w - 16, 10.5)):
+                parts.append(f'<text x="{x + 14:.0f}" y="{y:.1f}" '
+                             f'font-size="10.5" font-weight="600" '
+                             f'fill="{INK["text"]}">{_e(line)}</text>')
+                y += 12
+                del offset
+            parts.append(f'<text x="{x + 14:.0f}" y="{y:.1f}" font-size="9.5" '
+                         f'font-weight="700" fill="{ink}">'
+                         f'{_e(entry["measurement_ko"] if lang == "ko" else entry["measurement"])}'
+                         f'</text>')
+            y += 15
+        y += 10
+    review = report.get("review") or {}
+    if review.get("on"):
+        parts.append(f'<text x="{x:.0f}" y="{y:.1f}" font-size="10.5" '
+                     f'font-weight="700" fill="{INK["text"]}">'
+                     f'{_e(say("comeBack", lang))}: {_e(review["on"])}</text>')
+        y += 13
+        for line in _fit(review["why_ko"] if lang == "ko" else review["why"],
+                         w, 9.0):
+            parts.append(f'<text x="{x:.0f}" y="{y:.1f}" font-size="9" '
+                         f'fill="{INK["refused"]}">{_e(line)}</text>')
+            y += 10.5
+        y += 14
+    parts.append(_heading(say("plan", lang), x, y))
+    y += 22.0
     for index, entry in enumerate(report["programme"], 1):
         parts.append(f'<text x="{x:.0f}" y="{y:.1f}" font-size="10" '
                      f'font-weight="700" fill="{INK["joint"]}">{index}</text>')

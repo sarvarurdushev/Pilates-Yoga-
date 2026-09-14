@@ -90,6 +90,16 @@ const T = {
                 ko: '차이가 줄어든 것은 차이가 줄어든 것입니다. 그것이 개선인지는 지도하는 사람이 판단할 일입니다.' },
   firstOne:   { en: 'This is the first assessment on file. Take another in six to eight weeks and this page will show what moved.',
                 ko: '첫 번째 분석입니다. 6~8주 뒤에 다시 촬영하면 이 화면에서 변화를 확인할 수 있습니다.' },
+  pattern:    { en: 'What the measurements add up to', ko: '측정값이 말하는 것' },
+  regions:    { en: 'By part of the body', ko: '부위별 결과' },
+  priorities: { en: 'What to work on first', ko: '개선 우선순위' },
+  evenness:   { en: 'Left against right', ko: '좌우 균형' },
+  evenNote:   { en: 'averaged over {n} measurements that have a side to them',
+                ko: '좌우가 있는 {n}개 항목의 평균' },
+  leastEven:  { en: 'least even', ko: '가장 차이가 큰 항목' },
+  comeBack:   { en: 'Photograph again', ko: '다음 촬영' },
+  weakest:    { en: 'weakest', ko: '가장 낮음' },
+  checksN:    { en: '{n} checks', ko: '{n}개 항목' },
   severityWords: {
     marked:     { en: 'Marked', ko: '뚜렷함' },
     notable:    { en: 'Notable', ko: '주의' },
@@ -191,7 +201,7 @@ const STYLE = `
 #ss-pos .ss-go{margin:22px 0 0;display:flex;gap:12px;align-items:center;
   flex-wrap:wrap}
 #ss-pos .ss-bad{color:var(--gold);font-size:12px}
-#ss-pos .ss-grid{display:grid;gap:22px;grid-template-columns:236px 1fr;
+#ss-pos .ss-grid{display:grid;gap:22px;grid-template-columns:260px 1fr;
   align-items:start;margin:8px 0 0}
 @media(max-width:820px){#ss-pos .ss-grid{grid-template-columns:1fr}}
 #ss-pos .ss-card{border:1px solid var(--line);border-radius:7px;padding:16px 17px;
@@ -286,6 +296,30 @@ const STYLE = `
 #ss-pos .ss-chg .ss-was{font-size:10.5px;color:var(--dim2);
   font-variant-numeric:tabular-nums}
 #ss-pos .ss-delta{font-size:26px;font-weight:700;
+  font-variant-numeric:tabular-nums}
+#ss-pos .ss-pat{margin:0 0 4px;font-size:14px;font-weight:600;line-height:1.6}
+#ss-pos .ss-patwhy{margin:0;font-size:11.5px;color:var(--dim2);line-height:1.7}
+#ss-pos .ss-reg{display:grid;gap:11px;margin:2px 0 0}
+/* Direct children only. Without the combinator this also matched the wrapper
+   inside each row, turning the label into a second two-column grid and
+   breaking "weakest: head carried forward" one word per line. */
+#ss-pos .ss-reg > div{display:grid;grid-template-columns:1fr 44px;gap:10px;
+  align-items:center}
+#ss-pos .ss-reg > div > div{min-width:0}
+#ss-pos .ss-reg b{font-size:11.5px;font-weight:500;color:var(--txt)}
+#ss-pos .ss-reg small{display:block;font-size:9.5px;color:var(--dim2);
+  margin-top:1px}
+#ss-pos .ss-bar{height:5px;border-radius:3px;background:rgba(255,255,255,.07);
+  overflow:hidden;margin-top:5px}
+#ss-pos .ss-bar i{display:block;height:100%;border-radius:3px}
+#ss-pos .ss-reg em{font-style:normal;font-size:14px;font-weight:700;
+  text-align:right;font-variant-numeric:tabular-nums}
+#ss-pos ol.ss-pri{margin:0;padding:0 0 0 20px;font-size:12px;line-height:1.7}
+#ss-pos ol.ss-pri li{margin:0 0 9px;color:var(--dim)}
+#ss-pos ol.ss-pri b{color:var(--txt);font-weight:600;display:block}
+#ss-pos ol.ss-pri span{font-variant-numeric:tabular-nums;font-weight:600}
+#ss-pos .ss-even{display:flex;gap:12px;align-items:baseline;margin:0 0 6px}
+#ss-pos .ss-even b{font-size:26px;font-weight:700;
   font-variant-numeric:tabular-nums}
 @media print{
   #ss-pos{position:static;background:#fff;color:#111;overflow:visible}
@@ -450,6 +484,83 @@ function bandKo(english) {
   return { Excellent: '매우 우수', Good: '우수', Fair: '보통',
            'Needs attention': '주의', 'Needs work': '관리 필요' }[english]
     ?? english;
+}
+
+/**
+ * What the measurements add up to, which no single measurement says.
+ *
+ * The sagittal chain read as a shape, plus where in it to start. A head
+ * forward of a shoulder that is itself forward of the ankle is a body
+ * leaning; a head forward of a shoulder that is over the ankle is a neck.
+ * Both produce the same forward-head number.
+ */
+function patternHtml(report, lang) {
+  const p = report.pattern;
+  if (!p?.shape) return '';
+  const why = lang === 'ko' ? p.start_at_ko : p.start_at;
+  return `<div class="ss-card" style="margin-top:16px">
+    <h2>${esc(say('pattern', lang))}</h2>
+    <p class="ss-pat">${esc(lang === 'ko' ? p.shape_ko : p.shape)}</p>
+    ${why ? `<p class="ss-patwhy">${esc(why)}</p>` : ''}
+  </div>`;
+}
+
+/** The score broken down by part of the body, which was computed and never shown. */
+function regionsHtml(report, lang) {
+  const rows = report.regions ?? [];
+  if (!rows.length) return '';
+  const bars = rows.map((r) => {
+    const ink = r.score == null ? 'var(--dim2)'
+      : (r.score >= 85 ? INK.within_band
+        : (r.score >= 65 ? INK.watch
+          : (r.score >= 45 ? INK.notable : INK.marked)));
+    const weak = lang === 'ko' ? r.weakest_name_ko : r.weakest_name;
+    return `<div>
+      <div><b>${esc(lang === 'ko' ? r.name_ko : r.name)}</b>
+        <small>${esc(say('checksN', lang).replace('{n}', r.checks))}${
+          weak ? ` · ${esc(say('weakest', lang))}: ${esc(weak)}` : ''}</small>
+        <div class="ss-bar"><i style="width:${Math.max(2, r.score ?? 0)}%;
+          background:${ink}"></i></div></div>
+      <em style="color:${ink}">${r.score == null ? '—' : Math.round(r.score)}</em>
+    </div>`;
+  }).join('');
+  return `<div class="ss-card" style="margin-top:16px">
+    <h2>${esc(say('regions', lang))}</h2>
+    <div class="ss-reg">${bars}</div></div>`;
+}
+
+/** How even the two sides are, as one number over the checks it averaged. */
+function evennessHtml(report, lang) {
+  const b = report.balance;
+  if (!b?.evenness && b?.evenness !== 0) return '';
+  const ink = b.evenness >= 90 ? INK.within_band
+    : (b.evenness >= 75 ? INK.watch : INK.notable);
+  const worst = lang === 'ko' ? b.least_even_name_ko : b.least_even_name;
+  return `<div class="ss-card" style="margin-top:16px">
+    <h2>${esc(say('evenness', lang))}</h2>
+    <div class="ss-even"><b style="color:${ink}">${Math.round(b.evenness)}</b>
+      <span style="font-size:11px;color:var(--dim2)">${esc(
+        say('evenNote', lang).replace('{n}', b.from_checks))}</span></div>
+    ${worst ? `<p class="ss-patwhy">${esc(say('leastEven', lang))}: ${esc(worst)}</p>`
+            : ''}</div>`;
+}
+
+/** The order to work in, and when to photograph again. */
+function planHeadHtml(report, lang) {
+  const pri = report.priorities ?? [];
+  const review = report.review ?? {};
+  if (!pri.length && !review.on) return '';
+  const items = pri.map((entry) => `<li>
+    <b>${esc(lang === 'ko' ? entry.title_ko : entry.title)}</b>
+    <span style="color:${INK[entry.severity] ?? INK.within_band}">${esc(
+      lang === 'ko' ? entry.measurement_ko : entry.measurement)}</span></li>`).join('');
+  return `<div class="ss-card" style="margin-top:16px">
+    ${pri.length ? `<h2>${esc(say('priorities', lang))}</h2>
+      <ol class="ss-pri">${items}</ol>` : ''}
+    ${review.on ? `<p class="ss-patwhy" style="margin-top:${pri.length ? 12 : 0}px">
+      <b style="color:var(--txt)">${esc(say('comeBack', lang))}: ${esc(review.on)}</b><br>
+      ${esc(lang === 'ko' ? review.why_ko : review.why)}</p>` : ''}
+  </div>`;
 }
 
 /**
@@ -854,20 +965,26 @@ function reportHtml(state, lang, identity) {
     </header>
     <div class="ss-shots">${shots}</div>
     <div class="ss-grid">
-      <div class="ss-card" style="color:${ink}">
-        ${dial(score.value, ink, lang)}
-        <div class="ss-band">${esc(lang === 'ko' ? score.band_ko : score.band)}</div>
-        <div class="ss-bandnote">${esc(lang === 'ko' ? score.note_ko : score.note)}</div>
-        <div class="ss-ladder">${ladder}</div>
+      <div>
+        <div class="ss-card" style="color:${ink}">
+          ${dial(score.value, ink, lang)}
+          <div class="ss-band">${esc(lang === 'ko' ? score.band_ko : score.band)}</div>
+          <div class="ss-bandnote">${esc(lang === 'ko' ? score.note_ko : score.note)}</div>
+          <div class="ss-ladder">${ladder}</div>
+        </div>
+        ${evennessHtml(report, lang)}
+        ${regionsHtml(report, lang)}
       </div>
       <div>
-        <div class="ss-card">
+        ${patternHtml(report, lang)}
+        <div class="ss-card" style="margin-top:16px">
           <h2>${esc(say('findings', lang))}</h2>
           ${held ? `<p style="margin:0 0 14px;font-size:12px;
             color:${INK.notable};line-height:1.7">${esc(held)}</p>` : ''}
           ${findings || (held ? '' : `<p style="margin:0;font-size:12px;
             color:${INK.within_band}">${esc(say('clear', lang))}</p>`)}
         </div>
+        ${planHeadHtml(report, lang)}
         ${plan ? `<div class="ss-card" style="margin-top:16px">
           <h2>${esc(say('plan', lang))}</h2>
           <ol class="ss-plan">${plan}</ol></div>` : ''}
@@ -1053,5 +1170,6 @@ async function compareWith(state, before, after) {
 }
 
 export const _internals = { overlay, marksFor, anchorOf, dial, spark,
-                            historyHtml, changeHtml, formatValue,
-                            INK, ANCHOR, CHIP: T };
+                            historyHtml, changeHtml, patternHtml,
+                            regionsHtml, evennessHtml, planHeadHtml,
+                            formatValue, INK, ANCHOR, CHIP: T };

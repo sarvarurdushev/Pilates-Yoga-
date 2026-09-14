@@ -139,6 +139,20 @@ NORMAL_BANDS: dict[str, tuple[float, float]] = {
     "left_knee_deviation": (-0.04, 0.04),
     "right_knee_deviation": (-0.04, 0.04),
     "lateral_weight_bias": (-0.10, 0.10),
+    # The plumb chain, fore and aft. A standing assessment drops a vertical
+    # just in front of the ankle bone and asks where the ear, the shoulder,
+    # the hip and the knee sit against it; ideally near it, with the head
+    # allowed a little forward. Expressed as a share of the shoulder-to-ankle
+    # span, so 0.03 on a 170 cm person is about four centimetres.
+    "sagittal_ear_offset": (-0.04, 0.08),
+    "sagittal_shoulder_offset": (-0.04, 0.06),
+    "sagittal_hip_offset": (-0.05, 0.05),
+    "sagittal_knee_offset": (-0.04, 0.04),
+    # And the same chain side to side: does the head sit over the shoulders,
+    # the shoulders over the pelvis, the pelvis over the feet.
+    "lateral_head_shift": (-0.03, 0.03),
+    "lateral_shoulder_shift": (-0.03, 0.03),
+    "lateral_pelvis_shift": (-0.03, 0.03),
 }
 
 
@@ -638,8 +652,17 @@ def weight_bias(det: Detection, view: View, threshold: float = THRESHOLD) -> Met
             "anything; ask for the photograph again with the feet under "
             "the hips")
     offset = float(shoulders[0] - ankles[0])
-    if view is View.FRONT:
-        offset = -offset                    # image-left is the person's right
+    if view is View.REAR:
+        # Seen from the front the person's left is toward image right, so a
+        # positive offset already means "carried toward their left". Seen from
+        # behind it is the other way round and only then needs negating.
+        #
+        # This flipped on FRONT until a constructed body -- shifted a known
+        # distance toward its own left, photographed from both sides -- was
+        # measured against the docstring. It had reported the wrong side since
+        # it was written, and :mod:`pilates.guidance` turns the sign into the
+        # word "left" or "right" in front of a student.
+        offset = -offset
     return Metric(name, _zero(round(offset / stance, 3)), "ratio", Availability.ESTIMATED,
                   _joint_confidence(det, kp.L_ANKLE, kp.R_ANKLE,
                                     kp.L_SHOULDER, kp.R_SHOULDER),
@@ -669,6 +692,145 @@ def torso_rotation(det: Detection, view: View, threshold: float = THRESHOLD) -> 
                   reason="needs this student's own baseline to mean rotation")
 
 
+#: The plumb chain, from the ground up. Each landmark, and what to call it.
+#:
+#: These are the five points a standing assessment drops a vertical through --
+#: ear, shoulder, hip, knee, ankle -- and COCO-17 marks every one of them. The
+#: first version of this module measured two of them, which is why a side
+#: photograph produced two numbers and a studio asked where the analysis was.
+_CHAIN = (("ear", (kp.L_EAR, kp.R_EAR)),
+          ("shoulder", (kp.L_SHOULDER, kp.R_SHOULDER)),
+          ("hip", (kp.L_HIP, kp.R_HIP)),
+          ("knee", (kp.L_KNEE, kp.R_KNEE)))
+
+#: What each link is called in each plane. The knee has no lateral entry: side
+#: to side its offset is the knee tracking already measured against the
+#: hip-to-ankle line, and reporting the same quantity twice under two names
+#: would flatter the coverage without measuring anything more.
+_SAGITTAL_CHAIN = {"ear": "sagittal_ear_offset",
+                   "shoulder": "sagittal_shoulder_offset",
+                   "hip": "sagittal_hip_offset",
+                   "knee": "sagittal_knee_offset"}
+_LATERAL_CHAIN = {"ear": "lateral_head_shift",
+                  "shoulder": "lateral_shoulder_shift",
+                  "hip": "lateral_pelvis_shift"}
+
+
+def _plumb_x(det: Detection, threshold: float) -> float | None:
+    """Where the vertical reference is dropped: between the ankles.
+
+    A postural plumb line hangs just in front of the lateral malleolus. The
+    ankle landmark is the nearest thing a 17-point model has to it, and using
+    the same origin the drawing uses means the number and the picture agree.
+    """
+    feet = [det.keypoints[j][0] for j in (kp.L_ANKLE, kp.R_ANKLE)
+            if det.scores[j] >= threshold]
+    return float(sum(feet) / len(feet)) if feet else None
+
+
+def _facing(det: Detection, view: View, threshold: float) -> float:
+    """Which way is forward in image x: +1 toward image right, -1 toward left.
+
+    Read from the view rather than from the landmarks, because the view is
+    told by the studio and a landmark-based guess would disagree with it on
+    exactly the photographs where it matters.
+    """
+    return -1.0 if view is View.SIDE_RIGHT else 1.0
+
+
+def _chain_offset(det: Detection, pair: tuple[int, int], origin: float,
+                  span: float, threshold: float) -> tuple[float, float] | None:
+    """One landmark's horizontal offset from the plumb, and its confidence.
+
+    The pair is averaged where both are found and taken singly where one is:
+    side-on the far ear is behind the head and the far hip behind the near
+    one, so insisting on both would refuse the measurement on exactly the
+    photograph it is for.
+    """
+    found = [j for j in pair if det.scores[j] >= threshold]
+    if not found or span <= 0:
+        return None
+    x = sum(float(det.keypoints[j][0]) for j in found) / len(found)
+    confidence = min(float(det.scores[j]) for j in found)
+    return (x - origin) / span, confidence
+
+
+def plumb_chain(det: Detection, view: View,
+                threshold: float = THRESHOLD) -> list[Metric]:
+    """Where each landmark sits against the vertical, in the plane on view.
+
+    **Two planes, one chain.** From the side this is the classic postural
+    assessment: a vertical through the ankle, and the ear, shoulder, hip and
+    knee measured fore or aft of it -- which is what a side photograph is
+    taken for and what separates a forward head from a whole body leaning.
+    From the front or the back it is the same question turned ninety degrees:
+    does the head sit over the shoulders, the shoulders over the pelvis, the
+    pelvis over the feet.
+
+    **Offsets, not angles**, expressed as a share of the shoulder-to-ankle
+    span. An angle at the ankle would be tiny and hard to read; a share of
+    body height is the number a teacher can convert in their head -- three per
+    cent is about four centimetres on a person of average height -- and it
+    does not change with how far away the camera stood.
+
+    **The chain is the point, not the individual numbers.** A head four
+    centimetres forward of a shoulder that is itself four centimetres forward
+    is a different body from a head four centimetres forward of a shoulder
+    over the ankle, and only a chain shows the difference. See
+    :func:`pilates.guidance.pattern`.
+    """
+    lateral = view.is_frontal
+    names = (_LATERAL_CHAIN if lateral else _SAGITTAL_CHAIN)
+    # Every name, every time. A metric the plane cannot show is refused with
+    # its reason rather than left out, the way the rest of this module refuses
+    # forward-head from the front -- so a report can show the gap instead of
+    # quietly having one, and so a comparison between two visits finds the
+    # same keys on both sides.
+    other = (_SAGITTAL_CHAIN if lateral else _LATERAL_CHAIN)
+    plane = "side" if lateral else "front or back"
+    out: list[Metric] = [
+        _unavailable(name, "ratio",
+                     f"this offset is along the lens axis here; it needs a "
+                     f"photograph from the {plane}")
+        for name in sorted(set(other.values()) - set(names.values()))]
+    if view is View.UNKNOWN:
+        return out + [_unavailable(name, "ratio",
+                                   "the view could not be established")
+                      for name in sorted(set(names.values()))]
+
+    origin = _plumb_x(det, threshold)
+    span = body_height_px(det, threshold) or 0.0
+    for part, pair in _CHAIN:
+        name = names.get(part)
+        if name is None:
+            continue
+        if origin is None:
+            out.append(_unavailable(name, "ratio",
+                                    "neither ankle was found, so there is "
+                                    "nothing to drop a vertical from"))
+            continue
+        found = _chain_offset(det, pair, origin, span, threshold)
+        if found is None:
+            pretty = "knee" if part == "knee" else part
+            out.append(_unavailable(name, "ratio",
+                                    f"the {pretty} was not found"))
+            continue
+        value, confidence = found
+        if lateral:
+            # Positive is toward the person's left. From the front that is
+            # already the +x direction; from behind it is -x. See the same
+            # correction in :func:`weight_bias`, and the constructed-body test
+            # in ``tests/test_alignment.py`` that pins both.
+            if view is View.REAR:
+                value = -value
+        else:
+            value *= _facing(det, view, threshold)
+        out.append(Metric(name, _zero(round(value, 3)), "ratio",
+                          Availability.AVAILABLE, confidence,
+                          normal=NORMAL_BANDS[name]))
+    return out
+
+
 def sagittal_pelvic_tilt(det: Detection, view: View, threshold: float = THRESHOLD) -> Metric:
     """Anterior/posterior pelvic tilt. Not offered, and this says why.
 
@@ -693,11 +855,15 @@ def sagittal_pelvic_tilt(det: Detection, view: View, threshold: float = THRESHOL
 #: teacher would name them, so a low score can be traced to a region of the
 #: body and from there to one measurement.
 REGIONS: dict[str, tuple[str, ...]] = {
-    "head": ("head_lateral_tilt", "forward_head"),
-    "shoulders": ("shoulder_tilt",),
-    "pelvis": ("pelvic_obliquity",),
+    "head": ("head_lateral_tilt", "forward_head", "sagittal_ear_offset",
+             "lateral_head_shift"),
+    "shoulders": ("shoulder_tilt", "sagittal_shoulder_offset",
+                  "lateral_shoulder_shift"),
+    "pelvis": ("pelvic_obliquity", "sagittal_hip_offset",
+               "lateral_pelvis_shift"),
     "trunk": ("trunk_lean_lateral", "trunk_lean_sagittal"),
-    "lower_body": ("left_knee_deviation", "right_knee_deviation", "lateral_weight_bias"),
+    "lower_body": ("left_knee_deviation", "right_knee_deviation",
+                   "lateral_weight_bias", "sagittal_knee_offset"),
 }
 
 #: Ratios are scored against a different yardstick from degrees: a tenth of a
@@ -810,12 +976,20 @@ _ALL_METRIC_NAMES: tuple[str, ...] = tuple(
 VIEW_METRICS: dict[View, tuple[str, ...]] = {
     View.FRONT: ("head_lateral_tilt", "shoulder_tilt", "pelvic_obliquity",
                  "trunk_lean_lateral", "left_knee_deviation", "right_knee_deviation",
-                 "lateral_weight_bias", "torso_rotation_index"),
+                 "lateral_weight_bias", "torso_rotation_index",
+                 "lateral_head_shift", "lateral_shoulder_shift",
+                 "lateral_pelvis_shift"),
     View.REAR: ("head_lateral_tilt", "shoulder_tilt", "pelvic_obliquity",
                 "trunk_lean_lateral", "left_knee_deviation", "right_knee_deviation",
-                "lateral_weight_bias", "torso_rotation_index"),
-    View.SIDE_LEFT: ("forward_head", "trunk_lean_sagittal"),
-    View.SIDE_RIGHT: ("forward_head", "trunk_lean_sagittal"),
+                "lateral_weight_bias", "torso_rotation_index",
+                "lateral_head_shift", "lateral_shoulder_shift",
+                "lateral_pelvis_shift"),
+    View.SIDE_LEFT: ("forward_head", "trunk_lean_sagittal",
+                     "sagittal_ear_offset", "sagittal_shoulder_offset",
+                     "sagittal_hip_offset", "sagittal_knee_offset"),
+    View.SIDE_RIGHT: ("forward_head", "trunk_lean_sagittal",
+                      "sagittal_ear_offset", "sagittal_shoulder_offset",
+                      "sagittal_hip_offset", "sagittal_knee_offset"),
     View.UNKNOWN: (),
 }
 
@@ -872,6 +1046,7 @@ def assess(det: Detection, *, view: View | None = None, person_id: str = "",
         weight_bias(det, v, threshold),
         torso_rotation(det, v, threshold),
         sagittal_pelvic_tilt(det, v, threshold),
+        *plumb_chain(det, v, threshold),
     ]
     return PostureAssessment(
         view=estimate,

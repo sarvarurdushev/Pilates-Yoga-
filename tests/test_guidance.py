@@ -29,7 +29,7 @@ from pilates import alignment as al  # noqa: E402
 from pilates import guidance as gd  # noqa: E402
 from pilates import intake as ik  # noqa: E402
 from pilates.alignment import View  # noqa: E402
-from test_alignment import standing  # noqa: E402
+from test_alignment import side_on, standing  # noqa: E402
 from test_intake import four, photo  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -258,7 +258,8 @@ class TestTheProgramme:
 
     def test_priorities_take_one_finding_per_region_first(self):
         out = report_for(shoulder_tilt=14.0, hip_tilt=10.0, ear_ahead=60.0)
-        assert len(set(out["priorities"])) == len(out["priorities"])
+        named = [entry["metric"] for entry in out["priorities"]]
+        assert len(set(named)) == len(named)
 
     def test_habits_are_de_duplicated(self):
         out = report_for(shoulder_tilt=14.0, hip_tilt=10.0)
@@ -307,3 +308,160 @@ class TestTheReport:
 def test_a_measurement_is_formatted_once_for_every_reader(name, value, unit,
                                                           expected):
     assert gd.format_value(name, value, unit) == expected
+
+
+def chained(ear=0.0, shoulder=0.0, hip=0.0, knee=0.0) -> ik.PhotoAssessment:
+    """A body seen from its left, with each link pushed forward or back.
+
+    ``side_on`` faces image right here, so a positive offset is forward. The
+    near ear is the left one; moving the right one moves a landmark the model
+    could not see anyway.
+    """
+    det = side_on(facing_image_left=False, cx=300.0)
+    points = det.keypoints.copy()
+    for joint, amount in ((al.kp.L_EAR, ear),
+                          (al.kp.L_SHOULDER, shoulder),
+                          (al.kp.R_SHOULDER, shoulder),
+                          (al.kp.L_HIP, hip), (al.kp.R_HIP, hip),
+                          (al.kp.L_KNEE, knee), (al.kp.R_KNEE, knee)):
+        points[joint] = (points[joint][0] + amount, points[joint][1])
+    return ik.assess_photos([ik.Photo(View.SIDE_LEFT,
+                                      al.Detection(points, det.scores),
+                                      1080, 1440)])
+
+
+class TestReadingTheChain:
+    """The thing a list of measurements cannot say."""
+
+    def test_a_head_forward_of_a_square_body_is_the_head(self):
+        out = gd.pattern(chained(ear=60))
+        assert "head forward" in out["shape"]
+        assert "shoulders" not in out["shape"]
+        assert "the head rather than the body underneath it" in out["start_at"]
+
+    def test_a_head_forward_of_a_forward_body_is_the_body(self):
+        """Same forward-head number, different finding. Only the chain shows
+        the difference, which is the whole reason it is measured."""
+        out = gd.pattern(chained(ear=60, shoulder=50, hip=45))
+        assert "hips forward" in out["shape"]
+        assert "start at the hips" in out["start_at"]
+
+    def test_the_lowest_link_off_the_vertical_is_where_to_start(self):
+        out = gd.pattern(chained(hip=45, knee=-40))
+        assert "start at the knees" in out["start_at"]
+
+    def test_a_square_chain_says_so_rather_than_inventing_a_shape(self):
+        out = gd.pattern(chained())
+        assert "sits over the vertical" in out["shape"]
+        assert out["start_at"] == ""
+
+    def test_noise_below_the_floor_is_not_part_of_the_shape(self):
+        assert "forward" not in gd.pattern(chained(ear=4))["shape"]
+
+    def test_no_side_photograph_means_no_chain_to_read(self):
+        assert gd.pattern(ik.assess_photos(
+            [photo(View.FRONT, standing(cx=540))])) == {}
+
+    def test_the_shape_is_described_in_both_languages(self):
+        out = gd.pattern(chained(ear=60, hip=45))
+        assert out["shape"] and out["shape_ko"]
+        assert out["start_at"] and out["start_at_ko"]
+
+    def test_the_shape_names_no_condition(self):
+        """Positional words only. A posture *type* is the same move as a
+        diagnosis: authoritative-sounding, unmeasured, and not a studio's to
+        make."""
+        forbidden = ("kyphot", "lordot", "sway", "scoliosis", "syndrome",
+                     "postural type", "flat back")
+        for kw in (dict(ear=60), dict(ear=60, shoulder=50, hip=45),
+                   dict(hip=45, knee=-40), dict(shoulder=-40, hip=50)):
+            blob = " ".join(str(v) for v in gd.pattern(chained(**kw)).values())
+            for word in forbidden:
+                assert word not in blob.lower(), (kw, word)
+
+
+class TestHowEvenTheBodyIs:
+    def test_a_level_body_is_close_to_wholly_even(self):
+        out = gd.balance(ik.assess_photos(four()))
+        assert out["evenness"] > 95
+
+    def test_a_crooked_body_is_less_even(self):
+        level = gd.balance(ik.assess_photos(four()))["evenness"]
+        crooked = gd.balance(ik.assess_photos(
+            four(shoulder_tilt=12.0, hip_tilt=9.0)))["evenness"]
+        assert crooked < level
+
+    def test_it_names_the_measurement_it_was_least_even_on(self):
+        out = gd.balance(ik.assess_photos(four(shoulder_tilt=14.0)))
+        assert out["least_even"] == "shoulder_tilt"
+        assert out["least_even_name_ko"]
+
+    def test_it_says_how_many_checks_it_averaged(self):
+        out = gd.balance(ik.assess_photos(four()))
+        assert out["from_checks"] >= 6
+
+    def test_nothing_measured_means_no_number(self):
+        assert gd.balance(ik.assess_photos(
+            [ik.Photo(View.FRONT, None, 0, 0, problem="x")])) == {}
+
+
+class TestWhenToComeBack:
+    def test_something_marked_comes_back_sooner_than_a_level_body(self):
+        marked = gd.report(ik.assess_photos(
+            four(shoulder_tilt=14.0), taken_on="2026-01-01"))["review"]
+        level = gd.report(ik.assess_photos(
+            four(), taken_on="2026-01-01"))["review"]
+        assert marked["weeks"] < level["weeks"]
+
+    def test_it_gives_a_date_not_just_an_interval(self):
+        out = gd.report(ik.assess_photos(four(shoulder_tilt=14.0),
+                                         taken_on="2026-01-01"))["review"]
+        assert out["on"] == "2026-02-12"
+
+    def test_no_date_in_means_no_date_out_rather_than_today(self):
+        out = gd.report(ik.assess_photos(four()))["review"]
+        assert out["on"] == "" and out["weeks"]
+
+    def test_the_interval_says_why_it_is_that_long(self):
+        out = gd.report(ik.assess_photos(four()))["review"]
+        assert "measurement noise" in out["why"] and out["why_ko"]
+
+
+class TestTheRegionalBreakdown:
+    def test_every_region_with_a_check_is_reported(self):
+        out = gd.report(ik.assess_photos(four()))["regions"]
+        assert {r["region"] for r in out} == set(al.REGIONS)
+
+    def test_each_region_carries_a_name_a_score_and_its_weakest_check(self):
+        for region in gd.report(ik.assess_photos(
+                four(shoulder_tilt=9.0)))["regions"]:
+            assert region["name"] and region["name_ko"]
+            assert region["checks"] > 0
+            assert region["weakest_name"], region["region"]
+
+    def test_a_region_with_nothing_measured_is_left_out_not_scored_zero(self):
+        out = gd.report(ik.assess_photos(
+            [photo(View.SIDE_LEFT, side_on(cx=540))]))["regions"]
+        assert "shoulders" in {r["region"] for r in out}
+        assert all(r["checks"] > 0 for r in out)
+
+    def test_priorities_carry_enough_to_be_shown(self):
+        out = gd.report(ik.assess_photos(
+            four(shoulder_tilt=14.0, hip_tilt=10.0, ear_ahead=60.0)))
+        assert out["priorities"]
+        for entry in out["priorities"]:
+            assert entry["name"] and entry["name_ko"]
+            assert entry["title"] and entry["measurement"]
+
+
+class TestPrioritiesAreDistinct:
+    def test_one_region_contributes_one_priority(self):
+        """Two real head measurements are two findings and one thing to work
+        on. A plan that lists both has three slots, not four."""
+        out = report_for(shoulder_tilt=14.0, hip_tilt=10.0, ear_ahead=70.0)
+        regions = [gd._REGION_OF[p["metric"]] for p in out["priorities"]]
+        assert len(regions) == len(set(regions))
+
+    def test_the_list_is_not_padded_to_a_fixed_length(self):
+        out = report_for(shoulder_tilt=14.0)
+        assert len(out["priorities"]) == 1

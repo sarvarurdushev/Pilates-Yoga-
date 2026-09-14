@@ -325,3 +325,135 @@ class TestPayload:
         for name, availability in payload["availability"].items():
             if availability == "unavailable":
                 assert payload["reasons"].get(name), f"{name} refuses without a reason"
+
+
+def built(rear: bool, shift: float = 0.0, knee_in: float = 0.0,
+          cx: float = 300.0) -> Detection:
+    """One physical body, photographed from in front or from behind.
+
+    Built in the person's *own* coordinates rather than the picture's, which
+    is what :func:`standing` does not do: there, ``lean`` shifts the shoulders
+    toward image right in both fixtures, so the front and rear versions are
+    not the same body and cannot be used to check a sign convention.
+
+    Here world X is the person's left-positive axis. A front camera maps world
+    X straight to image x -- their left lands on the viewer's right -- and a
+    rear camera mirrors it. Landmark labels stay anatomical either way, which
+    is the fact the whole front/rear corroboration design rests on.
+    """
+    k = np.zeros((kp.NUM_KEYPOINTS, 2), np.float32)
+    s = np.ones(kp.NUM_KEYPOINTS, np.float32)
+    mirror = -1.0 if rear else 1.0
+
+    def put(joint: int, world_x: float, y: float) -> None:
+        k[joint] = (cx + mirror * world_x, y)
+
+    put(kp.L_EAR, 12 + shift, 150);      put(kp.R_EAR, -12 + shift, 150)
+    put(kp.L_SHOULDER, 40 + shift, 200); put(kp.R_SHOULDER, -40 + shift, 200)
+    put(kp.L_HIP, 25, 400);              put(kp.R_HIP, -25, 400)
+    put(kp.L_KNEE, 25 - knee_in, 520);   put(kp.R_KNEE, -25 + knee_in, 520)
+    put(kp.L_ANKLE, 25, 640);            put(kp.R_ANKLE, -25, 640)
+    put(kp.NOSE, shift, 155)
+    if rear:
+        s[kp.NOSE] = 0.05
+    return Detection(k, s)
+
+
+#: Every measurement built on image x, and what a positive value means.
+#:
+#: These are the ones a camera moving to the other side of the person can
+#: invert, and inverting one means naming the wrong side of somebody's body in
+#: a report -- the single most harmful thing this system can get wrong, because
+#: it is actionable and it looks right. ``lateral_weight_bias`` was inverted
+#: from the day it was written and nothing caught it: no test compared the two
+#: views, and the two existing conventions in the module disagreed with each
+#: other, one flipping on FRONT and one on REAR.
+SIDED = ("trunk_lean_lateral", "lateral_weight_bias", "lateral_head_shift",
+         "lateral_shoulder_shift", "lateral_pelvis_shift",
+         "left_knee_deviation", "right_knee_deviation")
+
+
+class TestWhichSideIsWhich:
+    @pytest.mark.parametrize("name", SIDED)
+    def test_the_front_and_the_back_agree(self, name):
+        """The same body from two cameras is the same body."""
+        front = al.assess(built(False, shift=30.0, knee_in=8.0),
+                          view=al.View.FRONT).metrics[name]
+        rear = al.assess(built(True, shift=30.0, knee_in=8.0),
+                         view=al.View.REAR).metrics[name]
+        assert front.measured and rear.measured, name
+        assert front.value == pytest.approx(rear.value, abs=1e-6), name
+
+    @pytest.mark.parametrize("name", ["trunk_lean_lateral", "lateral_weight_bias",
+                                      "lateral_head_shift", "lateral_shoulder_shift"])
+    def test_a_body_shifted_left_reads_positive(self, name):
+        """Positive is toward the person's own left, everywhere. A metric that
+        disagrees names the wrong side in front of a student."""
+        for rear in (False, True):
+            view = al.View.REAR if rear else al.View.FRONT
+            value = al.assess(built(rear, shift=30.0), view=view).metrics[name].value
+            assert value > 0, f"{name} from {view.value}"
+
+    @pytest.mark.parametrize("name", ["left_knee_deviation", "right_knee_deviation"])
+    def test_a_knee_rolled_inward_reads_positive(self, name):
+        for rear in (False, True):
+            view = al.View.REAR if rear else al.View.FRONT
+            value = al.assess(built(rear, knee_in=8.0), view=view).metrics[name].value
+            assert value > 0, f"{name} from {view.value}"
+
+    def test_a_square_body_reads_zero_either_way(self):
+        for rear in (False, True):
+            view = al.View.REAR if rear else al.View.FRONT
+            metrics = al.assess(built(rear), view=view).metrics
+            for name in SIDED:
+                assert metrics[name].value == pytest.approx(0.0, abs=1e-6), name
+
+
+class TestThePlumbChain:
+    """Ear, shoulder, hip, knee, ankle -- the five points a standing
+    assessment drops a vertical through. All five are in COCO-17, and the
+    first version of this module used two of them."""
+
+    def test_a_side_photograph_measures_the_whole_chain(self):
+        out = al.assess(side_on(facing_image_left=False, ear_ahead=40.0),
+                        view=al.View.SIDE_LEFT)
+        for name in ("sagittal_ear_offset", "sagittal_shoulder_offset",
+                     "sagittal_hip_offset", "sagittal_knee_offset"):
+            assert out.metrics[name].measured, name
+
+    def test_a_frontal_photograph_measures_the_lateral_chain(self):
+        out = al.assess(built(False, shift=30.0), view=al.View.FRONT)
+        for name in ("lateral_head_shift", "lateral_shoulder_shift",
+                     "lateral_pelvis_shift"):
+            assert out.metrics[name].measured, name
+
+    def test_the_chains_do_not_cross_planes(self):
+        """A sagittal shift is not measurable from the front and the reverse."""
+        front = al.assess(built(False), view=al.View.FRONT).metrics
+        side = al.assess(side_on(facing_image_left=False),
+                         view=al.View.SIDE_LEFT).metrics
+        assert not front["sagittal_ear_offset"].measured
+        assert not side["lateral_head_shift"].measured
+
+    def test_the_head_ahead_of_the_ankle_reads_forward_from_either_side(self):
+        for facing, view in ((False, al.View.SIDE_LEFT),
+                             (True, al.View.SIDE_RIGHT)):
+            det = side_on(facing_image_left=facing, ear_ahead=40.0)
+            value = al.assess(det, view=view).metrics["sagittal_ear_offset"].value
+            assert value > 0, view.value
+
+    def test_no_ankle_means_no_vertical_to_measure_against(self):
+        det = side_on(facing_image_left=False, ear_ahead=40.0)
+        scores = det.scores.copy()
+        scores[kp.L_ANKLE] = scores[kp.R_ANKLE] = 0.05
+        blind = Detection(det.keypoints, scores)
+        metric = al.assess(blind, view=al.View.SIDE_LEFT).metrics["sagittal_ear_offset"]
+        assert not metric.measured
+        assert "vertical" in metric.reason
+
+    def test_every_chain_metric_has_a_band_to_be_judged_against(self):
+        for name in ("sagittal_ear_offset", "sagittal_shoulder_offset",
+                     "sagittal_hip_offset", "sagittal_knee_offset",
+                     "lateral_head_shift", "lateral_shoulder_shift",
+                     "lateral_pelvis_shift"):
+            assert name in al.NORMAL_BANDS, name

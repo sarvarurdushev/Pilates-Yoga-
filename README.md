@@ -613,6 +613,68 @@ reason not to:
 > hip level **+11.3°** — the front and back photographs disagreed by 4.2°, which
 > is more than measurement noise; treat it as indicative
 
+### The plumb chain, in both planes
+
+The first version measured a side photograph twice -- forward head and trunk
+lean -- and a studio looked at the report and asked where the analysis was.
+Fair. COCO-17 marks **ear, shoulder, hip, knee and ankle**, which are exactly
+the five points a standing assessment drops a plumb line through, and two of
+them were being used.
+
+Now every link is measured against the vertical, in whichever plane faces the
+lens. From the side: how far the ear, shoulder, hip and knee sit fore or aft of
+a vertical dropped between the feet. From the front or back: the same question
+turned ninety degrees -- does the head sit over the shoulders, the shoulders
+over the pelvis, the pelvis over the feet. Offsets rather than angles, as a
+share of the shoulder-to-ankle span, because three per cent is about four
+centimetres on a person of average height and does not change with how far away
+the camera stood.
+
+A side photograph went from two measurements to six; a full set from ten to
+seventeen.
+
+**The chain is the point, not the individual numbers.** A head four centimetres
+forward of a shoulder that is itself four centimetres forward of the ankle is a
+body leaning. A head four centimetres forward of a shoulder that is *over* the
+ankle is a neck. Both produce the same forward-head number, they are not the
+same finding, and no list of measurements can tell them apart -- so
+`guidance.pattern()` reads the links together and says which:
+
+> standing side on: shoulders forward, hips forward — the chain carries upward,
+> so start at the hips; the links above it may be following rather than doing
+> anything themselves
+
+It describes and does not diagnose. No posture *type* is named, because naming
+one is the same move as naming a condition: authoritative-sounding, unmeasured,
+and not a studio's to make. A test asserts the vocabulary stays positional.
+
+Alongside it the report now carries what was computed from the first version and
+never shown: the **score broken down by part of the body**, the **improvement
+priorities** (one per region, and the list is as long as there are regions to
+name rather than padded to a fixed length), a **left-against-right evenness**
+number over the checks that have a side to them, and a **date to photograph
+again** -- six weeks where something is marked, twelve where nothing is, because
+a recommendation without a date is one nobody acts on.
+
+### Which side is which, and the bug that hid there
+
+Every measurement built on image x can be inverted by the camera moving to the
+other side of the person, and an inverted one names the wrong side of somebody's
+body in a report — the most harmful thing this system can get wrong, because it
+is actionable and it looks right.
+
+`lateral_weight_bias` was inverted from the day it was written. Nothing caught
+it: no test compared the two views, and the module held two conventions that
+disagreed with each other, one flipping on FRONT and one on REAR. It surfaced
+when a constructed body — shifted a known distance toward its own left,
+photographed from both sides — was measured against its own docstring.
+
+`tests/test_alignment.py::TestWhichSideIsWhich` now pins every sided
+measurement: front and back must agree, and a body shifted left must read
+positive from either. The fixture builds the body in the *person's* own
+coordinates rather than the picture's, which is what the older one did not do
+and why it could not have caught this.
+
 ### Confidence is not correctness
 
 Written after running the pipeline on a photograph with two people in it. The

@@ -41,6 +41,7 @@ a recommendation into a dead link.
 from __future__ import annotations
 
 import re
+import statistics
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -117,6 +118,19 @@ DIRECTIONS: dict[str, tuple[str, str]] = {
     "left_knee_deviation": ("left_knee_outward", "left_knee_inward"),
     "right_knee_deviation": ("right_knee_outward", "right_knee_inward"),
     "lateral_weight_bias": ("weight_toward_right", "weight_toward_left"),
+    # The plumb chain. Positive is forward of the ankle in the sagittal
+    # photographs and toward the person's left in the frontal ones, which is
+    # the convention every x-based measurement in the module now shares --
+    # see ``TestWhichSideIsWhich`` in tests/test_alignment.py.
+    "sagittal_ear_offset": ("head_behind_ankle", "head_ahead_of_ankle"),
+    "sagittal_shoulder_offset": ("shoulders_behind_ankle",
+                                 "shoulders_ahead_of_ankle"),
+    "sagittal_hip_offset": ("hips_behind_ankle", "hips_ahead_of_ankle"),
+    "sagittal_knee_offset": ("knees_behind_ankle", "knees_ahead_of_ankle"),
+    "lateral_head_shift": ("head_shifted_right", "head_shifted_left"),
+    "lateral_shoulder_shift": ("shoulders_shifted_right",
+                               "shoulders_shifted_left"),
+    "lateral_pelvis_shift": ("pelvis_shifted_right", "pelvis_shifted_left"),
 }
 
 
@@ -152,6 +166,20 @@ SHORT: dict[str, tuple[str, str]] = {
     "right_knee_outward": ("outward", "바깥쪽으로"),
     "weight_toward_left": ("toward the left", "왼쪽으로"),
     "weight_toward_right": ("toward the right", "오른쪽으로"),
+    "head_ahead_of_ankle": ("ahead of the ankle", "발목보다 앞"),
+    "head_behind_ankle": ("behind the ankle", "발목보다 뒤"),
+    "shoulders_ahead_of_ankle": ("ahead of the ankle", "발목보다 앞"),
+    "shoulders_behind_ankle": ("behind the ankle", "발목보다 뒤"),
+    "hips_ahead_of_ankle": ("ahead of the ankle", "발목보다 앞"),
+    "hips_behind_ankle": ("behind the ankle", "발목보다 뒤"),
+    "knees_ahead_of_ankle": ("ahead of the ankle", "발목보다 앞"),
+    "knees_behind_ankle": ("behind the ankle", "발목보다 뒤"),
+    "head_shifted_left": ("to the left", "왼쪽으로"),
+    "head_shifted_right": ("to the right", "오른쪽으로"),
+    "shoulders_shifted_left": ("to the left", "왼쪽으로"),
+    "shoulders_shifted_right": ("to the right", "오른쪽으로"),
+    "pelvis_shifted_left": ("to the left", "왼쪽으로"),
+    "pelvis_shifted_right": ("to the right", "오른쪽으로"),
 }
 
 
@@ -751,12 +779,354 @@ def _mirror(source: str, target: str, swaps: tuple[tuple[str, str], ...]) -> Non
         caution=base.caution, caution_ko=base.caution_ko)
 
 
+ADVICE.update({
+    # ---------------------------------------------------------- the plumb chain
+    #
+    # These four are the side-view assessment a studio actually does with a
+    # plumb line and the student against a wall, and they only mean anything
+    # as a chain: a head forward of a shoulder that is itself forward of the
+    # ankle is a different body from a head forward of a shoulder that is
+    # over it. :func:`pattern` reads them together; each entry below is what
+    # that one link says on its own.
+    "head_ahead_of_ankle": Advice(
+        title="Head sits ahead of the vertical through the ankle",
+        title_ko="머리가 발목 수직선보다 앞에 있습니다",
+        means="Standing side on, a vertical dropped between the feet passes "
+              "behind the ear rather than through it.",
+        means_ko="옆에서 볼 때 양발 사이에서 내린 수직선이 귀를 지나지 않고 귀 "
+                 "뒤쪽을 지납니다.",
+        usually="Measured against the ankle rather than against the shoulder, "
+                "so it says where the head is over the base of support rather "
+                "than where it is relative to the trunk. Read it beside the "
+                "shoulder and hip offsets: the whole body can be forward "
+                "without the neck doing anything unusual.",
+        usually_ko="어깨가 아니라 발목을 기준으로 측정한 값이므로, 몸통 대비 위치가 "
+                   "아니라 지지면 위에서 머리가 어디에 있는지를 나타냅니다. 어깨·골반 "
+                   "값과 함께 보세요. 목에 특별한 문제가 없어도 몸 전체가 앞으로 "
+                   "나와 있을 수 있습니다.",
+        exercises=(
+            _s("headNods", "pilates",
+               "The deep neck flexors, before the head is asked to move "
+               "anywhere.",
+               "머리를 움직이기 전에 목 심부 굽힘근부터 씁니다."),
+            _s("rollDownStanding", "pilates",
+               "Finds vertical from the top down, so the head arrives over the "
+               "feet rather than being placed there.",
+               "위에서부터 수직을 찾아 머리가 발 위에 자연스럽게 오도록 합니다."),
+            _s("tadasana", "yoga",
+               "Standing itself, taught as a position rather than a default.",
+               "서 있는 자세 자체를 기본값이 아니라 하나의 자세로 익힙니다."),
+            _s("anahatasana", "yoga",
+               "Opens the chest and upper back, which is usually where the "
+               "room to come back has to come from.",
+               "가슴과 등 위쪽을 열어 돌아올 공간을 만듭니다."),
+        ),
+        habits=(("Raise the top of a screen to eye level.",
+                 "화면 상단을 눈높이에 맞추세요."),
+                ("Notice the head position when reading a phone standing up.",
+                 "서서 휴대전화를 볼 때 머리 위치를 살펴보세요.")),
+    ),
+    "head_behind_ankle": Advice(
+        title="Head sits behind the vertical through the ankle",
+        title_ko="머리가 발목 수직선보다 뒤에 있습니다",
+        means="A vertical dropped between the feet passes in front of the ear.",
+        means_ko="양발 사이에서 내린 수직선이 귀보다 앞을 지납니다.",
+        usually="Uncommon on its own, and usually part of a whole trunk "
+                "carried back rather than anything the neck is doing. Check "
+                "the shoulder and hip offsets before treating it as a head "
+                "position at all.",
+        usually_ko="단독으로는 드물며, 대개 목이 아니라 몸통 전체가 뒤로 기운 "
+                   "결과입니다. 머리 자세로 보기 전에 어깨·골반 값을 확인하세요.",
+        exercises=(
+            _s("rollDownStanding", "pilates",
+               "Returns to vertical without bracing into it.",
+               "힘을 주지 않고 수직으로 돌아옵니다."),
+            _s("deadBug", "pilates",
+               "Holds the ribs down while the limbs move.",
+               "팔다리가 움직이는 동안 갈비뼈를 눌러 둡니다."),
+        ),
+        habits=(("Stand as you normally stand for the photograph, not as you "
+                 "think you should.",
+                 "촬영할 때 '바르게'가 아니라 평소대로 서세요."),),
+    ),
+    "shoulders_ahead_of_ankle": Advice(
+        title="Shoulders sit ahead of the vertical through the ankle",
+        title_ko="어깨가 발목 수직선보다 앞에 있습니다",
+        means="Seen from the side, the point of the shoulder is forward of a "
+              "vertical dropped between the feet.",
+        means_ko="옆에서 볼 때 어깨 끝이 양발 사이에서 내린 수직선보다 앞에 "
+                 "있습니다.",
+        usually="This is the link that separates a forward head from a "
+                "forward body. Where the hips are over the ankle and only the "
+                "shoulders are forward, the upper back is usually doing it; "
+                "where the hips are forward too, the whole body is leaning and "
+                "the calves and low back are holding it up.",
+        usually_ko="머리만 앞으로 나온 것인지 몸 전체가 앞으로 기운 것인지를 "
+                   "가르는 지점입니다. 골반은 발목 위에 있고 어깨만 앞에 있다면 "
+                   "대개 등 위쪽 문제이고, 골반도 함께 앞에 있다면 몸 전체가 기울어 "
+                   "종아리와 허리가 버티고 있는 상태입니다.",
+        exercises=(
+            _s("swan", "pilates",
+               "Extension through the upper back, which is where the shoulders "
+               "come back from.",
+               "어깨가 제자리로 돌아올 공간인 등 위쪽 폄을 다룹니다."),
+            _s("breastStroke", "pilates",
+               "The shoulder blades do the work rather than the neck.",
+               "목이 아니라 어깨뼈가 일하도록 합니다."),
+            _s("shoulderPlacement", "pilates",
+               "Where the shoulder blade sits before any arm work.",
+               "팔 동작 전에 어깨뼈의 위치를 정합니다."),
+            _s("sphinx", "yoga",
+               "A supported version of the same extension.",
+               "같은 폄 동작의 지지된 형태입니다."),
+        ),
+        habits=(("Check the depth of a chair: a seat that is too deep rolls "
+                 "the shoulders forward before you stand up.",
+                 "의자 깊이를 확인하세요. 너무 깊으면 일어서기 전부터 어깨가 앞으로 "
+                 "말립니다."),),
+    ),
+    "shoulders_behind_ankle": Advice(
+        title="Shoulders sit behind the vertical through the ankle",
+        title_ko="어깨가 발목 수직선보다 뒤에 있습니다",
+        means="The point of the shoulder is behind a vertical dropped between "
+              "the feet.",
+        means_ko="어깨 끝이 양발 사이에서 내린 수직선보다 뒤에 있습니다.",
+        usually="Usually seen with the hips pushed forward -- the body hangs "
+                "back from the front of the hips rather than standing on the "
+                "feet. Read the hip offset before this one.",
+        usually_ko="대개 골반이 앞으로 밀린 자세와 함께 나타납니다. 발로 서는 대신 "
+                   "골반 앞쪽에 몸을 걸고 있는 상태입니다. 골반 값을 먼저 보세요.",
+        exercises=(
+            _s("deadBug", "pilates",
+               "The control this pattern is short of: ribs down while the "
+               "limbs move.",
+               "이 패턴에 부족한 조절력입니다. 팔다리가 움직여도 갈비뼈를 눌러 둡니다."),
+            _s("imprintRelease", "pilates",
+               "Teaches the pelvis to move rather than be parked.",
+               "골반을 한쪽에 고정하지 않고 움직이도록 가르칩니다."),
+            _s("phalakasana", "yoga",
+               "One line from the heels to the head, held.",
+               "발뒤꿈치부터 머리까지 한 선을 유지합니다."),
+        ),
+        habits=(("Unlock the knees when standing still.",
+                 "가만히 설 때 무릎을 살짝 풀어 주세요."),),
+    ),
+    "hips_ahead_of_ankle": Advice(
+        title="Hips sit ahead of the vertical through the ankle",
+        title_ko="골반이 발목 수직선보다 앞에 있습니다",
+        means="Seen from the side, the hip is forward of a vertical dropped "
+              "between the feet.",
+        means_ko="옆에서 볼 때 골반이 양발 사이에서 내린 수직선보다 앞에 있습니다.",
+        usually="The base of the chain. When the hips are forward the "
+                "shoulders and head usually follow, so a shoulder offset "
+                "measured beside this one may be the hips rather than the "
+                "upper back. Work from the bottom of the chain upward.",
+        usually_ko="이 연결의 가장 아래입니다. 골반이 앞에 있으면 어깨와 머리도 "
+                   "따라오므로, 함께 측정된 어깨 값이 등 위쪽이 아니라 골반 때문일 수 "
+                   "있습니다. 아래에서 위로 접근하세요.",
+        exercises=(
+            _s("pelvicCurl", "pilates",
+               "Restores movement through the pelvis before it is asked to "
+               "hold a position.",
+               "자세를 유지시키기 전에 골반의 움직임을 회복합니다."),
+            _s("setuBandha", "yoga",
+               "Opens the front of the hips, which is commonly where this is "
+               "anchored.",
+               "이 자세가 붙잡혀 있는 엉덩관절 앞쪽을 엽니다."),
+            _s("clam", "pilates",
+               "Hip control, one side at a time, under no load.",
+               "부하 없이 한쪽씩 엉덩관절 조절을 익힙니다."),
+        ),
+        habits=(("Standing with the weight hung on the front of the hips is "
+                 "the habit; stand on the feet instead.",
+                 "골반 앞쪽에 체중을 거는 습관입니다. 발로 서세요."),),
+    ),
+    "hips_behind_ankle": Advice(
+        title="Hips sit behind the vertical through the ankle",
+        title_ko="골반이 발목 수직선보다 뒤에 있습니다",
+        means="The hip sits behind a vertical dropped between the feet.",
+        means_ko="골반이 양발 사이에서 내린 수직선보다 뒤에 있습니다.",
+        usually="Often seen with the trunk carried forward to balance it -- "
+                "the hips go back, the chest comes forward, and the two "
+                "measurements together describe a hinge rather than a lean.",
+        usually_ko="균형을 잡으려 몸통이 앞으로 나오는 자세와 함께 나타나는 경우가 "
+                   "많습니다. 골반은 뒤로, 가슴은 앞으로 — 두 값을 합치면 기울기가 "
+                   "아니라 접힘에 가깝습니다.",
+        exercises=(
+            _s("rollDownStanding", "pilates",
+               "Finds vertical a segment at a time.",
+               "한 마디씩 수직을 찾아갑니다."),
+            _s("salabhasana", "yoga",
+               "Back-body strength to hold a new position, not only reach it.",
+               "새 자세에 도달만 하지 않고 유지할 뒷몸 힘을 기릅니다."),
+        ),
+        habits=(("Check the seat height at a desk.",
+                 "책상 의자 높이를 확인하세요."),),
+    ),
+    "knees_ahead_of_ankle": Advice(
+        title="Knees sit ahead of the vertical through the ankle",
+        title_ko="무릎이 발목 수직선보다 앞에 있습니다",
+        means="Seen from the side, the knee is forward of a vertical dropped "
+              "between the feet -- the knee is not straightened over the foot.",
+        means_ko="옆에서 볼 때 무릎이 양발 사이에서 내린 수직선보다 앞에 있습니다. "
+                 "무릎이 발 위에서 펴지지 않은 상태입니다.",
+        usually="A standing knee that is not extended is usually accompanied "
+                "by the quadriceps working to hold it and the calves taking "
+                "more load. It also changes every standing measurement above "
+                "it, so it is worth addressing before reading the rest.",
+        usually_ko="선 자세에서 무릎이 펴지지 않으면 대개 넙다리네갈래근이 버티고 "
+                   "종아리 부하가 늘어납니다. 위쪽의 모든 선 자세 측정값에도 영향을 "
+                   "주므로 나머지를 읽기 전에 다루는 것이 좋습니다.",
+        exercises=(
+            _s("chairFootwork", "pilates",
+               "Loads the leg with the knee position visible and correctable.",
+               "무릎 위치를 보면서 교정할 수 있는 상태로 다리에 부하를 줍니다."),
+            _s("suptaPadangusthasana", "yoga",
+               "Length through the back of the leg, lying down, with no "
+               "balance to manage.",
+               "균형 부담 없이 누워서 다리 뒷면의 길이를 확보합니다."),
+            _s("utkatasana", "yoga",
+               "Two-legged load where the knee can be cued directly.",
+               "양다리 부하 상태에서 무릎을 직접 큐잉할 수 있습니다."),
+        ),
+        habits=(("Notice whether the knees are soft or locked when standing "
+                 "and waiting.",
+                 "서서 기다릴 때 무릎이 풀려 있는지 잠겨 있는지 살펴보세요."),),
+    ),
+    "knees_behind_ankle": Advice(
+        title="Knees sit behind the vertical through the ankle",
+        title_ko="무릎이 발목 수직선보다 뒤에 있습니다",
+        means="The knee is behind a vertical dropped between the feet: the "
+              "joint is pushed back past straight.",
+        means_ko="무릎이 양발 사이에서 내린 수직선보다 뒤에 있습니다. 관절이 곧게 "
+                 "편 상태를 지나 뒤로 밀려 있습니다.",
+        usually="A knee parked at the back of its range is resting on the "
+                "joint rather than being held by muscle, and the hamstrings "
+                "and calves are usually short with it. Common, and worth "
+                "unlearning before any standing load is added.",
+        usually_ko="가동 범위 끝에 걸쳐 둔 무릎은 근육이 아니라 관절에 기대고 있는 "
+                   "상태이며, 대개 햄스트링과 종아리가 짧아져 있습니다. 흔한 습관이며 "
+                   "선 자세 부하를 더하기 전에 고치는 것이 좋습니다.",
+        exercises=(
+            _s("chairFootwork", "pilates",
+               "Teaches the leg to straighten without locking back.",
+               "뒤로 잠기지 않고 다리를 펴는 법을 익힙니다."),
+            _s("sideLyingLegLift", "pilates",
+               "Hip control with the knee out of the argument.",
+               "무릎을 개입시키지 않고 엉덩관절 조절을 익힙니다."),
+            _s("utkatasana", "yoga",
+               "Bends the knee deliberately, which is the opposite habit.",
+               "의도적으로 무릎을 굽히는, 반대되는 습관을 만듭니다."),
+            _s("suptaPadangusthasana", "yoga",
+               "Length behind the leg, which is usually short with this.",
+               "이 자세와 함께 짧아져 있는 다리 뒷면을 늘립니다."),
+        ),
+        habits=(("Standing with the knees pushed back is the habit; keep a "
+                 "coin of bend in them.",
+                 "무릎을 뒤로 밀고 서는 습관입니다. 아주 약간 굽힘을 남겨 두세요."),),
+    ),
+    # ------------------------------------------------- the lateral chain
+    "head_shifted_left": Advice(
+        title="Head sits to the left of the midline",
+        title_ko="머리가 몸 중심선보다 왼쪽에 있습니다",
+        means="Seen from the front, the head is left of a vertical dropped "
+              "between the feet -- not tilted, translated.",
+        means_ko="정면에서 볼 때 머리가 양발 사이 수직선보다 왼쪽에 있습니다. "
+                 "기울어진 것이 아니라 통째로 옮겨간 상태입니다.",
+        usually="A shift is a different finding from a tilt and they can "
+                "happen in opposite directions at once. Where the shoulders "
+                "and pelvis are shifted the same way, the head is following "
+                "the body rather than doing anything itself.",
+        usually_ko="이동은 기울임과 다른 소견이며 서로 반대 방향으로 함께 나타날 수 "
+                   "있습니다. 어깨와 골반이 같은 쪽으로 이동해 있다면 머리는 몸을 "
+                   "따라간 것일 뿐입니다.",
+        exercises=(
+            _s("headNods", "pilates",
+               "Separates moving the head from moving the whole upper body.",
+               "머리 움직임과 상체 전체 움직임을 분리합니다."),
+            _s("mermaid", "pilates",
+               "Length through each side of the trunk, compared.",
+               "몸통 양옆의 길이를 비교하며 늘립니다."),
+            _s("tadasana", "yoga",
+               "Standing taught as a position, with the midline felt.",
+               "중심선을 느끼며 서 있는 자세를 익힙니다."),
+        ),
+        habits=(("Check the monitor is in front of you, not off to one side.",
+                 "모니터가 옆이 아니라 정면에 있는지 확인하세요."),),
+    ),
+    "shoulders_shifted_left": Advice(
+        title="Shoulders sit to the left of the midline",
+        title_ko="어깨가 몸 중심선보다 왼쪽에 있습니다",
+        means="The middle of the shoulders is left of a vertical dropped "
+              "between the feet.",
+        means_ko="어깨 중앙이 양발 사이 수직선보다 왼쪽에 있습니다.",
+        usually="Usually the same pattern as an unlevel pelvis seen higher up "
+                "the body. Where both are measured, work the pelvis first and "
+                "re-photograph before treating this as separate.",
+        usually_ko="대개 골반 기울기를 몸 위쪽에서 본 같은 패턴입니다. 둘 다 "
+                   "측정되었다면 골반을 먼저 다루고 다시 촬영한 뒤에 별개로 볼지 "
+                   "판단하세요.",
+        exercises=(
+            _s("sideBend", "pilates",
+               "Loads both sides of the trunk and shows which gives way.",
+               "몸통 양쪽에 부하를 주어 어느 쪽이 무너지는지 봅니다."),
+            _s("sideLyingLegLift", "pilates",
+               "The abductor that keeps the pelvis level underneath it.",
+               "그 아래에서 골반 수평을 유지하는 벌림근을 단련합니다."),
+            _s("trikonasana", "yoga",
+               "Makes the difference between the two sides plain.",
+               "좌우 차이를 분명히 드러냅니다."),
+        ),
+        habits=(("Notice which side you lean on at a counter.",
+                 "카운터에서 어느 쪽으로 기대는지 살펴보세요."),),
+    ),
+    "pelvis_shifted_left": Advice(
+        title="Pelvis sits to the left of the midline",
+        title_ko="골반이 몸 중심선보다 왼쪽에 있습니다",
+        means="The middle of the pelvis is left of a vertical dropped between "
+              "the feet: the hips are translated over the base, not tilted.",
+        means_ko="골반 중앙이 양발 사이 수직선보다 왼쪽에 있습니다. 기울어진 것이 "
+                 "아니라 지지면 위에서 통째로 옮겨간 상태입니다.",
+        usually="The bottom of the lateral chain, and usually the one to work "
+                "first: a pelvis shifted over one foot carries the shoulders "
+                "and head with it. Standing habit is the commonest cause, so "
+                "it is worth re-photographing on another day before building "
+                "a programme around it.",
+        usually_ko="좌우 연결의 가장 아래이며 대개 먼저 다뤄야 할 지점입니다. 골반이 "
+                   "한쪽 발 위로 옮겨가면 어깨와 머리도 함께 갑니다. 서는 습관이 가장 "
+                   "흔한 원인이므로 프로그램을 짜기 전에 다른 날 다시 촬영해 보세요.",
+        exercises=(
+            _s("sideLyingLegLift", "pilates",
+               "Direct work for the abductor that holds the pelvis over the "
+               "standing foot.",
+               "선 발 위에서 골반을 유지하는 벌림근을 직접 단련합니다."),
+            _s("clam", "pilates",
+               "The deep hip rotators, isolated.",
+               "엉덩관절 심부 회전근을 분리해 씁니다."),
+            _s("vrksasana", "yoga",
+               "Single-leg balance on each side, compared.",
+               "양쪽 한 다리 균형을 비교합니다."),
+            _s("utthitaPadangusthaBalance", "yoga",
+               "Shows immediately which side lets the pelvis travel.",
+               "어느 쪽에서 골반이 밀리는지 바로 드러납니다."),
+        ),
+        habits=(("Standing on one leg while waiting is the habit; change "
+                 "sides deliberately, or stand on both.",
+                 "기다릴 때 한 다리로 서는 습관입니다. 의식적으로 바꾸거나 양발로 "
+                 "서세요."),),
+    ),
+})
+
+
 _SIDE_WORDS = (("left", "right"), ("Left", "Right"), ("왼쪽", "오른쪽"), ("왼발", "오른발"))
 _mirror("left_shoulder_high", "right_shoulder_high", _SIDE_WORDS)
 _mirror("left_hip_high", "right_hip_high", _SIDE_WORDS)
 _mirror("head_tilted_right", "head_tilted_left", _SIDE_WORDS)
 _mirror("trunk_leans_left", "trunk_leans_right", _SIDE_WORDS)
 _mirror("weight_toward_left", "weight_toward_right", _SIDE_WORDS)
+_mirror("head_shifted_left", "head_shifted_right", _SIDE_WORDS)
+_mirror("shoulders_shifted_left", "shoulders_shifted_right", _SIDE_WORDS)
+_mirror("pelvis_shifted_left", "pelvis_shifted_right", _SIDE_WORDS)
 
 
 @dataclass(frozen=True)
@@ -880,8 +1250,14 @@ def priorities(found: list[Finding], limit: int = 4) -> list[Finding]:
 
     A list of four things from four parts of the body is a plan; a list of four
     things that are all the same shoulder is the same finding written out four
-    times. Regions are visited worst-first, and a second finding from a region
-    already represented waits for the next pass.
+    times. Regions are visited worst-first and each appears once.
+
+    **The list is as long as there are regions to name, and no longer.** It
+    used to pad up to ``limit`` from regions already represented, which put
+    "head carried ahead of the shoulders" and "head ahead of the vertical" in
+    the same four-item plan -- two real and distinct measurements, and one
+    thing to work on. A short list of distinct things beats a full list with a
+    repeat in it.
     """
     chosen: list[Finding] = []
     seen: set[str] = set()
@@ -891,12 +1267,7 @@ def priorities(found: list[Finding], limit: int = 4) -> list[Finding]:
         chosen.append(finding)
         seen.add(finding.region)
         if len(chosen) >= limit:
-            return chosen
-    for finding in found:                      # second pass, if there is room
-        if finding not in chosen:
-            chosen.append(finding)
-            if len(chosen) >= limit:
-                break
+            break
     return chosen
 
 
@@ -976,6 +1347,25 @@ METRIC_NAME: dict[str, tuple[str, str]] = {
     "lateral_weight_bias": ("where the body is carried", "체중 쏠림"),
     "torso_rotation_index": ("torso rotation index", "몸통 회전 지표"),
     "sagittal_pelvic_tilt": ("pelvic tilt, front to back", "골반 전후 경사"),
+    # The plumb chain. Named for the landmark and the line it is measured
+    # against, because "shoulder offset" alone does not say offset from what.
+    "sagittal_ear_offset": ("head over the ankle", "머리–발목 수직 정렬"),
+    "sagittal_shoulder_offset": ("shoulders over the ankle", "어깨–발목 수직 정렬"),
+    "sagittal_hip_offset": ("hips over the ankle", "골반–발목 수직 정렬"),
+    "sagittal_knee_offset": ("knees over the ankle", "무릎–발목 수직 정렬"),
+    "lateral_head_shift": ("head over the midline", "머리 좌우 중심"),
+    "lateral_shoulder_shift": ("shoulders over the midline", "어깨 좌우 중심"),
+    "lateral_pelvis_shift": ("pelvis over the midline", "골반 좌우 중심"),
+}
+
+
+#: The parts of the body the score is broken down by.
+REGION_NAME: dict[str, tuple[str, str]] = {
+    "head": ("Head and neck", "머리·목"),
+    "shoulders": ("Shoulders", "어깨"),
+    "pelvis": ("Pelvis", "골반"),
+    "trunk": ("Trunk", "몸통"),
+    "lower_body": ("Legs and feet", "다리·발"),
 }
 
 
@@ -1033,6 +1423,18 @@ REASON_KO: dict[str, str] = {
         "하중이 실리는 위치가 아니라 몸통이 서 있는 위치입니다",
     "needs this student's own baseline to mean rotation":
         "회전으로 해석하려면 이 회원 본인의 기준값이 필요합니다",
+    "neither ankle was found, so there is nothing to drop a vertical from":
+        "양쪽 발목을 찾지 못해 수직 기준선을 내릴 수 없습니다",
+    "the ear was not found": "귀를 찾지 못했습니다",
+    "the shoulder was not found": "어깨를 찾지 못했습니다",
+    "the hip was not found": "골반을 찾지 못했습니다",
+    "the knee was not found": "무릎을 찾지 못했습니다",
+    "this offset is along the lens axis here; it needs a photograph from the "
+    "side": "정면에서는 이 간격이 렌즈 축과 겹쳐 보입니다. 측면 사진이 필요합니다",
+    "this offset is along the lens axis here; it needs a photograph from the "
+    "front or back":
+        "측면에서는 이 간격이 렌즈 축과 겹쳐 보입니다. 정면 또는 후면 사진이 "
+        "필요합니다",
 }
 
 
@@ -1041,6 +1443,173 @@ def reason_text(reason: str, lang: str = "en") -> str:
     if lang != "ko" or not reason:
         return reason
     return REASON_KO.get(reason, reason)
+
+
+#: How far a link has to sit off the vertical before the pattern reader counts
+#: it as forward or back at all. A share of body height, like the measurement.
+#: Below this the link is "over the ankle" and the pattern is described without
+#: it, rather than every millimetre of noise becoming part of the shape.
+PATTERN_FLOOR = 0.03
+
+
+def pattern(assessment: PhotoAssessment) -> dict:
+    """Read the sagittal chain as a shape rather than four separate numbers.
+
+    This is the thing a list of measurements cannot say. A head four
+    centimetres forward of a shoulder that is itself four centimetres forward
+    of the ankle is a body leaning; a head four centimetres forward of a
+    shoulder that is over the ankle is a neck. Both produce the same
+    "forward head" number and they are not the same finding, and the only way
+    to tell them apart is to read the links together.
+
+    **It describes, it does not diagnose.** The vocabulary is positional --
+    which link is forward of which -- and no posture *type* is named. Naming
+    one would be the same move as naming a condition: it sounds authoritative,
+    it is not measured, and a studio is not licensed to make it. What comes
+    back is a sentence about where the parts are and a note about which end of
+    the chain to work from.
+
+    Returns an empty dict when the sagittal photographs are missing, because
+    there is no chain to read.
+    """
+    links = ("sagittal_ear_offset", "sagittal_shoulder_offset",
+             "sagittal_hip_offset", "sagittal_knee_offset")
+    values: dict[str, float] = {}
+    for name in links:
+        reading = assessment.readings.get(name)
+        if reading is not None and reading.measured:
+            values[name] = float(reading.value)
+    if len(values) < 3:
+        return {}
+
+    def where(name: str) -> int:
+        """-1 behind the vertical, 0 over it, +1 in front of it."""
+        value = values.get(name)
+        if value is None or abs(value) < PATTERN_FLOOR:
+            return 0
+        return 1 if value > 0 else -1
+
+    head, shoulder, hip, knee = (where(n) for n in links)
+    parts, parts_ko = [], []
+    for place, english, korean in ((head, "head", "머리"),
+                                   (shoulder, "shoulders", "어깨"),
+                                   (hip, "hips", "골반"),
+                                   (knee, "knees", "무릎")):
+        if place == 0:
+            continue
+        parts.append(f"{english} {'forward' if place > 0 else 'back'}")
+        parts_ko.append(f"{korean} {'앞' if place > 0 else '뒤'}")
+
+    if not parts:
+        return {"shape": "every link in the chain sits over the vertical",
+                "shape_ko": "모든 지점이 수직선 위에 있습니다",
+                "start_at": "", "start_at_ko": "", "links": values}
+
+    # Where to start is the lowest link that is off the vertical. The chain
+    # carries upward: a pelvis forward of the ankle takes the shoulders and
+    # head with it, so treating the shoulders first is treating a consequence.
+    ladder = (("sagittal_knee_offset", "the knees", "무릎"),
+              ("sagittal_hip_offset", "the hips", "골반"),
+              ("sagittal_shoulder_offset", "the shoulders", "어깨"),
+              ("sagittal_ear_offset", "the head", "머리"))
+    lowest = lowest_ko = ""
+    rung = len(ladder)
+    for index, (name, english, korean) in enumerate(ladder):
+        if where(name) != 0:
+            lowest, lowest_ko, rung = english, korean, index
+            break
+
+    shape = "standing side on: " + ", ".join(parts)
+    if not lowest:
+        start = start_ko = ""
+    elif rung == len(ladder) - 1:
+        # The head is the only link off the vertical: there is nothing above
+        # it to be following it, so the sentence about the chain would be
+        # nonsense here. It is the neck, and that is the useful thing to say.
+        start = ("the rest of the chain sits over the vertical, so this is "
+                 "the head rather than the body underneath it")
+        start_ko = ("아래쪽은 모두 수직선 위에 있으므로, 몸통이 아니라 머리 위치의 "
+                    "문제입니다")
+    else:
+        start = (f"the chain carries upward, so start at {lowest} -- the "
+                 f"links above it may be following rather than doing "
+                 f"anything themselves")
+        start_ko = (f"이 연결은 아래에서 위로 전달되므로 {lowest_ko}부터 "
+                    f"시작하세요. 그 위쪽은 스스로 그런 것이 아니라 따라간 것일 수 "
+                    f"있습니다")
+    return {"shape": shape, "shape_ko": "옆에서 볼 때: " + ", ".join(parts_ko),
+            "start_at": start, "start_at_ko": start_ko, "links": values}
+
+
+def balance(assessment: PhotoAssessment) -> dict:
+    """How much of what was measured is a left-right difference.
+
+    One number for the question a studio asks first -- *is this person even,
+    and if not by how much* -- taken as the mean deviation across the
+    measurements that have a side to them. It is a summary of the measurements
+    already shown, not a new claim, and it is reported beside the count it was
+    taken from so nobody reads a single lopsided reading as a whole body.
+    """
+    sided = ("head_lateral_tilt", "shoulder_tilt", "pelvic_obliquity",
+             "trunk_lean_lateral", "lateral_weight_bias", "lateral_head_shift",
+             "lateral_shoulder_shift", "lateral_pelvis_shift",
+             "left_knee_deviation", "right_knee_deviation")
+    scores: list[float] = []
+    worst_name, worst = "", 0.0
+    for name in sided:
+        reading = assessment.readings.get(name)
+        if reading is None or not reading.measured:
+            continue
+        deviation = reading.deviation or 0.0
+        scale = al.ZERO_AT if reading.metric.unit == "deg" else al.RATIO_ZERO_AT
+        share = min(1.0, deviation / scale)
+        scores.append(share)
+        if share > worst:
+            worst_name, worst = name, share
+    if not scores:
+        return {}
+    evenness = round(100.0 * (1.0 - statistics.fmean(scores)), 1)
+    return {"evenness": evenness, "from_checks": len(scores),
+            "least_even": worst_name,
+            "least_even_name": metric_name(worst_name),
+            "least_even_name_ko": metric_name(worst_name, "ko")}
+
+
+#: How long to leave between assessments, in weeks.
+#:
+#: Six to eight is the interval a studio training somebody twice a week can
+#: actually show a change over, and it is long enough that the difference
+#: clears the measurement noise rather than the student having stood
+#: differently. Sooner where something is marked, because that is the case a
+#: studio wants to know early whether the programme is working.
+REVIEW_WEEKS = {MARKED: 6, NOTABLE: 8, WATCH: 10, WITHIN: 12}
+
+
+def review_after(found: list[Finding], taken_on: str) -> dict:
+    """When to photograph again, and why then.
+
+    A date rather than "periodically", because a recommendation without one is
+    a recommendation nobody acts on -- and the interval is tied to what was
+    found rather than fixed, so a body with something marked comes back sooner
+    than one that is already even.
+    """
+    from datetime import date, timedelta
+
+    worst = found[0].severity if found else WITHIN
+    weeks = REVIEW_WEEKS[worst]
+    when = ""
+    try:
+        when = (date.fromisoformat(taken_on) + timedelta(weeks=weeks)).isoformat()
+    except ValueError:
+        when = ""
+    return {
+        "weeks": weeks, "on": when,
+        "why": (f"{weeks} weeks: long enough for a change to clear the "
+                f"measurement noise, short enough to find out whether the "
+                f"programme is working"),
+        "why_ko": (f"{weeks}주: 변화가 측정 오차를 넘어설 만큼 길면서, 프로그램이 "
+                   f"효과가 있는지 확인할 수 있을 만큼 짧은 간격입니다"),
+    }
 
 
 #: What a report must carry, word for word, wherever it is shown. Not a footer
@@ -1202,7 +1771,33 @@ def report(assessment: PhotoAssessment) -> dict:
         # printing a score over one, one sentence further down the page.
         "findings_note": _findings_note(assessment, found)[0],
         "findings_note_ko": _findings_note(assessment, found)[1],
-        "priorities": [f.name for f in priorities(found)],
+        "priorities": [{"metric": f.name,
+                        "name": metric_name(f.name),
+                        "name_ko": metric_name(f.name, "ko"),
+                        "severity": f.severity,
+                        "title": f.title(), "title_ko": f.title("ko"),
+                        "measurement": f.measurement,
+                        "measurement_ko": f.measurement_text("ko")}
+                       for f in priorities(found)],
+        # What the measurements add up to, rather than what each one says.
+        "pattern": pattern(assessment),
+        "balance": balance(assessment),
+        "review": review_after(found, assessment.taken_on),
+        # The regional breakdown was computed from the first version of this
+        # and never shown, which is most of why the report read as a list.
+        "regions": [{"region": name,
+                     "name": REGION_NAME.get(name, (name, ""))[0],
+                     "name_ko": REGION_NAME.get(name, (name, ""))[1],
+                     "score": None if comp.score is None else round(comp.score, 1),
+                     "checks": comp.n,
+                     "weakest": comp.weakest[0] if comp.weakest else "",
+                     "weakest_name": (metric_name(comp.weakest[0])
+                                      if comp.weakest else ""),
+                     "weakest_name_ko": (metric_name(comp.weakest[0], "ko")
+                                         if comp.weakest else "")}
+                    for name, comp in
+                    ((n, assessment.component(n)) for n in al.REGIONS)
+                    if comp.n],
         "programme": programme(found),
         "habits": habits(found),
         # What to call each measurement, for every reading rather than only the
