@@ -104,6 +104,14 @@ const T = {
   thenNowNote:{ en: 'Both outlines are scaled to the same body height and lined up at the feet, so what differs is the body and not how far away the camera was.',
                 ko: '두 윤곽선은 같은 신장으로 맞추고 발 위치를 기준으로 정렬했습니다. 따라서 차이는 카메라 거리가 아니라 신체의 변화입니다.' },
   before:     { en: 'Before', ko: '이전' },
+  left:       { en: 'left', ko: '좌측' },
+  right:      { en: 'right', ko: '우측' },
+  part_head_lateral_tilt: { en: 'ear', ko: '귀' },
+  part_shoulder_tilt:     { en: 'shoulder', ko: '어깨' },
+  part_pelvic_obliquity:  { en: 'hip', ko: '엉덩이' },
+  higherEnd:  { en: 'higher', ko: '높음' },
+  lowerEnd:   { en: 'lower', ko: '낮음' },
+  levelWith:  { en: 'level', ko: '수평' },
   ofHeight:   { en: 'furthest a joint moved', ko: '가장 많이 이동한 관절' },
   after:      { en: 'After', ko: '현재' },
   everyMeasure:{ en: 'Every measurement', ko: '전체 측정값' },
@@ -168,6 +176,26 @@ const ANCHOR = {
 const BONES = [[15, 13], [13, 11], [16, 14], [14, 12], [11, 12], [5, 11],
   [6, 12], [5, 6], [5, 7], [6, 8], [7, 9], [8, 10], [1, 2], [0, 1], [0, 2],
   [1, 3], [2, 4]];
+
+/**
+ * The two ends of each line that should be level, and what to call them.
+ *
+ * A tilt is one number about two landmarks, and putting it once in the middle
+ * loses the half a teacher needs: *which* shoulder. The reference reports a
+ * studio actually uses label both ends -- left shoulder and right shoulder,
+ * each with the side it is on -- and that is the difference between "the
+ * shoulder line is ten degrees off" and "the left one is the high one".
+ *
+ * Entries are ``metric: [[joint, side], [joint, side]]`` with the *first* end
+ * being the one a positive reading makes higher. Every sign convention in this
+ * project is anatomical -- positive is toward the person's own left -- so the
+ * left joint leads.
+ */
+const ENDS = {
+  head_lateral_tilt: [[3, 'left'], [4, 'right']],
+  shoulder_tilt: [[5, 'left'], [6, 'right']],
+  pelvic_obliquity: [[11, 'left'], [12, 'right']],
+};
 
 /** Lines that should be level, and the reading that says whether they are. */
 const LEVELS = [['head_lateral_tilt', 3, 4], ['shoulder_tilt', 5, 6],
@@ -532,7 +560,7 @@ function anchorOf(land, joints) {
  * landmark at (540, 712) is written as (540, 712) and is right at every size.
  * `vector-effect` keeps the strokes from being stretched with it.
  */
-function overlay(land, marks) {
+function overlay(land, marks, ends = []) {
   const { keypoints: k, scores: s, width, height } = land;
   const out = [];
   const feet = [15, 16].filter((j) => real(k[j], s[j]));
@@ -571,6 +599,7 @@ function overlay(land, marks) {
         text-anchor="middle" font-size="${r * 1.15}" font-weight="700"
         fill="#04121f">${mark.n}</text></g>`);
   }
+  out.push(...endLabels(land, ends));
   out.push(...callouts(land, marks));
   /* `meet`, not `none`: the photograph beside it is fitted with
    * `object-fit: contain`, and these two are the same transform. Stretching
@@ -578,6 +607,51 @@ function overlay(land, marks) {
    * the skeleton next to the body rather than on it. */
   return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet"
     xmlns="http://www.w3.org/2000/svg">${out.join('')}</svg>`;
+}
+
+/**
+ * The little boxes at each end of a level line, on the landmark itself.
+ *
+ * Drawn tight against the joint rather than out at the margin, because the
+ * whole point of them is *which* one: a box reading "left shoulder, 10°
+ * higher" sitting on the left shoulder needs no leader line and no sign
+ * convention to read. The margin callouts say what the measurement is; these
+ * say where it is on the body.
+ *
+ * They sit outward from the body -- the left one to the left, the right one to
+ * the right -- so neither covers the torso between them, which is where the
+ * skeleton and the plumb line are.
+ */
+export function endLabels(land, ends) {
+  if (!ends?.length) return [];
+  const { keypoints: k, scores: s, width, height } = land;
+  const size = Math.max(width, height) / 54;
+  /* Outward from the body, decided by where the joint *is* rather than by
+     which side of the person it belongs to. The two are opposite in a
+     front-facing photograph -- somebody's left shoulder is on the right of
+     the picture -- so placing by the anatomical name sent every label back
+     across the torso, where the pairs collided in the middle. */
+  const hips = [11, 12].filter((j) => real(k[j], s[j]));
+  const spine = hips.length
+    ? hips.reduce((a, j) => a + k[j][0], 0) / hips.length : width / 2;
+  const out = [];
+  for (const end of ends) {
+    const outward = end.at[0] < spine ? -1 : 1;
+    const x = end.at[0] + outward * size * 0.9;
+    const y = end.at[1];
+    const anchor = outward < 0 ? 'end' : 'start';
+    out.push(`<circle cx="${end.at[0]}" cy="${end.at[1]}" r="${size * 0.26}"
+      fill="${end.ink}" stroke="#04070c" stroke-width="${size * 0.1}"/>`);
+    out.push(`<text x="${x}" y="${y - size * 0.12}" text-anchor="${anchor}"
+      font-size="${size * 0.82}" font-weight="600" fill="${end.ink}"
+      stroke="#04070c" stroke-width="${size * 0.22}" paint-order="stroke"
+      stroke-linejoin="round">${esc(end.name)}</text>`);
+    out.push(`<text x="${x}" y="${y + size * 0.82}" text-anchor="${anchor}"
+      font-size="${size * 0.74}" fill="#c9d6e4"
+      stroke="#04070c" stroke-width="${size * 0.2}" paint-order="stroke"
+      stroke-linejoin="round">${esc(`${end.value} ${end.way}`)}</text>`);
+  }
+  return out;
 }
 
 /**
@@ -1572,6 +1646,61 @@ function marksFor(report, view, lang) {
   return out;
 }
 
+/**
+ * Each end of a line that should be level, labelled with the side it is on.
+ *
+ * A tilt is one number about two landmarks. Put once in the middle, it loses
+ * the half a teacher needs -- *which* shoulder is the high one -- and leaves
+ * them working it out from a sign convention printed somewhere else. The
+ * reference reports a studio actually uses label both ends, and so does this.
+ *
+ * The number at each end is the tilt of the whole line, not half of it: the
+ * line is ten degrees off level, and both ends are ends of that line. What
+ * differs is the word beside it, which says whether this end is the high one.
+ * Splitting the angle between them would be inventing two measurements out of
+ * one.
+ */
+export function endsFor(report, view, lang) {
+  const land = report.landmarks?.[view];
+  if (!land) return [];
+  const readings = report.assessment?.readings ?? {};
+  const bySeverity = new Map(
+    (report.findings ?? []).map((f) => [f.metric, f]));
+  const out = [];
+  for (const [metric, ends] of Object.entries(ENDS)) {
+    const reading = readings[metric];
+    if (!reading || reading.value == null) continue;
+    if (!reading.sources.includes(view)) continue;
+    const severity = bySeverity.get(metric)?.severity ?? 'within_band';
+    const tilt = reading.value;
+    ends.forEach(([joint, side], i) => {
+      if (!real(land.keypoints[joint], land.scores[joint])) return;
+      /* The first end is the one a positive reading lifts. Every sign in this
+         project is anatomical -- positive is toward the person's own left --
+         so a positive tilt makes the left end the high one. */
+      const high = (i === 0) === (tilt > 0);
+      const level = Math.abs(tilt) < 0.05;
+      out.push({
+        metric, side, joint,
+        at: [land.keypoints[joint][0], land.keypoints[joint][1]],
+        ink: INK[severity] ?? INK.within_band,
+        name: sideName(metric, side, lang),
+        value: formatValue(metric, { ...reading, value: Math.abs(tilt) }),
+        way: level ? say('levelWith', lang)
+                   : say(high ? 'higherEnd' : 'lowerEnd', lang),
+      });
+    });
+  }
+  return out;
+}
+
+/** What to call one end of a line: the side, then the part. */
+function sideName(metric, side, lang) {
+  const part = say(`part_${metric}`, lang);
+  const which = say(side, lang);
+  return lang === 'ko' ? `${which} ${part}` : `${which} ${part}`;
+}
+
 /** Only ever a fallback: the server formats every number it sends. */
 function formatValue(metric, reading) {
   if (reading.value == null) return '—';
@@ -1644,6 +1773,7 @@ function reportHtml(state, lang, identity) {
         <small>${esc(say('notTaken', lang))}</small></figcaption></figure>`;
     }
     const marks = land ? marksFor(report, slot.view, lang) : [];
+    const ends = land ? endsFor(report, slot.view, lang) : [];
     const rows = marks.map((mark) => `<button type="button"
       data-mark="${esc(slot.view)}:${esc(mark.metric)}">
       <i class="ss-pip" style="background:${mark.ink}"></i>
@@ -1654,7 +1784,7 @@ function reportHtml(state, lang, identity) {
     return `<figure>
       <div class="ss-frame ${shot ? '' : 'ss-noshot'}" ${frame}>
         ${shot ? `<img src="${shot.objectUrl}" alt="">` : ''}
-        ${land ? overlay(land, marks) : ''}</div>
+        ${land ? overlay(land, marks, ends) : ''}</div>
       <figcaption>${esc(titleOf(slot, lang))}
         ${photo?.problem ? `<small>${esc(photo.problem)}</small>`
           : (shot ? '' : `<small>${esc(say('noPhoto', lang))}</small>`)}</figcaption>
@@ -2115,5 +2245,5 @@ export const _internals = { overlay, marksFor, anchorOf, dial, spark,
                             bodyMapHtml, regionInk, callouts, scaleHtml,
                             musclesHtml, showMuscle, measurementsHtml,
                             trackHtml, outlinesHtml, normalise, fitBox,
-                            furthestMove,
+                            furthestMove, endsFor, endLabels,
                             INK, ANCHOR, CHIP: T };

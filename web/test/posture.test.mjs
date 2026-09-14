@@ -1095,3 +1095,92 @@ test('the drawing explains itself in Korean', () => {
   assert.match(html, /이전과 현재 겹쳐 보기/);
   assert.match(html, /카메라 거리가 아니라/);
 });
+
+/* ------------------------------------------- both ends of a line, by name */
+
+const { endsFor, endLabels } = _internals;
+
+test('a line that should be level is labelled at both of its ends', () => {
+  /* A tilt is one number about two landmarks. Put once in the middle it
+   * loses the half a teacher needs: which shoulder is the high one. */
+  const ends = endsFor(report(), 'front', 'en');
+  const shoulders = ends.filter((e) => e.metric === 'shoulder_tilt');
+  assert.equal(shoulders.length, 2);
+  assert.deepEqual(shoulders.map((e) => e.side).sort(), ['left', 'right']);
+});
+
+test('each end says which side of the body it is', () => {
+  const ends = endsFor(report(), 'front', 'en');
+  const named = ends.map((e) => e.name);
+  assert.ok(named.includes('left shoulder'), named.join(', '));
+  assert.ok(named.includes('right shoulder'));
+});
+
+test('the higher end is named as the higher one', () => {
+  /* Positive is toward the person's own left, everywhere in this project. */
+  const ends = endsFor(report(), 'front', 'en');
+  const left = ends.find((e) => e.name === 'left shoulder');
+  const right = ends.find((e) => e.name === 'right shoulder');
+  assert.equal(left.way, 'higher');
+  assert.equal(right.way, 'lower');
+});
+
+test('a negative tilt names the other end as the higher one', () => {
+  const flipped = report();
+  flipped.assessment.readings.shoulder_tilt.value = -9.1;
+  const ends = endsFor(flipped, 'front', 'en');
+  assert.equal(ends.find((e) => e.name === 'left shoulder').way, 'lower');
+  assert.equal(ends.find((e) => e.name === 'right shoulder').way, 'higher');
+});
+
+test('a level line says level rather than picking a winner', () => {
+  const even = report();
+  even.assessment.readings.shoulder_tilt.value = 0;
+  const ends = endsFor(even, 'front', 'en');
+  for (const end of ends.filter((e) => e.metric === 'shoulder_tilt')) {
+    assert.equal(end.way, 'level');
+  }
+});
+
+test('both ends carry the tilt of the whole line, not half of it each', () => {
+  /* Splitting the angle between them invents two measurements out of one. */
+  const ends = endsFor(report(), 'front', 'en').filter(
+    (e) => e.metric === 'shoulder_tilt');
+  for (const end of ends) assert.match(end.value, /9\.1/);
+});
+
+test('a line the photograph did not measure has no ends', () => {
+  const ends = endsFor(report(), 'side_left', 'en');
+  assert.equal(ends.filter((e) => e.metric === 'shoulder_tilt').length, 0);
+});
+
+test('the ends read in Korean', () => {
+  const ends = endsFor(report(), 'front', 'ko');
+  const named = ends.map((e) => e.name);
+  assert.ok(named.some((n) => n.includes('어깨')), named.join(', '));
+  assert.ok(ends.some((e) => e.way === '높음'));
+});
+
+test('a label sits outward from the body, on the side the joint is on', () => {
+  /* Somebody's left shoulder is on the right of a front-facing picture. A
+   * label placed by the anatomical name went back across the torso, and the
+   * pairs collided over the spine. */
+  const land = landmarks();
+  const drawn = endLabels(land, [
+    { metric: 'shoulder_tilt', side: 'left', joint: 6, at: [580, 520],
+      ink: '#fff', name: 'left shoulder', value: '+9.1°', way: 'higher' },
+    { metric: 'shoulder_tilt', side: 'right', joint: 5, at: [420, 500],
+      ink: '#fff', name: 'right shoulder', value: '+9.1°', way: 'lower' },
+  ]).join('');
+  const texts = [...drawn.matchAll(/<text x="([\d.]+)"[^>]*text-anchor="(\w+)"/g)]
+    .map((m) => ({ x: Number(m[1]), anchor: m[2] }));
+  /* The joint at 580 is right of the hips (500), so its label runs rightward
+     from it; the one at 420 runs leftward. */
+  assert.ok(texts.some((t) => t.x > 580 && t.anchor === 'start'));
+  assert.ok(texts.some((t) => t.x < 420 && t.anchor === 'end'));
+});
+
+test('nothing is drawn when there are no ends to draw', () => {
+  assert.deepEqual(endLabels(landmarks(), []), []);
+  assert.deepEqual(endLabels(landmarks(), null), []);
+});
