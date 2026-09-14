@@ -51,6 +51,7 @@ const T = {
   again:      { en: 'Start again', ko: '다시 하기' },
   print:      { en: 'Print', ko: '인쇄' },
   close:      { en: 'Close', ko: '닫기' },
+  back:       { en: '\u2190  Back to the analysis', ko: '\u2190  분석으로 돌아가기' },
   other:      { en: '한국어', ko: 'English' },
   need:       { en: 'Add at least one photograph.', ko: '사진을 한 장 이상 추가하세요.' },
   privacy:    { en: 'The photographs are measured and then dropped. They are not stored, and they are not sent back. What is kept is the numbers.',
@@ -158,6 +159,14 @@ const STYLE = `
   border:1px solid var(--line2);color:var(--dim)}
 #ss-pos-open:hover{color:var(--txt);border-color:var(--acc)}
 #ss-pos-open i{width:9px;height:9px;border-radius:2px;border:1.5px solid var(--acc)}
+/* The way back from an exercise. Fixed, high, and over everything: the whole
+   failure it fixes is a one-way door, so it must not be possible to miss. */
+#ss-pos-back{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;
+  z-index:140;padding:10px 20px;border-radius:22px;font:inherit;font-size:13px;
+  font-weight:600;cursor:pointer;background:var(--acc);border:0;color:#04121f;
+  box-shadow:0 8px 28px rgba(0,0,0,.5)}
+#ss-pos-back:hover{filter:brightness(1.1)}
+#ss-pos[hidden]{display:none}
 #ss-pos{position:fixed;inset:0;z-index:130;overflow:auto;
   background:linear-gradient(180deg,#070b12,#04070c);color:var(--txt)}
 #ss-pos .ss-sheet{max-width:1180px;margin:0 auto;padding:26px 22px 90px}
@@ -661,7 +670,13 @@ export function mount(nw, served, who) {
 }
 
 function screen(nw, served, identity) {
+  /* A screen already open may be *hidden* rather than closed -- somebody
+   * stepped out to look at an exercise and pressed the header button instead
+   * of the way back. Close it properly, or its photographs leak and its way
+   * back floats over the new screen pointing at a detached node. */
+  document.getElementById('ss-pos')?.dispatchEvent(new CustomEvent('ss-shut'));
   document.getElementById('ss-pos')?.remove();
+  document.getElementById('ss-pos-back')?.remove();
   const host = document.createElement('div');
   host.id = 'ss-pos';
   document.body.appendChild(host);
@@ -679,8 +694,12 @@ function screen(nw, served, identity) {
   const lang = () => nw?.app?.lang ?? 'en';
   const shut = () => {
     for (const shot of state.photos.values()) URL.revokeObjectURL(shot.objectUrl);
+    document.getElementById('ss-pos-back')?.remove();
     host.remove();
   };
+  /* So a replacement screen can release this one's photographs without
+   * reaching inside it for the state. */
+  host.addEventListener('ss-shut', shut);
   host.addEventListener('keydown', (e) => { if (e.key === 'Escape') shut(); });
 
   const draw = () => {
@@ -1097,13 +1116,43 @@ function wire(host, state, nw, served, identity, draw, shut) {
 
   for (const pill of host.querySelectorAll('[data-ex]')) {
     pill.addEventListener('click', () => {
-      /* Straight into the anatomy application underneath: the exercise's
-       * muscles light on the body that is already loaded. A recommendation
-       * you can look at beats a recommendation you can read. */
+      /* Into the anatomy application underneath: the exercise's muscles light
+       * on the body that is already loaded. A recommendation you can look at
+       * beats a recommendation you can read.
+       *
+       * **Hidden, never closed.** This used to call shut(), which removed the
+       * screen and revoked the photograph object URLs -- so the analysis was
+       * gone, and reopening could not bring it back because the pictures had
+       * been released. Pressing "show on the body" cost you the report you
+       * were reading. */
       nw?.setExercise?.(pill.dataset.ex);
-      shut();
+      peek(host, nw);
     });
   }
+}
+
+/**
+ * Step out of the report to look at the body, with a way back.
+ *
+ * The screen is hidden rather than torn down, so the photographs, the
+ * measurements and the scroll position are all still there when the button is
+ * pressed. The button is the whole point: without it, looking at an exercise
+ * is a one-way door.
+ */
+function peek(host, nw) {
+  host.hidden = true;
+  const lang = nw?.app?.lang ?? 'en';
+  document.getElementById('ss-pos-back')?.remove();
+  const back = document.createElement('button');
+  back.id = 'ss-pos-back';
+  back.type = 'button';
+  back.textContent = say('back', lang);
+  back.addEventListener('click', () => {
+    host.hidden = false;
+    back.remove();
+  });
+  document.body.appendChild(back);
+  return back;
 }
 
 function readAsDataUrl(file) {
@@ -1172,4 +1221,4 @@ async function compareWith(state, before, after) {
 export const _internals = { overlay, marksFor, anchorOf, dial, spark,
                             historyHtml, changeHtml, patternHtml,
                             regionsHtml, evennessHtml, planHeadHtml,
-                            formatValue, INK, ANCHOR, CHIP: T };
+                            formatValue, peek, INK, ANCHOR, CHIP: T };

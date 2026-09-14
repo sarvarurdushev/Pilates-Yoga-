@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { _internals } from '../src/session/posture.js';
 import { EXERCISE } from '../src/content/exercises.js';
 
-const { overlay, marksFor, anchorOf, formatValue, INK, ANCHOR } = _internals;
+const { overlay, marksFor, anchorOf, formatValue, peek, INK, ANCHOR } = _internals;
 
 /* The screen draws over a photograph the browser already holds, from landmarks
  * the server sent back, and every one of these tests is about one of the three
@@ -315,4 +315,102 @@ test('a withheld score on either side shows no headline difference', () => {
   const html = changeHtml({ change: change({ score_change: null }) }, 'en');
   assert.ok(!html.includes('ss-delta'));
   assert.match(html, /shoulder level/, 'the metrics still compare');
+});
+
+/* ---------------------------------------------------------------------------
+ * Stepping out to the body, and back.
+ *
+ * The bug these pin cost somebody their report: pressing "show on the body"
+ * tore the screen down and released the photograph object URLs, so there was
+ * nothing left to come back to. These tests run against a DOM small enough to
+ * write by hand -- appendChild, remove, getElementById, one event each -- which
+ * is all peek() touches, and keeps the suite free of a browser.
+ * ------------------------------------------------------------------------- */
+
+function fakeDom() {
+  const byId = new Map();
+  const mk = (tag = 'div') => {
+    const el = {
+      tagName: tag, id: '', type: '', textContent: '', hidden: false,
+      _handlers: new Map(), _attached: false,
+      addEventListener(name, fn) { el._handlers.set(name, fn); },
+      click() { el._handlers.get('click')?.(); },
+      remove() { el._attached = false; if (el.id) byId.delete(el.id); },
+    };
+    return el;
+  };
+  const document = {
+    createElement: mk,
+    getElementById: (id) => byId.get(id) ?? null,
+    body: { appendChild(el) { el._attached = true; if (el.id) byId.set(el.id, el); } },
+  };
+  return { document, mk };
+}
+
+test('looking at an exercise hides the report, it does not destroy it', () => {
+  const { document, mk } = fakeDom();
+  const prior = globalThis.document;
+  globalThis.document = document;
+  try {
+    const host = mk();
+    host.id = 'ss-pos';
+    document.body.appendChild(host);
+
+    const back = peek(host, { app: { lang: 'en' } });
+
+    assert.equal(host.hidden, true, 'the report is hidden');
+    assert.equal(host._attached, true, 'but it is still in the page');
+    assert.equal(back._attached, true, 'and there is a way back');
+    assert.match(back.textContent, /Back to the analysis/);
+  } finally { globalThis.document = prior; }
+});
+
+test('the way back brings the same report, photographs and all', () => {
+  const { document, mk } = fakeDom();
+  const prior = globalThis.document;
+  globalThis.document = document;
+  try {
+    const host = mk();
+    host.id = 'ss-pos';
+    document.body.appendChild(host);
+    const back = peek(host, { app: { lang: 'en' } });
+
+    back.click();
+
+    assert.equal(host.hidden, false, 'the report is showing again');
+    assert.equal(host._attached, true, 'and it was never rebuilt');
+    assert.equal(back._attached, false, 'the button takes itself away');
+  } finally { globalThis.document = prior; }
+});
+
+test('stepping out twice leaves one way back, not two', () => {
+  /* Two identical buttons stacked on each other: the second click lands on a
+   * button whose host reference is the same, so the page looks stuck. */
+  const { document, mk } = fakeDom();
+  const prior = globalThis.document;
+  globalThis.document = document;
+  try {
+    const host = mk();
+    host.id = 'ss-pos';
+    document.body.appendChild(host);
+    const first = peek(host, { app: { lang: 'en' } });
+    const second = peek(host, { app: { lang: 'en' } });
+
+    assert.equal(first._attached, false, 'the first is gone');
+    assert.equal(second._attached, true, 'the second stands');
+    assert.equal(document.getElementById('ss-pos-back'), second);
+  } finally { globalThis.document = prior; }
+});
+
+test('the way back is labelled in Korean when the application is', () => {
+  const { document, mk } = fakeDom();
+  const prior = globalThis.document;
+  globalThis.document = document;
+  try {
+    const host = mk();
+    host.id = 'ss-pos';
+    document.body.appendChild(host);
+    const back = peek(host, { app: { lang: 'ko' } });
+    assert.match(back.textContent, /분석으로 돌아가기/);
+  } finally { globalThis.document = prior; }
 });
