@@ -20,6 +20,12 @@ The subject is the *largest* body, because a studio photographs the person they
 are photographing from closer than the people they are not, and the presence of
 anybody else is reported rather than silently resolved.
 
+**A photograph of part of a person is refused, not measured.** The model
+will not refuse it for you -- handed a head and shoulders it invents the rest
+of the body a few dozen pixels below the chin and returns every joint at high
+confidence -- so the landmarks are checked for human proportions before they
+leave. See :func:`pilates.alignment.not_a_standing_body`.
+
 **Downscaling is for the model, not for the caller.** A twelve-megapixel phone
 photograph is resized before inference -- RTMO's exported graph takes 640x640
 whatever it is handed, so the pixels past that are cost without benefit -- and
@@ -36,7 +42,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .alignment import View
+from .alignment import View, not_a_standing_body
 from .intake import Photo
 from .types import Detection
 
@@ -163,6 +169,22 @@ def subject(frame: np.ndarray, backend) -> Subject:
     if scale != 1.0:
         chosen = Detection(keypoints=chosen.keypoints / scale,
                            scores=chosen.scores)
+    # Is what was found actually a whole body in this photograph?
+    #
+    # Asked here, before anything is measured, because the answer decides
+    # whether there is a measurement at all. A pose model handed a
+    # head-and-shoulders crop does not refuse it: it finds the head and
+    # invents hips, knees and ankles below the chin, confidently. Every
+    # number downstream then computes cleanly on a body that is not in the
+    # picture, and the report comes back saying the legs are perfect.
+    #
+    # A photograph that fails this is refused rather than flagged. A doubt
+    # withholds the score and prints the measurements underneath it, and the
+    # measurements are the problem.
+    shaped = not_a_standing_body(chosen)
+    if shaped:
+        raise BadPhoto(shaped[0])
+
     note, doubt = "", False
     if len(found) > 1:
         biggest, second = _body_height(ranked[0]), _body_height(ranked[1])

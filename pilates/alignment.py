@@ -353,6 +353,112 @@ def estimate_view(det: Detection, threshold: float = THRESHOLD) -> ViewEstimate:
 #: lateral weight bias, and lateral trunk lean.
 _LEVEL_METRICS_ARE_VIEW_INDEPENDENT = True
 
+#: What each part of a standing body is worth, as a share of the shoulder-to-
+#: ankle span this module measures everything against.
+#:
+#: Derived from Winter's standing-height table (*Biomechanics and Motor Control
+#: of Human Movement*), the same source :mod:`pilates.biomechanics` already
+#: scales limbs with, so the two cannot disagree about how a body is shaped.
+#: Winter gives heights as fractions of stature: shoulder 0.818, hip 0.530,
+#: knee 0.285, ankle 0.039, ear about 0.936. Shoulder to ankle is therefore
+#: 0.779 of stature, and dividing each drop by that gives the shares below.
+#:
+#: ``ear to shoulder`` is the one that matters most and it is worth saying why.
+#: A head is about a seventh of the distance from shoulder to ankle. It does
+#: not foreshorten much, it does not change with stance, and it is almost
+#: impossible to get wrong on a body that is actually in the photograph. A
+#: thigh, by contrast, can legitimately halve on camera when it angles toward
+#: the lens. So the head is the check that catches the failure this table was
+#: written for, and the leg checks are there to catch the rest.
+SEGMENT_SHARE: dict[str, tuple[str, float]] = {
+    # name: (what it spans, share of the shoulder-to-ankle span)
+    "head": ("ear to shoulder", 0.151),
+    "trunk": ("shoulder to hip", 0.370),
+    "thigh": ("hip to knee", 0.315),
+    "shank": ("knee to ankle", 0.316),
+}
+
+#: How far a segment may be from its share before the landmark set stops being
+#: a body. Deliberately loose -- a factor of one and four fifths either way.
+#:
+#: Two things widen it beyond the variation between people, which is nearer a
+#: tenth. A camera close to a standing person foreshortens whatever angles
+#: toward it, so a thigh in a side photograph legitimately measures well short.
+#: And a studio floor is not a laboratory: people stand with a knee soft and
+#: their weight on one hip. The number is set where a real body photographed
+#: badly still passes and a set of landmarks that is not a body does not.
+PROPORTION_SLACK = 1.8
+
+
+def not_a_standing_body(det: Detection,
+                        threshold: float = THRESHOLD) -> list[str]:
+    """Ways these landmarks are not a whole standing person in the frame.
+
+    **The check that was missing, and what it cost.** A pose model handed a
+    photograph cropped to somebody's head and shoulders does not refuse it. It
+    finds a head, and then it invents the rest: hips, knees and ankles, placed
+    a few dozen pixels below the chin, every one of them returned at high
+    confidence. Every measurement downstream then computes cleanly. The
+    shoulders come out level to a tenth of a degree because both hallucinated
+    shoulders landed on the same row of pixels, the pelvis likewise, the knees
+    track perfectly -- and a studio is handed a report saying *shoulders
+    100/100, pelvis 100/100, legs and feet 100/100* about a body that is not in
+    the picture.
+
+    Nothing already here catches it. Confidence cannot: the model is sure. The
+    ordering checks in :func:`implausible` cannot: an invented body is stacked
+    hip above knee above ankle in the correct order, because that is what the
+    model learned bodies look like. The size floor cannot, because the head is
+    large and close and the pixels are there.
+
+    What catches it is proportion. A head is about a seventh of the distance
+    from shoulder to ankle; in a head-and-shoulders crop it is half. See
+    :data:`SEGMENT_SHARE`.
+
+    Returns sentences a receptionist can act on. An empty list means these
+    landmarks are shaped like a standing body, which is not the same as their
+    being in the right places.
+    """
+    problems: list[str] = []
+    if geo.posture(det, threshold) not in ("upright", "unknown"):
+        # Lying or reclined: the vertical shares below describe standing and
+        # would condemn a correct photograph of somebody on a mat. The intake
+        # asks for standing, and `assess` says so separately.
+        return problems
+
+    span = body_height_px(det, threshold)
+    if not span:
+        return problems
+
+    pairs = {
+        "head": (kp.L_EAR, kp.R_EAR, kp.L_SHOULDER, kp.R_SHOULDER),
+        "trunk": (kp.L_SHOULDER, kp.R_SHOULDER, kp.L_HIP, kp.R_HIP),
+        "thigh": (kp.L_HIP, kp.R_HIP, kp.L_KNEE, kp.R_KNEE),
+        "shank": (kp.L_KNEE, kp.R_KNEE, kp.L_ANKLE, kp.R_ANKLE),
+    }
+    for name, (a1, a2, b1, b2) in pairs.items():
+        if not _confident(det, a1, a2, b1, b2, threshold=threshold):
+            continue
+        upper = _mid(det, a1, a2)
+        lower = _mid(det, b1, b2)
+        drop = abs(float(lower[1] - upper[1]))
+        share = drop / span
+        spans, expected = SEGMENT_SHARE[name]
+        if share > expected * PROPORTION_SLACK:
+            problems.append(
+                f"{spans} is {share:.0%} of the height of this body, where a "
+                f"standing person is about {expected:.0%}. The landmarks are "
+                f"not a whole body: this looks like a photograph cropped "
+                f"closer than the whole person")
+        elif share < expected / PROPORTION_SLACK:
+            problems.append(
+                f"{spans} is {share:.0%} of the height of this body, where a "
+                f"standing person is about {expected:.0%}. Either the body is "
+                f"not upright and square to the camera, or the landmarks are "
+                f"not all from the same person")
+    return problems
+
+
 def implausible(det: Detection, threshold: float = THRESHOLD) -> list[str]:
     """Ways this landmark set is not one person standing still.
 

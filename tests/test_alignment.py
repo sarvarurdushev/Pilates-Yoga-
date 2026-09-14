@@ -457,3 +457,110 @@ class TestThePlumbChain:
                      "lateral_head_shift", "lateral_shoulder_shift",
                      "lateral_pelvis_shift"):
             assert name in al.NORMAL_BANDS, name
+
+
+def head_crop(cx: float = 640.0, cy: float = 300.0, conf: float = 0.85):
+    """What a pose model returns for a head-and-shoulders photograph.
+
+    It does not refuse one. It finds the head and invents the rest of the body
+    a few dozen pixels below the chin -- hips, knees, ankles, stacked in the
+    right order, every joint at high confidence, because that is what it
+    learned bodies look like. This is the shape of the landmark set that
+    produced a report saying a studio's client had perfect legs.
+    """
+    points = np.zeros((kp.NUM_KEYPOINTS, 2), dtype=np.float32)
+    points[kp.NOSE] = (cx, cy)
+    points[kp.L_EYE] = (cx - 14, cy - 8)
+    points[kp.R_EYE] = (cx + 14, cy - 8)
+    points[kp.L_EAR] = (cx - 30, cy - 2)
+    points[kp.R_EAR] = (cx + 30, cy - 2)
+    points[kp.L_SHOULDER] = (cx - 52, cy + 70)
+    points[kp.R_SHOULDER] = (cx + 52, cy + 70)
+    points[kp.L_ELBOW] = (cx - 60, cy + 110)
+    points[kp.R_ELBOW] = (cx + 60, cy + 110)
+    points[kp.L_WRIST] = (cx - 64, cy + 140)
+    points[kp.R_WRIST] = (cx + 64, cy + 140)
+    points[kp.L_HIP] = (cx - 40, cy + 150)
+    points[kp.R_HIP] = (cx + 40, cy + 150)
+    points[kp.L_KNEE] = (cx - 38, cy + 180)
+    points[kp.R_KNEE] = (cx + 38, cy + 180)
+    points[kp.L_ANKLE] = (cx - 36, cy + 205)
+    points[kp.R_ANKLE] = (cx + 36, cy + 205)
+    return Detection(points, np.full(kp.NUM_KEYPOINTS, conf, dtype=np.float32))
+
+
+class TestIsThisAWholeBody:
+    """The check that stops a photograph of a head being measured as a body.
+
+    A studio uploaded a set cropped close and was handed a report saying
+    shoulders 100/100, pelvis 100/100, legs and feet 100/100. The numbers were
+    all real arithmetic over landmarks the model had invented below the chin,
+    and every existing guard passed: confidence was high, the joints were
+    stacked in the right order, and the pixels were there because the head was
+    large. Only the proportions gave it away.
+    """
+
+    def test_a_head_crop_is_not_a_body(self):
+        problems = al.not_a_standing_body(head_crop())
+        assert problems
+        assert "not a whole body" in problems[0]
+
+    def test_it_says_the_photograph_is_cropped_too_close(self):
+        """A receptionist has to know what to do differently."""
+        assert "cropped" in al.not_a_standing_body(head_crop())[0]
+
+    def test_the_head_is_what_gives_it_away(self):
+        """A head is about a seventh of shoulder-to-ankle and does not
+        foreshorten. In a head crop it is half."""
+        assert "ear to shoulder" in al.not_a_standing_body(head_crop())[0]
+
+    @pytest.mark.parametrize("body", [
+        standing(cx=540),
+        standing(shoulder_tilt=13.0, hip_tilt=9.0, cx=540),
+        standing(facing="rear", shoulder_tilt=8.0, cx=540),
+        side_on(facing_image_left=False, ear_ahead=60.0, cx=540),
+        side_on(facing_image_left=True, cx=540),
+    ])
+    def test_a_real_body_passes(self, body):
+        """The gate is worthless if it refuses the photographs a studio
+        actually takes."""
+        assert al.not_a_standing_body(body) == []
+
+    def test_a_body_lying_down_is_not_judged_by_standing_proportions(self):
+        """They describe standing, and would condemn a correct photograph of
+        somebody on a mat."""
+        from conftest import make_detection
+
+        lying = make_detection(lying=True)
+        assert al.not_a_standing_body(lying) == []
+
+    def test_landmarks_that_are_not_there_are_not_judged(self):
+        """A missing ankle is a measurement that cannot be made, not evidence
+        that the body is the wrong shape."""
+        det = head_crop()
+        scores = det.scores.copy()
+        for joint in (kp.L_EAR, kp.R_EAR):
+            scores[joint] = 0.05
+        assert al.not_a_standing_body(Detection(det.keypoints, scores)) == []
+
+    def test_the_proportions_come_from_the_same_source_as_the_load_model(self):
+        """Two tables describing how a body is shaped is two tables that
+        disagree. Winter's, in both places."""
+        from pilates import biomechanics as bio
+
+        import inspect
+
+        source = inspect.getsource(al)
+        assert "Winter" in source, "the table cites no source"
+        assert bio.SEGMENT_LENGTH_FRACTION["thigh_left"][2] == pytest.approx(
+            0.245)
+        # Thigh over shoulder-to-ankle: 0.245 of stature over 0.779 of stature.
+        assert al.SEGMENT_SHARE["thigh"][1] == pytest.approx(0.245 / 0.779,
+                                                             abs=0.01)
+
+    def test_the_shares_of_a_standing_body_add_up(self):
+        """Shoulder to hip to knee to ankle is the whole span, by
+        construction. A table where they do not sum is a table with a typo."""
+        total = sum(al.SEGMENT_SHARE[name][1]
+                    for name in ("trunk", "thigh", "shank"))
+        assert total == pytest.approx(1.0, abs=0.01)

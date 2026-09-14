@@ -680,3 +680,85 @@ class TestDrawingTwoVisitsTogether:
             "before": first["assessment_id"], "after": second["assessment_id"]})
         assert "image" not in repr(out)
         assert "base64" not in repr(out)
+
+
+class TestAPhotographOfPartOfAPerson:
+    """The failure a studio actually hit, over HTTP.
+
+    Four photographs cropped close to the head came back as a report saying
+    shoulders 100/100, pelvis 100/100, legs and feet 100/100. Every number was
+    honest arithmetic over landmarks the pose model had invented below the
+    chin. The photographs are refused now, and the refusal is the answer.
+    """
+
+    def _head(self):
+        from test_alignment import head_crop
+
+        return head_crop(cx=540, cy=300)
+
+    def test_a_head_crop_is_refused_rather_than_measured(self, coach, stubbed):
+        client, names, _ = coach
+        assert client.post("/roster/add", {"student": names["ann"]})[0] == 200
+        stubbed([self._head()] * 4)
+        status, out = client.post("/intake", {
+            "photos": shots(*ALL_FOUR), "username": names["ann"]})
+        assert status == 200
+        for view in ALL_FOUR:
+            photo = out["assessment"]["photos"][view.value]
+            assert not photo["usable"], f"{view.value} was measured"
+            assert "not a whole body" in photo["problem"]
+
+    def test_nothing_is_scored_from_it(self, coach, stubbed):
+        client, names, _ = coach
+        assert client.post("/roster/add", {"student": names["ann"]})[0] == 200
+        stubbed([self._head()] * 4)
+        _, out = client.post("/intake", {
+            "photos": shots(*ALL_FOUR), "username": names["ann"]})
+        assert out["score"]["value"] is None
+        assert out["assessment"]["readings"] == {} or all(
+            not r["availability"] == "available"
+            for r in out["assessment"]["readings"].values())
+
+    def test_no_region_comes_back_perfect(self, coach, stubbed):
+        """The thing that made it indefensible: legs and feet 100/100 on a
+        photograph with no legs in it."""
+        client, names, _ = coach
+        assert client.post("/roster/add", {"student": names["ann"]})[0] == 200
+        stubbed([self._head()] * 4)
+        _, out = client.post("/intake", {
+            "photos": shots(*ALL_FOUR), "username": names["ann"]})
+        assert out["regions"] == []
+        assert not out["findings"]
+
+    def test_the_studio_is_told_what_to_do_differently(self, coach, stubbed):
+        client, names, _ = coach
+        assert client.post("/roster/add", {"student": names["ann"]})[0] == 200
+        stubbed([self._head()] * 4)
+        _, out = client.post("/intake", {
+            "photos": shots(*ALL_FOUR), "username": names["ann"]})
+        assert any("cropped" in w for w in out["warnings"])
+
+    def test_a_good_set_is_still_measured(self, coach, stubbed):
+        """The gate is worthless if it refuses the photographs a studio
+        actually takes."""
+        client, names, _ = coach
+        assert client.post("/roster/add", {"student": names["ann"]})[0] == 200
+        stubbed(script_for(*ALL_FOUR))
+        _, out = client.post("/intake", {
+            "photos": shots(*ALL_FOUR), "username": names["ann"]})
+        assert out["score"]["value"] is not None
+        assert out["regions"]
+
+    def test_one_bad_photograph_does_not_throw_away_the_other_three(
+            self, coach, stubbed):
+        client, names, _ = coach
+        assert client.post("/roster/add", {"student": names["ann"]})[0] == 200
+        script = script_for(*ALL_FOUR)
+        script[1] = self._head()
+        stubbed(script)
+        _, out = client.post("/intake", {
+            "photos": shots(*ALL_FOUR), "username": names["ann"]})
+        supplied = out["assessment"]["supplied"]
+        assert View.SIDE_LEFT.value not in supplied
+        assert View.FRONT.value in supplied
+        assert len(supplied) == 3
