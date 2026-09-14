@@ -1218,3 +1218,27 @@ def compare(before: ScreeningAssessment,
         "judgement": JUDGEMENT,
         "judgement_ko": JUDGEMENT_KO,
     }
+
+
+#: What a screening report must carry, word for word, wherever it is shown.
+#: Not a footer to be styled small: it is the sentence that decides how
+#: everything above it is allowed to be read.
+#:
+#: Worded for movement rather than reusing the posture one. The claim being
+#: limited here is different and more tempting to overreach on: a range of
+#: motion compared against a published clinical figure looks like a clinical
+#: result, and the second sentence exists because that resemblance is the
+#: thing a reader has to be warned about rather than reassured by.
+DISCLAIMER = (
+    "This is a measurement of how far joints moved on camera, for training "
+    "purposes. The reference ranges are published figures measured by "
+    "clinicians with a goniometer on an isolated limb; a camera watching a "
+    "whole person is a screening tool and not that instrument. It is not a "
+    "medical assessment, it does not diagnose any condition, and it should "
+    "not be used in place of advice from a qualified clinician.")
+
+DISCLAIMER_KO = (
+    "본 자료는 카메라로 측정한 관절 가동 범위이며 운동 지도를 위한 참고용입니다. "
+    "기준 범위는 임상에서 각도계로 사지를 분리해 측정한 공개 수치이며, 전신을 "
+    "촬영하는 카메라는 선별 도구일 뿐 그 장비가 아닙니다. 의학적 진단이 아니며, "
+    "전문 의료인의 진료를 대신할 수 없습니다.")

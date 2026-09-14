@@ -74,6 +74,12 @@ class Job:
     state: str = QUEUED
     lines: list[str] = field(default_factory=list)
     bundle: dict | None = None
+    #: Per-frame landmarks, for a job asked for those rather than a session.
+    #: A movement screening needs two clips measured together, one per side,
+    #: and a server that held footage between them would be keeping video of
+    #: somebody's body for as long as it took them to turn around. So a clip
+    #: becomes numbers here and the numbers are what the page holds.
+    landmarks: dict | None = None
     error: str = ""
     started: float = field(default_factory=time.time)
     finished: float = 0.0
@@ -85,6 +91,7 @@ class Job:
             "lines": self.lines[-KEEP_LINES:], "error": self.error,
             "seconds": round((self.finished or time.time()) - self.started, 1),
             "bundle": self.bundle if self.state == DONE else None,
+            "landmarks": self.landmarks if self.state == DONE else None,
         }
 
 
@@ -131,9 +138,14 @@ class Jobs:
             work = Path(tempfile.mkdtemp(prefix=f"pilates-{job.id}-"))
             try:
                 job.state = RUNNING
-                self._analyse(job, video, work, options)
-                job.state = DONE if job.bundle else FAILED
-                if not job.bundle and not job.error:
+                if options.get("kind") == "landmarks":
+                    self._landmarks(job, video, work, options)
+                    got = job.landmarks is not None
+                else:
+                    self._analyse(job, video, work, options)
+                    got = job.bundle is not None
+                job.state = DONE if got else FAILED
+                if not got and not job.error:
                     job.error = "the pipeline produced no measurements"
             except Exception as exc:                      # noqa: BLE001
                 job.state = FAILED
@@ -177,6 +189,23 @@ class Jobs:
                          "--out", str(out), "--no-poses"])
         if out.exists():
             job.bundle = json.loads(out.read_text())
+
+    def _landmarks(self, job: Job, video: Path, work: Path,
+                   options: dict) -> None:
+        """Extract per-frame landmarks and keep nothing else.
+
+        Nothing is written to the studio's record: a clip filmed for a
+        screening is not a class, and filing it as one would put a shoulder
+        raise into somebody's attendance history. The measurement that comes
+        out of these landmarks is filed by the endpoint that makes it.
+        """
+        out = work / "landmarks.json"
+        args = ["landmarks", str(video), "--out", str(out)]
+        if options.get("stride"):
+            args += ["--stride", str(options["stride"])]
+        self._step(job, args)
+        if out.exists():
+            job.landmarks = json.loads(out.read_text())
 
     def _step(self, job: Job, args: list[str]) -> None:
         """Run one pilates command, keeping its output for the page."""

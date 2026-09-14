@@ -1,0 +1,749 @@
+/**
+ * The movement screening screen.
+ *
+ * The posture screen answers *what does this body look like standing still*.
+ * This one answers the question a studio asks next and cannot answer from a
+ * photograph: *how far does this joint actually go, and does the other side go
+ * as far*. A student is filmed doing one named movement, once per side, and
+ * what comes back is how far they got, how far the published range says a body
+ * goes, and the difference between the two.
+ *
+ * **Nothing here decides anything.** The catalogue, the reference ranges, the
+ * grading and the words all come from the server, because they also have to
+ * appear in a printed report and in the terminal, and three copies of a
+ * threshold is three thresholds that stop matching. This file uploads clips,
+ * collects the landmarks that come back, asks for the measurement, and draws
+ * it.
+ *
+ * **The clip is never kept and never travels twice.** It goes to /landmarks,
+ * comes back as numbers, and the file is deleted server-side whether the
+ * extraction worked or not. The two sides of a movement are filmed separately
+ * and have to be measured together, so the numbers wait in this page until
+ * both are in -- which is why they are numbers and not video.
+ */
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g,
+  (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* Every phrase this screen says, in both languages, in one table. The studio
+   this is built for teaches in Korean, and a half-translated screen makes a
+   reader switch registers mid-sentence and stop trusting both halves. */
+const T = {
+  open:       { en: 'Movement screening', ko: '움직임 검사' },
+  title:      { en: 'Movement screening', ko: '움직임 검사' },
+  lede:       { en: 'Film one named movement, once per side. What comes back is how far the joint went, against the range a body is published as having.',
+                ko: '지정된 동작을 좌우 각각 한 번씩 촬영합니다. 관절이 실제로 움직인 범위를 공개된 기준 범위와 비교해 보여 줍니다.' },
+  pick:       { en: 'Choose a screen', ko: '검사 항목 선택' },
+  how:        { en: 'How to film it', ko: '촬영 방법' },
+  view:       { en: 'Where the camera was', ko: '카메라 위치' },
+  noView:     { en: 'not stated', ko: '지정 안 함' },
+  viewWhy:    { en: 'Without this the numbers come back estimated: a movement partly toward the lens reads smaller than it was, and nothing can recover the difference.',
+                ko: '지정하지 않으면 측정값이 추정치로 표시됩니다. 카메라 쪽으로 향하는 동작은 실제보다 작게 보이며, 그 차이는 되돌릴 수 없습니다.' },
+  left:       { en: 'Left side clip', ko: '왼쪽 영상' },
+  right:      { en: 'Right side clip', ko: '오른쪽 영상' },
+  whole:      { en: 'Clip', ko: '영상' },
+  choose:     { en: 'Choose a file', ko: '파일 선택' },
+  drop:       { en: 'Remove', ko: '제거' },
+  run:        { en: 'Measure it', ko: '측정하기' },
+  working:    { en: 'Measuring…', ko: '측정 중…' },
+  reading:    { en: 'Reading the clip…', ko: '영상 분석 중…' },
+  who:        { en: 'Who this is', ko: '대상자' },
+  taken:      { en: 'Filmed on', ko: '촬영일' },
+  need:       { en: 'Add a clip first.', ko: '먼저 영상을 추가하세요.' },
+  again:      { en: 'Screen again', ko: '다시 검사' },
+  print:      { en: 'Print', ko: '인쇄' },
+  close:      { en: 'Close', ko: '닫기' },
+  other:      { en: '한국어', ko: 'English' },
+  reached:    { en: 'reached', ko: '도달' },
+  reference:  { en: 'reference', ko: '기준' },
+  short:      { en: 'short', ko: '부족' },
+  atRange:    { en: 'at the reference range', ko: '기준 범위 도달' },
+  reps:       { en: 'repetitions', ko: '반복' },
+  spread:     { en: 'spread across them', ko: '반복 간 편차' },
+  tempo:      { en: 'per repetition', ko: '회당 시간' },
+  ratio:      { en: 'return over out', ko: '복귀/올림 비율' },
+  held:       { en: 'held', ko: '유지' },
+  sway:       { en: 'drifted', ko: '흔들림' },
+  ofBody:     { en: 'of body height', ko: '(신장 대비)' },
+  sides:      { en: 'Left against right', ko: '좌우 비교' },
+  even:       { en: 'The two sides match within the measurement itself.',
+                ko: '좌우 차이가 측정 오차 범위 안에 있습니다.' },
+  lessFar:    { en: 'travelled less', ko: '쪽이 덜 움직였습니다' },
+  findings:   { en: 'What was found', ko: '측정 결과' },
+  clear:      { en: 'Nothing outside the reference range.', ko: '기준 범위를 벗어난 항목이 없습니다.' },
+  notMeasured:{ en: 'Not measured', ko: '측정하지 못함' },
+  score:      { en: 'Screening score', ko: '검사 점수' },
+  noScore:    { en: 'No score', ko: '점수 없음' },
+  source:     { en: 'Reference', ko: '기준 출처' },
+  functional: { en: 'a functional benchmark, not a clinical normal range',
+                ko: '임상 정상 범위가 아닌 기능 기준입니다' },
+  estimated:  { en: 'estimated', ko: '추정' },
+  history:    { en: 'Earlier screenings', ko: '이전 검사' },
+  change:     { en: 'Against the last one', ko: '이전 검사와 비교' },
+  offline:    { en: 'This copy of the site cannot measure a clip. It needs the analysis half of the project running behind it.',
+                ko: '이 사이트에서는 영상을 측정할 수 없습니다. 분석 서버가 함께 실행되어야 합니다.' },
+  loading:    { en: 'Fetching how to film this…', ko: '촬영 방법을 불러오는 중…' },
+};
+
+const say = (key, lang) => (T[key] ?? {})[lang] ?? (T[key] ?? {}).en ?? key;
+
+/* The severity colours the posture screen already uses. One vocabulary across
+   the product: a reader should not have to learn two. */
+const INK = {
+  marked: '#e0603f', notable: '#e8a33a', watch: '#d8c25e',
+  within_band: '#5fb98a', none: '#7d8ea4',
+};
+
+const STYLE = `
+#ss-mv-open{flex:none;align-self:flex-start;display:inline-flex;gap:9px;
+  align-items:center;padding:7px 15px;border-radius:4px;cursor:pointer;
+  font:inherit;font-size:11.5px;font-weight:500;letter-spacing:.11em;
+  text-transform:uppercase;white-space:nowrap;background:var(--glass);
+  border:1px solid var(--line2);color:var(--dim)}
+#ss-mv-open:hover{color:var(--txt);border-color:var(--acc)}
+#ss-mv-open i{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--acc)}
+#ss-mv, #ss-mv *{box-sizing:border-box;text-transform:none;letter-spacing:normal;
+  white-space:normal;max-height:none}
+#ss-mv{position:fixed;inset:0;z-index:130;overflow:auto;
+  background:linear-gradient(180deg,#070b12,#04070c);color:var(--txt)}
+#ss-mv .ss-sheet{max-width:1080px;margin:0 auto;padding:26px 22px 90px}
+#ss-mv h1{margin:0;font-size:21px;font-weight:500}
+#ss-mv h2{margin:0 0 12px;font-size:12px;font-weight:600;color:var(--dim);
+  letter-spacing:.08em;text-transform:uppercase}
+#ss-mv .ss-top{display:flex;gap:18px;align-items:flex-start;
+  justify-content:space-between;flex-wrap:wrap;margin:0 0 20px}
+#ss-mv .ss-lede{margin:6px 0 0;font-size:12.5px;color:var(--dim2);
+  line-height:1.75;max-width:62ch}
+#ss-mv .ss-acts{display:flex;gap:8px;flex-wrap:wrap}
+#ss-mv .ss-b{padding:8px 14px;border-radius:4px;font:inherit;font-size:12px;
+  cursor:pointer;background:var(--glass);border:1px solid var(--line2);
+  color:var(--dim)}
+#ss-mv .ss-b:hover{color:var(--txt);border-color:var(--acc)}
+#ss-mv .ss-card{border:1px solid var(--line);border-radius:8px;padding:18px;
+  background:rgba(255,255,255,.02);margin:0 0 16px}
+#ss-mv .ss-screens{display:grid;gap:10px;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+#ss-mv .ss-screens button{text-align:left;padding:13px 15px;border-radius:7px;
+  font:inherit;cursor:pointer;background:var(--glass);
+  border:1px solid var(--line2);color:var(--dim);line-height:1.6}
+#ss-mv .ss-screens button b{display:block;font-size:13px;font-weight:600;
+  color:var(--txt);margin:0 0 3px}
+#ss-mv .ss-screens button small{font-size:10.5px;color:var(--dim2)}
+#ss-mv .ss-screens button[aria-pressed=true]{border-color:var(--acc);
+  background:rgba(90,169,230,.12)}
+#ss-mv .ss-how{margin:0;font-size:12.5px;line-height:1.8;color:var(--txt)}
+#ss-mv .ss-row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;
+  margin:14px 0 0}
+#ss-mv label{display:block;font-size:11px;color:var(--dim);margin:0 0 5px}
+#ss-mv select, #ss-mv input[type=text], #ss-mv input[type=date]{
+  padding:8px 10px;border-radius:4px;font:inherit;font-size:12.5px;
+  background:#0a1017;border:1px solid var(--line2);color:var(--txt)}
+#ss-mv .ss-clips{display:grid;gap:12px;margin:14px 0 0;
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+#ss-mv .ss-clip{border:1px dashed var(--line2);border-radius:7px;padding:16px;
+  text-align:center;font-size:12px;color:var(--dim)}
+#ss-mv .ss-clip.ss-has{border-style:solid;border-color:var(--acc);
+  color:var(--txt)}
+#ss-mv .ss-clip b{display:block;font-size:12px;margin:0 0 8px;color:var(--dim)}
+#ss-mv .ss-clip button{margin:8px 4px 0;padding:6px 12px;border-radius:4px;
+  font:inherit;font-size:11.5px;cursor:pointer;background:var(--glass);
+  border:1px solid var(--line2);color:var(--dim)}
+#ss-mv .ss-clip input{display:none}
+#ss-mv .ss-go{margin:18px 0 0;padding:11px 22px;border-radius:5px;border:0;
+  font:inherit;font-size:13px;font-weight:600;cursor:pointer;
+  background:var(--acc);color:#04121f}
+#ss-mv .ss-go:disabled{opacity:.5;cursor:default}
+#ss-mv .ss-err{margin:12px 0 0;font-size:12px;color:${INK.marked};
+  line-height:1.7}
+#ss-mv .ss-log{margin:12px 0 0;font-size:11px;color:var(--dim2);
+  line-height:1.7;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+/* The bar: what was reached against what the reference says. Drawn rather than
+   written because the question is "how much of it" and a proportion is the one
+   thing a picture answers faster than a sentence. */
+#ss-mv .ss-bar{position:relative;height:10px;border-radius:5px;
+  background:rgba(255,255,255,.06);margin:9px 0 0;overflow:hidden}
+#ss-mv .ss-bar i{position:absolute;inset:0 auto 0 0;border-radius:5px;
+  display:block}
+#ss-mv .ss-side{margin:0 0 18px}
+#ss-mv .ss-side:last-child{margin-bottom:0}
+#ss-mv .ss-side h3{margin:0 0 4px;font-size:12.5px;font-weight:600;
+  color:var(--txt)}
+#ss-mv .ss-num{font-size:19px;font-weight:600;letter-spacing:-.01em}
+#ss-mv .ss-detail{margin:9px 0 0;font-size:11.5px;color:var(--dim2);
+  line-height:1.8}
+#ss-mv .ss-detail span{margin-right:14px;white-space:nowrap}
+#ss-mv .ss-note{margin:7px 0 0;font-size:11px;color:${INK.watch};
+  line-height:1.7}
+#ss-mv .ss-find{border-left:2px solid var(--line2);padding:2px 0 2px 13px;
+  margin:0 0 14px}
+#ss-mv .ss-find b{display:block;font-size:12.5px;font-weight:600;
+  margin:0 0 3px}
+#ss-mv .ss-find p{margin:0;font-size:11.5px;color:var(--dim2);line-height:1.7}
+#ss-mv .ss-grid{display:grid;gap:16px;
+  grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+#ss-mv .ss-disc{margin:26px 0 0;font-size:10.5px;color:var(--dim2);
+  line-height:1.8;max-width:76ch}
+#ss-mv[hidden]{display:none}
+@media print{
+  #ss-mv{position:static;background:#fff;color:#000}
+  #ss-mv .ss-acts,#ss-mv .ss-go,#ss-mv .ss-screens{display:none}
+}
+`;
+
+/* ------------------------------------------------------------------ mount */
+
+export function mount(nw, served, who) {
+  const identity = typeof who === 'function' ? who : () => who;
+  if (document.getElementById('ss-mv-open')) return null;
+  const style = document.createElement('style');
+  style.id = 'ss-mv-style';
+  style.textContent = STYLE;
+  document.head.appendChild(style);
+
+  const lang = () => nw?.app?.lang ?? 'en';
+  const open = document.createElement('button');
+  open.id = 'ss-mv-open';
+  open.type = 'button';
+  open.innerHTML = `<i></i><span>${esc(say('open', lang()))}</span>`;
+  open.addEventListener('click', () => screen(nw, served, identity()));
+
+  /* After the posture button: a studio assesses somebody standing, screens
+   * how they move, and then teaches the class. The header says so. */
+  const bar = document.getElementById('topbar');
+  const posture = document.getElementById('ss-pos-open');
+  const record = document.getElementById('ss-rec-open');
+  if (bar && record) bar.insertBefore(open, record);
+  else if (bar && posture) bar.insertBefore(open, posture.nextSibling);
+  else if (bar) bar.appendChild(open);
+  else document.body.appendChild(open);
+  return open;
+}
+
+function screen(nw, served, identity) {
+  document.getElementById('ss-mv')?.remove();
+  const host = document.createElement('div');
+  host.id = 'ss-mv';
+  document.body.appendChild(host);
+  const state = {
+    catalogue: CATALOGUE,
+    chosen: CATALOGUE[0]?.key ?? '',
+    view: '',
+    clips: new Map(),      // side -> File
+    busy: false,
+    progress: '',
+    error: '',
+    who: '',
+    taken: new Date().toISOString().slice(0, 10),
+    report: null,
+  };
+  const lang = () => nw?.app?.lang ?? 'en';
+  const shut = () => host.remove();
+  host.addEventListener('keydown', (e) => { if (e.key === 'Escape') shut(); });
+
+  const draw = () => {
+    host.innerHTML = state.report
+      ? reportHtml(state, lang())
+      : setupHtml(state, served, lang());
+    wire(host, state, nw, served, identity, draw, shut);
+  };
+  draw();
+  host.tabIndex = -1;
+  host.focus();
+  /* After the first paint rather than before it: the screen is useful with
+     the built-in list, and a page that waits on a request to draw anything is
+     a page that looks broken on a slow connection. */
+  loadCatalogue(state, draw);
+  return host;
+}
+
+/* The catalogue as this page knows it before the server answers. Enough to
+   draw the choice and the instruction; every number in a report still comes
+   from the measurement, never from here. */
+const CATALOGUE = [
+  { key: 'shoulder_abduction', sided: true, kind: 'range',
+    name: 'Shoulder abduction', name_ko: '어깨 벌림',
+    views: ['front', 'rear'] },
+  { key: 'shoulder_flexion', sided: true, kind: 'range',
+    name: 'Shoulder flexion', name_ko: '어깨 굽힘',
+    views: ['side_left', 'side_right'] },
+  { key: 'hip_flexion', sided: true, kind: 'range',
+    name: 'Hip flexion', name_ko: '엉덩관절 굽힘',
+    views: ['side_left', 'side_right'] },
+  { key: 'knee_flexion', sided: true, kind: 'range',
+    name: 'Knee flexion', name_ko: '무릎 굽힘',
+    views: ['side_left', 'side_right'] },
+  { key: 'squat_depth', sided: true, kind: 'range',
+    name: 'Squat depth', name_ko: '스쿼트 깊이',
+    views: ['side_left', 'side_right'] },
+  { key: 'single_leg_balance', sided: true, kind: 'hold',
+    name: 'Single-leg balance', name_ko: '한 발 서기 균형',
+    views: ['front', 'rear'] },
+];
+
+const VIEW_NAME = {
+  front: { en: 'front', ko: '정면' }, rear: { en: 'back', ko: '후면' },
+  side_left: { en: 'left side', ko: '좌측면' },
+  side_right: { en: 'right side', ko: '우측면' },
+};
+
+const SIDE_NAME = {
+  left: { en: 'Left', ko: '왼쪽' }, right: { en: 'Right', ko: '오른쪽' },
+  both: { en: 'Whole body', ko: '몸 전체' },
+};
+
+const named = (entry, lang) => (lang === 'ko' && entry?.name_ko) || entry?.name || '';
+
+export function screenOf(state) {
+  return state.catalogue.find((s) => s.key === state.chosen) ?? state.catalogue[0];
+}
+
+export function sidesOf(screenEntry) {
+  return screenEntry?.sided ? ['left', 'right'] : ['both'];
+}
+
+/* ------------------------------------------------------------------- setup */
+
+function setupHtml(state, served, lang) {
+  if (served && served.screening === false) {
+    return `<div class="ss-sheet">
+      <div class="ss-top"><div><h1>${esc(say('title', lang))}</h1></div>
+        <div class="ss-acts">
+          <button type="button" class="ss-b" data-close>${esc(say('close', lang))}</button>
+        </div></div>
+      <div class="ss-card"><p class="ss-how">${esc(say('offline', lang))}</p></div>
+    </div>`;
+  }
+
+  const entry = screenOf(state);
+  const sides = sidesOf(entry);
+  const chips = state.catalogue.map((s) => `<button type="button"
+    data-screen="${esc(s.key)}" aria-pressed="${s.key === state.chosen}">
+    <b>${esc(named(s, lang))}</b>
+    <small>${esc(s.views.map((v) => VIEW_NAME[v]?.[lang] ?? v).join(' / '))}</small>
+  </button>`).join('');
+
+  const views = entry.views.map((v) => `<option value="${esc(v)}"
+    ${state.view === v ? 'selected' : ''}>${esc(VIEW_NAME[v]?.[lang] ?? v)}</option>`).join('');
+
+  const clips = sides.map((side) => {
+    const file = state.clips.get(side);
+    const label = side === 'both' ? say('whole', lang) : say(side, lang);
+    return `<div class="ss-clip ${file ? 'ss-has' : ''}">
+      <b>${esc(label)}</b>
+      <div>${file ? esc(file.name.slice(0, 40)) : '—'}</div>
+      <input type="file" accept="video/*" data-file="${esc(side)}">
+      <button type="button" data-pick="${esc(side)}">${esc(say('choose', lang))}</button>
+      ${file ? `<button type="button" data-drop="${esc(side)}">${
+        esc(say('drop', lang))}</button>` : ''}
+    </div>`;
+  }).join('');
+
+  return `<div class="ss-sheet">
+    <div class="ss-top">
+      <div><h1>${esc(say('title', lang))}</h1>
+        <p class="ss-lede">${esc(say('lede', lang))}</p></div>
+      <div class="ss-acts">
+        <button type="button" class="ss-b" data-lang>${esc(say('other', lang))}</button>
+        <button type="button" class="ss-b" data-close>${esc(say('close', lang))}</button>
+      </div>
+    </div>
+    <div class="ss-card">
+      <h2>${esc(say('pick', lang))}</h2>
+      <div class="ss-screens">${chips}</div>
+    </div>
+    <div class="ss-card">
+      <h2>${esc(say('how', lang))}</h2>
+      <p class="ss-how" data-how>${esc(howOf(state, lang))}</p>
+      <div class="ss-row">
+        <div><label for="ss-mv-view">${esc(say('view', lang))}</label>
+          <select id="ss-mv-view" data-view>
+            <option value="">${esc(say('noView', lang))}</option>${views}
+          </select></div>
+        <div><label for="ss-mv-who">${esc(say('who', lang))}</label>
+          <input id="ss-mv-who" type="text" data-who value="${esc(state.who)}"></div>
+        <div><label for="ss-mv-on">${esc(say('taken', lang))}</label>
+          <input id="ss-mv-on" type="date" data-taken value="${esc(state.taken)}"></div>
+      </div>
+      <p class="ss-detail">${esc(say('viewWhy', lang))}</p>
+      <div class="ss-clips">${clips}</div>
+      <button type="button" class="ss-go" data-run ${state.busy ? 'disabled' : ''}>${
+        esc(state.busy ? say('working', lang) : say('run', lang))}</button>
+      ${state.progress ? `<p class="ss-log">${esc(state.progress)}</p>` : ''}
+      ${state.error ? `<p class="ss-err">${esc(state.error)}</p>` : ''}
+    </div>
+  </div>`;
+}
+
+/* ------------------------------------------------------------------ report */
+
+const fmt = (metric, unit) => {
+  if (!metric || metric.value === null || metric.value === undefined) return '—';
+  if (unit === 's') return `${metric.value.toFixed(1)}s`;
+  if (unit === 'ratio') return metric.value.toFixed(2);
+  return `${Math.round(metric.value)}°`;
+};
+
+export function barHtml(reached, ceiling, ink) {
+  const share = ceiling > 0
+    ? Math.max(0, Math.min(1, reached / ceiling)) : 0;
+  return `<div class="ss-bar"><i style="width:${(share * 100).toFixed(1)}%;
+    background:${ink}"></i></div>`;
+}
+
+export function sideHtml(result, side, screenPayload, lang) {
+  const entry = screenPayload;
+  const unit = entry.unit;
+  const label = SIDE_NAME[side]?.[lang] ?? side;
+  if (!result) return '';
+  if (result.peak?.value === null || result.peak?.value === undefined) {
+    return `<div class="ss-side"><h3>${esc(label)}</h3>
+      <p class="ss-detail" style="color:${INK.none}">${
+        esc(say('notMeasured', lang))} — ${esc(result.peak?.reason ?? '')}</p></div>`;
+  }
+  const ceiling = entry.reference?.[1] ?? 0;
+  const shortfall = result.shortfall?.value ?? 0;
+  const ink = shortfall <= 0 ? INK.within_band
+    : (shortfall > ceiling * 0.2 ? INK.marked
+      : (shortfall > ceiling * 0.1 ? INK.notable : INK.watch));
+  const estimated = result.peak?.availability === 'estimated'
+    ? ` <span style="color:${INK.watch}">(${esc(say('estimated', lang))})</span>` : '';
+  const bits = [];
+  if (result.repetitions) {
+    bits.push(`<span>${result.repetitions} ${esc(say('reps', lang))}</span>`);
+  }
+  if (result.consistency?.value !== null && result.consistency?.value !== undefined) {
+    bits.push(`<span>${esc(say('spread', lang))} ${
+      fmt(result.consistency, unit)}</span>`);
+  }
+  if (result.tempo?.value !== null && result.tempo?.value !== undefined) {
+    bits.push(`<span>${fmt(result.tempo, 's')} ${esc(say('tempo', lang))}</span>`);
+  }
+  if (result.tempo_ratio?.value !== null && result.tempo_ratio?.value !== undefined) {
+    bits.push(`<span>${esc(say('ratio', lang))} ${
+      fmt(result.tempo_ratio, 'ratio')}</span>`);
+  }
+  if (result.held?.value !== null && result.held?.value !== undefined) {
+    bits.push(`<span>${esc(say('held', lang))} ${fmt(result.held, 's')}</span>`);
+  }
+  if (result.sway?.value !== null && result.sway?.value !== undefined) {
+    bits.push(`<span>${esc(say('sway', lang))} ${
+      (result.sway.value * 100).toFixed(1)}% ${esc(say('ofBody', lang))}</span>`);
+  }
+  const summary = shortfall <= 0
+    ? esc(say('atRange', lang))
+    : `${Math.round(shortfall)}° ${esc(say('short', lang))}`;
+  return `<div class="ss-side">
+    <h3>${esc(label)}${estimated}</h3>
+    <div><span class="ss-num" style="color:${ink}">${fmt(result.peak, unit)}</span>
+      <span class="ss-detail" style="margin-left:8px">${esc(say('reference', lang))} ${
+        unit === 's' ? `${ceiling}s` : `${ceiling}°`} · ${summary}</span></div>
+    ${barHtml(result.peak.value, ceiling, ink)}
+    ${bits.length ? `<div class="ss-detail">${bits.join('')}</div>` : ''}
+    ${(result.notes ?? []).map((n) => `<p class="ss-note">${esc(n)}</p>`).join('')}
+  </div>`;
+}
+
+export function asymmetryHtml(payload, lang) {
+  const gap = payload.asymmetry ?? {};
+  if (gap.value === null || gap.value === undefined) {
+    return gap.reason
+      ? `<p class="ss-detail">${esc(gap.reason)}</p>` : '';
+  }
+  const shorter = payload.shorter_side;
+  const unit = payload.unit === 's' ? 's' : '°';
+  const ink = shorter ? INK.notable : INK.within_band;
+  const sentence = shorter
+    ? (lang === 'ko'
+      ? `${SIDE_NAME[shorter].ko}${say('lessFar', 'ko')}`
+      : `the ${SIDE_NAME[shorter].en.toLowerCase()} side ${say('lessFar', 'en')}`)
+    : say('even', lang);
+  return `<div style="margin-top:4px">
+    <span class="ss-num" style="color:${ink}">${Math.round(gap.value)}${unit}</span>
+    <span class="ss-detail" style="margin-left:8px">${esc(sentence)}</span>
+  </div>`;
+}
+
+export function findingsHtml(report, lang) {
+  const found = report.findings ?? [];
+  if (!found.length) {
+    return `<p class="ss-detail" style="color:${INK.within_band}">${
+      esc(say('clear', lang))}</p>`;
+  }
+  return found.map((f) => `<div class="ss-find"
+    style="border-left-color:${INK[f.severity] ?? INK.none}">
+    <b style="color:${INK[f.severity] ?? INK.none}">${
+      esc(lang === 'ko' ? f.title_ko : f.title)}</b>
+    <p>${esc(lang === 'ko' ? f.measurement_ko : f.measurement)}</p>
+  </div>`).join('');
+}
+
+function reportHtml(state, lang) {
+  const report = state.report;
+  const blocks = (report.attempted ?? []).map((key) => {
+    const payload = report.results[key];
+    const entry = (report.catalogue_detail ?? []).find((s) => s.key === key)
+      ?? { unit: payload.unit, reference: payload.reference };
+    const merged = { ...entry, ...payload };
+    const sides = ['left', 'right', 'both']
+      .map((side) => sideHtml(payload[side], side, merged, lang)).join('');
+    const source = lang === 'ko' && payload.reference_kind === 'functional'
+      ? `${payload.reference_source} — ${say('functional', 'ko')}`
+      : payload.reference_source;
+    return `<div class="ss-card">
+      <h2>${esc(lang === 'ko' ? payload.name_ko : payload.name)}</h2>
+      ${sides}
+      ${payload.left && payload.right ? `<div style="margin-top:16px">
+        <h2 style="margin-bottom:6px">${esc(say('sides', lang))}</h2>
+        ${asymmetryHtml(payload, lang)}</div>` : ''}
+      <p class="ss-detail" style="margin-top:16px">${esc(say('source', lang))}: ${
+        esc(source)}</p>
+    </div>`;
+  }).join('');
+
+  const score = report.overall_score;
+  const scoreCard = `<div class="ss-card">
+    <h2>${esc(say('score', lang))}</h2>
+    ${score === null || score === undefined
+      ? `<p class="ss-detail">${esc(say('noScore', lang))} — ${
+        esc(report.score_withheld_reason ?? '')}</p>`
+      : `<div><span class="ss-num" style="font-size:32px">${Math.round(score)}</span>
+         <span class="ss-detail" style="margin-left:8px">/ 100 · ${
+           report.checks} checks</span></div>`}
+  </div>`;
+
+  const refused = (report.refused ?? []).map((r) => `<p class="ss-detail">
+    <b>${esc(r.screen)}${r.side ? ` (${esc(r.side)})` : ''}</b> — ${esc(r.reason)}
+  </p>`).join('');
+
+  return `<div class="ss-sheet">
+    <div class="ss-top">
+      <div><h1>${esc(say('title', lang))}</h1>
+        <p class="ss-lede" style="margin-bottom:0">${esc(state.taken)}${
+          state.who ? ` · ${esc(state.who)}` : ''}</p></div>
+      <div class="ss-acts">
+        <button type="button" class="ss-b" data-lang>${esc(say('other', lang))}</button>
+        <button type="button" class="ss-b" data-again>${esc(say('again', lang))}</button>
+        <button type="button" class="ss-b" data-print>${esc(say('print', lang))}</button>
+        <button type="button" class="ss-b" data-close>${esc(say('close', lang))}</button>
+      </div>
+    </div>
+    <div class="ss-grid">
+      <div>${blocks}</div>
+      <div>
+        ${scoreCard}
+        <div class="ss-card">
+          <h2>${esc(say('findings', lang))}</h2>
+          ${findingsHtml(report, lang)}
+        </div>
+        ${refused ? `<div class="ss-card">
+          <h2>${esc(say('notMeasured', lang))}</h2>${refused}</div>` : ''}
+      </div>
+    </div>
+    <p class="ss-disc">${esc(lang === 'ko' ? report.disclaimer_ko
+                                           : report.disclaimer)}</p>
+  </div>`;
+}
+
+/* ---------------------------------------------------------------- behaviour */
+
+function wire(host, state, nw, served, identity, draw, shut) {
+  host.querySelector('[data-close]')?.addEventListener('click', shut);
+  host.querySelector('[data-print]')?.addEventListener('click', () => print());
+  host.querySelector('[data-again]')?.addEventListener('click', () => {
+    state.report = null;
+    state.error = '';
+    state.progress = '';
+    draw();
+  });
+  host.querySelector('[data-lang]')?.addEventListener('click', () => {
+    const next = (nw?.app?.lang ?? 'en') === 'en' ? 'ko' : 'en';
+    nw?.setLang?.(next);
+    draw();
+  });
+
+  for (const chip of host.querySelectorAll('[data-screen]')) {
+    chip.addEventListener('click', () => {
+      if (chip.dataset.screen === state.chosen) return;
+      state.chosen = chip.dataset.screen;
+      /* The clips go with the screen. A left-side shoulder raise is not a
+       * left-side knee bend, and carrying the file across would measure the
+       * wrong movement against the right reference and look plausible. */
+      state.clips.clear();
+      state.view = '';
+      state.error = '';
+      draw();
+    });
+  }
+  host.querySelector('[data-view]')?.addEventListener('change', (e) => {
+    state.view = e.target.value;
+  });
+  host.querySelector('[data-who]')?.addEventListener('input', (e) => {
+    state.who = e.target.value.trim();
+  });
+  host.querySelector('[data-taken]')?.addEventListener('change', (e) => {
+    state.taken = e.target.value;
+  });
+  for (const button of host.querySelectorAll('[data-pick]')) {
+    button.addEventListener('click', () => {
+      host.querySelector(`[data-file="${button.dataset.pick}"]`)?.click();
+    });
+  }
+  for (const input of host.querySelectorAll('[data-file]')) {
+    input.addEventListener('change', () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      state.clips.set(input.dataset.file, file);
+      state.error = '';
+      draw();
+    });
+  }
+  for (const button of host.querySelectorAll('[data-drop]')) {
+    button.addEventListener('click', () => {
+      state.clips.delete(button.dataset.drop);
+      draw();
+    });
+  }
+  host.querySelector('[data-run]')?.addEventListener('click',
+    () => run(state, draw, identity, nw?.app?.lang ?? 'en'));
+}
+
+/**
+ * Replace the built-in catalogue with the server's own.
+ *
+ * The list below is enough to draw the choice before the server answers, so
+ * the screen is never blank -- but the instructions, the reference ranges and
+ * the sources are the measurement layer's, and a page that kept its own copy
+ * would eventually be telling a studio to film something the server no longer
+ * measures that way.
+ */
+let FETCHED = null;   // the server's catalogue, kept for the next open
+
+async function loadCatalogue(state, draw) {
+  if (FETCHED) { state.catalogue = FETCHED; draw(); return; }
+  try {
+    const response = await fetch('screens');
+    if (!response.ok) return;
+    const body = await response.json();
+    if (Array.isArray(body.screens) && body.screens.length) {
+      FETCHED = body.screens;
+      state.catalogue = FETCHED;
+      if (!state.catalogue.some((s) => s.key === state.chosen)) {
+        state.chosen = state.catalogue[0].key;
+      }
+      draw();
+    }
+  } catch {
+    /* The built-in list stands. A studio with no connection can still read
+       what the screens are; it just cannot measure one. */
+  }
+}
+
+/**
+ * How to film the chosen screen.
+ *
+ * Deliberately absent from the built-in list above, which carries only the
+ * names and the camera angles needed to draw the choice. The instruction is a
+ * sentence a student is read aloud, it appears in a printed report and in the
+ * terminal as well as here, and a copy of it in this file is a copy that
+ * stops matching the day somebody rewords the other two.
+ */
+function howOf(state, lang) {
+  const entry = screenOf(state);
+  const text = (lang === 'ko' && entry?.instruction_ko) || entry?.instruction;
+  return text || say('loading', lang);
+}
+
+/**
+ * Upload one clip, wait for the landmarks, and hand back the longest track.
+ *
+ * The longest rather than the first: a reflection in the studio mirror, or the
+ * same student picked up under a second identity after walking behind a
+ * reformer, both produce extra tracks. The student is the one who was there
+ * the whole time.
+ */
+export async function extract(file, onProgress) {
+  const response = await fetch('landmarks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream',
+               'X-Filename': file.name || 'clip.mp4' },
+    body: file,
+  });
+  const started = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(started.error || `${response.status} ${response.statusText}`);
+  }
+  let job = started;
+  while (job.state === 'queued' || job.state === 'running') {
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    const poll = await fetch(`job/${job.id}`);
+    if (!poll.ok) throw new Error(`${poll.status} ${poll.statusText}`);
+    job = await poll.json();
+    onProgress?.(job.lines?.[job.lines.length - 1] ?? '');
+  }
+  if (job.state !== 'done') {
+    throw new Error(job.error || 'the clip could not be measured');
+  }
+  return longestTrack(job.landmarks);
+}
+
+export function longestTrack(landmarks) {
+  const tracks = landmarks?.tracks ?? [];
+  if (!tracks.length) throw new Error('nobody was tracked in that clip');
+  const best = tracks.reduce((a, b) => (b.samples > a.samples ? b : a));
+  return { times: best.times, frames: best.frames };
+}
+
+async function run(state, draw, identity, lang = 'en') {
+  const entry = screenOf(state);
+  const sides = sidesOf(entry);
+  if (![...state.clips.values()].length) {
+    state.error = say('need', lang);
+    draw();
+    return;
+  }
+  state.busy = true;
+  state.error = '';
+  state.progress = say('reading', lang);
+  draw();
+
+  try {
+    const clip = { };
+    if (state.view) clip.view = state.view;
+    for (const side of sides) {
+      const file = state.clips.get(side);
+      if (!file) continue;
+      const where = SIDE_NAME[side]?.[lang] ?? side;
+      state.progress = `${where}: ${say('reading', lang)}`;
+      draw();
+      clip[side] = await extract(file, (line) => {
+        state.progress = `${where}: ${line}`;
+        draw();
+      });
+    }
+    const response = await fetch('movement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clips: { [entry.key]: clip },
+        taken_on: state.taken,
+        ...(state.who ? { username: state.who } : {}),
+      }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      state.error = body.error || `${response.status} ${response.statusText}`;
+    } else {
+      state.report = body;
+      state.progress = '';
+    }
+  } catch (error) {
+    state.error = String(error?.message ?? error);
+  } finally {
+    state.busy = false;
+    draw();
+  }
+  void identity;
+}
+
+export const _internals = { setupHtml, reportHtml, sideHtml, asymmetryHtml,
+                            findingsHtml, barHtml, longestTrack, screenOf,
+                            sidesOf, howOf, INK, CHIP: T, CATALOGUE };

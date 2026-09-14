@@ -30,6 +30,7 @@ import { Session } from './session.js';
 import { attachLab, showReading } from './lab.js';
 import { capabilities, mount as mountRecorder } from './record.js';
 import { mount as mountPosture } from './posture.js';
+import { mount as mountMovement } from './movement.js';
 import { mount as mountCoach } from './coach.js';
 import { mount as mountRecordings } from './recordings.js';
 import { chip, gate, whoami } from './account.js';
@@ -408,6 +409,10 @@ async function boot() {
    * in that order -- and "where do I see my posture analysis" gets an answer
    * on the empty page, which is the page somebody sees first. */
   mountPosture(nw, served, () => identity);
+  /* And the one between the two. Standing still is one question and
+   * how far a joint goes is another, and a studio asks them in that
+   * order at the door, so the buttons sit in that order too. */
+  mountMovement(nw, served, () => identity);
   /* And a way back into what has already been measured. Without it a finished
    * analysis could only ever appear in the dialog that was watching the job,
    * and closing that dialog lost the result with nowhere to recover it. */

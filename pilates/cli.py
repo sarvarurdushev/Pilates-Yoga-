@@ -769,6 +769,262 @@ def cmd_intake(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_landmarks(args: argparse.Namespace) -> int:
+    """Turn a clip into landmarks and write them out. The video is not kept.
+
+    The boundary this whole project is built on, as a command. A screening
+    needs two clips measured together -- one per side -- and a server that
+    held footage between them would be storing video of somebody's body for
+    as long as it took them to turn around. So the clip becomes numbers here,
+    the numbers are what travels, and the file it came from is the caller's to
+    delete.
+
+    Every track is written, not just the longest. Which one is the student is
+    a judgement, and a command that quietly made it would throw away the
+    evidence that it was wrong.
+    """
+    import json
+
+    config = _load_config(args.config)
+    if args.stride is not None:
+        config.frame_stride = args.stride
+
+    tracks: dict[int, dict] = {}
+    frames = 0
+    with VideoSource(args.video, stride=config.frame_stride,
+                     start_frame=args.start, end_frame=args.end) as source:
+        for result in Pipeline(config).run(source):
+            frames += 1
+            for person in result.people:
+                track = tracks.setdefault(
+                    person.track_id, {"times": [], "frames": []})
+                track["times"].append(round(result.timestamp, 4))
+                track["frames"].append({
+                    "keypoints": person.detection.keypoints.round(2).tolist(),
+                    "scores": person.detection.scores.round(3).tolist()})
+
+    if not tracks:
+        print("Nobody was tracked in that clip.", file=sys.stderr)
+        return 1
+
+    payload = {
+        "frames": frames,
+        "threshold": config.keypoint_threshold,
+        "tracks": [{"track_id": tid, "samples": len(t["times"]), **t}
+                   for tid, t in sorted(tracks.items())],
+    }
+    if args.out:
+        Path(args.out).write_text(json.dumps(payload))
+        longest = max(payload["tracks"], key=lambda t: t["samples"])
+        print(f"{len(tracks)} track(s) over {frames} frame(s); the longest is "
+              f"#{longest['track_id']} with {longest['samples']} samples")
+        print(f"written to {args.out}")
+    else:
+        print(json.dumps(payload))
+    return 0
+
+
+def cmd_screens(args: argparse.Namespace) -> int:
+    """Print the screening catalogue: what to film, and what it is compared to."""
+    from . import screening as sc
+
+    lang = args.lang
+    # This listing is what a studio reads to learn what to film, so its
+    # scaffolding is translated too rather than leaving Korean names inside
+    # English sentences -- which is the half-translated register that makes a
+    # reader stop trusting both halves.
+    words = {
+        "en": {"each": "each side", "whole": "whole body",
+               "from": "filmed from", "ref": "reference", "src": "source",
+               "clinical": "clinical", "functional": "functional benchmark"},
+        "ko": {"each": "좌우 각각", "whole": "몸 전체",
+               "from": "촬영 방향", "ref": "기준", "src": "출처",
+               "clinical": "임상 표준", "functional": "기능 기준"},
+    }[lang if lang in ("en", "ko") else "en"]
+    views_ko = {"front": "정면", "rear": "후면",
+                "side_left": "좌측면", "side_right": "우측면"}
+    print()
+    for screen in sc.SCREENS.values():
+        low, high = screen.reference
+        unit = "도" if (lang == "ko" and screen.unit == "deg") else (
+            "초" if (lang == "ko" and screen.unit == "s") else screen.unit)
+        sides = words["each"] if screen.sided else words["whole"]
+        where = " / ".join(
+            views_ko.get(v.value, v.value) if lang == "ko"
+            else v.value.replace("_", " ") for v in screen.views)
+        print(f"  {screen.key}")
+        print(f"      {screen.named(lang)} — {sides}, {words['from']}: {where}")
+        print(f"      {screen.how(lang)}")
+        print(f"      {words['ref']} {low:.0f}–{high:.0f} {unit} "
+              f"({words[screen.reference_kind]})")
+        print(f"      {words['src']}: {screen.reference_source}")
+        print()
+    print(f"  {sc.DISCLAIMER_KO if lang == 'ko' else sc.DISCLAIMER}\n")
+    return 0
+
+
+def _subject_history(video: str, config) -> "object | None":
+    """The most-tracked person in one clip, as a movement history.
+
+    A screening clip has one person in it, but a pipeline does not know that:
+    a reflection, somebody walking past the door, or the same person picked up
+    under a second identity after an occlusion all produce extra tracks. The
+    longest one is the student, and taking it is more honest than averaging
+    across whatever the tracker issued.
+    """
+    from . import movement as mv
+
+    histories: dict[int, mv.TrackHistory] = {}
+    with VideoSource(video, stride=config.frame_stride) as source:
+        for result in Pipeline(config).run(source):
+            for person in result.people:
+                history = histories.setdefault(
+                    person.track_id, mv.TrackHistory(track_id=person.track_id))
+                history.add(result.timestamp, person.detection,
+                            config.keypoint_threshold)
+    if not histories:
+        return None
+    return max(histories.values(), key=lambda h: len(h.samples))
+
+
+def cmd_movement(args: argparse.Namespace) -> int:
+    """One movement screen, measured from a clip per side.
+
+    The counterpart to ``pilates intake``: that one measures a body standing
+    still, this one measures how far it goes. Separate clips per side because
+    a studio films them separately -- "lift the left knee three times" is one
+    recording -- and asking for both in one take is asking for a clip nobody
+    will get right.
+    """
+    from . import alignment as al
+    from . import screening as sc
+
+    screen = sc.SCREENS.get(args.screen)
+    if screen is None:
+        print(f"No such screen: {args.screen}. The catalogue is "
+              f"{', '.join(sc.SCREENS)} — run `pilates screens` to see it.",
+              file=sys.stderr)
+        return 2
+
+    supplied = ({"left": args.left, "right": args.right} if screen.sided
+                else {"both": args.clip})
+    given = {side: path for side, path in supplied.items() if path}
+    if not given:
+        wanted = "--left and --right" if screen.sided else "--clip"
+        print(f"{screen.key} needs {wanted}.", file=sys.stderr)
+        return 2
+    for path in given.values():
+        if not Path(path).exists():
+            print(f"No such file: {path}", file=sys.stderr)
+            return 2
+
+    view = None
+    if args.view:
+        try:
+            view = al.View(args.view)
+        except ValueError:
+            print(f"Unknown view {args.view!r}; use one of "
+                  f"{', '.join(v.value for v in al.View if v is not al.View.UNKNOWN)}.",
+                  file=sys.stderr)
+            return 2
+
+    config = _load_config(None)
+    histories = {}
+    for side, path in given.items():
+        history = _subject_history(path, config)
+        if history is None:
+            print(f"Nobody was tracked in {path}.", file=sys.stderr)
+            return 1
+        histories[side] = history
+
+    result = sc.measure(histories, screen, view=view)
+    assessment = sc.ScreeningAssessment(
+        results={screen.key: result}, person_id=args.name,
+        taken_on=args.date, views={screen.key: view} if view else {})
+    lang = args.lang
+
+    print(f"\n{args.name or 'movement screening'}"
+          + (f" — {args.date}" if args.date else ""))
+    low, high = screen.reference
+    unit = "°" if screen.unit == "deg" else f" {screen.unit}"
+    print(f"  {screen.named(lang)} — reference {high:.0f}{unit} "
+          f"({screen.reference_kind}; {screen.reference_source})")
+    if view is None:
+        print("  no camera angle given: the numbers below are estimates, not "
+              "measurements against that reference")
+
+    for side in result.sides:
+        label = side.side or "both"
+        if not side.measured:
+            print(f"\n  {label}: not measured — {side.peak.reason}")
+            continue
+        print(f"\n  {label}: reached {side.peak.value:.0f}{unit}, "
+              f"{side.shortfall.value:.0f}{unit} short")
+        if side.repetitions:
+            spread = ("" if side.consistency is None
+                      else f", spread {side.consistency.value:.0f}{unit}")
+            print(f"      {side.repetitions} repetition(s){spread}")
+        if side.tempo is not None:
+            print(f"      {side.tempo.value:.1f}s per repetition"
+                  + (f", return/out {side.tempo_ratio.value:.2f}"
+                     if side.tempo_ratio is not None else ""))
+        if side.held is not None:
+            print(f"      held {side.held.value:.1f}s")
+        if side.sway is not None and side.sway.measured:
+            print(f"      drifted {side.sway.value * 100:.1f}% of body height")
+        for note in side.notes:
+            print(f"      note: {note}")
+
+    gap = result.difference
+    if gap.measured:
+        shorter = result.shorter_side
+        print(f"\n  left against right: {gap.value:.0f}{unit}"
+              + (f", the {shorter} side travelling less" if shorter
+                 else ", which is within the measurement itself"))
+
+    found = assessment.findings()
+    for finding in found:
+        print(f"\n  [{finding.severity}] {finding.title(lang)}")
+        print(f"      {finding.measurement(lang)}")
+    if not found and any(s.measured for s in result.sides):
+        print("\n  nothing outside the reference range")
+
+    score = assessment.score()
+    if score.value is None:
+        print(f"\n  no score: {score.withheld_reason}")
+    else:
+        print(f"\n  {score.value:.0f}/100 from {score.checks} checks")
+
+    if args.db and args.name:
+        from datetime import datetime, timezone
+
+        from .store import Store
+
+        payload = assessment.to_dict()
+        with Store.open(args.db) as store:
+            row = store.record_screening(
+                username=args.name, by="cli",
+                taken_on=args.date or datetime.now(timezone.utc).date().isoformat(),
+                made_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                screens=",".join(assessment.attempted),
+                score=payload["overall_score"], coverage=payload["coverage"],
+                checks=payload["checks"], results=payload["results"],
+                views={k: v.value for k, v in assessment.views.items()},
+                findings=payload["findings"], doubts=payload["doubts"])
+            print(f"\n  filed as screening {row} in {args.db}")
+
+    if args.as_json:
+        import json
+
+        payload = assessment.to_dict()
+        payload["disclaimer"] = sc.DISCLAIMER
+        payload["disclaimer_ko"] = sc.DISCLAIMER_KO
+        Path(args.as_json).write_text(json.dumps(payload))
+
+    print(f"\n  {sc.DISCLAIMER_KO if lang == 'ko' else sc.DISCLAIMER}\n")
+    return 0
+
+
 def cmd_posture(args: argparse.Namespace) -> int:
     """Measure standing alignment, per person, from a clip or a single frame.
 
@@ -2780,6 +3036,52 @@ def main(argv: list[str] | None = None) -> int:
                           "the report carries the skeleton alone, which is "
                           "what a stored report should keep")
     ik_.set_defaults(func=cmd_intake)
+
+    mvs = sub.add_parser(
+        "movement",
+        help="the movement screening: how far the joints actually go")
+    mvs.add_argument("--screen", required=True,
+                     help="which screen; run --list to see the catalogue")
+    mvs.add_argument("--left", default=None,
+                     help="the clip of the left side")
+    mvs.add_argument("--right", default=None,
+                     help="the clip of the right side")
+    mvs.add_argument("--clip", default=None,
+                     help="the clip, for a screen that has no sides")
+    mvs.add_argument("--view", default="",
+                     help="which way the camera was pointed: front, rear, "
+                          "side_left or side_right. Without it the numbers "
+                          "come back estimated rather than measured")
+    mvs.add_argument("--name", default="", help="whose screening this is")
+    mvs.add_argument("--date", default="",
+                     help="the day it was filmed, YYYY-MM-DD")
+    mvs.add_argument("--model", default="m", choices=("s", "m", "l"),
+                     help="RTMO size; m is the default the pipeline uses")
+    mvs.add_argument("--lang", default="en", choices=("en", "ko"))
+    mvs.add_argument("--db", default=None,
+                     help="file the screening in this studio record, so a "
+                          "later one can be compared with it; needs --name")
+    mvs.add_argument("--json", dest="as_json", default=None,
+                     help="also write the whole measurement here, for a "
+                          "program rather than a person")
+    mvs.set_defaults(func=cmd_movement)
+
+    lm = sub.add_parser(
+        "landmarks",
+        help="turn a clip into landmarks; the video itself is not kept")
+    lm.add_argument("video")
+    lm.add_argument("--out", default=None,
+                    help="write here as JSON; without it, to standard output")
+    lm.add_argument("--config", default=None)
+    lm.add_argument("--stride", type=int, default=None)
+    lm.add_argument("--start", type=int, default=None)
+    lm.add_argument("--end", type=int, default=None)
+    lm.set_defaults(func=cmd_landmarks)
+
+    mvl = sub.add_parser(
+        "screens", help="the movement screening catalogue and how to film it")
+    mvl.add_argument("--lang", default="en", choices=("en", "ko"))
+    mvl.set_defaults(func=cmd_screens)
 
     ld = sub.add_parser("load", help="joint load and the muscle group carrying it")
     ld.add_argument("video")

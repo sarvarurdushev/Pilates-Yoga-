@@ -973,3 +973,158 @@ class TestBridgeCommand:
         path.write_text('{"exercises": []}')
         assert main(["bridge", str(path)]) == 1
         assert "export_neuro_wellness" in capsys.readouterr().err
+
+
+# --------------------------------------------------------------------------
+# The movement screening commands.
+#
+# The pipeline is scripted, as everywhere else in this file, so what is under
+# test is the command: that it names the screen it was asked for, refuses one
+# it does not know, says what could not be measured rather than printing a
+# number, and reads in both languages.
+
+def _screening_frames(peak=150.0, joint="shoulder", side="left", n=121):
+    """A clip of one joint travelling from 0 to ``peak`` and back, three times."""
+    import math
+    import sys
+    from pathlib import Path as _Path
+    sys.path.insert(0, str(_Path(__file__).parent))
+    from test_screening import body
+
+    out = []
+    for i in range(n):
+        phase = (1.0 - math.cos(2 * math.pi * i / 40)) / 2.0
+        person = TrackedPerson(track_id=1,
+                               detection=body(**{f"{side}_{joint}": peak * phase}))
+        out.append(FrameResult(frame_index=i, timestamp=i / 30.0,
+                               people=[person]))
+    return out
+
+
+class TestTheScreeningCatalogue:
+    def test_it_lists_every_screen_with_the_instruction(self, capsys):
+        from pilates import screening as sc
+        assert main(["screens"]) == 0
+        out = capsys.readouterr().out
+        for key in sc.SCREENS:
+            assert key in out
+
+    def test_every_reference_is_printed_with_its_source(self, capsys):
+        """A number in a report with no attribution is a number somebody will
+        eventually have to defend and cannot."""
+        assert main(["screens"]) == 0
+        out = capsys.readouterr().out
+        assert out.count("source:") == 6
+        assert "Norkin & White" in out
+
+    def test_a_functional_benchmark_is_not_printed_as_a_clinical_one(self, capsys):
+        main(["screens"])
+        out = capsys.readouterr().out
+        assert "functional benchmark" in out
+
+    def test_it_reads_in_korean(self, capsys):
+        assert main(["screens", "--lang", "ko"]) == 0
+        out = capsys.readouterr().out
+        assert "어깨 굽힘" in out and "기준" in out and "출처" in out
+        assert "each side" not in out, "no English scaffolding around it"
+
+    def test_the_disclaimer_is_printed_in_both_languages(self, capsys):
+        main(["screens"])
+        assert "goniometer" in capsys.readouterr().out
+        main(["screens", "--lang", "ko"])
+        assert "각도계" in capsys.readouterr().out
+
+
+class TestTheScreeningCommand:
+    def test_it_measures_a_range_from_a_clip(self, monkeypatch, capsys, tmp_path):
+        clip = tmp_path / "left.mov"
+        clip.write_bytes(b"")
+        right = tmp_path / "right.mov"
+        right.write_bytes(b"")
+        install(monkeypatch, _screening_frames(peak=150.0))
+        assert main(["movement", "--screen", "shoulder_flexion",
+                     "--left", str(clip), "--right", str(right),
+                     "--view", "side_left"]) == 0
+        out = capsys.readouterr().out
+        assert "Shoulder flexion" in out
+        assert "reference 180" in out
+        assert "reached 1" in out and "short" in out
+
+    def test_a_screen_it_has_never_heard_of(self, capsys):
+        assert main(["movement", "--screen", "backflip", "--left", "x"]) == 2
+        assert "No such screen" in capsys.readouterr().err
+
+    def test_a_sided_screen_asks_for_both_sides(self, capsys):
+        assert main(["movement", "--screen", "shoulder_flexion"]) == 2
+        assert "--left and --right" in capsys.readouterr().err
+
+    def test_a_clip_that_is_not_there(self, capsys):
+        assert main(["movement", "--screen", "shoulder_flexion",
+                     "--left", "/nope.mov", "--right", "/nope.mov"]) == 2
+        assert "No such file" in capsys.readouterr().err
+
+    def test_a_view_it_has_never_heard_of(self, capsys, tmp_path):
+        clip = tmp_path / "c.mov"
+        clip.write_bytes(b"")
+        assert main(["movement", "--screen", "shoulder_flexion",
+                     "--left", str(clip), "--right", str(clip),
+                     "--view", "sideways"]) == 2
+        assert "Unknown view" in capsys.readouterr().err
+
+    def test_no_camera_angle_is_said_to_cost_the_measurement(self, monkeypatch,
+                                                             capsys, tmp_path):
+        """A movement partly toward the lens reads smaller than it was, and a
+        number offered against a published range without saying so is the one
+        thing this module is written not to do."""
+        clip = tmp_path / "c.mov"
+        clip.write_bytes(b"")
+        install(monkeypatch, _screening_frames())
+        main(["movement", "--screen", "shoulder_flexion",
+              "--left", str(clip), "--right", str(clip)])
+        out = capsys.readouterr().out
+        assert "estimates, not" in out
+
+    def test_the_two_sides_are_compared(self, monkeypatch, capsys, tmp_path):
+        clip = tmp_path / "c.mov"
+        clip.write_bytes(b"")
+        install(monkeypatch, _screening_frames(peak=150.0))
+        main(["movement", "--screen", "shoulder_flexion",
+              "--left", str(clip), "--right", str(clip),
+              "--view", "side_left"])
+        out = capsys.readouterr().out
+        assert "left against right" in out
+
+    def test_it_files_the_screening_when_asked(self, monkeypatch, capsys,
+                                               tmp_path):
+        from pilates.store import Store
+        clip = tmp_path / "c.mov"
+        clip.write_bytes(b"")
+        db = tmp_path / "studio.db"
+        install(monkeypatch, _screening_frames(peak=120.0))
+        main(["movement", "--screen", "shoulder_flexion",
+              "--left", str(clip), "--right", str(clip),
+              "--view", "side_left", "--name", "kim",
+              "--date", "2026-09-14", "--db", str(db)])
+        assert "filed as screening" in capsys.readouterr().out
+        with Store.open(db) as store:
+            rows = store.screenings("kim")
+        assert rows and rows[0]["taken_on"] == "2026-09-14"
+
+    def test_nobody_in_the_clip_is_said_rather_than_scored(self, monkeypatch,
+                                                           capsys, tmp_path):
+        clip = tmp_path / "c.mov"
+        clip.write_bytes(b"")
+        install(monkeypatch, [])
+        assert main(["movement", "--screen", "shoulder_flexion",
+                     "--left", str(clip), "--right", str(clip)]) == 1
+        assert "Nobody was tracked" in capsys.readouterr().err
+
+    def test_the_report_carries_the_disclaimer(self, monkeypatch, capsys,
+                                               tmp_path):
+        clip = tmp_path / "c.mov"
+        clip.write_bytes(b"")
+        install(monkeypatch, _screening_frames())
+        main(["movement", "--screen", "shoulder_flexion",
+              "--left", str(clip), "--right", str(clip),
+              "--view", "side_left"])
+        assert "not a medical assessment" in capsys.readouterr().out.lower()

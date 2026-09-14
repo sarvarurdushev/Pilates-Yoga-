@@ -1365,6 +1365,257 @@ def photo_intake(store, viewer: Viewer | None, payload: dict) -> dict:
     return out
 
 
+# -- movement screening ------------------------------------------------------
+#
+# Named "movement" throughout rather than "screening", because `put_screening`
+# a few hundred lines above answers a health questionnaire and has nothing to
+# do with how far a shoulder goes. Two things called screening in one API is
+# two things nobody can tell apart at a call site.
+
+def _history(payload: dict, clip: dict) -> "object":
+    """Rebuild one side's recording from the landmarks the browser sent.
+
+    Frames arrive as they came out of the pose model -- seventeen points and
+    seventeen scores, with a timestamp -- and are replayed through the same
+    :class:`~pilates.movement.TrackHistory` the live pipeline fills. One
+    implementation of what a recorded movement is, rather than two that drift.
+    """
+    import numpy as np
+
+    from . import movement as mv
+    from .types import Detection
+
+    times = clip.get("times")
+    frames = clip.get("frames")
+    if not isinstance(frames, list) or not frames:
+        raise Refused("each recording needs a list of frames", 400)
+    if not isinstance(times, list) or len(times) != len(frames):
+        raise Refused("send one timestamp per frame", 400)
+    if len(frames) > MAX_SCREEN_FRAMES:
+        raise Refused(f"a screening recording is at most "
+                      f"{MAX_SCREEN_FRAMES} frames", 400)
+
+    history = mv.TrackHistory(track_id=0)
+    for when, frame in zip(times, frames):
+        try:
+            points = np.asarray(frame["keypoints"], dtype=np.float32)
+            scores = np.asarray(frame["scores"], dtype=np.float32)
+            detection = Detection(keypoints=points, scores=scores)
+        except (KeyError, TypeError, ValueError, IndexError) as exc:
+            raise Refused("each frame is 17 keypoints and 17 scores", 400) from exc
+        try:
+            history.add(float(when), detection, THRESHOLD)
+        except (TypeError, ValueError) as exc:
+            raise Refused("a timestamp is a number of seconds", 400) from exc
+    return history
+
+
+#: Frames one recording may carry. Thirty seconds at 60 fps, which is the
+#: longest screen in the catalogue filmed on the fastest phone. Bounded
+#: because the cost of replaying them is linear and the request is public.
+MAX_SCREEN_FRAMES = 1800
+
+#: The keypoint confidence the geometry layer works at. Named here so the
+#: replay matches what the live pipeline does rather than defaulting apart.
+THRESHOLD = 0.4
+
+
+def movement_screening(store, viewer: Viewer | None, payload: dict) -> dict:
+    """Recorded movement in, a screening report out.
+
+    Landmarks rather than video, on the same boundary every other endpoint
+    here keeps: the clip is analysed where it was recorded and what travels is
+    the numbers. Nothing that could reconstruct a picture of anybody crosses
+    this line.
+
+    ``clips`` maps a screen key to ``{"view": ..., "left": {...}, "right":
+    {...}}``, each side being ``{"times": [...], "frames": [{"keypoints":
+    ..., "scores": ...}, ...]}``. A screen that cannot be measured does not
+    fail the request: it comes back refused, with the reason, beside the ones
+    that could.
+    """
+    from . import alignment as al
+    from . import screening as sc
+
+    who = str(payload.get("username", "")).strip()
+    if who:
+        guard_subject(store, viewer, who)
+    else:
+        _need(viewer)
+
+    clips = payload.get("clips")
+    if not isinstance(clips, dict) or not clips:
+        raise Refused("send a recording for at least one screen", 400)
+    if len(clips) > len(sc.SCREENS):
+        raise Refused(f"there are {len(sc.SCREENS)} screens", 400)
+
+    rebuilt: dict[str, dict] = {}
+    views: dict[str, object] = {}
+    for key, clip in clips.items():
+        screen = sc.SCREENS.get(str(key))
+        if screen is None:
+            raise Refused(f"unknown screen {key!r}; the catalogue is "
+                          f"{', '.join(sc.SCREENS)}", 400)
+        if not isinstance(clip, dict):
+            raise Refused(f"{key} needs a recording per side", 400)
+        asked = str(clip.get("view", "")).strip().lower()
+        if asked:
+            try:
+                views[screen.key] = al.View(asked)
+            except ValueError as exc:
+                raise Refused(
+                    f"unknown view {asked!r}; use one of "
+                    f"{', '.join(v.value for v in al.View if v is not al.View.UNKNOWN)}",
+                    400) from exc
+        sides = ("left", "right") if screen.sided else ("both",)
+        rebuilt[screen.key] = {}
+        for side in sides:
+            if clip.get(side) is None:
+                continue
+            rebuilt[screen.key][side] = _history(payload, clip[side])
+        if not rebuilt[screen.key]:
+            raise Refused(
+                f"{key} was sent with no recording; the sides it needs are "
+                f"{', '.join(sides)}", 400)
+
+    assessment = sc.screen_all(
+        rebuilt, views=views,
+        person_id=who or str(payload.get("person_id", "")),
+        taken_on=str(payload.get("taken_on", ""))[:10])
+
+    out = assessment.to_dict()
+    out["catalogue_detail"] = [
+        {"key": s.key, "name": s.name, "name_ko": s.name_ko,
+         "instruction": s.instruction, "instruction_ko": s.instruction_ko,
+         "sided": s.sided, "kind": s.kind, "unit": s.unit,
+         "reference": list(s.reference), "reference_kind": s.reference_kind,
+         "reference_source": s.reference_source,
+         "views": [v.value for v in s.views]}
+        for s in sc.SCREENS.values()
+    ]
+    out["disclaimer"] = sc.DISCLAIMER
+    out["disclaimer_ko"] = sc.DISCLAIMER_KO
+
+    # Filed, so a second screening means something. Only against a named
+    # person, and only when something was measured: a session where every
+    # screen was refused is a session to film again, not a point on a chart.
+    out["screening_id"] = None
+    subject = who or (viewer.username if viewer else "")
+    measured = any(r.measured for r in assessment.results.values())
+    if subject and measured and payload.get("save", True):
+        out["screening_id"] = store.record_screening(
+            username=subject,
+            by=(viewer.username if viewer else ""),
+            taken_on=assessment.taken_on or today(),
+            made_at=_now(),
+            screens=",".join(assessment.attempted),
+            score=out["overall_score"],
+            coverage=out["coverage"],
+            checks=out["checks"],
+            results=out["results"],
+            views={k: v.value for k, v in views.items()},
+            findings=out["findings"],
+            doubts=out["doubts"])
+    return out
+
+
+def screening_history(store, viewer: Viewer | None, username: str) -> dict:
+    """What movement screenings are on file for one person, newest first."""
+    who = (username or "").strip()
+    if who:
+        guard_subject(store, viewer, who)
+    else:
+        who = _need(viewer).username
+    rows = store.screenings(who)
+    return {
+        "username": who,
+        "screenings": rows,
+        # Withheld scores are left out rather than plotted as zero: a chart
+        # with a cliff in it where there was no measurement invents a
+        # collapse that did not happen.
+        "trend": [{"id": row["id"], "on": row["taken_on"],
+                   "score": row["score"]}
+                  for row in reversed(rows) if row["score"] is not None],
+    }
+
+
+def screening_change(store, viewer: Viewer | None, payload: dict) -> dict:
+    """Two filed screenings, compared.
+
+    Rebuilt from the stored measurements rather than from a stored verdict, so
+    the comparison applies the rules that measured them -- including the one
+    that refuses to compare a screen filmed from two different planes.
+    """
+    from . import alignment as al
+    from . import screening as sc
+
+    first, second = payload.get("before"), payload.get("after")
+    if not first or not second:
+        raise Refused("send the ids of two screenings as before and after", 400)
+    rows = []
+    for which in (first, second):
+        try:
+            row = store.screening_record(int(which))
+        except (TypeError, ValueError) as exc:
+            raise Refused("a screening id is a number", 400) from exc
+        if row is None:
+            raise Refused(f"no screening {which}", 404)
+        guard_subject(store, viewer, row["username"])
+        rows.append(row)
+    if rows[0]["username"] != rows[1]["username"]:
+        # Two people's ranges compared as one person's progress is the worst
+        # thing this endpoint could produce, and it would look right.
+        raise Refused("those two screenings are of different people", 400)
+
+    def rebuild(row: dict) -> sc.ScreeningAssessment:
+        out = sc.ScreeningAssessment(person_id=row["username"],
+                                     taken_on=row["taken_on"])
+        for key, payload_ in (row.get("results") or {}).items():
+            if key not in sc.SCREENS:
+                continue
+            out.results[key] = _screen_from_dict(key, payload_)
+        for key, value in (row.get("views") or {}).items():
+            try:
+                out.views[key] = al.View(value)
+            except ValueError:
+                continue
+        return out
+
+    return sc.compare(rebuild(rows[0]), rebuild(rows[1]))
+
+
+def _screen_from_dict(key: str, payload: dict) -> "object":
+    """Rebuild one screen's result from what was filed.
+
+    Only the fields a comparison reads are restored -- the peak and whether it
+    was measured. A stored row is a record of a measurement, not a substitute
+    for the recording, and reconstructing the repetitions from it would be
+    claiming to know something the row does not hold.
+    """
+    from . import screening as sc
+    from .alignment import Availability, Metric
+
+    result = sc.ScreenResult(screen=key)
+    screen = sc.SCREENS[key]
+    for side in ("left", "right", "both"):
+        stored = (payload or {}).get(side)
+        if not stored:
+            continue
+        peak = stored.get("peak") or {}
+        value = peak.get("value")
+        available = Availability(peak.get("availability", "unavailable"))
+        metric = Metric(f"{key}_peak", value, peak.get("unit", screen.unit),
+                        available, float(peak.get("confidence") or 0.0),
+                        peak.get("reason", ""),
+                        tuple(peak["normal"]) if peak.get("normal") else None)
+        setattr(result, side, sc.SideResult(
+            screen=key, side="" if side == "both" else side, peak=metric,
+            shortfall=Metric(f"{key}_shortfall", None, screen.unit,
+                             Availability.UNAVAILABLE),
+            confidence=float(stored.get("confidence") or 0.0)))
+    return result
+
+
 def assessment_history(store, viewer: Viewer | None, username: str) -> dict:
     """What standing assessments are on file for one person, newest first.
 

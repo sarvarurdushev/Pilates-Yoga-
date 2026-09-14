@@ -381,6 +381,11 @@ class Handler(SimpleHTTPRequestHandler):
             # 404s and the button explains how to start the other half instead
             # of offering an analysis nothing can run.
             self._json({"analyse": self.jobs is not None,
+                        # A movement screening needs both halves: something to
+                        # turn a clip into landmarks, and a record to file the
+                        # measurement against. Offering it with only one would
+                        # be offering a screen that measures and forgets.
+                        "screening": bool(self.db and self.jobs is not None),
                         "max_upload_bytes": MAX_UPLOAD_BYTES,
                         "session": self.bundle is not None,
                         # Whether a clip analysed here joins a history or is
@@ -395,7 +400,7 @@ class Handler(SimpleHTTPRequestHandler):
                         # a pose model to load; the first is knowable now, the
                         # second is not without spending ninety megabytes to
                         # find out, so the route says so if it fails.
-                        "intake": bool(self.db),
+                        "intake": bool(self.db), "movement": bool(self.db),
                         # Whether the page has to ask for a passcode before it
                         # can upload or write. Saying so is not a leak: the
                         # 401 would say it anyway, one round trip later.
@@ -543,6 +548,35 @@ class Handler(SimpleHTTPRequestHandler):
 
             self._answer(history)
             return
+        if route.path == "/screens":
+            # The screening catalogue, so a page can offer the choice and the
+            # instruction without holding its own copy of either. Held in
+            # Python because the same words appear in a printed report and in
+            # the terminal, and three copies of a phrase is how they stop
+            # matching. No account needed: it is a list of exercises.
+            from . import screening as sc
+
+            self._json({"screens": [
+                {"key": s.key, "name": s.name, "name_ko": s.name_ko,
+                 "instruction": s.instruction,
+                 "instruction_ko": s.instruction_ko,
+                 "sided": s.sided, "kind": s.kind, "unit": s.unit,
+                 "reference": list(s.reference),
+                 "reference_kind": s.reference_kind,
+                 "reference_source": s.reference_source,
+                 "views": [v.value for v in s.views]}
+                for s in sc.SCREENS.values()],
+                "disclaimer": sc.DISCLAIMER,
+                "disclaimer_ko": sc.DISCLAIMER_KO})
+            return
+        if route.path == "/screenings" and self.db:
+            asked = parse_qs(route.query).get("username", [""])[0]
+
+            def movement(store):
+                return api.screening_history(store, self._viewer(store), asked)
+
+            self._answer(movement)
+            return
         if route.path == "/people" and self.db:
             def people(store):
                 names = api.visible_usernames(store, self._viewer(store))
@@ -601,6 +635,14 @@ class Handler(SimpleHTTPRequestHandler):
         # request reliably gets written down.
         "/assessment/compare": lambda self, store, body: api.assessment_change(
             store, self._viewer(store), body),
+        # Movement screening: recorded landmarks in, ranges out. Same boundary
+        # as /posture and /intake -- the clip is analysed where it was
+        # recorded, and nothing that could rebuild a picture of anybody
+        # crosses this line.
+        "/movement": lambda self, store, body: api.movement_screening(
+            store, self._viewer(store), body),
+        "/movement/compare": lambda self, store, body: api.screening_change(
+            store, self._viewer(store), body),
         "/roster/end": lambda self, store, body: api.end_assignment(
             store, self._viewer(store), body),
         "/admin/decide": lambda self, store, body: api.decide(
@@ -628,7 +670,18 @@ class Handler(SimpleHTTPRequestHandler):
     #: Per route rather than a higher shared limit, because raising the shared
     #: one would let *every* endpoint on the server accept forty-six megabytes
     #: -- a denial-of-service surface bought to solve one route's problem.
-    PAYLOAD_LIMITS = {"/intake": 46 * 1024 * 1024}
+    PAYLOAD_LIMITS = {
+        "/intake": 46 * 1024 * 1024,
+        # A screening is landmarks, not pictures, and is much smaller -- but
+        # still far past a form. Six screens, two sides, the 1800 frames
+        # :data:`pilates.api.MAX_SCREEN_FRAMES` allows, at 17 points and 17
+        # scores each: about 51 numbers a frame, and JSON spends roughly eight
+        # bytes on each. That is 12 MB at the absolute ceiling, and the limit
+        # is set there rather than at what a typical session sends, because a
+        # studio that films the whole catalogue should not be told its
+        # screening is too large.
+        "/movement": 16 * 1024 * 1024,
+    }
 
     def do_POST(self):  # noqa: N802
         route = urlparse(self.path)
@@ -650,7 +703,12 @@ class Handler(SimpleHTTPRequestHandler):
         if route.path == "/note":
             self._note()
             return
-        if route.path != "/analyse" or self.jobs is None:
+        # Two ways in, one machine behind them. /analyse measures a class and
+        # files it; /landmarks turns a clip into numbers and files nothing,
+        # which is what a screening needs -- the two sides of a movement are
+        # filmed separately and have to be measured together, and holding the
+        # first clip until the second arrives would mean storing video.
+        if route.path not in ("/analyse", "/landmarks") or self.jobs is None:
             self._json({"error": "not here"}, 404)
             return
         if not self._allowed():
@@ -673,6 +731,14 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         options = {k: v[0] for k, v in parse_qs(route.query).items()}
+        if route.path == "/landmarks":
+            # Set here rather than trusted from the query: a caller that could
+            # choose the kind could ask /analyse for landmarks and skip the
+            # filing, or ask /landmarks for a session and file a shoulder
+            # raise as a class.
+            options["kind"] = "landmarks"
+        else:
+            options.pop("kind", None)
         data = self.rfile.read(length)
         job = self.jobs.submit(data, self.headers.get("X-Filename", "clip.mp4"),
                                options)

@@ -382,6 +382,39 @@ CREATE TABLE IF NOT EXISTS assessments (
 CREATE INDEX IF NOT EXISTS assessments_person
     ON assessments(username, taken_on, id);
 
+-- Movement screenings: how far the joints went, rather than where the body
+-- stood. Its own table rather than a column on assessments, because the two
+-- are answers to different questions taken on different days from different
+-- recordings, and a row that had to carry both would be half empty whichever
+-- one it was.
+--
+-- Named in full because `screenings` above is already taken, by the health
+-- questionnaire. The two are unrelated: one is what somebody answered on a
+-- form, the other is how far their shoulder went.
+CREATE TABLE IF NOT EXISTS movement_screenings (
+    id        INTEGER PRIMARY KEY,
+    username  TEXT NOT NULL REFERENCES people(username) ON DELETE CASCADE,
+    by        TEXT NOT NULL DEFAULT '',
+    -- The day it was filmed, which is not the day it was analysed.
+    taken_on  TEXT NOT NULL DEFAULT '',
+    made_at   TEXT NOT NULL DEFAULT '',
+    -- Which screens the session covered, comma separated, in catalogue order.
+    screens   TEXT NOT NULL DEFAULT '',
+    score     REAL,
+    coverage  REAL NOT NULL DEFAULT 0,
+    checks    INTEGER NOT NULL DEFAULT 0,
+    -- The whole measurement, so a later comparison re-reads the numbers
+    -- rather than trusting a summary of them.
+    results   TEXT NOT NULL DEFAULT '{}',
+    -- Which view each screen was filmed from, so a comparison can refuse to
+    -- put a foreshortening error into a progress number.
+    views     TEXT NOT NULL DEFAULT '{}',
+    findings  TEXT NOT NULL DEFAULT '[]',
+    doubts    TEXT NOT NULL DEFAULT '[]'
+);
+CREATE INDEX IF NOT EXISTS movement_screenings_person
+    ON movement_screenings(username, taken_on, id);
+
 -- One-time links: a password reset, or an email verification. Hashed, for the
 -- same reason a session token is: the server needs to recognise one it is
 -- shown, never to reproduce it, and a stolen database should not be a stolen
@@ -1079,6 +1112,86 @@ class Store:
         self.db.commit()
         return int(cursor.rowcount)
 
+    # -- movement screenings --------------------------------------------
+
+    def record_screening(self, *, username: str, by: str, taken_on: str,
+                         made_at: str, screens: str, score: float | None,
+                         coverage: float, checks: int, results: dict,
+                         views: dict, findings: list, doubts: list) -> int:
+        """File one movement screening. Returns the row id.
+
+        Enrols the person if they are not already, on the same reasoning as a
+        standing assessment: a screening is often the first thing that happens
+        to somebody, and refusing to keep the first visit because there is no
+        row yet makes the first visit the one that cannot be kept.
+        """
+        self.enrol(username)
+        cursor = self.db.execute(
+            "INSERT INTO movement_screenings (username, by, taken_on, made_at, "
+            "screens, "
+            "score, coverage, checks, results, views, findings, doubts) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (username, by, taken_on, made_at, screens,
+             None if score is None else float(score),
+             float(coverage), int(checks), json.dumps(results),
+             json.dumps(views), json.dumps(list(findings)),
+             json.dumps(list(doubts))))
+        self.db.commit()
+        return int(cursor.lastrowid)
+
+    def screenings(self, username: str, limit: int = 40) -> list[dict]:
+        """A person's movement screenings, newest first, without the results.
+
+        The same split the standing assessments make: this answers "what is on
+        file", which a history strip needs, and the results are megabytes a
+        history strip has no use for.
+        """
+        rows = self.db.execute(
+            "SELECT id, username, by, taken_on, made_at, screens, score, "
+            "coverage, checks, findings, doubts FROM movement_screenings "
+            "WHERE username = ? ORDER BY taken_on DESC, id DESC LIMIT ?",
+            (username, int(limit)))
+        return [{"id": row["id"], "username": row["username"],
+                 "by": row["by"], "taken_on": row["taken_on"],
+                 "made_at": row["made_at"],
+                 "screens": [v for v in (row["screens"] or "").split(",") if v],
+                 "score": row["score"], "coverage": row["coverage"],
+                 "checks": row["checks"],
+                 "findings": json.loads(row["findings"] or "[]"),
+                 "doubts": json.loads(row["doubts"] or "[]")}
+                for row in rows]
+
+    def screening_record(self, screening_id: int) -> dict | None:
+        """One screening in full, or None. Named apart from ``put_screening``,
+        which answers health questions and has nothing to do with this."""
+        row = self.db.execute(
+            "SELECT * FROM movement_screenings WHERE id = ?",
+            (int(screening_id),)).fetchone()
+        if row is None:
+            return None
+        return {"id": row["id"], "username": row["username"], "by": row["by"],
+                "taken_on": row["taken_on"], "made_at": row["made_at"],
+                "screens": [v for v in (row["screens"] or "").split(",") if v],
+                "score": row["score"], "coverage": row["coverage"],
+                "checks": row["checks"],
+                "results": json.loads(row["results"] or "{}"),
+                "views": json.loads(row["views"] or "{}"),
+                "findings": json.loads(row["findings"] or "[]"),
+                "doubts": json.loads(row["doubts"] or "[]")}
+
+    def forget_screenings(self, username: str) -> int:
+        """Erase somebody's movement screenings. Returns how many went.
+
+        Reachable from ``pilates export --forget``, which is the promise this
+        project makes about every other record it keeps and would quietly have
+        stopped making the moment a table existed that erase did not know
+        about.
+        """
+        cursor = self.db.execute(
+            "DELETE FROM movement_screenings WHERE username = ?", (username,))
+        self.db.commit()
+        return int(cursor.rowcount)
+
     # -- evaluations ----------------------------------------------------
 
     def evaluate_structure(self, evaluation) -> int:
@@ -1671,6 +1784,12 @@ class Store:
                    "assessments": self.db.execute(
                        "SELECT COUNT(*) AS n FROM assessments WHERE username = ?",
                        (username,)).fetchone()["n"],
+                   # Spelled in full: "screenings" alone would read as the
+                   # health questionnaire, which is keyed on the account
+                   # rather than the person and is not what this counts.
+                   "movement_screenings": self.db.execute(
+                       "SELECT COUNT(*) AS n FROM movement_screenings "
+                       "WHERE username = ?", (username,)).fetchone()["n"],
                    "readings": self.db.execute(
                        "SELECT COUNT(*) AS n FROM structure_evals "
                        "WHERE username = ?",
