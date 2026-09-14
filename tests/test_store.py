@@ -645,3 +645,69 @@ class TestExportIsComplete:
         export = store.export_person("anna")
         for section in ("measurements", "findings", "events", "pose_streams"):
             assert export[section], section
+
+
+class TestStandingAssessments:
+    """Four photographs, measured, and then gone. What is kept is the numbers
+    and the landmarks -- the same trade this store makes with video."""
+
+    def file(self, store, username="anna", on="2026-09-14", score=82.5,
+             views="front,rear", **extra):
+        return store.record_assessment(
+            username=username, by="coach", taken_on=on,
+            made_at=f"{on}T09:00:00+00:00", views=views, score=score,
+            band=extra.pop("band", "Fair"), coverage=0.8, checks=9,
+            readings=extra.pop("readings", {"shoulder_tilt": {"value": 9.1}}),
+            landmarks=extra.pop("landmarks", {"front": {"scores": [1.0]}}),
+            doubts=extra.pop("doubts", []), warnings=extra.pop("warnings", []))
+
+    def test_one_assessment_comes_back_as_it_went_in(self, store):
+        row = store.assessment(self.file(store))
+        assert row["username"] == "anna" and row["taken_on"] == "2026-09-14"
+        assert row["views"] == ["front", "rear"]
+        assert row["readings"]["shoulder_tilt"]["value"] == 9.1
+        assert row["landmarks"]["front"]["scores"] == [1.0]
+
+    def test_a_withheld_score_stays_distinguishable_from_zero(self, store):
+        """A chart that plots a withheld score as zero draws a collapse where
+        there was no measurement."""
+        row = store.assessment(self.file(store, score=None, band="Not scored"))
+        assert row["score"] is None
+
+    def test_the_list_is_newest_first_and_carries_no_landmarks(self, store):
+        for day in ("2026-01-10", "2026-06-10", "2026-09-14"):
+            self.file(store, on=day)
+        rows = store.assessments("anna")
+        assert [r["taken_on"] for r in rows] == [
+            "2026-09-14", "2026-06-10", "2026-01-10"]
+        assert "landmarks" not in rows[0] and "readings" not in rows[0]
+
+    def test_the_list_is_limited(self, store):
+        for n in range(6):
+            self.file(store, on=f"2026-01-0{n + 1}")
+        assert len(store.assessments("anna", limit=3)) == 3
+
+    def test_an_assessment_that_is_not_there_is_none_not_an_error(self, store):
+        assert store.assessment(9001) is None
+
+    def test_somebody_with_none_on_file_gets_an_empty_list(self, store):
+        assert store.assessments("ben") == []
+
+    def test_filing_enrols_somebody_who_is_not_yet_a_person(self, store):
+        """An assessment is often the first thing that happens to somebody."""
+        self.file(store, username="carla")
+        assert any(p["username"] == "carla" for p in store.people())
+        assert len(store.assessments("carla")) == 1
+
+    def test_forgetting_a_person_takes_their_assessments(self, store):
+        self.file(store)
+        self.file(store, username="ben")
+        removed = store.forget("anna")
+        assert removed["assessments"] == 1
+        assert store.assessments("anna") == []
+        assert len(store.assessments("ben")) == 1, "and leaves the other alone"
+
+    def test_erasing_only_the_assessments_leaves_the_person(self, store):
+        self.file(store)
+        assert store.forget_assessments("anna") == 1
+        assert any(p["username"] == "anna" for p in store.people())

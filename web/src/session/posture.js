@@ -78,6 +78,18 @@ const T = {
   signIn:     { en: 'Sign in first — an assessment belongs to somebody.',
                 ko: '먼저 로그인하세요. 분석 결과는 특정 회원에게 속합니다.' },
   disputed:   { en: 'the two photographs disagreed', ko: '두 사진이 어긋났습니다' },
+  onFile:     { en: 'Already on file', ko: '기록된 분석' },
+  trend:      { en: 'Score over time', ko: '점수 변화' },
+  changed:    { en: 'What has changed since', ko: '지난 분석 이후 변화' },
+  since:      { en: 'since', ko: '이후' },
+  toward:     { en: 'closer to level', ko: '수평에 가까워짐' },
+  away:       { en: 'further from level', ko: '수평에서 멀어짐' },
+  same:       { en: 'unchanged', ko: '변화 없음' },
+  notCompared: { en: 'Not compared', ko: '비교하지 않음' },
+  judgement:  { en: 'A smaller deviation is a smaller deviation. Whether it is an improvement is a judgement for the person teaching.',
+                ko: '차이가 줄어든 것은 차이가 줄어든 것입니다. 그것이 개선인지는 지도하는 사람이 판단할 일입니다.' },
+  firstOne:   { en: 'This is the first assessment on file. Take another in six to eight weeks and this page will show what moved.',
+                ko: '첫 번째 분석입니다. 6~8주 뒤에 다시 촬영하면 이 화면에서 변화를 확인할 수 있습니다.' },
   severityWords: {
     marked:     { en: 'Marked', ko: '뚜렷함' },
     notable:    { en: 'Notable', ko: '주의' },
@@ -241,6 +253,27 @@ const STYLE = `
   border:1px solid rgba(233,180,92,.35);background:rgba(233,180,92,.06);
   font-size:11.5px;color:var(--dim);line-height:1.75;max-width:80ch}
 #ss-pos .ss-log{margin:14px 0 0;font-size:11.5px;color:var(--dim2);line-height:1.7}
+#ss-pos .ss-hist{display:grid;gap:16px;grid-template-columns:1fr 260px;
+  align-items:center;margin:0 0 22px}
+@media(max-width:720px){#ss-pos .ss-hist{grid-template-columns:1fr}}
+#ss-pos .ss-past{display:grid;gap:1px}
+#ss-pos .ss-past div{display:flex;gap:10px;align-items:baseline;
+  padding:5px 0;font-size:11.5px;color:var(--dim);
+  border-top:1px solid var(--line)}
+#ss-pos .ss-past div:first-child{border-top:0}
+#ss-pos .ss-past b{font-weight:600;color:var(--txt);font-variant-numeric:tabular-nums}
+#ss-pos .ss-past em{margin-left:auto;font-style:normal;font-size:10.5px}
+#ss-pos .ss-spark{width:100%;height:88px;display:block}
+#ss-pos .ss-chg{display:grid;gap:1px;margin:10px 0 0}
+#ss-pos .ss-chg div{display:flex;gap:10px;align-items:baseline;padding:7px 0;
+  font-size:11.5px;border-top:1px solid var(--line);color:var(--dim)}
+#ss-pos .ss-chg b{color:var(--txt);font-weight:500}
+#ss-pos .ss-chg .ss-num{margin-left:auto;font-weight:700;
+  font-variant-numeric:tabular-nums}
+#ss-pos .ss-chg .ss-was{font-size:10.5px;color:var(--dim2);
+  font-variant-numeric:tabular-nums}
+#ss-pos .ss-delta{font-size:26px;font-weight:700;
+  font-variant-numeric:tabular-nums}
 @media print{
   #ss-pos{position:static;background:#fff;color:#111;overflow:visible}
   #ss-pos .ss-acts,#ss-pos .ss-marks button{display:none}
@@ -339,6 +372,132 @@ function dial(value, ink, lang) {
         : say('outOf', lang))}</text></svg>`;
 }
 
+/**
+ * The score over time, as a line.
+ *
+ * Withheld scores are not in the series at all -- the server leaves them out of
+ * `trend` for the same reason: a chart that plots a withheld score as zero
+ * draws a collapse where there was no measurement. So the line joins the points
+ * that exist, and the count underneath says how many there were.
+ */
+function spark(trend, ink) {
+  if (!trend.length) return '';
+  const W = 260, H = 88, PAD = 14;
+  const lo = Math.min(40, ...trend.map((p) => p.score));
+  const hi = Math.max(100, ...trend.map((p) => p.score));
+  const x = (i) => PAD + (W - 2 * PAD) * (trend.length < 2 ? 0.5
+    : i / (trend.length - 1));
+  const y = (v) => H - PAD - (H - 2 * PAD) * ((v - lo) / Math.max(1, hi - lo));
+  const line = trend.map((p, i) => `${i ? 'L' : 'M'} ${x(i).toFixed(1)} ${y(p.score).toFixed(1)}`).join(' ');
+  const dots = trend.map((p, i) => `<circle cx="${x(i).toFixed(1)}"
+    cy="${y(p.score).toFixed(1)}" r="${i === trend.length - 1 ? 4.5 : 3}"
+    fill="${bandInk(p.band)}" stroke="#0b111b" stroke-width="1.5"/>`).join('');
+  const last = trend[trend.length - 1];
+  return `<svg class="ss-spark" viewBox="0 0 ${W} ${H}">
+    <line x1="${PAD}" y1="${y(hi).toFixed(1)}" x2="${W - PAD}"
+      y2="${y(hi).toFixed(1)}" stroke="rgba(255,255,255,.07)"/>
+    <line x1="${PAD}" y1="${y(lo).toFixed(1)}" x2="${W - PAD}"
+      y2="${y(lo).toFixed(1)}" stroke="rgba(255,255,255,.07)"/>
+    <path d="${line}" fill="none" stroke="${ink}" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round"/>
+    ${dots}
+    <text x="${PAD}" y="${H - 2}" font-size="9"
+      fill="#8b95ab">${esc(trend[0].on)}</text>
+    <text x="${W - PAD}" y="${H - 2}" font-size="9" text-anchor="end"
+      fill="#8b95ab">${esc(last.on)}</text>
+    <text x="${W - PAD}" y="${(y(hi) - 4).toFixed(1)}" font-size="8.5"
+      text-anchor="end" fill="#6c7789">${hi.toFixed(0)}</text></svg>`;
+}
+
+/** What is already on file, above the empty slots. */
+function historyHtml(state, lang) {
+  const rows = state.history?.assessments ?? [];
+  if (!rows.length) return '';
+  const trend = state.history?.trend ?? [];
+  const listed = rows.slice(0, 5).map((row) => `<div>
+    <b>${esc(row.taken_on || row.made_at.slice(0, 10))}</b>
+    <span style="color:${row.score == null ? 'var(--dim2)' : bandInk(row.band)}">
+      ${row.score == null ? esc(say('noScore', lang))
+        : `${Math.round(row.score)} · ${esc(lang === 'ko' ? bandKo(row.band) : row.band)}`}</span>
+    <em>${row.views.length}/4</em></div>`).join('');
+  return `<div class="ss-card ss-hist">
+    <div><h2>${esc(say('onFile', lang))}</h2>
+      <div class="ss-past">${listed}</div></div>
+    ${trend.length > 1 ? `<div><h2>${esc(say('trend', lang))}</h2>
+      ${spark(trend, bandInk(trend[trend.length - 1].band))}</div>` : ''}
+  </div>`;
+}
+
+/** Korean for a band name, without a second table: the server sends both. */
+function bandKo(english) {
+  return { Excellent: '매우 우수', Good: '우수', Fair: '보통',
+           'Needs attention': '주의', 'Needs work': '관리 필요' }[english]
+    ?? english;
+}
+
+/**
+ * What moved since the last assessment.
+ *
+ * Nothing here calls a smaller deviation an improvement -- that is a clinical
+ * judgement and it belongs to the person teaching, which the line at the bottom
+ * says in as many words. What is shown is the two numbers and the difference,
+ * and the metrics one visit did not measure are listed as not compared rather
+ * than left out, because an absence that looks like a result is the way a
+ * progress report lies.
+ */
+function changeHtml(state, lang) {
+  const change = state.change;
+  if (!change) {
+    return (state.history?.assessments?.length ?? 0) > 1 ? '' :
+      `<div class="ss-card" style="margin-top:16px">
+        <h2>${esc(say('changed', lang))}</h2>
+        <p style="margin:0;font-size:12px;color:var(--dim2);line-height:1.7">
+          ${esc(say('firstOne', lang))}</p></div>`;
+  }
+  const named = (metric) => {
+    const entry = change.names?.[metric];
+    return (lang === 'ko' && entry?.ko) || entry?.en || metric.replace(/_/g, ' ');
+  };
+  const compared = Object.entries(change.changes)
+    .filter(([, c]) => c.comparable);
+  const refused = Object.entries(change.changes)
+    .filter(([, c]) => !c.comparable);
+  const rows = compared.map(([metric, c]) => {
+    const toward = c.toward_neutral;
+    const ink = c.absolute === 0 ? 'var(--dim2)'
+      : (toward ? INK.within_band : INK.notable);
+    const word = c.absolute === 0 ? say('same', lang)
+      : (toward ? say('toward', lang) : say('away', lang));
+    /* Degrees as degrees, everything else as a percentage of a body length
+     * -- the same spelling the measurement layer uses, so a change and the
+     * number it changed from are written in one unit. */
+    const fmt = (v) => (c.unit === 'deg'
+      ? `${v > 0 ? '+' : ''}${v.toFixed(1)}°`
+      : `${v > 0 ? '+' : ''}${Math.round(v * 100)}%`);
+    return `<div><b>${esc(named(metric))}</b>
+      <span class="ss-was">${esc(fmt(c.before))} → ${esc(fmt(c.after))}</span>
+      <span style="color:${ink};font-size:10.5px">${esc(word)}</span>
+      <span class="ss-num" style="color:${ink}">${esc(fmt(c.absolute))}</span>
+      </div>`;
+  }).join('');
+  const delta = change.score_change;
+  const deltaInk = delta == null ? 'var(--dim2)'
+    : (delta > 0 ? INK.within_band : (delta < 0 ? INK.notable : 'var(--dim2)'));
+  return `<div class="ss-card" style="margin-top:16px">
+    <h2>${esc(say('changed', lang))} ${esc(change.before_on)}</h2>
+    ${delta == null ? '' : `<div class="ss-delta" style="color:${deltaInk}">
+      ${delta > 0 ? '+' : ''}${delta.toFixed(1)}
+      <span style="font-size:11px;font-weight:400;color:var(--dim2)">
+      ${change.before_score == null ? '' : `${Math.round(change.before_score)} → ${Math.round(change.after_score)}`}
+      </span></div>`}
+    <div class="ss-chg">${rows}</div>
+    ${refused.length ? `<p style="margin:12px 0 0;font-size:10.5px;
+      color:var(--dim2);line-height:1.7">${esc(say('notCompared', lang))}:
+      ${esc(refused.map(([m]) => named(m)).join(', '))}</p>` : ''}
+    <p style="margin:12px 0 0;font-size:10.5px;color:var(--dim2);
+      line-height:1.7">${esc(say('judgement', lang))}</p></div>`;
+}
+
 /* -------------------------------------------------------------------- state */
 
 export function mount(nw, served, who) {
@@ -386,6 +545,8 @@ function screen(nw, served, identity) {
     error: '',
     who: '',
     taken: new Date().toISOString().slice(0, 10),
+    history: null,          // what is already on file, newest first
+    change: null,           // this assessment against the one before it
   };
   const lang = () => nw?.app?.lang ?? 'en';
   const shut = () => {
@@ -403,7 +564,23 @@ function screen(nw, served, identity) {
   draw();
   host.tabIndex = -1;
   host.focus();
+  /* What is already on file, fetched after the first paint rather than before
+   * it: the screen is useful with no history and a page that waits on a
+   * request before drawing anything is a page that looks broken on a slow
+   * connection. */
+  loadHistory(state, draw);
   return host;
+}
+
+
+async function loadHistory(state, draw) {
+  try {
+    const response = await fetch('/assessments');
+    if (!response.ok) return;
+    const body = await response.json();
+    state.history = body;
+    draw();
+  } catch { /* no server behind this copy; the screen says so already */ }
 }
 
 /* ------------------------------------------------------------------- intake */
@@ -460,6 +637,7 @@ function intakeHtml(state, served, lang, identity) {
     <p class="ss-lede">${esc(say('lede', lang))}</p>
     ${signedIn ? '' : `<p class="ss-bad">${esc(say('signIn', lang))}</p>`}
     ${canRun ? '' : `<p class="ss-bad">${esc(say('offline', lang))}</p>`}
+    ${historyHtml(state, lang)}
     <div class="ss-who">
       <div><label>${esc(say('taken', lang))}</label>
         <input type="date" data-taken value="${esc(state.taken)}"></div>
@@ -666,6 +844,7 @@ function reportHtml(state, lang, identity) {
         ${habits ? `<div class="ss-card" style="margin-top:16px">
           <h2>${esc(say('habits', lang))}</h2>
           <ul class="ss-habits">${habits}</ul></div>` : ''}
+        ${changeHtml(state, lang)}
       </div>
     </div>
     <div class="ss-limits">
@@ -812,6 +991,15 @@ async function run(state, draw, identity) {
     } else {
       state.report = body;
       state.protocol = body.protocol ?? state.protocol;
+      state.change = null;
+      /* Against the one before it, automatically. A studio taking a second set
+       * wants the difference, and asking them to go and find the first one is
+       * asking them to do the comparison this already has both halves of. */
+      const previous = state.history?.assessments?.[0];
+      if (body.assessment_id && previous?.id) {
+        await compareWith(state, previous.id, body.assessment_id);
+      }
+      loadHistory(state, draw);
     }
   } catch (error) {
     state.error = String(error?.message ?? error);
@@ -822,5 +1010,18 @@ async function run(state, draw, identity) {
   void identity;
 }
 
-export const _internals = { overlay, marksFor, anchorOf, dial,
-                            formatValue, INK, ANCHOR, CHIP: T };
+
+async function compareWith(state, before, after) {
+  try {
+    const response = await fetch('/assessment/compare', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ before, after }),
+    });
+    if (response.ok) state.change = await response.json();
+  } catch { /* the report stands on its own without it */ }
+}
+
+export const _internals = { overlay, marksFor, anchorOf, dial, spark,
+                            historyHtml, changeHtml, formatValue,
+                            INK, ANCHOR, CHIP: T };

@@ -9,6 +9,7 @@ plain static server plus three routes that are not files.
 ``/capabilities``   what this server can do, so the page can hide what it cannot
 ``/analyse``        a clip, uploaded; returns a job id
 ``/intake``         four photographs; returns one pre-session assessment
+``/assessments``    what standing assessments are on file for one person
 ``/job/<id>``       how that job is going, and the bundle when it is done
 ``/note``           one coach observation, written from the body itself
 ``/sheet``          what to read before this person's next class
@@ -534,6 +535,14 @@ class Handler(SimpleHTTPRequestHandler):
 
             self._answer(one)
             return
+        if route.path == "/assessments" and self.db:
+            asked = parse_qs(route.query).get("username", [""])[0]
+
+            def history(store):
+                return api.assessment_history(store, self._viewer(store), asked)
+
+            self._answer(history)
+            return
         if route.path == "/people" and self.db:
             def people(store):
                 names = api.visible_usernames(store, self._viewer(store))
@@ -586,6 +595,11 @@ class Handler(SimpleHTTPRequestHandler):
         # photographs are measured and dropped -- what comes back is landmarks,
         # so the browser draws the overlay on the copy it already holds.
         "/intake": lambda self, store, body: api.photo_intake(
+            store, self._viewer(store), body),
+        # Two filed assessments, compared. A POST rather than a GET because
+        # the ids are about somebody's body and a URL is the one place a
+        # request reliably gets written down.
+        "/assessment/compare": lambda self, store, body: api.assessment_change(
             store, self._viewer(store), body),
         "/roster/end": lambda self, store, body: api.end_assignment(
             store, self._viewer(store), body),

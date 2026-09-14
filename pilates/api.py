@@ -1338,4 +1338,143 @@ def photo_intake(store, viewer: Viewer | None, payload: dict) -> dict:
          "how_ko": ik.instructions(view, "ko")[1]}
         for view in ik.PROTOCOL
     ]
+
+    # Filed, so a second visit means something.
+    #
+    # Only against a named person: an assessment with nobody attached cannot be
+    # compared with anything and would be a row that grows and is never read.
+    # And only when something was measured -- a set where every photograph was
+    # refused is a set to retake, not a point on a chart.
+    out["assessment_id"] = None
+    subject = who or (viewer.username if viewer else "")
+    if subject and assessment.supplied and payload.get("save", True):
+        out["assessment_id"] = store.record_assessment(
+            username=subject,
+            by=(viewer.username if viewer else ""),
+            taken_on=assessment.taken_on or today(),
+            made_at=_now(),
+            views=",".join(v.value for v in assessment.supplied),
+            score=out["score"]["value"],
+            band=out["score"]["band"],
+            coverage=out["score"]["coverage"],
+            checks=out["score"]["checks"],
+            readings={n: r.to_dict() for n, r in assessment.readings.items()},
+            landmarks=out["landmarks"],
+            doubts=assessment.doubts,
+            warnings=assessment.warnings)
     return out
+
+
+def assessment_history(store, viewer: Viewer | None, username: str) -> dict:
+    """What standing assessments are on file for one person, newest first.
+
+    Without the landmarks: this answers "what is on file", which a history
+    strip and a trend line need, and pulling a megabyte of landmark data to
+    draw a dozen dots would be a strange way to spend a phone's connection.
+    """
+    who = (username or "").strip()
+    if who:
+        guard_subject(store, viewer, who)
+    else:
+        who = _need(viewer).username
+    rows = store.assessments(who)
+    return {
+        "username": who,
+        "assessments": rows,
+        # The line a studio actually looks at. Withheld scores are left out
+        # rather than plotted as zero: a chart with a cliff in it where there
+        # was no measurement is a chart that invents a collapse.
+        "trend": [{"id": row["id"], "on": row["taken_on"],
+                   "score": row["score"], "band": row["band"]}
+                  for row in reversed(rows) if row["score"] is not None],
+    }
+
+
+def assessment_change(store, viewer: Viewer | None, payload: dict) -> dict:
+    """Two filed assessments, compared.
+
+    Rebuilt from the stored readings rather than from a stored verdict, so the
+    comparison applies the same rules that measured them: a metric is compared
+    only when both visits measured it, and a percentage is withheld when the
+    earlier value was near zero.
+    """
+    from . import alignment as al
+    from . import guidance as gd
+    from . import intake as ik
+
+    first, second = payload.get("before"), payload.get("after")
+    if not first or not second:
+        raise Refused("send the ids of two assessments as before and after", 400)
+    rows = []
+    for which in (first, second):
+        try:
+            row = store.assessment(int(which))
+        except (TypeError, ValueError) as exc:
+            raise Refused("an assessment id is a number", 400) from exc
+        if row is None:
+            raise Refused(f"no assessment {which}", 404)
+        guard_subject(store, viewer, row["username"])
+        rows.append(row)
+    if rows[0]["username"] != rows[1]["username"]:
+        # Two people's alignment compared as one person's progress is the
+        # worst thing this endpoint could produce, and it would look right.
+        raise Refused("those two assessments are of different people", 400)
+
+    def rebuild(row: dict) -> ik.PhotoAssessment:
+        out = ik.PhotoAssessment(
+            person_id=row["username"], taken_on=row["taken_on"],
+            warnings=list(row["warnings"]), doubts=list(row["doubts"]))
+        for name, stored in row["readings"].items():
+            metric = al.Metric(
+                name, stored.get("value"), stored.get("unit", "deg"),
+                al.Availability(stored.get("availability", "unavailable")),
+                stored.get("confidence", 0.0), stored.get("reason", ""),
+                normal=al.NORMAL_BANDS.get(name))
+            out.readings[name] = ik.Reading(
+                metric,
+                tuple(al.View(v) for v in stored.get("sources", ())),
+                stored.get("spread"), stored.get("per_view", {}))
+        for view in row["views"]:
+            out.photos[al.View(view)] = ik.Photo(
+                view=al.View(view),
+                detection=_blank_detection(),
+                width=0, height=0)
+        return out
+
+    before, after = rebuild(rows[0]), rebuild(rows[1])
+    comparison = ik.compare(before, after)
+    out = comparison.to_dict()
+    out["before_id"], out["after_id"] = rows[0]["id"], rows[1]["id"]
+    out["before_on"], out["after_on"] = rows[0]["taken_on"], rows[1]["taken_on"]
+    out["before_score"], out["after_score"] = rows[0]["score"], rows[1]["score"]
+    out["names"] = {name: {"en": gd.metric_name(name),
+                           "ko": gd.metric_name(name, "ko")}
+                    for name in out["changes"]}
+    out["note"] = ("A smaller deviation is a smaller deviation. Whether it is "
+                   "an improvement is a judgement for the person teaching.")
+    out["note_ko"] = ("차이가 줄어든 것은 차이가 줄어든 것입니다. 그것이 개선인지는 "
+                      "지도하는 사람이 판단할 일입니다.")
+    return out
+
+
+def _blank_detection():
+    """A placeholder body for a rebuilt assessment.
+
+    :func:`pilates.intake.PhotoAssessment.supplied` asks each photograph
+    whether it is usable, and a rebuilt assessment has no landmarks to hand it
+    -- the readings are what was stored. This keeps ``supplied`` honest about
+    which photographs existed without pretending to have their landmarks.
+    """
+    import numpy as np
+
+    from . import keypoints as kp
+    from .types import Detection
+
+    return Detection(keypoints=np.zeros((kp.NUM_KEYPOINTS, 2), np.float32),
+                     scores=np.zeros(kp.NUM_KEYPOINTS, np.float32))
+
+
+def _now() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")

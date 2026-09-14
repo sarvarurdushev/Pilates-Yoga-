@@ -683,6 +683,39 @@ disclaimer -- and `tests/test_guidance.py` reads every fixed refusal out of
 `alignment.py` and fails if one of them has no Korean. A page that is Korean
 except for the four headings somebody forgot is a page a reader stops trusting.
 
+### A second visit is the point, so the assessment is kept
+
+An assessment that vanishes when the tab closes cannot be compared with
+anything, which makes the second set of photographs pointless. One row per
+assessment -- `assessments` in the store -- holds the merged readings, the
+landmarks, the score and which photographs it came from. Not the photographs.
+
+The application fetches what is on file when the screen opens, draws the score
+over time, and compares a new assessment against the one before it **without
+being asked**: a studio taking a second set wants the difference, and making
+them go and find the first one is asking them to do a comparison the page
+already has both halves of.
+
+```bash
+python -m pilates intake --front f.jpg --back b.jpg --name anna --db studio.db
+```
+
+Two rules carry over from `alignment.compare()` and are the reason this cannot
+manufacture progress. A metric is compared **only when both visits measured
+it** -- absence is not improvement, and a metric one visit did not see is
+listed as not compared rather than left out, because an absence that looks like
+a result is how a progress report lies. And **nothing calls a smaller deviation
+an improvement**: that is a clinical judgement and it belongs to the person
+teaching, which the line under the comparison says in as many words.
+
+A **withheld score is not plotted as zero**, and is not plotted at all. A chart
+that draws a cliff where there was no measurement invents a collapse.
+
+Erase takes the assessments with it and says how many went: `forget()` counts
+them explicitly rather than letting the foreign-key cascade delete them
+silently, because a row nobody was told about is a row somebody will later be
+surprised to find gone -- or, worse, not.
+
 ### The photographs are measured and dropped
 
 They arrive in memory, are decoded, are measured, and the bytes go. Nothing is

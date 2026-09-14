@@ -331,3 +331,150 @@ class TestTheDecoder:
         found = ph.subject(frame, Two())
         assert found.people == 2
         assert found.detection.keypoints.max() == subject_body.keypoints.max()
+
+
+class TestWhatIsKept:
+    """An assessment that vanishes with the tab cannot be compared with
+    anything, which is the whole point of taking a second one."""
+
+    def test_an_assessment_is_filed_against_the_person(self, coach, stubbed):
+        client, _, _ = coach
+        stubbed(script_for(*ALL_FOUR))
+        _, out = client.post("/intake", {"photos": shots(*ALL_FOUR),
+                                         "taken_on": "2026-09-14"})
+        assert out["assessment_id"]
+        status, history = client.get("/assessments")
+        assert status == 200
+        assert len(history["assessments"]) == 1
+        filed = history["assessments"][0]
+        assert filed["taken_on"] == "2026-09-14"
+        assert filed["views"] == [v.value for v in ALL_FOUR]
+
+    def test_the_photographs_are_not_in_what_was_kept(self, coach, stubbed):
+        client, _, _ = coach
+        stubbed(script_for(*ALL_FOUR))
+        client.post("/intake", {"photos": shots(*ALL_FOUR)})
+        _, history = client.get("/assessments")
+        assert "data:image" not in repr(history)
+
+    def test_a_set_where_nothing_could_be_measured_is_not_filed(self, coach,
+                                                                stubbed):
+        """A set to retake is not a point on a chart."""
+        client, _, _ = coach
+        stubbed([None])
+        _, out = client.post("/intake", {"photos": shots(View.FRONT)})
+        assert out["assessment_id"] is None
+        assert client.get("/assessments")[1]["assessments"] == []
+
+    def test_filing_can_be_declined(self, coach, stubbed):
+        client, _, _ = coach
+        stubbed(script_for(View.FRONT))
+        _, out = client.post("/intake", {"photos": shots(View.FRONT),
+                                         "save": False})
+        assert out["assessment_id"] is None
+
+    def test_a_withheld_score_is_left_out_of_the_trend_not_plotted_as_zero(
+            self, coach, stubbed):
+        """A chart with a cliff where there was no measurement invents one."""
+        client, _, _ = coach
+        stubbed(script_for(View.SIDE_LEFT))
+        _, out = client.post("/intake", {"photos": shots(View.SIDE_LEFT)})
+        assert out["score"]["value"] is None
+        _, history = client.get("/assessments")
+        assert history["assessments"][0]["score"] is None
+        assert history["trend"] == []
+
+    def test_the_trend_runs_oldest_first(self, coach, stubbed):
+        client, _, _ = coach
+        for day in ("2026-01-10", "2026-03-10", "2026-06-10"):
+            stubbed(script_for(*ALL_FOUR))
+            client.post("/intake", {"photos": shots(*ALL_FOUR),
+                                    "taken_on": day})
+        _, history = client.get("/assessments")
+        assert [p["on"] for p in history["trend"]] == [
+            "2026-01-10", "2026-03-10", "2026-06-10"]
+        assert [a["taken_on"] for a in history["assessments"]][0] == "2026-06-10"
+
+    def test_a_coach_may_not_read_somebody_else_s_history(self, coach, stubbed):
+        client, names, _ = coach
+        stubbed([])
+        assert client.get(f"/assessments?username={names['ben']}")[0] == 403
+
+    def test_a_signed_out_visitor_reads_none(self, studio):  # noqa: F811
+        base, _, _ = studio
+        assert Client(base).get("/assessments")[0] in (401, 403)
+
+
+class TestComparingTwoVisits:
+    def one(self, client, stubbed, day, tilt):
+        stubbed([standing(shoulder_tilt=tilt, cx=540),
+                 side_on(facing_image_left=False, ear_ahead=40.0, cx=540),
+                 side_on(facing_image_left=True, ear_ahead=40.0, cx=540),
+                 standing(facing="rear", shoulder_tilt=tilt, cx=540)])
+        _, out = client.post("/intake", {"photos": shots(*ALL_FOUR),
+                                         "taken_on": day})
+        return out["assessment_id"]
+
+    def test_two_visits_are_compared_metric_by_metric(self, coach, stubbed):
+        client, _, _ = coach
+        first = self.one(client, stubbed, "2026-01-10", 11.0)
+        second = self.one(client, stubbed, "2026-06-10", 4.0)
+        status, out = client.post("/assessment/compare",
+                                  {"before": first, "after": second})
+        assert status == 200
+        change = out["changes"]["shoulder_tilt"]
+        assert change["comparable"] and change["toward_neutral"] is True
+        assert change["absolute"] < 0
+
+    def test_the_comparison_carries_the_dates_and_the_names(self, coach,
+                                                            stubbed):
+        client, _, _ = coach
+        first = self.one(client, stubbed, "2026-01-10", 11.0)
+        second = self.one(client, stubbed, "2026-06-10", 4.0)
+        _, out = client.post("/assessment/compare",
+                             {"before": first, "after": second})
+        assert out["before_on"] == "2026-01-10"
+        assert out["after_on"] == "2026-06-10"
+        assert out["names"]["shoulder_tilt"]["ko"]
+        assert "judgement for the person teaching" in out["note"]
+        assert out["note_ko"]
+
+    def test_a_metric_missing_from_one_visit_is_not_a_result(self, coach,
+                                                             stubbed):
+        client, _, _ = coach
+        first = self.one(client, stubbed, "2026-01-10", 11.0)
+        stubbed(script_for(View.FRONT))
+        _, only = client.post("/intake", {"photos": shots(View.FRONT),
+                                          "taken_on": "2026-06-10"})
+        _, out = client.post("/assessment/compare",
+                             {"before": first, "after": only["assessment_id"]})
+        assert out["changes"]["shoulder_tilt"]["comparable"]
+        assert not out["changes"]["forward_head"]["comparable"]
+
+    @pytest.mark.parametrize("payload", [
+        {}, {"before": 1}, {"after": 1}, {"before": "x", "after": "y"}])
+    def test_a_malformed_request_is_refused(self, coach, stubbed, payload):
+        client, _, _ = coach
+        stubbed([])
+        assert client.post("/assessment/compare", payload)[0] == 400
+
+    def test_an_assessment_that_is_not_there_is_a_404(self, coach, stubbed):
+        client, _, _ = coach
+        stubbed([])
+        assert client.post("/assessment/compare",
+                           {"before": 9001, "after": 9002})[0] == 404
+
+    def test_somebody_else_s_assessment_cannot_be_compared_in(self, coach,
+                                                              stubbed):
+        """Two people's alignment compared as one person's progress would look
+        exactly right and be nonsense."""
+        client, names, _ = coach
+        mine = self.one(client, stubbed, "2026-01-10", 11.0)
+        assert client.post("/roster/add", {"student": names["ann"]})[0] == 200
+        stubbed(script_for(*ALL_FOUR))
+        _, theirs = client.post("/intake", {"photos": shots(*ALL_FOUR),
+                                            "username": names["ann"]})
+        status, out = client.post("/assessment/compare",
+                                  {"before": mine,
+                                   "after": theirs["assessment_id"]})
+        assert status == 400 and "different people" in out["error"]

@@ -696,6 +696,37 @@ def cmd_intake(args: argparse.Namespace) -> int:
     for warning in report["doubts"]:
         print(f"  ! {warning}")
 
+    if args.db and args.name:
+        # Filed, so a second visit means something. Only against a name: an
+        # assessment with nobody attached cannot be compared with anything.
+        from datetime import datetime, timezone
+
+        from .store import Store
+
+        with Store.open(args.db) as store:
+            row = store.record_assessment(
+                username=args.name, by="cli",
+                taken_on=args.date or datetime.now(timezone.utc).date().isoformat(),
+                made_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                views=",".join(v.value for v in assessment.supplied),
+                score=score["value"], band=score["band"],
+                coverage=score["coverage"], checks=score["checks"],
+                readings={n: r.to_dict()
+                          for n, r in assessment.readings.items()},
+                landmarks={p.view.value: {
+                    "keypoints": p.detection.keypoints.round(2).tolist(),
+                    "scores": p.detection.scores.round(3).tolist(),
+                    "width": p.width, "height": p.height}
+                    for p in shots if p.usable},
+                doubts=assessment.doubts, warnings=assessment.warnings)
+            print(f"\n  filed as assessment {row} in {args.db}")
+            earlier = [a for a in store.assessments(args.name)
+                       if a["id"] != row and a["score"] is not None]
+            if earlier:
+                print(f"  {len(earlier)} earlier assessment(s) on file; "
+                      f"the most recent was {earlier[0]['taken_on']} at "
+                      f"{earlier[0]['score']:.0f}")
+
     if args.svg:
         images = {}
         if args.embed:
@@ -2720,6 +2751,9 @@ def main(argv: list[str] | None = None) -> int:
     ik_.add_argument("--model", default="m", choices=("s", "m", "l"),
                      help="RTMO size; m is the default the pipeline uses")
     ik_.add_argument("--lang", default="en", choices=("en", "ko"))
+    ik_.add_argument("--db", default=None,
+                     help="file the assessment in this studio record, so a "
+                          "second visit can be compared with it; needs --name")
     ik_.add_argument("--svg", default=None, help="write the report here")
     ik_.add_argument("--embed", action="store_true",
                      help="put the photographs into the drawing; without this "

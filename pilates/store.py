@@ -343,6 +343,45 @@ CREATE TABLE IF NOT EXISTS structure_evals (
 CREATE INDEX IF NOT EXISTS structure_evals_person
     ON structure_evals(username, structure, made_on);
 
+-- One standing assessment: four photographs, measured, and then gone.
+--
+-- What is kept is the numbers and the landmarks, never the photographs -- the
+-- same trade the rest of this system makes with video, and for the same
+-- reason. Landmarks are about a kilobyte a photograph against a couple of
+-- megabytes, and they are what a report is drawn from, so an assessment can be
+-- redrawn in a year without anybody's photographs having been stored to do it.
+--
+-- `readings` is the merged measurement per quantity, as
+-- `pilates.intake.Reading.to_dict()` writes it: the value, the unit, whether
+-- it was available, which photographs measured it and whether they agreed. A
+-- comparison is rebuilt from this rather than from a stored verdict, so two
+-- visits are compared by the same rules that measured them.
+--
+-- `score` is NULL when the score was withheld, which is a different thing from
+-- zero and has to stay distinguishable: a chart that plots a withheld score as
+-- zero draws a cliff where there was no measurement.
+CREATE TABLE IF NOT EXISTS assessments (
+    id        INTEGER PRIMARY KEY,
+    username  TEXT NOT NULL REFERENCES people(username) ON DELETE CASCADE,
+    by        TEXT NOT NULL DEFAULT '',
+    -- The day the photographs were taken, which is not the day they were
+    -- uploaded. A set photographed last week and uploaded now would otherwise
+    -- land on today's date and move a trend line that did not move.
+    taken_on  TEXT NOT NULL DEFAULT '',
+    made_at   TEXT NOT NULL DEFAULT '',
+    views     TEXT NOT NULL DEFAULT '',
+    score     REAL,
+    band      TEXT NOT NULL DEFAULT '',
+    coverage  REAL NOT NULL DEFAULT 0,
+    checks    INTEGER NOT NULL DEFAULT 0,
+    readings  TEXT NOT NULL DEFAULT '{}',
+    landmarks TEXT NOT NULL DEFAULT '{}',
+    doubts    TEXT NOT NULL DEFAULT '[]',
+    warnings  TEXT NOT NULL DEFAULT '[]'
+);
+CREATE INDEX IF NOT EXISTS assessments_person
+    ON assessments(username, taken_on, id);
+
 -- One-time links: a password reset, or an email verification. Hashed, for the
 -- same reason a session token is: the server needs to recognise one it is
 -- shown, never to reproduce it, and a stolen database should not be a stolen
@@ -962,6 +1001,84 @@ class Store:
         self.record_audit(actor=by, action="assignment:ended", subject=student,
                           studio=studio, detail=coach)
 
+    # -- standing assessments -------------------------------------------
+
+    def record_assessment(self, *, username: str, by: str, taken_on: str,
+                          made_at: str, views: str, score: float | None,
+                          band: str, coverage: float, checks: int,
+                          readings: dict, landmarks: dict,
+                          doubts: list, warnings: list) -> int:
+        """File one standing assessment. Returns the row id.
+
+        The person is enrolled if they are not already: an assessment is often
+        the first thing that happens to somebody, before any class, and
+        refusing to file it because there is no row yet would make the first
+        visit the one visit that cannot be kept.
+        """
+        self.enrol(username)
+        cursor = self.db.execute(
+            "INSERT INTO assessments (username, by, taken_on, made_at, views, "
+            "score, band, coverage, checks, readings, landmarks, doubts, "
+            "warnings) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (username, by, taken_on, made_at, views,
+             None if score is None else float(score), band,
+             float(coverage), int(checks), json.dumps(readings),
+             json.dumps(landmarks), json.dumps(list(doubts)),
+             json.dumps(list(warnings))))
+        self.db.commit()
+        return int(cursor.lastrowid)
+
+    def assessments(self, username: str, limit: int = 40) -> list[dict]:
+        """A person's standing assessments, newest first.
+
+        Without the landmarks and readings: this answers "what is on file",
+        which a history strip and a trend line need, and both would otherwise
+        pull a megabyte of landmark data to draw a dozen dots.
+        """
+        rows = self.db.execute(
+            "SELECT id, username, by, taken_on, made_at, views, score, band, "
+            "coverage, checks, doubts FROM assessments WHERE username = ? "
+            "ORDER BY taken_on DESC, id DESC LIMIT ?",
+            (username, int(limit)))
+        return [{"id": row["id"], "username": row["username"],
+                 "by": row["by"], "taken_on": row["taken_on"],
+                 "made_at": row["made_at"],
+                 "views": [v for v in (row["views"] or "").split(",") if v],
+                 "score": row["score"], "band": row["band"],
+                 "coverage": row["coverage"], "checks": row["checks"],
+                 "doubts": json.loads(row["doubts"] or "[]")}
+                for row in rows]
+
+    def assessment(self, assessment_id: int) -> dict | None:
+        """One assessment in full, or None. The readings come back parsed."""
+        row = self.db.execute(
+            "SELECT * FROM assessments WHERE id = ?",
+            (int(assessment_id),)).fetchone()
+        if row is None:
+            return None
+        return {"id": row["id"], "username": row["username"], "by": row["by"],
+                "taken_on": row["taken_on"], "made_at": row["made_at"],
+                "views": [v for v in (row["views"] or "").split(",") if v],
+                "score": row["score"], "band": row["band"],
+                "coverage": row["coverage"], "checks": row["checks"],
+                "readings": json.loads(row["readings"] or "{}"),
+                "landmarks": json.loads(row["landmarks"] or "{}"),
+                "doubts": json.loads(row["doubts"] or "[]"),
+                "warnings": json.loads(row["warnings"] or "[]")}
+
+    def forget_assessments(self, username: str) -> int:
+        """Erase somebody's standing assessments. Returns how many went.
+
+        Reachable from `pilates export --forget`, which is the promise this
+        project makes about every other kind of record it keeps and would
+        quietly have stopped making the moment a table existed that erase did
+        not know about.
+        """
+        cursor = self.db.execute(
+            "DELETE FROM assessments WHERE username = ?", (username,))
+        self.db.commit()
+        return int(cursor.rowcount)
+
     # -- evaluations ----------------------------------------------------
 
     def evaluate_structure(self, evaluation) -> int:
@@ -1546,7 +1663,22 @@ class Store:
         ids = [(r["session_id"], r["track_id"]) for r in self.db.execute(
             "SELECT session_id, track_id FROM links WHERE username = ?", (username,))]
         removed = {"measurements": 0, "findings": 0, "links": len(ids),
-                   "events": 0, "pose_streams": 0}
+                   "events": 0, "pose_streams": 0,
+                   # Deleting the person cascades to these, and a cascade is
+                   # silent: counted here so that what erase reports is what
+                   # erase did. A row nobody was told about is a row somebody
+                   # will later be surprised to find gone -- or, worse, not.
+                   "assessments": self.db.execute(
+                       "SELECT COUNT(*) AS n FROM assessments WHERE username = ?",
+                       (username,)).fetchone()["n"],
+                   "readings": self.db.execute(
+                       "SELECT COUNT(*) AS n FROM structure_evals "
+                       "WHERE username = ?",
+                       (username,)).fetchone()["n"],
+                   "observations": self.db.execute(
+                       "SELECT COUNT(*) AS n FROM observations "
+                       "WHERE username = ?",
+                       (username,)).fetchone()["n"]}
         for session_id, track_id in ids:
             removed["measurements"] += self.db.execute(
                 "DELETE FROM measurements WHERE session_id = ? AND track_id = ?",

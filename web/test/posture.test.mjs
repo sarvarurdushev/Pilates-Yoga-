@@ -188,3 +188,131 @@ test('every exercise the guidance can suggest exists in this library', () => {
     assert.ok(EXERCISE[key], `${key} is in the library`);
   }
 });
+
+/* ------------------------------------------------------- history and change */
+
+const { spark, historyHtml, changeHtml } = _internals;
+
+function history(rows) {
+  return {
+    assessments: rows,
+    trend: [...rows].reverse()
+      .filter((r) => r.score != null)
+      .map((r) => ({ id: r.id, on: r.taken_on, score: r.score, band: r.band })),
+  };
+}
+
+const visit = (id, on, score, band = 'Fair') => ({
+  id, taken_on: on, made_at: `${on}T09:00:00Z`, score, band,
+  views: ['front', 'side_left', 'side_right', 'rear'], coverage: 1, checks: 9,
+  doubts: [],
+});
+
+test('nothing on file draws no history at all', () => {
+  assert.equal(historyHtml({ history: history([]) }, 'en'), '');
+  assert.equal(historyHtml({}, 'en'), '');
+});
+
+test('one assessment on file is listed but not charted', () => {
+  /* A line between one point is not a trend, it is a dot with a claim. */
+  const html = historyHtml({ history: history([visit(1, '2026-03-01', 80)]) }, 'en');
+  assert.match(html, /2026-03-01/);
+  assert.ok(!html.includes('ss-spark'));
+});
+
+test('two assessments get a line', () => {
+  const html = historyHtml({ history: history(
+    [visit(2, '2026-06-01', 86), visit(1, '2026-03-01', 74)]) }, 'en');
+  assert.match(html, /ss-spark/);
+});
+
+test('a withheld score is listed as withheld and left off the line', () => {
+  /* A chart that plots a withheld score as zero draws a collapse where there
+   * was no measurement. */
+  const rows = [visit(2, '2026-06-01', null, 'Not scored'),
+                visit(1, '2026-03-01', 74)];
+  const html = historyHtml({ history: history(rows) }, 'en');
+  assert.match(html, /No score/);
+  assert.ok(!html.includes('ss-spark'), 'one point left, so no line');
+});
+
+test('the trend line joins every point it was given', () => {
+  const trend = [{ on: 'a', score: 60, band: 'Fair' },
+                 { on: 'b', score: 75, band: 'Fair' },
+                 { on: 'c', score: 88, band: 'Good' }];
+  const svg = spark(trend, '#fff');
+  assert.equal((svg.match(/<circle/g) ?? []).length, 3);
+  assert.equal((svg.match(/[ML] \d/g) ?? []).length, 3);
+});
+
+test('a rising score does not draw an upside-down line', () => {
+  /* SVG y grows downward, and getting that backwards draws every improvement
+   * as a decline -- which would look completely plausible. */
+  const svg = spark([{ on: 'a', score: 50, band: 'Fair' },
+                     { on: 'b', score: 90, band: 'Good' }], '#fff');
+  const ys = [...svg.matchAll(/<circle cx="[\d.]+"\s*cy="([\d.]+)"/g)]
+    .map((m) => Number(m[1]));
+  assert.equal(ys.length, 2);
+  assert.ok(ys[1] < ys[0], `the higher score is drawn higher (${ys})`);
+});
+
+function change(over = {}) {
+  return {
+    before_on: '2026-03-01', after_on: '2026-09-01',
+    before_score: 74, after_score: 86, score_change: 12,
+    names: { shoulder_tilt: { en: 'shoulder level', ko: '어깨 수평' },
+             forward_head: { en: 'head carried forward', ko: '머리 전방 이동' } },
+    changes: {
+      shoulder_tilt: { before: 11, after: 4, unit: 'deg', absolute: -7,
+                       comparable: true, toward_neutral: true, reason: '' },
+      forward_head: { before: null, after: 0.2, unit: 'ratio', absolute: null,
+                      comparable: false, toward_neutral: null,
+                      reason: 'not measured in the earlier assessment' },
+    },
+    ...over,
+  };
+}
+
+test('a first assessment says so instead of showing an empty comparison', () => {
+  const html = changeHtml({ change: null, history: history([visit(1, 'a', 80)]) }, 'en');
+  assert.match(html, /first assessment on file/);
+});
+
+test('a comparison shows both numbers and the difference', () => {
+  const html = changeHtml({ change: change() }, 'en');
+  assert.match(html, /shoulder level/);
+  assert.match(html, /\+11\.0° → \+4\.0°/);
+  assert.match(html, /-7\.0°/);
+});
+
+test('a metric one visit did not measure is named, not dropped', () => {
+  /* An absence that looks like a result is how a progress report lies. */
+  const html = changeHtml({ change: change() }, 'en');
+  assert.match(html, /Not compared/);
+  assert.match(html, /head carried forward/);
+});
+
+test('nothing in the comparison calls a smaller deviation an improvement', () => {
+  /* "improvement" may appear exactly once, in the sentence that refuses to
+   * make the claim. Anywhere else it is the claim. */
+  const html = changeHtml({ change: change() }, 'en');
+  assert.match(html, /closer to level/);
+  const judgement = 'A smaller deviation is a smaller deviation. Whether it '
+    + 'is an improvement is a judgement for the person teaching.';
+  assert.ok(html.includes(judgement), 'the judgement line is there');
+  assert.ok(!/improve/i.test(html.replace(judgement, '')),
+    'and it is the only place the word appears');
+});
+
+test('the comparison reads in Korean too', () => {
+  const html = changeHtml({ change: change() }, 'ko');
+  assert.match(html, /어깨 수평/);
+  assert.match(html, /수평에 가까워짐/);
+  assert.match(html, /지도하는 사람이 판단할 일입니다/);
+});
+
+test('a withheld score on either side shows no headline difference', () => {
+  const html = changeHtml({ change: change({ score_change: null }) }, 'en');
+  assert.ok(!html.includes('ss-delta'));
+  assert.match(html, /shoulder level/, 'the metrics still compare');
+});
