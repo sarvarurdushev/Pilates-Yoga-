@@ -5,9 +5,11 @@ feeds the image-space score. Saved reports contain measurements, not footage.
 """
 
 from datetime import datetime, timezone
+from functools import wraps
 import json
 import math
 import statistics
+import threading
 import uuid
 import numpy as np
 from . import alignment as al, geometry as geo, movement as mv, pose3d
@@ -15,6 +17,23 @@ from .validation import validate_body, suppress_fragments
 from .types import Detection
 
 VERSION = "2.0-evidence"
+_ANALYSIS_LOCK = threading.Lock()
+
+
+def one_assessment_at_a_time(fn):
+    """Bound model scratch memory while health and job-status requests stay live."""
+    @wraps(fn)
+    def run(*args, **kwargs):
+        from .api import Refused
+        if not _ANALYSIS_LOCK.acquire(blocking=False):
+            raise Refused("Another assessment is being analysed. Try again when it finishes.", 409)
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            _ANALYSIS_LOCK.release()
+    return run
+
+
 FRONTAL = ("front", "rear")
 SIDE = ("side_left", "side_right")
 SPECS = {
@@ -290,6 +309,7 @@ def tile_geometry(width, height):
     return cols, rows, min(1, 640 / edge)
 
 
+@one_assessment_at_a_time
 def photo(payload, backend=None):
     from . import api, photos
     from .filters import suppress_duplicates
@@ -484,14 +504,16 @@ def analyse_series(times, values):
     }
 
 
+@one_assessment_at_a_time
 def video(path, *, view="auto", tiled=False, progress=None, backend=None, protocol=""):
     import cv2
+    from . import api
     from .config import StudioConfig
     from .pipeline import Pipeline
 
     if view not in ("auto", *[v.value for v in al.View]):
         raise ValueError("Unknown camera view")
-    cap = cv2.VideoCapture(str(path))
+    cap = cv2.VideoCapture(str(path), cv2.CAP_FFMPEG, [cv2.CAP_PROP_N_THREADS, 1])
     fps = cap.get(cv2.CAP_PROP_FPS)
     n = cap.get(cv2.CAP_PROP_FRAME_COUNT)
     if not cap.isOpened() or not math.isfinite(fps) or fps <= 0:
@@ -510,7 +532,10 @@ def video(path, *, view="auto", tiled=False, progress=None, backend=None, protoc
     cfg.tile_cols = cols if tiled else 1
     cfg.tile_rows = rows if tiled else 1
     cfg.tile_scale = 1
-    if backend is not None and tiled:
+    # Photo and video share model weights; each Pipeline still owns a fresh
+    # tracker. A second RTMO session can exhaust a small deployment's memory.
+    backend = backend or api.pose_backend()
+    if tiled:
         from .pose import TiledBackend
 
         backend = TiledBackend(backend, cols=cols, rows=rows, scale=1, overlap=0.25)

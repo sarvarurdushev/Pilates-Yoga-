@@ -16,7 +16,10 @@ An explicit `PILATES_3D_MODEL` takes precedence. RTMO-m keeps its existing
 download/cache behavior. CPU inference uses one thread on Render and avoids
 retaining ORT scratch buffers between requests. A repeated real standing-photo
 check with both models peaked at approximately 434 MiB locally; this is not a
-capacity guarantee for concurrent uploads or large videos.
+capacity guarantee for large videos. Photo and video assessments share RTMO
+weights, use one video decoding thread, and admit one assessment at a time.
+A real photo followed by a six-second video peaked at approximately 444 MiB
+locally. Job-status and health requests remain available during analysis.
 
 `GET /evidence/capabilities` exposes the actual `RENDER_GIT_COMMIT`, enabled
 features and deployment platform, so a live release can be distinguished from

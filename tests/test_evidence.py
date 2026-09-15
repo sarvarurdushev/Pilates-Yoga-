@@ -208,18 +208,28 @@ def test_tiling_fragment_merges_without_merging_neighbouring_people():
     assert sum(np.count_nonzero(p.scores >= 0.5) == 17 for p in result) == 2
 
 
-def test_video_pipeline_runs_on_decoded_frames_without_inventing_cycles(tmp_path):
+def test_video_pipeline_runs_on_decoded_frames_without_inventing_cycles(tmp_path, monkeypatch):
     import cv2
+    from pilates import api
 
     path = tmp_path / "clip.avi"
     writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"MJPG"), 6, (800, 900))
     for _ in range(18):
         writer.write(np.zeros((900, 800, 3), np.uint8))
     writer.release()
-    r = ev.video(path, backend=lambda f: [standing()], view="front", protocol="hold")
+    monkeypatch.setattr(api, "pose_backend", lambda: lambda f: [standing()])
+    r = ev.video(path, view="front", protocol="hold")
     assert r["tracking"]["stable"] and r["people"][0]["suitable"]
     assert r["duration"] == 3
     assert all(s.get("repetitions", 0) == 0 for s in r["people"][0]["signals"].values())
+
+
+def test_simultaneous_photo_and_video_are_refused_before_loading_models():
+    from pilates.api import Refused
+    with ev._ANALYSIS_LOCK:
+        for call in (lambda: ev.photo({}), lambda: ev.video("unused.mp4")):
+            with pytest.raises(Refused, match="Another assessment"):
+                call()
 
 
 def test_isolated_wrong_leg_sample_cannot_create_a_repetition():
