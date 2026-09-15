@@ -47,7 +47,11 @@ button{font:inherit;cursor:pointer}
  align-items:flex-start;gap:18px;padding:14px 22px;min-height:var(--barh);pointer-events:none;
  background:linear-gradient(180deg,rgba(2,4,8,.86) 0%,rgba(2,4,8,.52) 55%,transparent 100%)}
 #topbar>*{pointer-events:auto}
-.wm{display:flex;align-items:baseline;gap:12px;min-width:0;flex:0 1 auto;padding-top:2px}
+.wm{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:0;flex:0 1 auto;padding-top:2px}
+.assessment-home{display:inline-flex;align-items:center;min-height:24px;
+ color:var(--acc2);font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap}
+.assessment-home:hover{text-decoration:underline;color:var(--txt)}
+.assessment-home:focus-visible{outline:2px solid var(--acc2);outline-offset:3px;border-radius:2px}
 .wm b{font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
  color:var(--txt)}
 .wm span{color:var(--dim2);font-size:11px;letter-spacing:.02em;white-space:nowrap;
@@ -1105,7 +1109,7 @@ body.sheet #view{cursor:move}
 </style></head><body>
 <div id="app">
   <header id="topbar">
-    <div class="wm"><b id="title">Neuro Wellness</b><span id="subtitle"></span></div>
+    <div class="wm"><a class="assessment-home" href="/">← Back to Motion Study</a><b id="title">Neuro Wellness</b><span id="subtitle"></span></div>
     <div id="discBar"></div>
     <span id="bodyPick"></span>
     <button id="langBtn">한국어</button>
