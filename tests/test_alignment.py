@@ -55,6 +55,7 @@ def standing(*, facing: str = "front", shoulder_tilt: float = 0.0,
     k[kp.NOSE] = (cx, 155)
     if facing == "rear":
         s[kp.NOSE] = 0.05          # the back of a head has no nose to find
+    s[np.all(k == 0, axis=1)] = 0
     return Detection(k, s)
 
 
@@ -76,6 +77,7 @@ def side_on(*, facing_image_left: bool = True, ear_ahead: float = 0.0,
     near, far = (kp.R_EAR, kp.L_EAR) if facing_image_left else (kp.L_EAR, kp.R_EAR)
     k[near] = (cx + d * ear_ahead, 150)
     s[far] = 0.05
+    s[np.all(k == 0, axis=1)] = 0
     return Detection(k, s)
 
 
@@ -99,7 +101,7 @@ class TestViewEstimation:
         for joint in (kp.L_SHOULDER, kp.R_SHOULDER):        # squeeze toward side-on
             pts[joint][0] = 300.0 + (pts[joint][0] - 300.0) * 0.75
         estimate = al.estimate_view(Detection(pts, det.scores))
-        assert estimate.view is al.View.UNKNOWN
+        assert estimate.view is al.View.THREE_QUARTER
         assert "turned part-way" in estimate.note
 
     def test_no_shoulders_means_no_view(self):
@@ -356,6 +358,7 @@ def built(rear: bool, shift: float = 0.0, knee_in: float = 0.0,
     put(kp.NOSE, shift, 155)
     if rear:
         s[kp.NOSE] = 0.05
+    s[np.all(k == 0, axis=1)] = 0
     return Detection(k, s)
 
 
@@ -449,7 +452,7 @@ class TestThePlumbChain:
         blind = Detection(det.keypoints, scores)
         metric = al.assess(blind, view=al.View.SIDE_LEFT).metrics["sagittal_ear_offset"]
         assert not metric.measured
-        assert "vertical" in metric.reason
+        assert "visible" in metric.reason or "visibility" in metric.reason
 
     def test_every_chain_metric_has_a_band_to_be_judged_against(self):
         for name in ("sagittal_ear_offset", "sagittal_shoulder_offset",

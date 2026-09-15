@@ -177,6 +177,7 @@ class View(str, Enum):
     REAR = "rear"
     SIDE_LEFT = "side_left"      # the person's left side is toward the camera
     SIDE_RIGHT = "side_right"
+    THREE_QUARTER = "three_quarter"
     UNKNOWN = "unknown"
 
     @property
@@ -334,7 +335,7 @@ def estimate_view(det: Detection, threshold: float = THRESHOLD) -> ViewEstimate:
         confidence = min(1.0, 0.5 + 0.5 * min(1.0, abs(lead) / max(1e-6, 0.25 * torso)))
         return ViewEstimate(view, round(confidence, 3), round(aspect, 3),
                             note="shoulder span has collapsed")
-    return ViewEstimate(View.UNKNOWN, 0.25, round(aspect, 3),
+    return ViewEstimate(View.THREE_QUARTER, 0.5, round(aspect, 3),
                         note=f"turned part-way ({aspect:.2f} of torso); neither "
                              "plane faces the lens")
 
@@ -975,7 +976,7 @@ class PostureAssessment:
 
     @property
     def reliable(self) -> bool:
-        return not self.warnings and self.view.view is not View.UNKNOWN
+        return not self.warnings and self.view.view not in (View.UNKNOWN, View.THREE_QUARTER)
 
     @property
     def measured(self) -> dict[str, Metric]:
@@ -1010,7 +1011,7 @@ class PostureAssessment:
         body was visible -- and writing a second scorer would have been writing
         a second place for that rule to be forgotten.
         """
-        score = Score(measurable=max(1, len(self.expected)))
+        score = Score(measurable=max(1, len(self.expected)), blocked="; ".join(self.warnings))
         for region in REGIONS:
             comp = self.component(region)
             if comp.n:
@@ -1083,7 +1084,8 @@ def _zero(value: float) -> float:
 
 
 def assess(det: Detection, *, view: View | None = None, person_id: str = "",
-           frame_height: int | None = None, threshold: float = THRESHOLD) -> PostureAssessment:
+           frame_height: int | None = None, frame_width: int | None = None,
+           threshold: float = THRESHOLD) -> PostureAssessment:
     """Measure one person's standing alignment from one frame.
 
     ``view`` overrides the estimator, for the case a studio knows where its
@@ -1109,13 +1111,18 @@ def assess(det: Detection, *, view: View | None = None, person_id: str = "",
             warnings.append(
                 f"the body spans {fraction:.1%} of frame height; below "
                 f"{MIN_BODY_FRACTION:.0%} a one-degree tilt is under a pixel")
-    if estimate.view is View.UNKNOWN:
+    if estimate.view in (View.UNKNOWN, View.THREE_QUARTER):
         warnings.append(f"view not established: {estimate.note}")
     if det.confidence < 0.35:
         warnings.append(f"mean joint confidence {det.confidence:.2f} is too low to build on")
     # Confidence is not correctness. See :func:`implausible`, which exists
     # because a model returned 1.00 on a landmark belonging to somebody else.
     warnings.extend(implausible(det, threshold))
+    warnings.extend(not_a_standing_body(det, threshold))
+    from .validation import validate_body
+    evidence = validate_body(det, width=frame_width, height=frame_height,
+                             standing=True, side=estimate.view.is_sagittal, threshold=threshold)
+    warnings.extend(evidence.reasons)
 
     v = estimate.view
     metrics = [
@@ -1131,6 +1138,9 @@ def assess(det: Detection, *, view: View | None = None, person_id: str = "",
         sagittal_pelvic_tilt(det, v, threshold),
         *plumb_chain(det, v, threshold),
     ]
+    if warnings:
+        reason = "; ".join(dict.fromkeys(warnings))
+        metrics = [_unavailable(m.name, m.unit, reason) for m in metrics]
     return PostureAssessment(
         view=estimate,
         metrics={m.name: m for m in metrics},

@@ -70,3 +70,12 @@ def make_detection(
 @pytest.fixture
 def detection_factory():
     return make_detection
+
+
+@pytest.fixture(autouse=True)
+def explicit_legacy_auth_mode(request, monkeypatch):
+    """Old account tests exercise the optional authenticated deployment mode."""
+    if request.node.get_closest_marker("mvp"):
+        monkeypatch.setenv("PILATES_REQUIRE_AUTH", "0")
+    else:
+        monkeypatch.setenv("PILATES_REQUIRE_AUTH", "1")

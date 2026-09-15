@@ -346,9 +346,10 @@ class TestReadingTheChain:
         assert "hips forward" in out["shape"]
         assert "start at the hips" in out["start_at"]
 
-    def test_the_lowest_link_off_the_vertical_is_where_to_start(self):
-        out = gd.pattern(chained(hip=45, knee=-40))
-        assert "start at the knees" in out["start_at"]
+    def test_a_bent_knee_is_not_interpreted_as_neutral_standing_guidance(self):
+        assessment = chained(hip=45, knee=-40)
+        assert assessment.score().value is None
+        assert not gd.pattern(assessment).get("start_at")
 
     def test_a_square_chain_says_so_rather_than_inventing_a_shape(self):
         out = gd.pattern(chained())

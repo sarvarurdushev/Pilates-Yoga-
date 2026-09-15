@@ -1,3 +1,11 @@
+# Current assessment MVP
+
+The default app now opens without signing in. Upload photographs or movement videos, inspect refusal/landmarks, rotate a learned 3D skeleton when available, and compare saved measurements. RTMO and the existing class pipeline remain.
+
+Start with [the current run guide](docs/ASSESSMENT_MVP.md), [independent audit](docs/ARCHITECTURE_AUDIT.md), [model evaluation](docs/MODEL_EVALUATION.md), and [validation limits](docs/VALIDATION.md). The material below documents the retained legacy tools and anatomy viewer; its account setup is not required for the current local MVP.
+
+---
+
 # Pilates / Yoga Movement Analysis
 
 One camera watches a whole class. Every student is found, given a stable

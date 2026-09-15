@@ -181,9 +181,13 @@ def subject(frame: np.ndarray, backend) -> Subject:
     # A photograph that fails this is refused rather than flagged. A doubt
     # withholds the score and prints the measurements underneath it, and the
     # measurements are the problem.
-    shaped = not_a_standing_body(chosen)
+    from .validation import validate_body
+    from .alignment import estimate_view
+    shaped = validate_body(chosen, width=width, height=height, standing=True,
+                           side=estimate_view(chosen).view.is_sagittal).reasons
+    shaped += not_a_standing_body(chosen)
     if shaped:
-        raise BadPhoto(shaped[0])
+        raise BadPhoto("Insufficient visibility: not a whole body suitable for standing assessment. It may be cropped. " + " ".join(dict.fromkeys(shaped)))
 
     note, doubt = "", False
     if len(found) > 1:

@@ -248,7 +248,14 @@ class TestAPhotographThatWillNotDo:
         four refusals and an empty report.
         """
         client, _, _ = coach
-        stubbed(script_for(*ALL_FOUR))
+        # The stub must place its body INSIDE these small images. The old
+        # fixture returned x=540 and y=640 for a 161x361 photograph.
+        fitted=[]
+        for v, width in zip(ALL_FOUR, (161,166,151,116)):
+            d=BODIES[v]();p=d.keypoints.copy()
+            p[:,0]=(p[:,0]-540)*.43+width/2;p[:,1]=p[:,1]*.43+32
+            fitted.append(type(d)(p,d.scores))
+        stubbed(fitted)
         status, out = client.post("/intake", {"photos": [
             {"view": "front", "image": png(161, 361)},
             {"view": "side_left", "image": png(166, 360)},
@@ -420,7 +427,7 @@ class TestWhatIsKept:
         _, out = client.post("/intake", {"photos": shots(View.SIDE_LEFT)})
         assert out["score"]["value"] is None, out["score"]["withheld_reason"]
         _, history = client.get("/assessments")
-        assert history["assessments"][0]["score"] is None
+        assert history["assessments"] == []  # no visible head: refuse the whole assessment
         assert history["trend"] == []
 
     def test_the_trend_runs_oldest_first(self, coach, stubbed):

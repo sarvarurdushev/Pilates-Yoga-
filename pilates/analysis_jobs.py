@@ -138,7 +138,17 @@ class Jobs:
             work = Path(tempfile.mkdtemp(prefix=f"pilates-{job.id}-"))
             try:
                 job.state = RUNNING
-                if options.get("kind") == "landmarks":
+                if options.get("kind") == "evidence":
+                    from .assessment import video as analyse_video, record
+                    job.bundle = analyse_video(video, view=options.get("view", "auto"),
+                        tiled=options.get("tiled") == "true", progress=job.lines.append,
+                        protocol=options.get("protocol", ""))
+                    if self.db:
+                        from .store import Store
+                        with Store.open(self.db) as store:
+                            job.bundle["assessment_id"] = record(store, job.bundle, options.get("subject", "Unnamed"))
+                    got = job.bundle is not None
+                elif options.get("kind") == "landmarks":
                     self._landmarks(job, video, work, options)
                     got = job.landmarks is not None
                 else:

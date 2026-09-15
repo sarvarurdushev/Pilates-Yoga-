@@ -29,6 +29,11 @@ class Detection:
         if self.scores.shape != (kp.NUM_KEYPOINTS,):
             raise ValueError(f"scores must be ({kp.NUM_KEYPOINTS},), got {self.scores.shape}")
 
+        if not np.isfinite(self.keypoints).all() or not np.isfinite(self.scores).all():
+            raise ValueError("keypoints and scores must be finite numbers")
+        if np.any(self.scores < 0) or np.any(self.scores > 1):
+            raise ValueError("scores must be between 0 and 1")
+
     @property
     def confidence(self) -> float:
         """Mean confidence across all joints."""

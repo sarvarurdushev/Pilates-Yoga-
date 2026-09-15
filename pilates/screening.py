@@ -543,6 +543,9 @@ def measure_side(history: mv.TrackHistory, screen: Screen, side: str = "",
                        frames=seen, confidence=confidence)
     times, raw = window
     frames = len(raw)
+    gaps = [b-a for a,b in zip(times, times[1:])]
+    if gaps and (min(gaps) <= 0 or max(gaps) > max(.6, 3 * statistics.median(gaps))):
+        return _refuse(screen, side, "The visible movement has a tracking gap. Film a continuous movement with the joints visible.", frames=frames, confidence=confidence)
 
     scales = [s.scale for s in history.samples if s.scale]
     span = statistics.median(scales) if scales else None

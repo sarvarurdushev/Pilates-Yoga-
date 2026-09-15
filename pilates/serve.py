@@ -89,6 +89,8 @@ IMMUTABLE_MAX_AGE = 604800
 
 
 class Handler(SimpleHTTPRequestHandler):
+    require_auth = False
+
     """Static files, plus the few things that are not files."""
 
     bundle: dict | None = None
@@ -302,6 +304,9 @@ class Handler(SimpleHTTPRequestHandler):
         """The membership this request is acting as, or None."""
         if not self.db:
             return None
+        if not self.require_auth:
+            from .accounts import Viewer, ADMIN
+            return Viewer("local", "local", ADMIN)
         return auth.viewer_for(store, self._token())
 
     def _payload(self, limit: int = 64 * 1024) -> dict:
@@ -374,13 +379,17 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             self._json(self.bundle)
             return
+        if route.path.startswith("/evidence/"):
+            self._evidence_get(route)
+            return
         if route.path == "/capabilities":
             # The page asks before it dresses the Record button as the thing
             # to press. It is drawn either way -- a hidden button answers
             # "where do I record" with silence -- but on a static host this
             # 404s and the button explains how to start the other half instead
             # of offering an analysis nothing can run.
-            self._json({"analyse": self.jobs is not None,
+            self._json({"analyse": self.jobs is not None, "login_required": self.require_auth,
+                        "assessment": True,
                         # A movement screening needs both halves: something to
                         # turn a clip into landmarks, and a record to file the
                         # measurement against. Offering it with only one would
@@ -439,6 +448,9 @@ class Handler(SimpleHTTPRequestHandler):
             return
         # -- accounts ---------------------------------------------------
         if route.path == "/auth/me":
+            if not self.require_auth:
+                self._json({"signed_in": False, "accounts": False, "mvp": True, "studios": []})
+                return
             if not self.db:
                 self._json({"signed_in": False, "accounts": False,
                             "studios": []})
@@ -698,6 +710,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):  # noqa: N802
         route = urlparse(self.path)
+        if route.path.startswith("/evidence/"):
+            self._evidence_post(route)
+            return
         if route.path in ("/auth/signin", "/auth/signout", "/auth/switch"):
             self._session_route(route.path)
             return
@@ -756,6 +771,64 @@ class Handler(SimpleHTTPRequestHandler):
         job = self.jobs.submit(data, self.headers.get("X-Filename", "clip.mp4"),
                                options)
         self._json(job.public(), 202)
+
+    def _evidence_access(self):
+        if self.require_auth:
+            with self._store() as store:
+                api._need(self._viewer(store))
+                raise api.Refused("The local assessment workspace is disabled in authenticated studio mode.", 403)
+
+    def _evidence_get(self, route):
+        from . import assessment as ev, pose3d
+        from .deployment import metadata
+        try:
+            self._evidence_access()
+            query = parse_qs(route.query)
+            if route.path == "/evidence/capabilities":
+                self._json({"photo": True, "video": self.jobs is not None,
+                            "three_d": pose3d.configured(), "login_required": self.require_auth,
+                            "model": "RTMO-m", "version": ev.VERSION,
+                            "deployment": metadata()})
+            elif route.path == "/evidence/jobs":
+                job = self.jobs.get(query.get("id", [""])[0]) if self.jobs else None
+                self._json(job.public() if job else {"error": "Job not found"}, 200 if job else 404)
+            elif self.db:
+                with self._store() as store:
+                    if route.path == "/evidence/history":
+                        self._json({"assessments": ev.history(store)})
+                    elif route.path == "/evidence/detail":
+                        self._json(ev.detail(store, query.get("id", [""])[0]))
+                    else: self._json({"error": "Not found"}, 404)
+            else: self._json({"assessments": []})
+        except api.Refused as exc: self._json({"error": str(exc)}, exc.status)
+        except (ValueError, KeyError) as exc: self._json({"error": str(exc)}, 400)
+
+    def _evidence_post(self, route):
+        from . import assessment as ev
+        try:
+            self._evidence_access()
+            if route.path == "/evidence/video":
+                if not self.jobs: raise api.Refused("Video analysis is not enabled", 503)
+                length = int(self.headers.get("Content-Length") or 0)
+                if not 0 < length <= MAX_UPLOAD_BYTES: raise api.Refused("Video must be between 1 byte and 512 MB", 413)
+                if self.jobs.running(): raise api.Refused("Another video is being analysed", 409)
+                options = {k: v[0] for k,v in parse_qs(route.query).items()}
+                options["kind"] = "evidence"
+                job = self.jobs.submit(self.rfile.read(length), self.headers.get("X-Filename", "clip.mp4"), options)
+                self._json(job.public(), 202)
+                return
+            body = self._payload(12 * 1024 * 1024)
+            if route.path == "/evidence/photo":
+                report = ev.photo(body)
+                if self.db:
+                    with self._store() as store: report["assessment_id"] = ev.record(store, report, body.get("subject", "Unnamed"))
+                self._json(report)
+            elif route.path == "/evidence/compare" and self.db:
+                with self._store() as store:
+                    self._json(ev.compare(store, body["before_id"], body["after_id"], body["before_person"], body["after_person"]))
+            else: self._json({"error": "Not found"}, 404)
+        except api.Refused as exc: self._json({"error": str(exc)}, exc.status)
+        except (ValueError, KeyError, TypeError) as exc: self._json({"error": str(exc)}, 400)
 
     def _session_route(self, path: str) -> None:
         """Sign in, out, or change which role you are acting as.
@@ -882,17 +955,20 @@ def serve(bundle: dict | None, root: Path = WEB, port: int = 8000,
     """
     import os
 
+    from .deployment import prepare_render
+    prepare_render()
     if port == 8000 and os.environ.get("PORT"):
         port = int(os.environ["PORT"])
     handler = partial(Handler, directory=str(root))
-    Handler.passcode = os.environ.get("PILATES_PASSCODE", "").strip()
+    Handler.require_auth = os.environ.get("PILATES_REQUIRE_AUTH", "0") == "1"
+    Handler.passcode = os.environ.get("PILATES_PASSCODE", "").strip() if Handler.require_auth else ""
     Handler.bundle = bundle
     # The record goes to the jobs runner too, so an uploaded clip is measured
     # into the studio's history rather than into a scratch file that is deleted
     # with the job. Without one it still analyses; it just cannot remember.
     Handler.jobs = Jobs(db=db) if analyse else None
     Handler.db = db
-    if db:
+    if db and Handler.require_auth:
         claim_owner(db)
     server = ThreadingHTTPServer((host, port), handler)
     url = f"http://{host}:{server.server_address[1]}/index.html"

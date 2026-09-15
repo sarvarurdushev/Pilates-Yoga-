@@ -21,3 +21,11 @@ web/bpdata/
 web/node_modules/
 web/.render/
 web/.render/
+
+# Local assessment runtime and generated build artifacts
+.local/
+.cache/
+.venv/
+models/*.task
+web/dist/
+:memory:.ses

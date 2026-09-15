@@ -398,7 +398,7 @@ async function boot() {
   /* Who is looking, before anything of anybody's is drawn. A studio with
    * accounts gets a gate; one without keeps working exactly as it did. */
   identity = await whoami();
-  if (identity?.accounts && !identity.signed_in) {
+  if (served?.login_required && identity?.accounts && !identity.signed_in) {
     identity = await gate(identity);
   }
   room(identity);

@@ -9,3 +9,6 @@ rtmlib>=0.0.13
 # Exercise recognition. Both BSD-3-Clause.
 scikit-learn>=1.3
 joblib>=1.3
+
+# Independent learned 3D landmarks for the deployed photo assessment.
+mediapipe==0.10.32

@@ -56,6 +56,22 @@ class RTMOBackend:
             device=device,
         )
 
+        # ORT's host-wide default can oversubscribe a constrained server.
+        if backend == "onnxruntime" and device == "cpu":
+            import os
+            import onnxruntime as ort
+            options = ort.SessionOptions()
+            options.intra_op_num_threads = max(1, int(os.environ.get("PILATES_CPU_THREADS", "4")))
+            options.inter_op_num_threads = 1
+            # Avoid retaining large scratch buffers between requests on small
+            # hosts. Release the first session before allocating its replacement.
+            options.enable_cpu_mem_arena = False
+            options.enable_mem_pattern = False
+            del self._model.session
+            self._model.session = ort.InferenceSession(
+                self._model.onnx_model, sess_options=options,
+                providers=["CPUExecutionProvider"])
+
     def __call__(self, frame: np.ndarray) -> list[Detection]:
         keypoints, scores = self._model(frame)
         return [

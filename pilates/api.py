@@ -1184,6 +1184,7 @@ def posture_assessment(store, viewer: Viewer | None, payload: dict) -> dict:
     return al.assess(
         detection, view=view, person_id=str(payload.get("person_id", "")),
         frame_height=int(frame_height) if frame_height else None,
+        frame_width=int(payload["frame_width"]) if payload.get("frame_width") else None,
     ).to_dict()
 
 
@@ -1390,6 +1391,7 @@ def _history(payload: dict, clip: dict) -> "object":
                       f"{MAX_SCREEN_FRAMES} frames", 400)
 
     history = mv.TrackHistory(track_id=0)
+    previous_time = -float("inf")
     for when, frame in zip(times, frames):
         try:
             points = np.asarray(frame["keypoints"], dtype=np.float32)
@@ -1398,7 +1400,12 @@ def _history(payload: dict, clip: dict) -> "object":
         except (KeyError, TypeError, ValueError, IndexError) as exc:
             raise Refused("each frame is 17 keypoints and 17 scores", 400) from exc
         try:
-            history.add(float(when), detection, THRESHOLD)
+            import math
+            timestamp = float(when)
+            if not math.isfinite(timestamp) or timestamp <= previous_time:
+                raise ValueError("timestamps must increase")
+            previous_time = timestamp
+            history.add(timestamp, detection, THRESHOLD)
         except (TypeError, ValueError) as exc:
             raise Refused("a timestamp is a number of seconds", 400) from exc
     return history
