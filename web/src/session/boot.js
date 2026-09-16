@@ -387,6 +387,11 @@ function room(me) {
 }
 
 async function boot() {
+  // The studio owns capture and reports. Keep archived session rendering available
+  // through explicit URLs without exposing a second set of assessment tools.
+  const entry = new URLSearchParams(location.search);
+  if (!entry.has('legacy') && !entry.has('session')) return;
+
   /* The recorder is mounted first, before any session and whatever the server
    * turns out to be: "where do I start recording" must have an answer on an
    * empty page, which is the page somebody sees before they have ever recorded

@@ -231,11 +231,18 @@ class TestTheGeometryIsCompressed:
             assert "Accept-Encoding" in (headers.get("Vary") or "")
 
     def test_modules_and_the_page_are_compressed_too(self, running):
+        from pilates.serve import GZIP_MIN_BYTES
         base, _ = running
-        for path in ("/index.html", "/src/main.js", "/src/generated/structures.json"):
+        for path in ("/index.html", "/anatomy.html", "/src/studio/app.js", "/src/main.js", "/src/generated/structures.json"):
             headers, body = self._fetch(f"{base}{path}")
-            assert headers.get("Content-Encoding") == "gzip", path
-            assert gzip.decompress(body) == (WEB / path.lstrip("/")).read_bytes(), path
+            original = (WEB / path.lstrip("/")).read_bytes()
+            if len(original) >= GZIP_MIN_BYTES:
+                assert headers.get("Content-Encoding") == "gzip", path
+                assert gzip.decompress(body) == original, path
+            else:
+                # The studio entry page is now a small module loader.
+                assert headers.get("Content-Encoding") is None, path
+                assert body == original, path
 
     def test_a_compressed_copy_reports_the_original_modification_time(self, running):
         """It is a copy of the file, so it must not claim to be newer than the

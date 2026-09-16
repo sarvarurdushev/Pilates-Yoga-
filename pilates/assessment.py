@@ -325,15 +325,18 @@ def photo(payload, backend=None):
     h, w = frame.shape[:2]
     backend = backend or api.pose_backend()
     cols, rows, tile_scale = tile_geometry(w, h)
-    infer = (
-        TiledBackend(backend, cols=cols, rows=rows, scale=1, overlap=0.25)
-        if payload.get("tiled")
-        else backend
-    )
+    # A portrait must not be divided into head/torso/leg fragments. Always keep
+    # the full-frame pass; class tiles only supplement sufficiently wide images.
+    use_tiles = bool(payload.get("tiled")) and w >= 0.85 * h and min(w, h) >= 320
+    candidates = backend(frame)
+    scales = {id(d): min(1, 640 / max(w, h)) for d in candidates}
+    if use_tiles:
+        extra = TiledBackend(backend, cols=cols, rows=rows, scale=1, overlap=0.25)(frame)
+        scales.update({id(d): tile_scale for d in extra})
+        candidates += extra
     # Preserve source resolution for suitability: upscaling cannot earn precision.
-    found, _ = suppress_duplicates(infer(frame), 0.4, 0.65)
+    found, _ = suppress_duplicates(candidates, 0.4, 0.65)
     found = suppress_fragments(found)
-    inference_scale = tile_scale if payload.get("tiled") else min(1, 640 / max(w, h))
     people = []
     for i, det in enumerate(found):
         p = assess_person(
@@ -343,7 +346,7 @@ def photo(payload, backend=None):
             person_id=str(i + 1),
             view=view,
             mode=mode,
-            inference_scale=inference_scale,
+            inference_scale=scales.get(id(det), min(1, 640 / max(w, h))),
         )
         if p["suitable"] and payload.get("include_3d", True):
             p["pose3d"] = pose3d.estimate(frame, det)
@@ -356,7 +359,7 @@ def photo(payload, backend=None):
         "height": h,
         "people": people,
         "model": "RTMO-m",
-        "tiled": bool(payload.get("tiled")),
+        "tiled": use_tiles,
         "warnings": (
             []
             if people

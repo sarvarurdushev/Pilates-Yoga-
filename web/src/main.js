@@ -118,8 +118,22 @@ for (const l of LAYER_ORDER) {
 /* ------------------------------------------------------------------ renderer */
 const canvas = document.getElementById('view');
 const stage  = document.getElementById('stage');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true,
-  alpha: true });
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true,
+    alpha: true });
+} catch (error) {
+  const loading = document.getElementById('loading');
+  loading.setAttribute('role', 'alert');
+  loading.innerHTML = '<div style="max-width:440px;padding:28px;line-height:1.7;text-align:center">'
+    + '<h2 style="color:#eaf4ff">The anatomy viewer needs WebGL</h2>'
+    + '<p>This browser could not start 3D graphics. Try opening this page in a browser with hardware acceleration enabled.</p>'
+    + '<p>Photo and video analysis, reports, and estimated pose skeletons remain available in the studio.</p>'
+    + '<a style="color:#5aa9e6" href="/#home" target="_top">Return to Motion Yoga studio →</a></div>';
+  document.getElementById('rail').hidden = true;
+  document.getElementById('viewbar').hidden = true;
+  throw error;
+}
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 /* The section strip borrows this renderer: the sections are drawn from the same geometry
  * buffers the scene is drawing, so they have to come out of the context that owns them. */

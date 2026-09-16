@@ -12,7 +12,8 @@ export function rotatePoint([x, y, z], yaw, pitch = 0) {
   ];
 }
 export class PoseCanvas {
-  constructor(canvas, container) {
+  constructor(canvas, container, { dark = false } = {}) {
+    this.dark = dark;
     this.canvas = canvas;
     this.container = container;
     this.ctx = canvas.getContext("2d");
@@ -37,7 +38,11 @@ export class PoseCanvas {
     });
     canvas.addEventListener("pointerup", () => (last = null));
     canvas.addEventListener("pointercancel", () => (last = null));
-    new ResizeObserver(() => this.draw()).observe(container);
+    this.observer = new ResizeObserver(() => this.draw());
+    this.observer.observe(container);
+  }
+  dispose() {
+    this.observer.disconnect();
   }
   set(pose) {
     this.pose = pose;
@@ -61,7 +66,7 @@ export class PoseCanvas {
     const c = this.ctx;
     c.setTransform(dpi, 0, 0, dpi, 0, 0);
     c.clearRect(0, 0, w, h);
-    c.fillStyle = "#f2f7f4";
+    c.fillStyle = this.dark ? "#0b1728" : "#f2f7f4";
     c.fillRect(0, 0, w, h);
     const raw = this.pose.joints,
       scores = this.pose.scores;
@@ -95,12 +100,12 @@ export class PoseCanvas {
       line(
         project([-1, bottom + 0.1, k]),
         project([1, bottom + 0.1, k]),
-        "#dce7df",
+        this.dark ? "#24374d" : "#dce7df",
       );
       line(
         project([k, bottom + 0.1, -1]),
         project([k, bottom + 0.1, 1]),
-        "#dce7df",
+        this.dark ? "#24374d" : "#dce7df",
       );
     }
     line(
@@ -134,7 +139,7 @@ export class PoseCanvas {
     });
     c.font = "10px system-ui";
     c.textAlign = "center";
-    c.fillStyle = "#6f887e";
+    c.fillStyle = this.dark ? "#8eabc3" : "#6f887e";
     c.fillText("LEARNED 3D · HIP-CENTRED", w / 2, 23);
     c.textAlign = "left";
     c.fillStyle = "#348977";

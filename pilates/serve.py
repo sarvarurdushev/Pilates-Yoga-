@@ -47,6 +47,7 @@ import json
 import mimetypes
 import os
 import shutil
+import sqlite3
 import tempfile
 import threading
 from functools import partial
@@ -373,6 +374,9 @@ class Handler(SimpleHTTPRequestHandler):
     # -- routes -----------------------------------------------------------
     def do_GET(self):  # noqa: N802 - the base class names it
         route = urlparse(self.path)
+        if route.path.startswith("/studio/"):
+            self._studio_get(route)
+            return
         if route.path == SESSION_ROUTE:
             if self.bundle is None:
                 self._json({"error": "no session was loaded"}, 404)
@@ -710,6 +714,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):  # noqa: N802
         route = urlparse(self.path)
+        if route.path.startswith("/studio/"):
+            self._studio_post(route)
+            return
         if route.path.startswith("/evidence/"):
             self._evidence_post(route)
             return
@@ -771,6 +778,58 @@ class Handler(SimpleHTTPRequestHandler):
         job = self.jobs.submit(data, self.headers.get("X-Filename", "clip.mp4"),
                                options)
         self._json(job.public(), 202)
+
+    def _studio_key(self):
+        from .studio import workspace
+        if self.require_auth:
+            raise api.Refused("The personal preview workspace is disabled in authenticated studio mode.", 403)
+        return workspace(self.headers.get("X-Studio-Workspace", ""))
+
+    def _studio_get(self, route):
+        try:
+            key = self._studio_key()
+            query = parse_qs(route.query)
+            if route.path == "/studio/state":
+                self._json(self.studio_repository.load(key))
+            elif route.path == "/studio/job":
+                job = self.studio_jobs.get(key, query.get("id", [""])[0]) if self.studio_jobs else None
+                self._json(job or {"error": "The analysis session is no longer available. Your capture is saved in this browser; retry the analysis."}, 200 if job else 404)
+            else:
+                self._json({"error": "Unknown studio endpoint"}, 404)
+        except api.Refused as exc:
+            self._json({"error": str(exc)}, exc.status)
+        except (ValueError, KeyError, TypeError) as exc:
+            self._json({"error": str(exc)}, 400)
+        except (OSError, sqlite3.Error):
+            self._json({"error": "Storage is temporarily unavailable. Your capture remains on this device; retry shortly."}, 503)
+
+    def _studio_post(self, route):
+        try:
+            key = self._studio_key()
+            if route.path in ("/studio/analyse", "/studio/video") and self.studio_jobs is None:
+                raise api.Refused("Analysis is disabled on this server.", 503)
+            if route.path == "/studio/video":
+                length = int(self.headers.get("Content-Length") or 0)
+                if not 0 < length <= 64 * 1024 * 1024:
+                    raise api.Refused("Choose a video between 1 byte and 64 MB.", 413)
+                options = {k: v[0] for k, v in parse_qs(route.query).items()}
+                options["filename"] = self.headers.get("X-Filename", "clip.mp4")
+                options["client"] = {"id": options.get("client_id"), "name": options.get("client_name", "New client")}
+                self._json(self.studio_jobs.submit_video(key, options, self.rfile, length), 202)
+                return
+            body = self._payload(8 * 1024 * 1024)
+            if route.path == "/studio/analyse":
+                self._json(self.studio_jobs.submit_photo(key, body), 202)
+            elif route.path == "/studio/save":
+                self._json(self.studio_repository.save_item(key, body["collection"], body["item"]))
+            else:
+                self._json({"error": "Unknown studio endpoint"}, 404)
+        except api.Refused as exc:
+            self._json({"error": str(exc)}, exc.status)
+        except (ValueError, KeyError, TypeError) as exc:
+            self._json({"error": str(exc)}, 400)
+        except (OSError, sqlite3.Error):
+            self._json({"error": "Storage is temporarily unavailable. Your capture remains on this device; retry shortly."}, 503)
 
     def _evidence_access(self):
         if self.require_auth:
@@ -968,6 +1027,9 @@ def serve(bundle: dict | None, root: Path = WEB, port: int = 8000,
     # with the job. Without one it still analyses; it just cannot remember.
     Handler.jobs = Jobs(db=db) if analyse else None
     Handler.db = db
+    from .studio import Repository, AnalysisJobs
+    Handler.studio_repository = Repository(db)
+    Handler.studio_jobs = AnalysisJobs(Handler.studio_repository) if analyse else None
     if db and Handler.require_auth:
         claim_owner(db)
     server = ThreadingHTTPServer((host, port), handler)
