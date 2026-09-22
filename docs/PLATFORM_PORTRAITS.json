@@ -1,0 +1,17 @@
+{
+  "tool": "Built-in image_gen",
+  "prompts": [
+    {
+      "key": "portraits-1",
+      "prompt": "Use case: photorealistic-natural. Asset type: a square profile-avatar contact sheet for a clearly labelled fictional Pilates studio demo. Create an EXACT edge-to-edge 3 by 3 grid of nine equal square portrait photographs, no gutters or borders. Each cell contains one DIFFERENT fictional East Asian adult, head and shoulders centered in the cell, full hair visible with breathing room, friendly natural expression, plain athletic shirt, neutral blue-gray studio background. Natural diverse faces and realistic age-appropriate skin, varied hairstyles, no beauty retouching. Row 1: man age 24, woman age 31, man age 38. Row 2: woman age 45, man age 52, woman age 59. Row 3: man age 66, woman age 26, man age 33. Soft even portrait light. NO text, labels, numbers, logos, watermarks, real celebrities. Every face must be distinct. All nine square panels must align perfectly."
+    },
+    {
+      "key": "portraits-2",
+      "prompt": "Use case: photorealistic-natural. Asset type: a square profile-avatar contact sheet for a clearly labelled fictional Pilates studio demo. Create an EXACT edge-to-edge 3 by 3 grid of nine equal square portrait photographs, no gutters or borders. Each cell contains one DIFFERENT fictional East Asian adult, head and shoulders centered in the cell, full hair visible with breathing room, friendly natural expression, plain athletic shirt, neutral blue-gray studio background. Natural diverse faces and realistic age-appropriate skin, varied hairstyles, no beauty retouching. Row 1: woman age 40, man age 47, woman age 54. Row 2: man age 61, woman age 68, man age 28. Row 3: woman age 35, man age 42, woman age 49. Soft even portrait light. NO text, labels, numbers, logos, watermarks, real celebrities. Every face must be distinct. All nine square panels must align perfectly."
+    },
+    {
+      "key": "portraits-3",
+      "prompt": "Use case: photorealistic-natural. Asset type: a square profile-avatar contact sheet for a clearly labelled fictional Pilates studio demo. Create an EXACT edge-to-edge 3 by 3 grid of nine equal square portrait photographs, no gutters or borders. Each cell contains one DIFFERENT fictional East Asian adult, head and shoulders centered in the cell, full hair visible with breathing room, friendly natural expression, plain athletic shirt, neutral blue-gray studio background. Natural diverse faces and realistic age-appropriate skin, varied hairstyles, no beauty retouching. Row 1: man age 56, woman age 63, man age 23. Row 2: woman age 30, man age 37, woman age 44. Row 3: man age 51, woman age 58, man age 65. Soft even portrait light. NO text, labels, numbers, logos, watermarks, real celebrities. Every face must be distinct. All nine square panels must align perfectly."
+    }
+  ]
+}

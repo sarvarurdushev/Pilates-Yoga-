@@ -218,6 +218,8 @@ const camera = new THREE.PerspectiveCamera(32, 1, 0.005, 100);
  * tall, so his head and his feet were both off the canvas and it read as a deliberate torso
  * crop. `deriveHome` replaces it with a measurement of whichever body actually loaded. */
 let HOME = { p: new THREE.Vector3(0.62, 0.10, 1.16), t: new THREE.Vector3(0, -0.06, 0) };
+let PLATFORM_READY = false;
+export const isAnatomyReady = () => PLATFORM_READY;
 let REG_READY = false;   // `resetView` can fire before the body's structure table lands
 camera.position.copy(HOME.p);
 
@@ -6254,6 +6256,8 @@ Promise.all([
     loadShell();                       // backdrop; the body does not wait on it
     await loadLayer('muscles_superficial');
     syncLayers();
+    PLATFORM_READY = true;
+    document.dispatchEvent(new Event('motion-anatomy-ready'));
   })
   .catch(e => {
     console.error(e);

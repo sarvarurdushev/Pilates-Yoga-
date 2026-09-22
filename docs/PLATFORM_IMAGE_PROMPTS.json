@@ -1,0 +1,41 @@
+{
+  "tool": "Built-in image_gen",
+  "folder": "web/assets/platform",
+  "assets": [
+    {
+      "id": "older-woman",
+      "filename": "older-woman.png",
+      "prompt": "Use case: photorealistic-natural. Asset type: fictional client before-and-after diptych for an educational Pilates coaching demo. Exactly TWO equal vertical panels side by side, full body barefoot from head to feet with margins, front three-quarter camera angle. Subject: 68-year-old woman, silver bob hairstyle, fuller average build, lavender T-shirt and charcoal leggings, subtle forward-head and rounded-shoulder posture in left panel. SAME fictional identity, age, clothing, body shape, camera, lighting and background in both panels. Right panel shows only a subtle believable improvement in upright relaxed alignment, not a transformation. Neutral blue-gray studio backdrop and even soft photographic light, natural skin texture, anatomically plausible. No text, labels, arrows, measurement marks, logos or watermarks. Landscape composition. Both feet and hands fully visible."
+    },
+    {
+      "id": "older-man",
+      "filename": "older-man.png",
+      "prompt": "Use case: photorealistic-natural. Asset type: fictional client before-and-after diptych for an educational Pilates coaching demo. Exactly TWO equal vertical panels side by side, full body barefoot from head to feet with margins, front three-quarter camera angle. Subject: 70-year-old man, gray short hair and beard, average build, teal T-shirt and dark shorts, subtle forward-head and rounded-shoulder posture in left panel. SAME fictional identity, age, clothing, body shape, camera, lighting and background in both panels. Right panel shows only a subtle believable improvement in upright relaxed alignment, not a transformation. Neutral blue-gray studio backdrop and even soft photographic light, natural skin texture, anatomically plausible. No text, labels, arrows, measurement marks, logos or watermarks. Landscape composition. Both feet and hands fully visible."
+    },
+    {
+      "id": "sarah",
+      "filename": "sarah.png",
+      "prompt": "Use case: photorealistic-natural. Asset type: fictional client before-and-after diptych for an educational Pilates coaching demo. Exactly TWO equal vertical panels side by side, full body barefoot from head to feet with margins, front three-quarter camera angle. Subject: 28-year-old East Asian woman, tied black hair, cobalt sleeveless sports top and charcoal leggings, slightly elevated anatomical right shoulder in left panel. SAME fictional identity, age, clothing, body shape, camera, lighting and background in both panels. Right panel shows only a subtle believable improvement in upright relaxed alignment, not a transformation. Neutral blue-gray studio backdrop and even soft photographic light, natural skin texture, anatomically plausible. No text, labels, arrows, measurement marks, logos or watermarks. Landscape composition. Both feet and hands fully visible."
+    },
+    {
+      "id": "david",
+      "filename": "david.png",
+      "prompt": "Use case: photorealistic-natural. Asset type: fictional client before-and-after diptych for an educational Pilates coaching demo. Exactly TWO equal vertical panels side by side, full body barefoot from head to feet with margins, front three-quarter camera angle. Subject: 32-year-old East Asian man, short black hair, average build, olive T-shirt and black shorts, slight uneven shoulder level and weight shift in left panel. SAME fictional identity, age, clothing, body shape, camera, lighting and background in both panels. Right panel shows only a subtle believable improvement in upright relaxed alignment, not a transformation. Neutral blue-gray studio backdrop and even soft photographic light, natural skin texture, anatomically plausible. No text, labels, arrows, measurement marks, logos or watermarks. Landscape composition. Both feet and hands fully visible."
+    },
+    {
+      "id": "athletic",
+      "filename": "athletic.png",
+      "prompt": "Use case: photorealistic-natural. Asset type: fictional client before-and-after diptych for an educational Pilates coaching demo. Exactly TWO equal vertical panels side by side, full body barefoot from head to feet with margins, front three-quarter camera angle. Subject: 40-year-old Black woman, braided hair, athletic build, rust sleeveless top and black leggings, slight pelvis weight shift in left panel. SAME fictional identity, age, clothing, body shape, camera, lighting and background in both panels. Right panel shows only a subtle believable improvement in upright relaxed alignment, not a transformation. Neutral blue-gray studio backdrop and even soft photographic light, natural skin texture, anatomically plausible. No text, labels, arrows, measurement marks, logos or watermarks. Landscape composition. Both feet and hands fully visible."
+    },
+    {
+      "id": "middle-woman",
+      "filename": "middle-woman.png",
+      "prompt": "Use case: photorealistic-natural. Asset type: fictional client before-and-after diptych for an educational Pilates coaching demo. Exactly TWO equal vertical panels side by side, full body barefoot from head to feet with margins, front three-quarter camera angle. Subject: 52-year-old Latina woman, wavy brown shoulder-length hair, fuller build, plum T-shirt and navy leggings, relaxed slouched posture in left panel. SAME fictional identity, age, clothing, body shape, camera, lighting and background in both panels. Right panel shows only a subtle believable improvement in upright relaxed alignment, not a transformation. Neutral blue-gray studio backdrop and even soft photographic light, natural skin texture, anatomically plausible. No text, labels, arrows, measurement marks, logos or watermarks. Landscape composition. Both feet and hands fully visible."
+    },
+    {
+      "id": "middle-man",
+      "filename": "middle-man.png",
+      "prompt": "Use case: photorealistic-natural. Asset type: fictional client before-and-after diptych for an educational Pilates coaching demo. Exactly TWO equal vertical panels side by side, full body barefoot from head to feet with margins, front three-quarter camera angle. Subject: 54-year-old East Asian man, stocky build, short graying hair, blue-gray T-shirt and navy shorts, subtle shoulder hunch in left panel. SAME fictional identity, age, clothing, body shape, camera, lighting and background in both panels. Right panel shows only a subtle believable improvement in upright relaxed alignment, not a transformation. Neutral blue-gray studio backdrop and even soft photographic light, natural skin texture, anatomically plausible. No text, labels, arrows, measurement marks, logos or watermarks. Landscape composition. Both feet and hands fully visible."
+    }
+  ]
+}

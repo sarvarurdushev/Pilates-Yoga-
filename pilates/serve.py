@@ -374,6 +374,10 @@ class Handler(SimpleHTTPRequestHandler):
     # -- routes -----------------------------------------------------------
     def do_GET(self):  # noqa: N802 - the base class names it
         route = urlparse(self.path)
+        if route.path.startswith("/platform/"):
+            from .platform.http import dispatch
+            dispatch(self, self.command, route)
+            return
         if route.path.startswith("/studio/"):
             self._studio_get(route)
             return
@@ -714,6 +718,10 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):  # noqa: N802
         route = urlparse(self.path)
+        if route.path.startswith("/platform/"):
+            from .platform.http import dispatch
+            dispatch(self, self.command, route)
+            return
         if route.path.startswith("/studio/"):
             self._studio_post(route)
             return
@@ -1014,8 +1022,7 @@ def serve(bundle: dict | None, root: Path = WEB, port: int = 8000,
     """
     import os
 
-    from .deployment import prepare_render
-    prepare_render()
+    # Bind promptly; platform jobs prepare weights lazily.
     if port == 8000 and os.environ.get("PORT"):
         port = int(os.environ["PORT"])
     handler = partial(Handler, directory=str(root))
@@ -1030,6 +1037,10 @@ def serve(bundle: dict | None, root: Path = WEB, port: int = 8000,
     from .studio import Repository, AnalysisJobs
     Handler.studio_repository = Repository(db)
     Handler.studio_jobs = AnalysisJobs(Handler.studio_repository) if analyse else None
+    from .platform.repository import Repository as PlatformRepository
+    from .platform.jobs import Jobs as PlatformJobs
+    Handler.platform_repository = PlatformRepository(db) if db else None
+    Handler.platform_jobs = PlatformJobs(Handler.platform_repository) if db and analyse else None
     if db and Handler.require_auth:
         claim_owner(db)
     server = ThreadingHTTPServer((host, port), handler)

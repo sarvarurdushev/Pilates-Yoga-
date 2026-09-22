@@ -20,7 +20,7 @@ def metadata():
 
 
 def prepare_render():
-    """Cache the pinned 3D weights before serving, without loading either model.
+    """Cache pinned 3D weights on first analysis, without loading either model.
 
     An explicit model configuration is respected. A failed download leaves 2D
     available and the capability endpoint reports 3D as unavailable.

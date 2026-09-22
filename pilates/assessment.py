@@ -487,6 +487,7 @@ def analyse_series(times, values):
         "peak": round(max(all_values), 1),
         "rom": round(max(all_values) - min(all_values), 1),
         "repetitions": count,
+        "cycles": [{"start": r.start, "end": r.end, "rom": round(r.range_of_motion,1), "out_seconds": r.out_duration, "return_seconds": r.back_duration, "duration": r.duration} for r in reps],
         "tempo_s": round(statistics.mean(durations), 2) if durations else None,
         "tempo_cv": (
             round(statistics.pstdev(durations) / statistics.mean(durations), 3)
@@ -508,7 +509,7 @@ def analyse_series(times, values):
 
 
 @one_assessment_at_a_time
-def video(path, *, view="auto", tiled=False, progress=None, backend=None, protocol=""):
+def video(path, *, view="auto", tiled=False, progress=None, backend=None, protocol="", include_3d=False):
     import cv2
     from . import api
     from .config import StudioConfig
@@ -550,6 +551,7 @@ def video(path, *, view="auto", tiled=False, progress=None, backend=None, protoc
     sampled = 0
     last_time = -1
     timestamp_fallback = False
+    last_depth = {}
     try:
         while True:
             ok, frame = cap.read()
@@ -606,6 +608,11 @@ def video(path, *, view="auto", tiled=False, progress=None, backend=None, protoc
                             "suitable": p["suitable"],
                         }
                     )
+                    # Sparse depth is independently corroborated. Unsampled frames
+                    # have no Z values; hidden movement is never interpolated.
+                    if include_3d and p["suitable"] and t - last_depth.get(key, -2) >= 1:
+                        tr["frames"][-1]["pose3d"] = pose3d.estimate(frame, d)
+                        last_depth[key] = t
                     if p["suitable"]:
                         tr["valid"] += 1
                         tr["conf"].append(float(d.confidence))
@@ -707,7 +714,7 @@ def video(path, *, view="auto", tiled=False, progress=None, backend=None, protoc
                     ]
                 ),
                 "pose3d": pose3d.unavailable(
-                    "Temporal 3D reconstruction is not configured. Movement uses projected 2D landmarks."
+                    "Depth is independently estimated on selected visible frames when requested. Movement angles use projected 2D landmarks; depth gaps remain unavailable."
                 ),
                 "score": {
                     "value": None,

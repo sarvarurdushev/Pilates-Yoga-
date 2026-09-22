@@ -18,3 +18,15 @@ Both are labeled as public educational samples, never as the imaging of a demo c
 ## Exercise references
 
 Own brief descriptions link to the [AAOS spine conditioning program](https://www.orthoinfo.org/recovery/spine-conditioning-program/), [NHS strength and flexibility information](https://www.nhs.uk/live-well/exercise/how-to-improve-strength-flexibility/), and [NHS balance exercises](https://www.nhs.uk/live-well/exercise/balance-exercises/). Plans require coach selection; the application does not infer muscle activation or prescribe rehabilitation from photographs.
+
+## Platform rebuild assets
+
+Generated fictional before/after pairs for Sarah, David, an older woman, an older man, an athletic client, a middle-aged woman and a middle-aged man are in `web/assets/platform/{sarah,david,older-woman,older-man,athletic,middle-woman,middle-man}.png`. Three portrait boards supply 27 additional fictional profiles. Prompts and returned generation files are recorded in `PLATFORM_IMAGE_PROMPTS.json`, `PLATFORM_PORTRAITS.json` and `PLATFORM_EXERCISE_IMAGE.json`. The exercise board contains nine educational illustrations. CSS selects the appropriate panel without changing the original raster. Generated photographs are illustrative; synthetic histories are computed from explicitly simulated landmarks, not claimed as measurements of the photographs.
+
+Additional unmodified public radiographs, matched to the demo record's anatomical region:
+
+- `web/assets/platform/xray-ankle.jpg`: Mikael Häggström, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). [Original and rights](https://commons.wikimedia.org/wiki/File:X-ray_of_normal_ankle_-_frontal.jpg).
+- `web/assets/platform/xray-cervical.jpg`: UC San Diego Radiology staff, public domain medical imaging; permission recorded by Commons. [Original and rights](https://commons.wikimedia.org/wiki/File:X-ray_of_the_cervical_spine_of_an_20_year_old_male_-_lateral,_case_2.jpg).
+- `web/assets/platform/xray-chest.jpg`: Yale Rosen, [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/), unmodified. [Original and rights](https://commons.wikimedia.org/wiki/File:Normal_PA_chest_x-ray_(5414485536).jpg).
+
+These references are not scans of the fictional client. Attribution and a link to the original license appear in the scan viewer. Manual annotations are stored separately from the source image. No X-ray appearance is synthesized from uploaded posture photographs.

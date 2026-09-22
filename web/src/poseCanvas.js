@@ -140,7 +140,7 @@ export class PoseCanvas {
     c.font = "10px system-ui";
     c.textAlign = "center";
     c.fillStyle = this.dark ? "#8eabc3" : "#6f887e";
-    c.fillText("LEARNED 3D · HIP-CENTRED", w / 2, 23);
+    c.fillText(this.pose.label || "LEARNED 3D · HIP-CENTRED", w / 2, 23);
     c.textAlign = "left";
     c.fillStyle = "#348977";
     c.fillText("● Anatomical left", 16, h - 17);
