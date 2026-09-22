@@ -102,7 +102,8 @@ def seed_organization(repo, org):
                 "SELECT 1 FROM p_organizations WHERE id=?", (org,)
             ).fetchone():
                 return
-        _seed(repo, org)
+        with repo.batch():
+            _seed(repo, org)
 
 
 def _seed(repo, org):
@@ -450,9 +451,10 @@ def _seed(repo, org):
             aids = []
             for visit in range(6):
                 date = today - timedelta(days=(5 - visit) * 7 + 2)
-                report = simulation(
-                    i, visit, "posture" if visit % 2 == 0 else "movement"
-                )
+                from .demo_scenarios import prepared_scenario
+
+                prepared = prepared_scenario(i, visit)
+                report = prepared["report"]
                 media = {}
                 image = ROOT / "web/assets/platform" / f"{asset}.png"
                 if asset and image.exists():
@@ -513,6 +515,7 @@ def _seed(repo, org):
                         "asset": asset,
                         "panel": 0 if visit < 3 else 1,
                     },
+                    prepared=prepared,
                 )
                 aids.append(aid)
                 with repo.db() as db:

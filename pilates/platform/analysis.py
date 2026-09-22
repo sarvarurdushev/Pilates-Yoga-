@@ -16,7 +16,10 @@ def save_analysis(
     synthetic=False,
     created_at=None,
     detail=None,
+    prepared=None,
 ):
+    if prepared is not None and not synthetic:
+        raise ValueError("Prepared scenarios are only allowed for labelled demo data.")
     repo.assert_student(actor, student_id, True)
     identifier = uid()
     created_at = created_at or now()
@@ -46,11 +49,15 @@ def save_analysis(
         p.get("suitable") for v in views for p in v["report"].get("people", [])
     )
     report["kinematics"] = (
-        temporal(
-            views[0]["report"].get("people", []), (detail or {}).get("target_angle")
+        prepared["kinematics"]
+        if prepared is not None
+        else (
+            temporal(
+                views[0]["report"].get("people", []), (detail or {}).get("target_angle")
+            )
+            if kind == "movement"
+            else {}
         )
-        if kind == "movement"
-        else {}
     )
     report.update(
         id=identifier, student_id=student_id, created_at=created_at, synthetic=synthetic
@@ -141,14 +148,19 @@ def save_analysis(
                             int(bool(frame.get("suitable"))),
                         ),
                     )
-                    for c in coordinates(
-                        frame["landmarks"],
-                        frame.get("pose3d"),
-                        frame.get("suitable"),
-                        frame.get("uncertain_joints", ()),
-                    ):
-                        db.execute(
-                            "INSERT INTO p_coordinates(frame_id,landmark_id,x,y,z,confidence,space,status,reason) VALUES (?,?,?,?,?,?,?,?,?)",
+                    values = (
+                        prepared["coordinates"][camera][person_id][frame_index]
+                        if prepared is not None
+                        else coordinates(
+                            frame["landmarks"],
+                            frame.get("pose3d"),
+                            frame.get("suitable"),
+                            frame.get("uncertain_joints", ()),
+                        )
+                    )
+                    db.executemany(
+                        "INSERT INTO p_coordinates(frame_id,landmark_id,x,y,z,confidence,space,status,reason) VALUES (?,?,?,?,?,?,?,?,?)",
+                        [
                             (
                                 fid,
                                 c["landmark_id"],
@@ -159,8 +171,10 @@ def save_analysis(
                                 c["space"],
                                 c["status"],
                                 c["reason"],
-                            ),
-                        )
+                            )
+                            for c in values
+                        ],
+                    )
                 for metric in person.get("metrics", []):
                     region = region_for(metric["name"])
                     cur = db.execute(

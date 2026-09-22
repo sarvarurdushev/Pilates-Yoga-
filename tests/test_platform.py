@@ -663,3 +663,76 @@ def test_client_history_survives_api_page_boundary(state):
     finally:
         with r.db() as db:
             db.executemany("DELETE FROM p_notes WHERE id=?", [(i,) for i in created])
+
+
+def test_precomputed_demo_matches_current_geometry():
+    """Demo startup optimization must preserve every measurement and trajectory."""
+    import gzip
+    from pilates.platform import demo_scenarios as cache
+    from pilates.platform.seed import scenario_for
+
+    for scenario in range(6):
+        client = next(i for i in range(34) if scenario_for(i) == scenario)
+        for visit in range(6):
+            stored = cache.compressed(scenario, visit)
+            assert stored, "Rebuild and package all 36 demo scenarios"
+            data = json.loads(gzip.decompress(stored))
+            # JSON persistence converts tuple series to arrays in both paths.
+            assert data == json.loads(json.dumps(cache.calculate(client, visit)))
+            loaded = cache.prepared_scenario(client, visit)
+            loaded["report"]["id"] = "must-not-leak-to-another-client"
+            assert "id" not in cache.prepared_scenario(client, visit)["report"]
+
+
+def test_batch_is_atomic_and_thread_confined(tmp_path):
+    import threading
+
+    r = Repository(tmp_path / "atomic.db")
+    observed = []
+    with pytest.raises(RuntimeError):
+        with r.batch():
+            with r.db() as db:
+                db.execute(
+                    "INSERT INTO p_organizations VALUES ('partial', 'Partial', 1, 'now')"
+                )
+
+            def read_other_thread():
+                with r.db() as db:
+                    observed.append(
+                        db.execute(
+                            "SELECT count(*) FROM p_organizations WHERE id='partial'"
+                        ).fetchone()[0]
+                    )
+
+            worker = threading.Thread(target=read_other_thread)
+            worker.start()
+            worker.join(timeout=5)
+            assert not worker.is_alive()
+            with r.db() as db:
+                assert (
+                    db.execute(
+                        "SELECT count(*) FROM p_organizations WHERE id='partial'"
+                    ).fetchone()[0]
+                    == 1
+                )
+            raise RuntimeError("Interrupted seed")
+    assert observed == [0]
+    with r.db() as db:
+        assert (
+            db.execute(
+                "SELECT count(*) FROM p_organizations WHERE id='partial'"
+            ).fetchone()[0]
+            == 0
+        )
+    with r.batch():
+        with r.db() as db:
+            db.execute(
+                "INSERT INTO p_organizations VALUES ('ready', 'Ready', 1, 'now')"
+            )
+    with r.db() as db:
+        assert (
+            db.execute(
+                "SELECT count(*) FROM p_organizations WHERE id='ready'"
+            ).fetchone()[0]
+            == 1
+        )

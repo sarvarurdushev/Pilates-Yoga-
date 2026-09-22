@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import secrets
 import sqlite3
+import threading
 import time
 import uuid
 
@@ -146,6 +147,7 @@ def password_ok(password, stored):
 class Repository:
     def __init__(self, path, media_root=None):
         self.path = str(path)
+        self._transaction = threading.local()
         self.media_root = Path(media_root or (str(path) + ".media"))
         self.media_root.mkdir(parents=True, exist_ok=True)
         with self.db() as db:
@@ -157,6 +159,10 @@ class Repository:
 
     @contextmanager
     def db(self):
+        active = getattr(self._transaction, "connection", None)
+        if active is not None:
+            yield active
+            return
         conn = sqlite3.connect(self.path, timeout=20)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys=ON")
@@ -169,6 +175,20 @@ class Repository:
             raise
         finally:
             conn.close()
+
+    @contextmanager
+    def batch(self):
+        """One atomic transaction for a connected import, confined to this thread."""
+        if getattr(self._transaction, "connection", None) is not None:
+            yield
+            return
+        with self.db() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            self._transaction.connection = conn
+            try:
+                yield
+            finally:
+                del self._transaction.connection
 
     def create_org(self, name, email, password, organization):
         name, email = str(name).strip()[:100], str(email).strip().lower()[:254]

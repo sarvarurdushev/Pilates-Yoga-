@@ -35,3 +35,19 @@ The in-app browser reports WebGL context creation failure. The atlas has actual 
 ## Hosted checks
 
 Pending release: record the new SHA, GitHub/Render deployment status, public capabilities, login/role pages, and real hosted photo/video jobs. A build success alone is not a successful analysis deployment.
+
+### First hosted release and startup correction
+
+Render deployment `6596089102` succeeded at `2026-09-22T16:56:44Z`; the public
+capability endpoint confirms commit `c3dd3e16a1f9adbe9ad3d6601e244274b7d2d7c0`.
+The new login screen is live. Fresh demo initialization exceeded the hosted
+request timeout, so this is not recorded as a successful full workflow.
+
+A measured correction precomputes only the labelled synthetic scenario geometry,
+checks its source fingerprint, and inserts all linked demo rows atomically.
+Real inference is unchanged. All 36 cached scenarios are compared against the
+current geometry/temporal calculations; transaction rollback and cross-thread
+visibility are tested. Seed profiling improved from **24.87 s to 4.94 s** locally
+(29.9 million calls to 325 thousand), while preserving 204 historical analyses.
+Platform regression: 16 tests passed before correcting a test's tuple-vs-JSON
+array comparison; the corrected scenario test then passed (17 total).
