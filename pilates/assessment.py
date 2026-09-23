@@ -387,7 +387,7 @@ def continuous_segments(times, values, max_gap=0.6):
                 segments.append(current)
                 current = []
         else:
-            if current and t - current[-1][0] > max_gap:
+            if current and t - current[-1][0] > max_gap + 1e-9:
                 segments.append(current)
                 current = []
             current.append((t, v))
@@ -408,7 +408,7 @@ def screen_spikes(times, values):
     groups = []
     group = []
     for i, v in enumerate(values):
-        if v is None or (group and times[i] - times[group[-1]] > 0.6):
+        if v is None or (group and times[i] - times[group[-1]] > 0.6 + 1e-9):
             if group:
                 groups.append(group)
                 group = []

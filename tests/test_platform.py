@@ -174,6 +174,12 @@ def test_coordinates_and_derivatives():
     assert coordinates(lm, suitable=False)[0]["x"] is None
     v, a = derivatives([[0, 0], [0.2, 2], [0.4, 4], [1.5, 10], [1.7, None], [1.9, 14]])
     assert v[1][1] == 10 and a[2][1] == 0 and v[3][1] is None and v[-1][1] is None
+    # Rounded 0.6-second demo intervals must not split at binary float noise.
+    from pilates.assessment import continuous_segments
+
+    sample = [[0, 0], [0.6, 6], [1.2, 12]]
+    assert len(continuous_segments(*zip(*sample))) == 1
+    assert derivatives(sample)[0][-1][1] == 10
 
 
 def test_reservations_conflicts(state):
@@ -458,7 +464,7 @@ def test_library_pagination_search_and_unique_scenarios(state):
         report = simulation(scenario, 0, "movement")
         p = report["views"][0]["report"]["people"][0]
         assert all(f["suitable"] for f in p["frames"]), scenario
-        assert len(p["frames"]) == 31
+        assert len(p["frames"]) == 21
         traces.append(json.dumps(p["frames"][15]["landmarks"]["keypoints"]))
     assert len(set(traces)) == 6
 

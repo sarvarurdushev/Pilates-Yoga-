@@ -89,9 +89,9 @@ def derivatives(series, max_gap=0.6):
         acc = None
         if v is not None and previous is not None:
             dt = t - previous[0]
-            if 0 < dt <= max_gap:
+            if 0 < dt <= max_gap + 1e-9:
                 speed = (v - previous[1]) / dt
-                if previous_v is not None and 0 < t - previous_v[0] <= max_gap:
+                if previous_v is not None and 0 < t - previous_v[0] <= max_gap + 1e-9:
                     acc = (speed - previous_v[1]) / (t - previous_v[0])
         velocity.append([t, round(speed, 5) if speed is not None else None])
         acceleration.append([t, round(acc, 5) if acc is not None else None])

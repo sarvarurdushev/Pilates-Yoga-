@@ -854,7 +854,10 @@ class Handler(SimpleHTTPRequestHandler):
             if route.path == "/evidence/capabilities":
                 self._json({"photo": True, "video": self.jobs is not None,
                             "three_d": pose3d.configured(), "login_required": self.require_auth,
-                            "model": "RTMO-m", "version": ev.VERSION,
+                            "model": "RTMO-" + os.environ.get(
+                                "PILATES_POSE_MODEL",
+                                "s" if os.environ.get("RENDER") == "true" else "m",
+                            ), "version": ev.VERSION,
                             "deployment": metadata()})
             elif route.path == "/evidence/jobs":
                 job = self.jobs.get(query.get("id", [""])[0]) if self.jobs else None
