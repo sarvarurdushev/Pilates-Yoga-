@@ -458,7 +458,7 @@ def test_library_pagination_search_and_unique_scenarios(state):
         report = simulation(scenario, 0, "movement")
         p = report["views"][0]["report"]["people"][0]
         assert all(f["suitable"] for f in p["frames"]), scenario
-        assert len(p["frames"]) == 61
+        assert len(p["frames"]) == 31
         traces.append(json.dumps(p["frames"][15]["landmarks"]["keypoints"]))
     assert len(set(traces)) == 6
 

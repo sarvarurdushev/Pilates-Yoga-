@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from functools import wraps
 import json
 import math
+import os
 import statistics
 import threading
 import uuid
@@ -365,7 +366,7 @@ def photo(payload, backend=None):
         "width": w,
         "height": h,
         "people": people,
-        "model": "RTMO-m",
+        "model": f"RTMO-{getattr(backend, 'size', 'custom')}",
         "tiled": use_tiles,
         "warnings": (
             []
@@ -572,7 +573,10 @@ def video(
 
         backend = TiledBackend(backend, cols=cols, rows=rows, scale=1, overlap=0.25)
     pipeline = Pipeline(cfg, backend=backend)
-    stride = max(1, int(round(fps / 6)))
+    sample_fps = float(os.environ.get("PILATES_VIDEO_SAMPLE_FPS", "6"))
+    if not math.isfinite(sample_fps) or not 1 <= sample_fps <= 30:
+        raise ValueError("Video sampling rate must be between 1 and 30 fps.")
+    stride = max(1, int(round(fps / sample_fps)))
     tracks = {}
     counts = []
     index = 0

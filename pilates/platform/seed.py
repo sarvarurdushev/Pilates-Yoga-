@@ -736,7 +736,10 @@ def simulation(client, visit, kind):
         "source": "Explicit demo coordinate simulation",
     }
     if kind == "movement":
-        times = [round(i * 0.2, 2) for i in range(61)]
+        # Thirty-one observations retain the full 12-second trend and remain
+        # within the 0.6-second derivative gap, while keeping the demo's
+        # coordinate history small enough for a free 512 MB host.
+        times = [round(i * 0.4, 2) for i in range(31)]
         frames = []
         series = {key: [] for key in SIGNALS}
         for t in times:

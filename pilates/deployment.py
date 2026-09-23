@@ -28,6 +28,11 @@ def prepare_render():
     if os.environ.get("RENDER") != "true":
         return
     os.environ.setdefault("PILATES_CPU_THREADS", "1")
+    # The free instance must leave room for the anatomy app, the SQLite
+    # history and the independent depth model while a capture is in flight.
+    # Higher-capacity deployments can override either setting explicitly.
+    os.environ.setdefault("PILATES_POSE_MODEL", "s")
+    os.environ.setdefault("PILATES_VIDEO_SAMPLE_FPS", "3")
     if os.environ.get("PILATES_3D_MODEL"):
         return
     target = Path(os.environ.get("XDG_CACHE_HOME", "/tmp/cache")) / "pose_landmarker_full.task"

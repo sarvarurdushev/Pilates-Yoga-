@@ -20,6 +20,7 @@ revoke any of them in a click, and read every time it was opened.
 """
 from __future__ import annotations
 
+import os
 from .accounts import (ACTIVE, ADMIN, COACH, PARQ, PENDING, REQUESTABLE, ROLES,
                        SCOPES, STUDENT, Profile, Screening, Viewer,
                        may_read_measurements, may_write_about, today,
@@ -1245,7 +1246,7 @@ def pose_backend():
     if _BACKEND is None:
         try:
             from .pose import RTMOBackend
-            _BACKEND = RTMOBackend(size="m")
+            _BACKEND = RTMOBackend(size=os.environ.get("PILATES_POSE_MODEL", "m"))
         except MemoryError as exc:
             raise Refused("this server does not have enough memory to load "
                           "the pose model; a photograph assessment needs "
