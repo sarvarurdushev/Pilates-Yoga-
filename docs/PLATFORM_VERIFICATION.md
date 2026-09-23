@@ -51,3 +51,25 @@ visibility are tested. Seed profiling improved from **24.87 s to 4.94 s** locall
 (29.9 million calls to 325 thousand), while preserving 204 historical analyses.
 Platform regression: 16 tests passed before correcting a test's tuple-vs-JSON
 array comparison; the corrected scenario test then passed (17 total).
+
+### Hosted photo and free-tier video memory correction
+
+On commit `3e74e0b102b084830fff70bfc8f8dedcedfe756d`, Render created the
+coach demo and served Sarah's linked history and schedule. An uploaded real
+front photograph (`male_full_height_hands.jpg`) completed in **51.48 s** as
+analysis `56ccdb6497f64a20b77f0e74fedd5761`. Person 1 passed the body gate;
+its independent 3D pose was estimated, its 40 coordinates were retrieved, the
+coach review succeeded, and the analysis appeared in Sarah's history.
+
+A real `tree-demo.mp4` upload started processing, but the free instance briefly
+returned 502 and restarted the job. The server marked it failed on restart.
+This run is not counted as hosted video success. The likely pressure is running
+RTMO and the optional independent depth model at the same time, near the 512 MB
+ceiling; exact hosted RSS is unavailable through the current service.
+
+The video pipeline now finishes RTMO tracking first, retains sparse JPEG frames
+for independent depth, releases the RTMO session and native allocations, then
+loads the depth model. A real local repeat of the same 5.93-second clip found
+34 frames for the suitable person and **five independently estimated depth
+frames**, with a **273.9 MB peak RSS**, down from the prior 460.2 MB. The
+48 relevant evidence/platform regression tests passed. Hosted retest pending.

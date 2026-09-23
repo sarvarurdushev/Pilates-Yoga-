@@ -22,15 +22,20 @@ _ANALYSIS_LOCK = threading.Lock()
 
 def one_assessment_at_a_time(fn):
     """Bound model scratch memory while health and job-status requests stay live."""
+
     @wraps(fn)
     def run(*args, **kwargs):
         from .api import Refused
+
         if not _ANALYSIS_LOCK.acquire(blocking=False):
-            raise Refused("Another assessment is being analysed. Try again when it finishes.", 409)
+            raise Refused(
+                "Another assessment is being analysed. Try again when it finishes.", 409
+            )
         try:
             return fn(*args, **kwargs)
         finally:
             _ANALYSIS_LOCK.release()
+
     return run
 
 
@@ -331,7 +336,9 @@ def photo(payload, backend=None):
     candidates = backend(frame)
     scales = {id(d): min(1, 640 / max(w, h)) for d in candidates}
     if use_tiles:
-        extra = TiledBackend(backend, cols=cols, rows=rows, scale=1, overlap=0.25)(frame)
+        extra = TiledBackend(backend, cols=cols, rows=rows, scale=1, overlap=0.25)(
+            frame
+        )
         scales.update({id(d): tile_scale for d in extra})
         candidates += extra
     # Preserve source resolution for suitability: upscaling cannot earn precision.
@@ -487,7 +494,17 @@ def analyse_series(times, values):
         "peak": round(max(all_values), 1),
         "rom": round(max(all_values) - min(all_values), 1),
         "repetitions": count,
-        "cycles": [{"start": r.start, "end": r.end, "rom": round(r.range_of_motion,1), "out_seconds": r.out_duration, "return_seconds": r.back_duration, "duration": r.duration} for r in reps],
+        "cycles": [
+            {
+                "start": r.start,
+                "end": r.end,
+                "rom": round(r.range_of_motion, 1),
+                "out_seconds": r.out_duration,
+                "return_seconds": r.back_duration,
+                "duration": r.duration,
+            }
+            for r in reps
+        ],
         "tempo_s": round(statistics.mean(durations), 2) if durations else None,
         "tempo_cv": (
             round(statistics.pstdev(durations) / statistics.mean(durations), 3)
@@ -509,7 +526,17 @@ def analyse_series(times, values):
 
 
 @one_assessment_at_a_time
-def video(path, *, view="auto", tiled=False, progress=None, backend=None, protocol="", include_3d=False):
+def video(
+    path,
+    *,
+    view="auto",
+    tiled=False,
+    progress=None,
+    backend=None,
+    protocol="",
+    include_3d=False,
+):
+    import gc
     import cv2
     from . import api
     from .config import StudioConfig
@@ -538,7 +565,8 @@ def video(path, *, view="auto", tiled=False, progress=None, backend=None, protoc
     cfg.tile_scale = 1
     # Photo and video share model weights; each Pipeline still owns a fresh
     # tracker. A second RTMO session can exhaust a small deployment's memory.
-    backend = backend or api.pose_backend()
+    model_backend = backend or api.pose_backend()
+    backend = model_backend
     if tiled:
         from .pose import TiledBackend
 
@@ -552,6 +580,7 @@ def video(path, *, view="auto", tiled=False, progress=None, backend=None, protoc
     last_time = -1
     timestamp_fallback = False
     last_depth = {}
+    depth_candidates = []
     try:
         while True:
             ok, frame = cap.read()
@@ -610,8 +639,32 @@ def video(path, *, view="auto", tiled=False, progress=None, backend=None, protoc
                     )
                     # Sparse depth is independently corroborated. Unsampled frames
                     # have no Z values; hidden movement is never interpolated.
-                    if include_3d and p["suitable"] and t - last_depth.get(key, -2) >= 1:
-                        tr["frames"][-1]["pose3d"] = pose3d.estimate(frame, d)
+                    if (
+                        include_3d
+                        and p["suitable"]
+                        and t - last_depth.get(key, -2) >= 1
+                    ):
+                        # Keep a small encoded frame until 2D tracking finishes.
+                        # Running both inference models together exceeded the
+                        # memory ceiling on the free Render instance.
+                        encoded, jpeg = cv2.imencode(
+                            ".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 92]
+                        )
+                        if encoded:
+                            from .types import Detection
+
+                            depth_candidates.append(
+                                (
+                                    key,
+                                    len(tr["frames"]) - 1,
+                                    jpeg.tobytes(),
+                                    Detection(d.keypoints.copy(), d.scores.copy()),
+                                )
+                            )
+                        else:
+                            tr["frames"][-1]["pose3d"] = pose3d.unavailable(
+                                "This sampled frame could not be prepared for independent depth estimation."
+                            )
                         last_depth[key] = t
                     if p["suitable"]:
                         tr["valid"] += 1
@@ -632,6 +685,27 @@ def video(path, *, view="auto", tiled=False, progress=None, backend=None, protoc
             index += 1
     finally:
         cap.release()
+    if depth_candidates:
+        if api._BACKEND is model_backend:
+            api._BACKEND = None
+        del pipeline, backend, model_backend, frame, r, person, d
+        gc.collect()
+        try:
+            import ctypes
+
+            ctypes.CDLL(None).malloc_trim(0)
+        except (AttributeError, OSError):
+            pass
+        if progress:
+            progress("Estimating depth on corroborated visible frames")
+        for key, frame_number, jpeg, detection in depth_candidates:
+            image = cv2.imdecode(np.frombuffer(jpeg, dtype=np.uint8), cv2.IMREAD_COLOR)
+            tracks[key]["frames"][frame_number]["pose3d"] = (
+                pose3d.estimate(image, detection)
+                if image is not None
+                else pose3d.unavailable("The sampled frame could not be decoded.")
+            )
+        del depth_candidates
     # Retain established tracking gate; diagnostics cannot certify an identity.
     typical = float(np.median([c for c in counts if c])) if any(counts) else 0
     churn = len(tracks) / typical if typical else 0
