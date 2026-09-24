@@ -157,3 +157,16 @@ def test_program_http_routes(studio):
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_revision_evidence_survives_backup_restore(studio):
+    from pilates.platform.backup import export_archive, restore_archive
+    repo, coach, admin, student = studio
+    fresh = repo.actor(repo.create_org("Restored owner", "designer-restore@example.org", "a-strong-password", "Restored"))
+    with export_archive(repo, admin) as archive:
+        restore_archive(repo, fresh, archive)
+    restored = next(p for p in repo.list(fresh, "programs")["items"] if p["name"] == "Shoulder control · Phase 1")
+    latest = versions(repo, fresh, restored["id"])["items"][0]
+    assert latest["source_kind"] == "analysis"
+    assert repo.get(fresh, "analyses", latest["source_id"])["student_id"] == restored["detail"]["student_id"]
+    assert latest["snapshot"]["steps"][0]["detail"]["source"]["id"] == latest["source_id"]
