@@ -243,6 +243,11 @@ async function render() {
       : null;
   } catch (error) {
     if (myGeneration !== generation) return;
+    if (error.status === 401) {
+      state.me = null;
+      login();
+      return;
+    }
     state.client = null;
     shell();
     $("#app").innerHTML = empty(
@@ -305,6 +310,11 @@ async function render() {
     } else await section(root, page);
     bindButtons(root);
   } catch (e) {
+    if (e.status === 401) {
+      state.me = null;
+      login();
+      return;
+    }
     root.innerHTML = empty(
       "This view could not open",
       esc(e.message),
