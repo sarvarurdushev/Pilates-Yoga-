@@ -233,6 +233,8 @@ def restore_archive(repo, actor, archive):
                                 row[key] = mapping[(parent, value)]
                         elif len(keys) == 1 and key == keys[0]:
                             row[key] = mapping[(table, value)]
+                        elif table == "p_program_revisions" and key == "source_id" and value:
+                            row[key] = text_ids.get(value, value)
                         elif key in {"detail", "result", "summary", "completed", "snapshot"}:
                             row[key] = encode(remap_json(json.loads(value)))
                     if table == "p_users":
