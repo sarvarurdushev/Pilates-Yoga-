@@ -37,7 +37,10 @@ function removeButton(kind, id) {
     : "";
 }
 export async function edit(kind, id, copy = false) {
-  if (kind === "programs") return programEditor(id, copy);
+  if (kind === "programs") {
+    const { programEditor } = await import("./programs.js");
+    return programEditor(id, copy);
+  }
   if (kind === "exercises") return exerciseEditor(id, copy);
   const me = state.me;
   let item = {};
@@ -495,186 +498,11 @@ async function exerciseEditor(id, copy) {
   );
   wireRemove(d, "exercises", id);
 }
-async function programEditor(id, copy) {
-  const source = id ? await record("programs", id) : {};
-  if (copy) id = null;
-  const first = await list("exercises", { limit: 50 });
-  const ex = first.items;
-  for (const step of source.steps || []) {
-    if (!ex.some((e) => e.id === step.exercise_id))
-      ex.push(await record("exercises", step.exercise_id));
-  }
-  const detail = source.detail || {};
-  let steps = structuredClone(source.steps || []);
-  const html =
-    field(
-      "Program name",
-      "name",
-      (copy ? "Copy of " : "") + (source.name || ""),
-      "text",
-      "required",
-    ) +
-    area("Description", "description", detail.description) +
-    area("Goal", "goal", source.goal) +
-    `<div class="grid two">${select(
-      "Difficulty",
-      "difficulty",
-      ["Foundation", "Intermediate", "Advanced"].map((x) => [x, x]),
-      detail.difficulty || "Foundation",
-      null,
-    )}${field("Frequency", "frequency", detail.frequency || "Twice weekly")}${select("Target region", "region_id", regions(), source.region_id || params().get("region"))}${select("Location", "location_id", state.me.locations, source.location_id || state.client?.location_ids?.[0], "Any assigned location")}</div>` +
-    field("Movement focus", "movement_focus", detail.movement_focus) +
-    `<h3>Exercise sequence</h3><p class="muted">Add movements, then drag steps or use the arrow controls.</p><div class="filter-row">${field("Find an exercise", "exercise_search")}${select("Exercise to add", "exercise_id", ex, "", "Choose an exercise")}<button type="button" id="step-add">+ Add movement</button></div><div id="program-steps"></div>` +
-    removeButton("programs", id);
-  const d = modal(
-    copy ? "Duplicate program" : id ? "Edit program" : "New program",
-    html,
-    async (f) => {
-      readSteps();
-      const values = asObject(f);
-      const saved = await api("save", {
-        collection: "programs",
-        item: {
-          id,
-          name: values.name,
-          goal: values.goal,
-          region_id: values.region_id,
-          location_id: values.location_id,
-          detail: {
-            ...detail,
-            source_analysis_id:
-              detail.source_analysis_id ||
-              (state.client?.analyses.some((a) => a.id === params().get("id"))
-                ? params().get("id")
-                : null),
-            source_student_id:
-              detail.source_student_id || state.client?.id || null,
-            description: values.description,
-            difficulty: values.difficulty,
-            frequency: values.frequency,
-            movement_focus: values.movement_focus,
-            duration: Math.round(
-              steps.reduce((n, s) => n + s.sets * (s.seconds + s.rest), 0) / 60,
-            ),
-          },
-          steps,
-        },
-      });
-      go("program", { id: saved.id });
-    },
-  );
-  function readSteps() {
-    d.querySelectorAll(".program-step").forEach((el, i) => {
-      for (const key of ["sets", "reps", "seconds", "rest"])
-        steps[i][key] = Number(el.querySelector(`[name=${key}]`).value);
-      steps[i].notes = el.querySelector("[name=notes]").value;
-      steps[i].phase = el.querySelector("[name=phase]").value;
-    });
-  }
-  let dragged = null;
-  function draw() {
-    d.querySelector("#program-steps").innerHTML = steps
-      .map(
-        (s, i) =>
-          `<div class="program-step" draggable="true" data-index="${i}"><div class="page-head"><h3>${i + 1}. ${esc(ex.find((e) => e.id === s.exercise_id)?.name || "Exercise")}</h3><div><button type="button" data-move="${i},-1" aria-label="Move step ${i + 1} up">↑</button><button type="button" data-move="${i},1" aria-label="Move step ${i + 1} down">↓</button><button type="button" data-duplicate="${i}">Duplicate</button><button type="button" data-step-delete="${i}">Remove</button></div></div><div class="grid five">${select(
-            "Phase",
-            "phase",
-            ["Warm-up", "Practice", "Cooldown"].map((v) => [v, v]),
-            s.phase || "Practice",
-            null,
-          )}${field("Sets", "sets", s.sets || 1, "number", 'min="1"')}${field("Reps", "reps", s.reps ?? 8, "number", 'min="0"')}${field("Duration (s)", "seconds", s.seconds ?? 60, "number", 'min="0"')}${field("Rest (s)", "rest", s.rest ?? 20, "number", 'min="0"')}</div>${area("Step coaching note", "notes", s.notes)}</div>`,
-      )
-      .join("");
-    d.querySelectorAll("[data-move]").forEach(
-      (b) =>
-        (b.onclick = () => {
-          readSteps();
-          const [i, delta] = b.dataset.move.split(",").map(Number),
-            j = i + delta;
-          if (j >= 0 && j < steps.length)
-            [steps[i], steps[j]] = [steps[j], steps[i]];
-          draw();
-        }),
-    );
-    d.querySelectorAll("[data-duplicate]").forEach(
-      (b) =>
-        (b.onclick = () => {
-          readSteps();
-          steps.splice(
-            +b.dataset.duplicate + 1,
-            0,
-            structuredClone(steps[+b.dataset.duplicate]),
-          );
-          draw();
-        }),
-    );
-    d.querySelectorAll("[data-step-delete]").forEach(
-      (b) =>
-        (b.onclick = () => {
-          readSteps();
-          steps.splice(+b.dataset.stepDelete, 1);
-          draw();
-        }),
-    );
-    d.querySelectorAll(".program-step").forEach((el) => {
-      el.ondragstart = () => {
-        readSteps();
-        dragged = +el.dataset.index;
-      };
-      el.ondragover = (e) => e.preventDefault();
-      el.ondrop = (e) => {
-        e.preventDefault();
-        if (dragged !== null) {
-          const step = steps.splice(dragged, 1)[0];
-          steps.splice(+el.dataset.index, 0, step);
-          draw();
-        }
-      };
-    });
-  }
-  d.querySelector("#step-add").onclick = () => {
-    readSteps();
-    const eid = d.querySelector("[name=exercise_id]").value;
-    if (eid) {
-      steps.push({
-        exercise_id: eid,
-        sets: 1,
-        reps: 8,
-        seconds: 60,
-        rest: 20,
-        phase: steps.length ? "Practice" : "Warm-up",
-      });
-      draw();
-    }
-  };
-  let searchVersion = 0,
-    searchTimer;
-  d.querySelector("[name=exercise_search]").placeholder =
-    "Search all exercises; refine to show up to 50 matches";
-  d.querySelector("[name=exercise_search]").oninput = (e) => {
-    const q = e.target.value,
-      version = ++searchVersion;
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(async () => {
-      try {
-        const result = await list("exercises", { q, limit: 50 });
-        if (version !== searchVersion || !d.isConnected) return;
-        for (const item of result.items)
-          if (!ex.some((x) => x.id === item.id)) ex.push(item);
-        d.querySelector("[name=exercise_id]").innerHTML = options(
-          result.items,
-          "",
-          `${result.total} matches · choose a movement`,
-        );
-      } catch (error) {
-        toast(error.message);
-      }
-    }, 200);
-  };
-  draw();
-  wireRemove(d, "programs", id);
-}
 export async function detailPage(root, kind, id) {
+  if (kind === "program") {
+    const { programDetail } = await import("./programs.js");
+    return programDetail(root, id);
+  }
   const collection = kind === "program" ? "programs" : "exercises";
   const item = await record(collection, id);
   const d = item.detail || {};
