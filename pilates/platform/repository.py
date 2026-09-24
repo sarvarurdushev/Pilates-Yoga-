@@ -156,6 +156,9 @@ class Repository:
         from .regions import seed_regions
 
         seed_regions(self)
+        from .designer import backfill_revisions
+
+        backfill_revisions(self)
 
     @contextmanager
     def db(self):
@@ -285,6 +288,9 @@ class Repository:
         from .seed import seed_organization
 
         seed_organization(self, org)
+        from .designer import backfill_revisions
+
+        backfill_revisions(self, org)
         with self.db() as db:
             if user_id:
                 row = db.execute(
@@ -372,10 +378,11 @@ class Repository:
         if collection == "media":
             if actor.role == "admin":
                 return "org_id=?", [actor.org_id]
-            return (
-                f"org_id=? AND (student_id IN ({marks}) OR owner_id=? OR exercise_id IN (SELECT id FROM p_exercises WHERE org_id=? AND visibility='organization') OR exercise_id IN (SELECT pe.exercise_id FROM p_program_exercises pe JOIN p_program_assignments pa ON pa.program_id=pe.program_id WHERE pa.student_id IN ({marks})))",
-                [actor.org_id, *students, actor.user_id, actor.org_id, *students],
-            )
+            where = f"org_id=? AND (student_id IN ({marks}) OR owner_id=? OR exercise_id IN (SELECT id FROM p_exercises WHERE org_id=? AND visibility='organization') OR exercise_id IN (SELECT pe.exercise_id FROM p_program_exercises pe JOIN p_program_assignments pa ON pa.program_id=pe.program_id WHERE pa.student_id IN ({marks})))"
+            if actor.role == "student":
+                where += " AND id NOT IN (SELECT json_extract(m.value,'$.media_id') FROM p_program_step_details sd, json_each(sd.detail,'$.media') m WHERE json_extract(m.value,'$.visibility')='coach')"
+                where += " AND id NOT IN (SELECT json_extract(m.value,'$.media_id') FROM p_program_revisions r, json_each(r.snapshot,'$.steps') s, json_each(s.value,'$.detail.media') m WHERE json_extract(m.value,'$.visibility')='coach')"
+            return where, [actor.org_id, *students, actor.user_id, actor.org_id, *students]
         if collection in ("locations", "equipment") and actor.role != "admin":
             locations = self.location_ids(actor, db)
             field = "id" if collection == "locations" else "location_id"
@@ -390,8 +397,9 @@ class Repository:
                 [actor.org_id, actor.user_id, *students],
             )
         if collection == "programs" and actor.role != "admin":
+            template = " OR (json_extract(detail,'$.template')=1 AND json_extract(detail,'$.template_visibility')='organization')" if actor.role == "coach" else ""
             return (
-                f"org_id=? AND (owner_id=? OR id IN (SELECT program_id FROM p_program_assignments WHERE student_id IN ({marks})))",
+                f"org_id=? AND (owner_id=? OR id IN (SELECT program_id FROM p_program_assignments WHERE student_id IN ({marks})){template})",
                 [actor.org_id, actor.user_id, *students],
             )
         return "org_id=?", [actor.org_id]
@@ -423,6 +431,8 @@ class Repository:
             if kind and collection == "analyses":
                 where += " AND kind=?"
                 args.append(kind)
+            if collection == "exercises":
+                where += " AND COALESCE(json_extract(detail,'$.program_only'),0)!=1"
             if category and collection == "exercises":
                 where += " AND (category=? OR EXISTS (SELECT 1 FROM json_each(detail,'$.tags') WHERE value=?))"
                 args.extend([category, category])
@@ -477,6 +487,9 @@ class Repository:
             if collection == "media":
                 for row in rows:
                     row.pop("path", None)
+            if collection == "programs" and actor.role == "student":
+                for row in rows:
+                    row["detail"].pop("coach_notes", None)
             if collection == "exercises":
                 for row in rows:
                     first = db.execute(
@@ -501,13 +514,22 @@ class Repository:
             raise Refused("This record is not available in your workspace.", 404)
         result = unpack(row)
         if collection == "programs":
-            result["steps"] = [
-                unpack(r)
-                for r in db.execute(
-                    "SELECT * FROM p_program_exercises WHERE program_id=? ORDER BY position",
-                    (identifier,),
-                )
-            ]
+            from .designer import student_program
+
+            result["steps"] = []
+            for r in db.execute(
+                "SELECT pe.*,sd.detail AS step_detail,e.name AS exercise_name,e.category AS exercise_category,e.region_id AS exercise_region_id FROM p_program_exercises pe LEFT JOIN p_program_step_details sd ON sd.step_id=pe.id JOIN p_exercises e ON e.id=pe.exercise_id WHERE pe.program_id=? ORDER BY pe.position",
+                (identifier,),
+            ):
+                step = dict(r)
+                step["detail"] = json.loads(step.pop("step_detail") or "{}")
+                result["steps"].append(step)
+            result["steps"].extend(
+                {**dict(r), "type": "note"}
+                for r in db.execute("SELECT * FROM p_program_step_notes WHERE program_id=?", (identifier,))
+            )
+            result["steps"].sort(key=lambda row: row["position"])
+            result["version"] = db.execute("SELECT COALESCE(MAX(version),0) FROM p_program_revisions WHERE program_id=?", (identifier,)).fetchone()[0]
             students = self.student_ids(actor, db)
             result["assignments"] = [
                 unpack(r)
@@ -517,20 +539,28 @@ class Repository:
                 )
                 if r["student_id"] in students
             ]
+            if actor.role == "student":
+                result = student_program(result)
         if collection == "exercises":
-            result["resources"] = [
-                dict(r)
-                for r in db.execute(
-                    "SELECT * FROM p_resources WHERE exercise_id=?", (identifier,)
-                )
-            ]
-            result["media"] = [
-                {k: v for k, v in unpack(r).items() if k != "path"}
-                for r in db.execute(
-                    "SELECT m.* FROM p_media m JOIN p_exercise_media e ON e.media_id=m.id WHERE e.exercise_id=?",
-                    (identifier,),
-                )
-            ]
+            result["resources"] = []
+            for r in db.execute(
+                "SELECT pr.*,rd.detail AS resource_detail FROM p_resources pr LEFT JOIN p_resource_details rd ON rd.resource_id=pr.id WHERE pr.exercise_id=?", (identifier,)
+            ):
+                resource = dict(r)
+                resource["detail"] = json.loads(resource.pop("resource_detail") or "{}")
+                if actor.role != "student" or resource["detail"].get("visibility", "student") == "student":
+                    result["resources"].append(resource)
+            result["media"] = []
+            for r in db.execute(
+                "SELECT m.* FROM p_media m JOIN p_exercise_media e ON e.media_id=m.id WHERE e.exercise_id=?",
+                (identifier,),
+            ):
+                if actor.role == "student":
+                    try:
+                        self.get(actor, "media", r["id"], db)
+                    except Refused:
+                        continue
+                result["media"].append({k: v for k, v in unpack(r).items() if k != "path"})
             result["equipment"] = [
                 dict(r)
                 for r in db.execute(
@@ -712,7 +742,7 @@ class Repository:
             client["sessions"] = [
                 unpack(r)
                 for r in db.execute(
-                    "SELECT * FROM p_training_sessions WHERE student_id=? ORDER BY performed_at DESC",
+                    "SELECT ts.*,pv.version AS program_version FROM p_training_sessions ts LEFT JOIN p_training_session_program_versions pv ON pv.session_id=ts.id WHERE ts.student_id=? ORDER BY ts.performed_at DESC",
                     (identifier,),
                 )
             ]
@@ -812,10 +842,30 @@ class Repository:
             ):
                 raise Refused("Duplicate this shared content before editing it.", 403)
             fields = {k: item[k] for k in WRITABLE[collection] if k in item}
+            if collection == "programs" and not existing and "detail" not in fields:
+                fields["detail"] = {"status": "Draft"}
+            if collection == "programs" and "detail" in fields:
+                from .designer import program_detail
+
+                fields["detail"] = program_detail(self, actor, fields["detail"], db)
+            if collection == "exercises" and "detail" in fields:
+                detail = fields["detail"]
+                if not isinstance(detail, dict):
+                    raise Refused("Enter exercise details.")
+                if "target_region_ids" in detail:
+                    from .designer import _region_ids
+
+                    detail["target_region_ids"] = _region_ids(db, detail["target_region_ids"])
+                if "program_only" in detail:
+                    detail["program_only"] = bool(detail["program_only"])
+                    if detail["program_only"] and fields.get("visibility", existing.get("visibility", "private")) != "private":
+                        raise Refused("Program-only exercises must stay private.")
             for k in list(fields):
                 if k.endswith("_id") and fields[k] == "":
                     fields[k] = None
             merged = {**existing, **fields}
+            if collection == "programs" and not str(merged.get("name") or "").strip():
+                raise Refused("Name the program.")
             self._linked(actor, merged, db, merged.get("student_id"))
             for f in ("name", "text"):
                 if f in fields and not str(fields[f]).strip():
@@ -861,6 +911,10 @@ class Repository:
                 )
             if collection == "programs" and "steps" in item:
                 self._steps(actor, identifier, item["steps"], db)
+            if collection == "programs":
+                from .designer import record_revision
+
+                record_revision(self, actor, identifier, item, db)
             if collection == "exercises":
                 self._exercise_links(actor, identifier, item, db)
             if collection == "locations" and "rooms" in item:
@@ -882,19 +936,35 @@ class Repository:
     def _steps(self, actor, program, steps, db):
         if not isinstance(steps, list) or len(steps) > 200:
             raise Refused("A program supports up to 200 sequence steps.")
+        program_detail = unpack(db.execute("SELECT detail FROM p_programs WHERE id=?", (program,)).fetchone())["detail"]
+        assigned = [r[0] for r in db.execute("SELECT DISTINCT student_id FROM p_program_assignments WHERE program_id=?", (program,))]
+        student_id = program_detail.get("student_id") or (assigned[0] if len(assigned) == 1 else None)
         db.execute("DELETE FROM p_program_exercises WHERE program_id=?", (program,))
+        db.execute("DELETE FROM p_program_step_notes WHERE program_id=?", (program,))
         for position, step in enumerate(steps):
+            if not isinstance(step, dict):
+                raise Refused("Enter a valid program step.")
+            if step.get("type") == "note":
+                text = str(step.get("text") or "").strip()
+                if not text or len(text) > 3000 or step.get("visibility", "student") not in ("student", "coach"):
+                    raise Refused("Enter a note and choose who can see it.")
+                db.execute("INSERT INTO p_program_step_notes VALUES (?,?,?,?,?,?,?)", (uid(), program, position, str(step.get("phase", "Practice"))[:80], str(step.get("section", ""))[:80], text, step.get("visibility", "student")))
+                continue
             self.get(actor, "exercises", step["exercise_id"], db)
+            from .designer import step_detail
+
+            extra = step_detail(self, actor, step["exercise_id"], step.get("detail"), db, student_id)
             values = [
                 int(step.get(k, d))
                 for k, d in [("sets", 1), ("reps", 8), ("seconds", 60), ("rest", 20)]
             ]
             if any(v < 0 or v > 7200 for v in values) or values[0] < 1:
                 raise Refused("Enter valid sets, repetitions and durations.")
+            step_id = uid()
             db.execute(
                 "INSERT INTO p_program_exercises VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (
-                    uid(),
+                    step_id,
                     program,
                     step["exercise_id"],
                     position,
@@ -903,6 +973,8 @@ class Repository:
                     str(step.get("notes", ""))[:3000],
                 ),
             )
+            if extra:
+                db.execute("INSERT INTO p_program_step_details VALUES (?,?)", (step_id, encode(extra)))
 
     def _exercise_links(self, actor, exercise, item, db):
         if "resources" in item:
@@ -910,17 +982,28 @@ class Repository:
                 raise Refused("Use at most 30 resources per exercise.")
             db.execute("DELETE FROM p_resources WHERE exercise_id=?", (exercise,))
             for r in item["resources"]:
-                if not re.match(r"^https?://[^\s]+$", str(r.get("url", ""))):
+                if not isinstance(r, dict) or not re.match(r"^https?://[^\s]+$", str(r.get("url", ""))):
                     raise Refused("Resources need an http or https URL.")
+                from .designer import REFERENCE_TYPES
+
+                detail = dict(r.get("detail") or {})
+                for key in ("type", "description", "visibility"):
+                    if key in r:
+                        detail[key] = r[key]
+                if detail.get("type", "other") not in REFERENCE_TYPES or detail.get("visibility", "student") not in ("student", "coach"):
+                    raise Refused("Choose a valid reference type and audience.")
+                detail["description"] = str(detail.get("description") or "")[:1000]
+                resource_id = uid()
                 db.execute(
                     "INSERT INTO p_resources VALUES (?,?,?,?)",
                     (
-                        uid(),
+                        resource_id,
                         exercise,
                         str(r.get("title") or "Resource")[:150],
                         r["url"],
                     ),
                 )
+                db.execute("INSERT INTO p_resource_details VALUES (?,?)", (resource_id, encode(detail)))
         if "equipment" in item:
             db.execute(
                 "DELETE FROM p_exercise_equipment WHERE exercise_id=?", (exercise,)
@@ -1257,6 +1340,16 @@ class Repository:
                         "Remove this exercise from its programs before deleting it.",
                         409,
                     )
+                if collection == "programs" and (
+                    db.execute("SELECT 1 FROM p_program_assignments WHERE program_id=?", (identifier,)).fetchone()
+                    or db.execute("SELECT 1 FROM p_training_sessions WHERE program_id=?", (identifier,)).fetchone()
+                    or db.execute("SELECT 1 FROM p_program_revisions WHERE program_id=? AND version>1", (identifier,)).fetchone()
+                ):
+                    raise Refused("Archive an assigned or edited program to preserve its history.", 409)
+                if collection == "media" and db.execute("SELECT 1 FROM p_program_revisions WHERE instr(snapshot,?)>0 LIMIT 1", (identifier,)).fetchone():
+                    raise Refused("This media belongs to a historical program version. Archive the plan instead.", 409)
+                if collection == "exercises" and db.execute("SELECT 1 FROM p_program_revisions WHERE instr(snapshot,?)>0 LIMIT 1", (identifier,)).fetchone():
+                    raise Refused("This exercise belongs to a historical program version.", 409)
                 paths = (
                     [
                         r[0]
@@ -1283,7 +1376,19 @@ class Repository:
             raise Refused("Your coach assigns programs.", 403)
         with self.db() as db:
             self.assert_student(actor, item["student_id"], True, db)
-            self.get(actor, "programs", item["program_id"], db)
+            program = self.get(actor, "programs", item["program_id"], db)
+            if program["detail"].get("student_id") and program["detail"]["student_id"] != item["student_id"]:
+                raise Refused("This client-specific plan belongs to another client.", 403)
+            from .designer import _source
+
+            for step in program["steps"]:
+                source = step.get("detail", {}).get("source")
+                if source:
+                    _source(self, actor, source, db, item["student_id"])
+                for medium in step.get("detail", {}).get("media", []):
+                    linked = self.get(actor, "media", medium.get("media_id"), db)
+                    if linked["kind"] == "capture" and linked.get("student_id") != item["student_id"]:
+                        raise Refused("A client capture belongs to another client.")
             self._linked(actor, item, db, item["student_id"])
             if item.get("replace", True):
                 db.execute(
@@ -1318,7 +1423,7 @@ class Repository:
                     raise Refused(
                         "Assign this program to the client before recording a session."
                     )
-                allowed = {s["exercise_id"] for s in program["steps"]}
+                allowed = {s["exercise_id"] for s in program["steps"] if s.get("exercise_id")}
                 if any(x not in allowed for x in item.get("completed", [])):
                     raise Refused("Completed exercises must belong to the program.")
 
@@ -1340,6 +1445,10 @@ class Repository:
                     str(item.get("notes", ""))[:3000],
                 ),
             )
+            if item.get("program_id"):
+                version = db.execute("SELECT MAX(version) FROM p_program_revisions WHERE program_id=?", (item["program_id"],)).fetchone()[0]
+                if version:
+                    db.execute("INSERT INTO p_training_session_program_versions VALUES (?,?,?)", (identifier, item["program_id"], version))
             if item.get("reservation_id"):
                 db.execute(
                     "UPDATE p_reservations SET status='attended' WHERE id=?",

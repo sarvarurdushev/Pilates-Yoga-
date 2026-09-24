@@ -108,7 +108,9 @@ def restore_archive(repo, actor, archive):
             meta = schema(db)
             tables = manifest.get("tables", [])
             expected = set(meta) - PUBLIC
-            if set(tables) != expected or len(tables) != len(expected):
+            optional_new = {"p_program_step_details", "p_program_step_notes", "p_program_revisions", "p_resource_details", "p_training_session_program_versions"}
+            missing = expected - set(tables)
+            if (set(tables) - expected) or (missing - optional_new) or len(tables) != len(set(tables)):
                 raise Refused(
                     "The backup schema does not match this application version."
                 )
@@ -231,7 +233,7 @@ def restore_archive(repo, actor, archive):
                                 row[key] = mapping[(parent, value)]
                         elif len(keys) == 1 and key == keys[0]:
                             row[key] = mapping[(table, value)]
-                        elif key in {"detail", "result", "summary", "completed"}:
+                        elif key in {"detail", "result", "summary", "completed", "snapshot"}:
                             row[key] = encode(remap_json(json.loads(value)))
                     if table == "p_users":
                         row["password_hash"] = ""
