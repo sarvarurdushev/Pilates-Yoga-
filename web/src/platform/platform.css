@@ -49,6 +49,9 @@ textarea:focus-visible {
 #topbar {
   height: auto;
   min-height: 72px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 #global-search {
   display: flex;
@@ -63,7 +66,24 @@ textarea:focus-visible {
   display: none;
 }
 .breadcrumb {
-  text-transform: capitalize;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  line-height: 1.4;
+  min-width: 0;
+  flex: 0 1 auto;
+  max-width: min(38vw, 460px);
+}
+.breadcrumb strong {
+  color: #edf4ff;
+  font-weight: 650;
+}
+.breadcrumb a {
+  color: #a8c7ff;
+}
+.breadcrumb span {
+  color: #627997;
 }
 .panel {
   background: #101c2d;
@@ -169,8 +189,61 @@ textarea:focus-visible {
 .client-identity {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 20px;
+  gap: 18px;
+  padding: 16px 20px;
+}
+.client-person {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 210px;
+}
+.client-person .eyebrow {
+  display: block;
+  margin: 0 0 3px;
+}
+.client-return {
+  display: inline-block;
+  margin-top: 5px;
+  font-size: 11px;
+  font-weight: 650;
+}
+.context-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 9px 14px;
+  max-width: 230px;
+  font-size: 11px;
+}
+.context-actions a {
+  white-space: nowrap;
+}
+.session-source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.session-facts {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+.session-facts div {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 10px;
+}
+.session-facts dt {
+  color: #98acc8;
+}
+.session-facts dd {
+  margin: 0;
+}
+.session-exercises {
+  padding-left: 20px;
+  line-height: 2;
 }
 .context-summary {
   margin-left: auto;
@@ -182,8 +255,8 @@ textarea:focus-visible {
   font-size: 13px;
 }
 .client-tabs {
-  display: flex;
-  overflow-x: auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   border-top: 1px solid #2d4362;
   background: #0b1729;
   padding: 0 10px;
@@ -198,6 +271,11 @@ textarea:focus-visible {
   color: #9ccdff;
   border-bottom-color: #62a9ff;
   background: #142b49;
+}
+@media (min-width: 1400px) {
+  .client-tabs {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
 }
 .client-grid {
   display: grid;
@@ -783,9 +861,12 @@ dialog::backdrop {
     flex-wrap: wrap;
   }
   #topbar .breadcrumb {
-    display: none;
+    display: flex;
+    flex: 1 1 220px;
   }
   #global-search {
+    order: 3;
+    flex-basis: 100%;
     max-width: none;
     min-width: 160px;
   }
@@ -844,6 +925,13 @@ dialog::backdrop {
   .client-tabs a {
     padding: 12px;
   }
+  .context-summary {
+    margin-left: 0;
+  }
+  .context-actions {
+    justify-content: flex-start;
+    max-width: none;
+  }
   .client-context h2 {
     font-size: 19px;
   }
@@ -876,6 +964,18 @@ dialog::backdrop {
   }
 }
 @media (max-width: 480px) {
+  .client-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 0 4px;
+  }
+  .client-tabs a {
+    font-size: 11px;
+    padding: 10px 8px;
+  }
+  .session-facts div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
   .capture-grid {
     grid-template-columns: 1fr;
   }
