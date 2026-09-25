@@ -425,11 +425,25 @@ async function render() {
     $("#view-retry").onclick = render;
   }
 }
+async function allReservations() {
+  const items = [];
+  let offset = 0;
+  let total = 0;
+  do {
+    const page = await list("reservations", { limit: 200, offset });
+    items.push(...page.items);
+    offset += page.items.length;
+    total = page.total;
+    if (!page.items.length && offset < total)
+      throw new Error("Reservation history could not be fully loaded.");
+  } while (offset < total);
+  return { items: [...new Map(items.map((item) => [item.id, item])).values()], total };
+}
 async function dashboard(root) {
   const student = state.me.role === "student";
   const [analysis, reservations, programs] = await Promise.all([
     list("analyses", { limit: 12 }),
-    list("reservations"),
+    allReservations(),
     list("programs"),
   ]);
   const future = reservations.items
@@ -773,6 +787,8 @@ function progress(root) {
       (r) => ids.has(r.analysis_id) && r.metric === metric,
     ).sort((a, b) => String(a.recorded_at).localeCompare(String(b.recorded_at)));
     const current = rows.at(-1), previous = rows.at(-2);
+    const sourceIds = new Set(rows.map((row) => row.analysis_id));
+    const sourceSessions = sessions.filter((analysis) => sourceIds.has(analysis.id));
     const measure = metricCopy({
       id: metric.split(":").at(-1),
       name: metric.replace(/[:_]/g, " "),
@@ -826,8 +842,8 @@ function progress(root) {
       });
     });
     root.querySelector("#history-records").innerHTML = card(
-      "Source sessions",
-      analysisTable(sessions),
+      "Source sessions for this measurement",
+      analysisTable(sourceSessions),
     );
   }
   function metrics() {
@@ -839,7 +855,7 @@ function progress(root) {
     ];
     if (!names.length) {
       root.querySelector("#history-chart").innerHTML = notice("These sessions have no comparable measurements yet. Try another capture protocol.");
-      root.querySelector("#history-records").innerHTML = card("Source sessions", analysisTable(sources()));
+      root.querySelector("#history-records").innerHTML = card("Sessions in this protocol", analysisTable(sources()));
       return;
     }
     root.querySelector("[name=history-metric]").innerHTML = options(
