@@ -32,6 +32,7 @@ import {
   regionName,
 } from "./core.js";
 import { edit } from "./forms.js";
+import { metricCopy, explainedChart } from "./explain.js";
 // One client workspace is the entrance to all scoped records. Older tab URLs
 // still resolve below; these tabs group the information by the user's task.
 const workspaceTabs = [
@@ -469,7 +470,7 @@ async function dashboard(root) {
         ? "Follow your program and understand what changes over time."
         : "Client histories, planned sessions and the evidence behind each program.",
     ) +
-    `<div class="stats">${stat(student ? "Assigned programs" : "Active clients", student ? c?.programs.length || 0 : state.me.students.length, student ? "Chosen by your coach" : "Visible to your role", "clients")}${stat("Assessments", analysis.total, "Saved to client histories")}${stat("Upcoming sessions", future.length, "Confirmed reservations", "schedule")}${stat(student ? "Your coach" : "Locations", student ? coachName(c?.coach_ids[0]) : state.me.locations.length, student ? locationName(c?.location_ids[0]) : "Connected studios", "home")}</div><div class="grid two">${card(student ? "Today’s program" : "Next on your schedule", student ? programCards(programs.items) : reservationTable(future.slice(0, 6)))}${card("Recent analysis", analysisTable(analysis.items.slice(0, 6)))}</div>${!student ? card("Clients to review", `<div class="client-grid">${attention.slice(0, 8).map(clientCard).join("") || "<p>No clients currently need a missing-program, capture-quality or 30-day review follow-up.</p>"}</div>`) : c ? card("Your progress", progressChart(c.progress || [])) : ""}`;
+    `<div class="stats">${stat(student ? "Assigned programs" : "Active clients", student ? c?.programs.length || 0 : state.me.students.length, student ? "Chosen by your coach" : "Visible to your role", "clients")}${stat("Assessments", analysis.total, "Saved to client histories")}${stat("Upcoming sessions", future.length, "Confirmed reservations", "schedule")}${stat(student ? "Your coach" : "Locations", student ? coachName(c?.coach_ids[0]) : state.me.locations.length, student ? locationName(c?.location_ids[0]) : "Connected studios", "home")}</div><div class="grid two">${card(student ? "Today’s program" : "Next on your schedule", student ? programCards(programs.items) : reservationTable(future.slice(0, 6)))}${card("Recent analysis", analysisTable(analysis.items.slice(0, 6)))}</div>${!student ? card("Clients to review", `<div class="client-grid">${attention.slice(0, 8).map(clientCard).join("") || "<p>No clients currently need a missing-program, capture-quality or 30-day review follow-up.</p>"}</div>`) : c ? card("Your progress", `<p>Compare measurements only when the capture protocol and camera view match.</p><a class="button" href="${workspaceHref("progress")}">Review explained progress →</a>`) : ""}`;
 
   if (!student)
     root.innerHTML +=
@@ -703,33 +704,6 @@ async function sessionDetail(root, sessionId, assessmentId) {
     card("Session summary", summary) +
     `<div class="grid two">${card("Who and where", `<dl class="session-facts"><div><dt>Client</dt><dd>${esc(c.name)}</dd></div><div><dt>Coach</dt><dd>${sessionCoachId ? esc(coachName(sessionCoachId)) : "No coach recorded for this session"}</dd></div><div><dt>Location</dt><dd>${reservation?.location_id ? esc(locationName(reservation.location_id)) : "No location linked"}</dd></div><div><dt>Reservation</dt><dd>${reservation ? esc(dt(reservation.starts_at) + " · " + reservation.status) : "No reservation linked"}</dd></div></dl>`)}${card("Capture and assessment", assessment ? `<p><strong>Protocol:</strong> ${esc(assessment.protocol)}</p><p><strong>Type:</strong> ${esc(assessment.kind === "movement" ? "Movement analysis" : "Posture assessment")}</p><p><strong>Status:</strong> ${esc(assessment.status)}</p>${reportLink}` : notice("This practice has no linked movement or posture capture. Ask a coach to record an assessment if one is needed."))}${card("Completed exercises", practice ? exerciseRows ? `<ol class="session-exercises">${exerciseRows}</ol><p>${esc(practice.notes || "")}</p>` : notice("No completed exercises were listed in this practice record.") : notice("This assessment was uploaded without a linked practice record."))}${card("Program", program ? `<p>${esc(program.name)}</p><a class="button" href="${href("program", { id: program.id })}">Open program →</a>` : notice("No program is linked to this session."))}${card("Coach feedback", linkedNotes.length ? notesHTML(linkedNotes) : notice("No coach feedback has been linked to this assessment yet."))}${card("Body regions", regionIds.length ? regionIds.map((region) => `<a class="record-link" href="${workspaceHref("anatomy", { region, id: assessment?.id })}">${esc(regionName(region))} →</a>`).join("") : notice("No body-region finding or feedback has been linked to this session."))}</div>`;
 }
-function progressChart(rows) {
-  const metrics = [...new Set(rows.map((r) => r.metric))];
-  const preferred = [
-    "front:shoulder_tilt",
-    "front:pelvic_obliquity",
-    "front:left_shoulder_rom",
-    "front:right_shoulder_rom",
-  ];
-  return (
-    [
-      ...preferred.filter((k) => metrics.includes(k)),
-      ...metrics.filter((k) => !preferred.includes(k)),
-    ]
-      .slice(0, 4)
-      .map((key) =>
-        spark(
-          rows.filter((r) => r.metric === key).map((r, i) => [i + 1, r.value]),
-          {
-            label: key.replaceAll("_", " "),
-            unit: rows.find((r) => r.metric === key)?.unit,
-          },
-        ),
-      )
-      .join("") ||
-    notice("Progress charts appear after comparable measurements are saved.")
-  );
-}
 function progress(root) {
   const c = state.client;
   if (!c.progress.length || !c.analyses.length) {
@@ -747,6 +721,16 @@ function progress(root) {
       ),
     ),
   ];
+  const requestedMetric = params().get("metric");
+  const requestedRow = c.progress
+    .filter((row) => row.metric === requestedMetric)
+    .sort((a, b) => String(a.recorded_at).localeCompare(String(b.recorded_at)))
+    .at(-1);
+  const requestedAnalysis = c.analyses.find((analysis) => analysis.id === requestedRow?.analysis_id);
+  const requestedGroup = requestedAnalysis
+    ? `${requestedAnalysis.demo ? "Demo simulation" : "Uploaded media"} · ${requestedAnalysis.kind} · ${requestedAnalysis.protocol}`
+    : groups[0];
+  let pendingMetric = requestedMetric;
   root.innerHTML =
     head(
       "Progress across visits",
@@ -756,7 +740,7 @@ function progress(root) {
       "Comparable protocol",
       "history-protocol",
       groups.map((x) => [x, x]),
-      groups[0],
+      requestedGroup,
       null,
     )}${select("Measurement", "history-metric", [], "", null)}</div><div id="history-chart"></div><div id="history-records"></div>`;
   const sources = () =>
@@ -771,16 +755,35 @@ function progress(root) {
       metric = root.querySelector("[name=history-metric]").value;
     const rows = c.progress.filter(
       (r) => ids.has(r.analysis_id) && r.metric === metric,
+    ).sort((a, b) => String(a.recorded_at).localeCompare(String(b.recorded_at)));
+    const current = rows.at(-1), previous = rows.at(-2);
+    const measure = metricCopy({
+      id: metric.split(":").at(-1),
+      name: metric.replace(/[:_]/g, " "),
+    });
+    const selectedSource = root.querySelector("[name=history-protocol]").value;
+    const view = metric.includes(":") ? metric.split(":")[0].replaceAll("_", " ") + " view" : "";
+    const trace = spark(
+      rows.map((r) => [new Date(r.recorded_at).getTime(), r.value]),
+      {
+        label: metric.replace(/[:_]/g, " "),
+        unit: current?.unit || "",
+        xLabel: (v) => date(new Date(v)),
+      },
     );
     root.querySelector("#history-chart").innerHTML =
-      spark(
-        rows.map((r) => [new Date(r.recorded_at).getTime(), r.value]),
-        {
-          label: metric.replaceAll("_", " "),
-          unit: rows[0]?.unit || "",
-          xLabel: (v) => date(new Date(v)),
-        },
-      ) +
+      explainedChart({
+        title: metric.replace(/[:_]/g, " "),
+        definition: measure.definition,
+        why: measure.why,
+        notice: "Compare visits recorded with the same protocol and camera view. Open either source session to review the capture before interpreting a change.",
+        current: current?.value,
+        previous: previous?.value,
+        unit: current?.unit || "",
+        source: [selectedSource, view, selectedSource.startsWith("Demo simulation") ? "synthetic scenario coordinates" : "visible pose landmarks"].filter(Boolean).join(" · "),
+        chart: trace,
+        sessionLink: current ? `<a href="${workspaceHref("sessions", { assessment: current.analysis_id })}">Open latest source session →</a>` : "",
+      }) +
       table(
         ["Date", "Value", "Source"],
         rows.map((r) => [
@@ -825,15 +828,15 @@ function progress(root) {
     }
     root.querySelector("[name=history-metric]").innerHTML = options(
       names.map((n) => [n, n.replaceAll("_", " ")]),
-      names.find((n) =>
-        /shoulder_rom|hip_rom|knee_rom|shoulder_tilt|head_tilt|forward_head/.test(
-          n,
-        ),
-      ) ||
+      (pendingMetric && names.includes(pendingMetric) ? pendingMetric : null) ||
+        names.find((n) =>
+          /shoulder_rom|hip_rom|knee_rom|shoulder_tilt|head_tilt|forward_head/.test(n),
+        ) ||
         names.find((n) => n.endsWith("_rom")) ||
         names[0],
       null,
     );
+    pendingMetric = "";
     draw();
   }
   root.querySelector("[name=history-protocol]").onchange = metrics;
@@ -848,9 +851,15 @@ export function notesHTML(notes) {
   return notes.map((n) => {
     const author = state.me.coaches.find((coach) => coach.id === n.author_id)?.name ||
       (state.me.user.id === n.author_id ? state.me.user.name : "Studio staff");
-    const demo = state.me.organization.demo && /^Demo visit \d+:/.test(n.text || "");
-    const source = n.detail?.source || (demo ? "Demo coach feedback" : "Coach feedback");
-    return `<article class="note">${badge(source, demo ? "demo" : "")}<h3><a href="${href("client", { tab: "anatomy", region: n.region_id, id: n.analysis_id })}">${esc(regionName(n.region_id))}</a></h3><p>${esc(n.text)}</p><small>${esc(author)} · ${date(n.created_at)} · ${n.visibility === "student" ? "Shared with student" : "Coach only"}</small><div class="actions">${n.analysis_id ? `<a href="${workspaceHref("sessions", { assessment: n.analysis_id })}">Source session</a><a href="${href("report", { id: n.analysis_id })}">Assessment report</a>` : ""}${n.scan_id ? `<a href="${workspaceHref("scans", { scan: n.scan_id })}">Linked scan</a>` : ""}${n.program_id ? `<a href="${href("program", { id: n.program_id })}">Program</a>` : ""}${n.exercise_id ? `<a href="${href("exercise", { id: n.exercise_id })}">Exercise</a>` : ""}${state.me.role !== "student" ? `<button data-edit="notes" data-id="${n.id}">Edit feedback</button>` : ""}</div></article>`;
+    const demo = n.detail?.source === "demo_coach_feedback" ||
+      (!n.detail?.source && state.me.organization.demo && /^Demo visit \d+:/.test(n.text || ""));
+    const source = demo ? "Demo coach feedback" : "Coach feedback";
+    const updated = n.detail?.updated_at ? " · Updated " + dt(n.detail.updated_at) : "";
+    const finding = state.client?.observations?.find((item) => item.id === n.detail?.observation_id);
+    const findingLabel = finding
+      ? `<p><strong>Linked finding · ${esc(finding.source)}</strong> ${finding.analysis_id ? `<a href="${workspaceHref("sessions", { assessment: finding.analysis_id })}">${esc(finding.text)}</a>` : esc(finding.text)}</p>`
+      : n.detail?.observation_id ? "<p>Linked finding is no longer available.</p>" : "";
+    return `<article class="note">${badge(source, demo ? "demo" : "")}<h3><a href="${href("client", { tab: "anatomy", region: n.region_id, id: n.analysis_id })}">${esc(regionName(n.region_id))}</a></h3><p>${esc(n.text)}</p>${findingLabel}<small>${esc(author)} · ${date(n.created_at)}${updated} · ${n.visibility === "student" ? "Shared with student" : "Coach only"}</small><div class="actions">${n.analysis_id ? `<a href="${workspaceHref("sessions", { assessment: n.analysis_id })}">Source session</a><a href="${href("report", { id: n.analysis_id })}">Assessment report</a>` : ""}${n.scan_id ? `<a href="${workspaceHref("scans", { scan: n.scan_id })}">Linked scan</a>` : ""}${n.program_id ? `<a href="${href("program", { id: n.program_id })}">Program</a>` : ""}${n.exercise_id ? `<a href="${href("exercise", { id: n.exercise_id })}">Exercise</a>` : ""}${state.me.role !== "student" ? `<button data-edit="notes" data-id="${n.id}">Edit feedback</button>` : ""}</div></article>`;
   }).join("");
 }
 async function section(root, section) {
