@@ -239,33 +239,41 @@ export async function edit(kind, id, copy = false) {
     return;
   } else if (kind === "notes") {
     if (!state.client)
-      throw Error("Select a client before adding a coaching note.");
+      throw Error("Select a client before adding coach feedback.");
     const c = state.client;
-    const programs = (await list("programs")).items;
+    const [programs, exercises] = await Promise.all([
+      list("programs").then((result) => result.items),
+      list("exercises").then((result) => result.items),
+    ]);
+    if (item.exercise_id && !exercises.some((exercise) => exercise.id === item.exercise_id))
+      exercises.push(await record("exercises", item.exercise_id));
+    const route = params();
+    const assessmentId = item.analysis_id || route.get("report") ||
+      route.get("assessment") || route.get("id") || "";
+    const observationId = item.detail?.observation_id || route.get("observation") || "";
+    const observations = c.observations || [];
+    const observationName = (o) =>
+      [dt(o.created_at), o.kind || "Finding", o.text || regionName(o.region_id)].join(" · ").slice(0, 180);
     html =
+      select("Body region", "region_id", regions(), item.region_id || route.get("region")) +
       select(
-        "Anatomical region",
-        "region_id",
-        regions(),
-        item.region_id || params().get("region"),
-      ) +
-      select(
-        "Analysis session",
+        "Related movement or posture assessment",
         "analysis_id",
         c.analyses.map((a) => ({
           id: a.id,
-          name: dt(a.created_at) + " · " + a.kind,
+          name: dt(a.created_at) + " · " + (a.protocol || a.kind),
         })),
-        item.analysis_id || params().get("id"),
-        "General client note",
+        assessmentId,
+        "General coach feedback",
       ) +
       select(
-        "Related scan",
-        "scan_id",
-        c.scans,
-        item.scan_id || params().get("scan"),
-        "No scan",
+        "Linked finding / observation",
+        "observation_id",
+        observations.map((o) => ({ id: o.id, name: observationName(o) })),
+        observationId,
+        "No specific finding",
       ) +
+      select("Related scan", "scan_id", c.scans, item.scan_id || route.get("scan"), "No scan") +
       select(
         "Related program",
         "program_id",
@@ -273,7 +281,8 @@ export async function edit(kind, id, copy = false) {
         item.program_id || c.programs[0]?.program_id,
         "No program",
       ) +
-      area("Coach note", "text", item.text) +
+      select("Related exercise", "exercise_id", exercises, item.exercise_id, "No exercise") +
+      area("Coach feedback", "text", item.text) +
       select(
         "Visibility",
         "visibility",
@@ -288,10 +297,47 @@ export async function edit(kind, id, copy = false) {
     save = async (f) =>
       api("save", {
         collection: kind,
-        item: { ...asObject(f), id, student_id: c.id },
+        item: {
+          ...asObject(f),
+          id,
+          student_id: c.id,
+          detail: { ...(item.detail || {}), observation_id: f.get("observation_id") || null },
+        },
       });
   } else throw Error("Choose a supported record type.");
-  const d = modal(id ? "Edit " + kind : "New " + kind, html, save);
+  const title = kind === "notes"
+    ? (id ? "Edit coach feedback" : "New coach feedback")
+    : (id ? "Edit " + kind : "New " + kind);
+  const d = modal(title, html, save);
+  if (kind === "notes") {
+    const analysis = d.querySelector('[name="analysis_id"]');
+    const finding = d.querySelector('[name="observation_id"]');
+    const region = d.querySelector('[name="region_id"]');
+    const scan = d.querySelector('[name="scan_id"]');
+    const observations = state.client.observations || [];
+    const name = (o) =>
+      [dt(o.created_at), o.kind || "Finding", o.text || regionName(o.region_id)].join(" · ").slice(0, 180);
+    const filterFindings = () => {
+      const selected = finding.value;
+      finding.innerHTML = options(
+        observations.filter((o) => !analysis.value || o.analysis_id === analysis.value)
+          .map((o) => ({ id: o.id, name: name(o) })),
+        selected,
+        "No specific finding",
+      );
+    };
+    analysis.onchange = filterFindings;
+    finding.onchange = () => {
+      const selected = observations.find((o) => o.id === finding.value);
+      if (!selected) return;
+      if (selected.analysis_id) analysis.value = selected.analysis_id;
+      if (selected.region_id) region.value = selected.region_id;
+      if (selected.scan_id) scan.value = selected.scan_id;
+      filterFindings();
+    };
+    if (finding.value) finding.onchange();
+    else filterFindings();
+  }
   wireRemove(d, kind, id);
 }
 function localDate(value) {
