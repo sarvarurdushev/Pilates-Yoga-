@@ -235,9 +235,20 @@ export async function programEditor(id, copy = false, addPhase = false) {
       id = source.id;
       toast("A client-specific copy was created so other clients keep their original plan.");
     }
+    const needsAssignment = clientId && (!id || !(source.assignments || []).some((assignment) =>
+      assignment.student_id === clientId && assignment.active));
     const saved = await api("save",{collection:"programs",item:{id,name:values.name,goal:values.goal,
       region_id:selectedTargets[0],location_id:values.location_id || null,detail,steps:cleaned,
       change_reason:values.change_reason || "",change_source:{kind:values.change_kind,id:values.change_kind === "manual" ? null : values.change_source_id || null}}});
+    id = saved.id;
+    if (needsAssignment) {
+      await api("assign", {
+        student_id: clientId,
+        program_id: saved.id,
+        analysis_id: sourceReport || null,
+        notes: "",
+      });
+    }
     go("program",{id:saved.id,client:clientId || ""});
   });
   dialog.classList.add("pd-dialog");
