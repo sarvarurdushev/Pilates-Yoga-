@@ -142,7 +142,7 @@ async function clientProgramWorkspace(root) {
   const practice = client.sessions?.filter((s) => s.program_id === active?.program_id) || [];
   const latest = practice[0];
   const details = program?.detail || {};
-  const total = program?.steps?.length || 0;
+  const total = (program?.steps || []).filter((step) => step.exercise_id && (!step.detail?.program_phase || step.detail.program_phase === (details.phase || "Foundation"))).length;
   const completed = latest?.completed?.length || 0;
   root.innerHTML = head(
     student ? "Your current program" : `${client.name} · program`,
@@ -169,8 +169,8 @@ async function clientProgramWorkspace(root) {
   });
   if (root.querySelector("#pd-new-phase")) root.querySelector("#pd-new-phase").onclick = async () => {
     try {
-      const { edit } = await import("./forms.js");
-      await edit("programs", program.id, true);
+      const { programEditor } = await import("./programs.js");
+      await programEditor(program.id, false, true);
     } catch (e) { toast(e.message); }
   };
   root.querySelectorAll("[data-template]").forEach((button) => button.onclick = async () => {
