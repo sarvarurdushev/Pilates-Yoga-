@@ -30,6 +30,8 @@ import {
   toast,
   spark,
   regionName,
+  regions,
+  relatedRegion,
 } from "./core.js";
 import { edit } from "./forms.js";
 import { metricCopy, explainedChart } from "./explain.js";
@@ -100,6 +102,8 @@ function workspaceTabHref(tab, p) {
       ...(p.get("region") ? { region: p.get("region") } : {}),
       ...(p.get("id") ? { id: p.get("id") } : {}),
     });
+  if (tab === "notes" && p.get("region"))
+    return workspaceHref(tab, { region: p.get("region") });
   return workspaceHref(tab);
 }
 function clientBreadcrumb(page, p) {
@@ -914,14 +918,26 @@ async function section(root, section) {
   }
   if (section === "notes") {
     if (!c) return chooseClient(root);
+    const selectedRegionId = params().get("region");
+    const selectedRegion = regions().find((region) => region.id === selectedRegionId);
+    const visibleNotes = selectedRegion
+      ? c.notes.filter((note) => relatedRegion(note.region_id, selectedRegion.id))
+      : selectedRegionId ? [] : c.notes;
+    const filter = selectedRegionId
+      ? selectedRegion
+        ? `<div class="filter-row"><p><strong>${esc(selectedRegion.name)}</strong> · ${visibleNotes.length} ${visibleNotes.length === 1 ? "feedback entry" : "feedback entries"}</p><a class="button" href="${workspaceHref("notes")}">Show all feedback →</a><a class="button" href="${workspaceHref("anatomy", { region: selectedRegion.id })}">Back to this body region →</a></div>`
+        : `${notice("This body region is no longer available. Choose another region or show all feedback.")}<a class="button" href="${workspaceHref("notes")}">Show all feedback →</a>`
+      : "";
     root.innerHTML =
       head(
-        "Coach feedback",
-        "Coach-written feedback linked to this client, a body region, session or exercise.",
+        selectedRegion ? selectedRegion.name + " · coach feedback" : "Coach feedback",
+        selectedRegion
+          ? "Coach-written feedback connected to this body region across visits."
+          : "Coach-written feedback linked to this client, a body region, session or exercise.",
         state.me.role === "student"
           ? ""
           : '<button data-edit="notes">+ Coach feedback</button>',
-      ) + notesHTML(c.notes);
+      ) + filter + notesHTML(visibleNotes);
     return;
   }
   if (collection === "exercises" || collection === "programs") {
