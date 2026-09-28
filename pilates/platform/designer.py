@@ -125,7 +125,7 @@ def _source(repo, actor, value, db, student_id=None):
     return kind, identifier
 
 
-def step_detail(repo, actor, exercise_id, value, db, student_id=None):
+def step_detail(repo, actor, exercise_id, value, db, student_id=None, program_location_id=None):
     if value is None:
         return {}
     if not isinstance(value, dict):
@@ -135,6 +135,34 @@ def step_detail(repo, actor, exercise_id, value, db, student_id=None):
         result["target_region_ids"] = _region_ids(db, result["target_region_ids"])
     if result.get("side", "Both") not in {"Left", "Right", "Both"}:
         raise Refused("Choose Left, Right or Both for the exercise side.")
+    equipment = result.get("equipment", [])
+    if not isinstance(equipment, list) or len(equipment) > 20:
+        raise Refused("Choose up to 20 equipment items for a movement.")
+    normalized_equipment = []
+    seen_equipment = set()
+    for entry in equipment:
+        if not isinstance(entry, dict) or not isinstance(entry.get("equipment_id"), str):
+            raise Refused("Choose equipment from the studio inventory.")
+        equipment_id = entry["equipment_id"]
+        if equipment_id in seen_equipment:
+            raise Refused("Choose each equipment item once per movement.")
+        seen_equipment.add(equipment_id)
+        item = repo.get(actor, "equipment", equipment_id, db)
+        if program_location_id and item["location_id"] != program_location_id:
+            raise Refused("Choose equipment at the program location.")
+        try:
+            quantity = int(entry.get("quantity", 1))
+        except (TypeError, ValueError) as exc:
+            raise Refused("Enter a valid equipment quantity.") from exc
+        if not 1 <= quantity <= 50 or quantity > item["quantity"]:
+            raise Refused("Equipment quantity exceeds the studio inventory.")
+        normalized_equipment.append({
+            "equipment_id": equipment_id,
+            "quantity": quantity,
+            "name": item["name"],
+        })
+    if "equipment" in result:
+        result["equipment"] = normalized_equipment
     media = result.get("media", [])
     if not isinstance(media, list) or len(media) > 16:
         raise Refused("Attach at most 16 photos or videos to a step.")
@@ -192,7 +220,7 @@ def student_step(step):
     row = dict(step)
     row.pop("notes", None)
     detail = dict(row.get("detail") or {})
-    for key in ("coach_instructions", "coach_cue", "common_mistake", "precautions"):
+    for key in ("coach_instructions", "common_mistake"):
         detail.pop(key, None)
     detail["media"] = [m for m in detail.get("media", []) if m.get("visibility", "student") == "student"]
     detail["references"] = [r for r in detail.get("references", []) if r.get("visibility", "student") == "student"]
