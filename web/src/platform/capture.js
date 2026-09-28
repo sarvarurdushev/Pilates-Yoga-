@@ -2,6 +2,7 @@ import {
   $,
   state,
   api,
+  list,
   params,
   href,
   go,
@@ -14,6 +15,7 @@ import {
   modal,
   upload,
   toast,
+  dt,
   views,
 } from "./core.js";
 const drafts = new Map();
@@ -57,6 +59,24 @@ const help = {
   side_right:
     "Your right shoulder faces the camera. Keep the head, hips and feet in frame.",
 };
+export function eligibleCaptureReservations(rows, studentId, locationId) {
+  if (!locationId) return [];
+  return (rows || [])
+    .filter((row) => row.student_id === studentId && row.location_id === locationId &&
+      ["reserved", "attended"].includes(row.status))
+    .sort((a, b) => String(b.starts_at || "").localeCompare(String(a.starts_at || "")));
+}
+
+export function captureSessionLinks(studentId, locationId, reservationId, locations, reservations) {
+  if ((locations.length && !locationId) ||
+      (locationId && !locations.some((place) => place.id === locationId)))
+    throw Error("Choose one of this client's assigned capture locations.");
+  if (reservationId && !eligibleCaptureReservations(reservations, studentId, locationId)
+    .some((booking) => booking.id === reservationId))
+    throw Error("Choose a booked session for this client at the selected location.");
+  return {location_id: locationId || null, reservation_id: reservationId || null};
+}
+
 export async function capture(root) {
   if (!state.me.students.length) {
     root.innerHTML =
@@ -65,13 +85,43 @@ export async function capture(root) {
     return;
   }
   const cid =
-    state.client?.id || params().get("client") || state.me.students[0].id;
+    params().get("client") || state.client?.id || state.me.students[0].id;
+  const profile = state.client?.id === cid
+    ? state.client : state.me.students.find((person) => person.id === cid);
+  const locations = (state.me.locations || []).filter((place) =>
+    profile?.location_ids?.includes(place.id));
+  let reservations = [], reservationError = "";
+  if (state.client?.id === cid && Array.isArray(state.client.reservations)) {
+    reservations = state.client.reservations;
+  } else {
+    try {
+      reservations = (await list("reservations", {student_id: cid, limit: 200})).items || [];
+    } catch (error) {
+      reservationError = error.message;
+    }
+  }
   const draft = drafts.get(cid) || {
     kind: "posture",
     protocol: "Standing posture",
     files: {},
     view: "front",
   };
+  const requestedReservation = params().get("reservation_id") || params().get("reservation");
+  const requestedBooking = requestedReservation
+    ? reservations.find((row) => row.id === requestedReservation && row.student_id === cid &&
+      locations.some((place) => place.id === row.location_id) &&
+      ["reserved", "attended"].includes(row.status))
+    : null;
+  if (requestedBooking) {
+    draft.location_id = requestedBooking.location_id;
+    draft.reservation_id = requestedBooking.id;
+  }
+  if (!locations.some((place) => place.id === draft.location_id))
+    draft.location_id = locations[0]?.id || "";
+  if (!eligibleCaptureReservations(reservations, cid, draft.location_id)
+    .some((row) => row.id === draft.reservation_id)) draft.reservation_id = "";
+  const reservationChoices = () => eligibleCaptureReservations(reservations, cid, draft.location_id)
+    .map((row) => [row.id, [dt(row.starts_at), row.session_type || "Studio session", row.status].join(" · ")]);
   drafts.set(cid, draft);
   root.innerHTML =
     head(
@@ -84,7 +134,7 @@ export async function capture(root) {
       protocols.map((x) => [x, x]),
       draft.protocol,
       null,
-    )}</div><a class="text-button" href="#" id="new-client">+ New client</a><p class="muted">The selected client stays attached to every capture and saved result.</p></section><section class="panel"><div class="page-head"><h2>Capture the body clearly</h2><div class="segmented"><button type="button" data-kind="posture">Photographs</button><button type="button" data-kind="movement">Movement video</button></div></div><div id="capture-inputs"></div>${notice("Use a steady camera and even lighting. Capture the full body from head to feet. For movement, begin at rest, move through a comfortable range, then return.")}<details><summary>Capture settings</summary><label class="check"><input type="checkbox" name="include_3d" checked>Estimate depth when the independent models agree</label><label class="check"><input type="checkbox" name="class_scan">Wider class scan · use only for multiple people</label>${field("Optional coach target angle · degrees", "target_angle", "", "number", 'min="0" max="180"')}<small>A target is a coaching reference, not a diagnosis or population norm.</small></details><p class="form-error" role="alert"></p><p id="capture-progress" role="status"></p><progress id="capture-bar" max="100" value="0" hidden></progress><button id="analyze" class="primary" type="submit">Analyze and review</button></section></form>`;
+    )}</div><div class="grid two">${select("Capture location", "location_id", locations, draft.location_id, locations.length ? null : "No assigned location")}${select("Link a booked session (optional)", "reservation_id", reservationChoices(), draft.reservation_id, "No linked booking")}</div><a class="text-button" href="#" id="new-client">+ New client</a><p class="muted">The client and selected location stay attached to every saved result. You can link one of this client's reserved or attended sessions at that location.${!locations.length ? " Ask an administrator to assign a studio location if this session took place at one." : ""}</p>${reservationError ? notice("Booked sessions could not load: " + reservationError + " You can continue without linking one.") : ""}</section><section class="panel"><div class="page-head"><h2>Capture the body clearly</h2><div class="segmented"><button type="button" data-kind="posture">Photographs</button><button type="button" data-kind="movement">Movement video</button></div></div><div id="capture-inputs"></div>${notice("Use a steady camera and even lighting. Capture the full body from head to feet. For movement, begin at rest, move through a comfortable range, then return.")}<details><summary>Capture settings</summary><label class="check"><input type="checkbox" name="include_3d" checked>Estimate depth when the independent models agree</label><label class="check"><input type="checkbox" name="class_scan">Wider class scan · use only for multiple people</label>${field("Optional coach target angle · degrees", "target_angle", "", "number", 'min="0" max="180"')}<small>A target is a coaching reference, not a diagnosis or population norm.</small></details><p class="form-error" role="alert"></p><p id="capture-progress" role="status"></p><progress id="capture-bar" max="100" value="0" hidden></progress><button id="analyze" class="primary" type="submit">Analyze and review</button></section></form>`;
   const form = root.querySelector("form");
   const markStep = (number) =>
     root.querySelectorAll(".capture-steps li").forEach((li, i) => {
@@ -96,6 +146,15 @@ export async function capture(root) {
   markStep(2);
   form.querySelector("[name=student_id]").onchange = (e) =>
     go("capture", { client: e.target.value });
+  form.querySelector("[name=location_id]").onchange = (e) => {
+    draft.location_id = e.target.value;
+    draft.reservation_id = "";
+    form.querySelector("[name=reservation_id]").innerHTML =
+      options(reservationChoices(), "", "No linked booking");
+  };
+  form.querySelector("[name=reservation_id]").onchange = (e) => {
+    draft.reservation_id = e.target.value;
+  };
   form.querySelector("[name=protocol]").onchange = (e) => {
     draft.protocol = e.target.value;
     markStep(3);
@@ -188,6 +247,19 @@ export async function capture(root) {
       error.textContent = "Upload a photograph or video before analyzing.";
       return;
     }
+    let sessionLinks;
+    try {
+      sessionLinks = captureSessionLinks(
+        cid,
+        form.querySelector("[name=location_id]").value,
+        form.querySelector("[name=reservation_id]").value,
+        locations,
+        reservations,
+      );
+    } catch (linkError) {
+      error.textContent = linkError.message;
+      return;
+    }
     button.disabled = true;
     bar.hidden = false;
     try {
@@ -213,8 +285,7 @@ export async function capture(root) {
         protocol: draft.protocol,
         mode: draft.protocol === "Standing posture" ? "standing" : "pose",
         captures,
-        location_id: state.me.students.find((c) => c.id === cid)
-          ?.location_ids[0],
+        ...sessionLinks,
         include_3d: form.querySelector("[name=include_3d]").checked,
         class_scan: form.querySelector("[name=class_scan]").checked,
         target_angle: target === "" ? null : Number(target),

@@ -11,6 +11,8 @@ export function contextForRegion(previous, client, region, structureId) {
     ...previous,
     client: { id: client.id, name: client.name },
     region,
+    layer: "region",
+    exercise: null,
     structure_id: structureId,
     notes: client.notes
       .filter((note) => relatedRegion(note.region_id, region.id))

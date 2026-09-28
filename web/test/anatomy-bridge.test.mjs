@@ -20,7 +20,7 @@ test('full-screen anatomy selection preserves client and assessment while changi
 });
 
 test('full-screen region context shows only feedback for the selected region', () => {
-  const previous = { analysis_id: 'visit-8', layer: 'region' };
+  const previous = { analysis_id: 'visit-8', layer: 'muscles_full', exercise: 'bird_dog' };
   const client = {
     id: 'sarah', name: 'Sarah',
     notes: [
@@ -35,5 +35,7 @@ test('full-screen region context shows only feedback for the selected region', (
   assert.equal(context.client.id, 'sarah');
   assert.equal(context.region.id, 'left_hip');
   assert.equal(context.structure_id, 42);
+  assert.equal(context.layer, 'region');
+  assert.equal(context.exercise, null);
   assert.deepEqual(context.notes, ['Use a supported hinge.', 'Keep the pelvis level.']);
 });
