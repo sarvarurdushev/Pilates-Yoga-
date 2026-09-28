@@ -1,11 +1,33 @@
 import { relatedRegion } from "./core.js";
+
+export function fullscreenRegionURL(pathname, search, hash, regionId) {
+  const next = new URLSearchParams(search);
+  next.set("region", regionId);
+  return pathname + "?" + next + hash;
+}
+
+export function contextForRegion(previous, client, region, structureId) {
+  return {
+    ...previous,
+    client: { id: client.id, name: client.name },
+    region,
+    structure_id: structureId,
+    notes: client.notes
+      .filter((note) => relatedRegion(note.region_id, region.id))
+      .map((note) => note.text),
+  };
+}
+
 /** Same-origin client context, real atlas IDs, and bounded asynchronous loading. */
 const query = new URLSearchParams(location.search);
 if (query.get("platform") === "1") {
   let ready = false,
     pending = null,
     applying = false,
-    atlas = null;
+    atlas = null,
+    regionCatalog = null,
+    clientRecord = null,
+    currentContext = null;
   const panel = document.createElement("aside");
   panel.id = "motion-context-panel";
   Object.assign(panel.style, {
@@ -24,25 +46,76 @@ if (query.get("platform") === "1") {
     font: "12px/1.5 system-ui",
   });
   document.body.append(panel);
-  const returnURL =
-    "/#" +
-    new URLSearchParams({
-      page: "client",
-      client: query.get("client"),
-      tab: "anatomy",
-      region: query.get("region"),
-      ...(query.get("analysis") ? { id: query.get("analysis") } : {}),
-    });
-  document.querySelectorAll('a[href="/#home"]').forEach((a) => {
-    a.href = returnURL;
-    a.target = "_top";
-    a.textContent = "← Return to client workspace";
+  panel.hidden = parent !== window;
+  const returnLinks = [...document.querySelectorAll('a[href="/#home"]')];
+  const returnURL = (regionId) => "/#" + new URLSearchParams({
+    page: "client", client: query.get("client"), tab: "anatomy",
+    region: regionId,
+    ...(query.get("analysis") ? { id: query.get("analysis") } : {}),
   });
+  const syncReturnLinks = (regionId) => returnLinks.forEach((link) => {
+    link.href = returnURL(regionId);
+    link.target = "_top";
+    link.textContent = "← Return to client workspace";
+  });
+  syncReturnLinks(query.get("region"));
 
   const tell = (type, data = {}) => {
     if (parent !== window)
       parent.postMessage({ type, ...data }, location.origin);
   };
+  const availableRegions = async () => {
+    if (regionCatalog) return regionCatalog;
+    const response = await fetch("/platform/me", { credentials: "same-origin" });
+    if (!response.ok) throw Error("Sign in to select body regions.");
+    regionCatalog = (await response.json()).regions || [];
+    return regionCatalog;
+  };
+  const selectedClient = async () => {
+    if (clientRecord) return clientRecord;
+    const response = await fetch(
+      "/platform/client?id=" + encodeURIComponent(query.get("client")),
+      { credentials: "same-origin" },
+    );
+    if (!response.ok) throw Error("Sign in to view this client.");
+    clientRecord = await response.json();
+    return clientRecord;
+  };
+  document.addEventListener("motion-anatomy-selection", async (event) => {
+    const structureId = Number(event.detail?.structure_id);
+    if (!Number.isInteger(structureId)) return;
+    try {
+      const catalog = await availableRegions();
+      const region = catalog.find((entry) =>
+        (entry.structures || []).some((part) => Number(part.id) === structureId),
+      );
+      if (parent !== window) {
+        tell("motion-atlas-selection", {
+          structure_id: structureId,
+          region_id: region?.id || null,
+        });
+      } else if (region) {
+        const client = await selectedClient();
+        history.replaceState(null, "", fullscreenRegionURL(
+          location.pathname, location.search, location.hash, region.id,
+        ));
+        query.set("region", region.id);
+        syncReturnLinks(region.id);
+        apply(contextForRegion(currentContext, client, region, structureId));
+      } else {
+        panel.textContent = "This atlas structure has no mapped coaching region. Select a marked body area in the client workspace.";
+      }
+    } catch {
+      if (parent !== window) {
+        tell("motion-atlas-selection", {
+          structure_id: structureId,
+          region_id: null,
+        });
+      } else {
+        panel.textContent = "This body region could not load. Return to the client workspace and try again.";
+      }
+    }
+  });
   const error = (e) => {
     panel.textContent =
       "The 3D viewer could not open. Enable WebGL/hardware acceleration and reload. Your linked notes and scans remain available in the client workspace.";
@@ -50,6 +123,8 @@ if (query.get("platform") === "1") {
     console.error(e);
   };
   async function apply(context) {
+    currentContext = context;
+    if (Array.isArray(context.regions)) regionCatalog = context.regions;
     pending = context;
     if (!ready || applying) return;
     applying = true;
@@ -98,32 +173,37 @@ if (query.get("platform") === "1") {
         atlas.selectStructure(ids[0], { auto: true });
         atlas.flyToGroup(ids);
       }
-      panel.replaceChildren();
-      const title = document.createElement("strong");
-      title.textContent = context.client.name + " · " + r.name;
-      panel.append(title);
-      const p = document.createElement("p");
-      p.textContent = r.explanation;
-      panel.append(p);
-      for (const note of context.notes || []) {
-        const n = document.createElement("p");
-        n.textContent = "Coach: " + note;
-        panel.append(n);
-      }
-      const back = document.createElement("a");
-      back.href =
-        "/#" +
-        new URLSearchParams({
-          page: "client",
-          client: context.client.id,
-          tab: "anatomy",
-          region: r.id,
+      if (parent === window) {
+        panel.replaceChildren();
+        const title = document.createElement("strong");
+        title.textContent = context.client.name + " · " + r.name;
+        panel.append(title);
+        const p = document.createElement("p");
+        p.textContent = r.explanation;
+        panel.append(p);
+        const notes = context.notes || [];
+        if (notes.length) {
+          const details = document.createElement("details");
+          const summary = document.createElement("summary");
+          summary.textContent = `Coach feedback (${notes.length})`;
+          details.append(summary);
+          for (const note of notes) {
+            const n = document.createElement("p");
+            n.textContent = note;
+            details.append(n);
+          }
+          panel.append(details);
+        }
+        const back = document.createElement("a");
+        back.href = "/#" + new URLSearchParams({
+          page: "client", client: context.client.id, tab: "anatomy", region: r.id,
           ...(context.analysis_id ? { id: context.analysis_id } : {}),
         });
-      back.textContent = "Return to this client’s workspace";
-      back.style.color = "#7aceff";
-      back.target = "_top";
-      panel.append(back);
+        back.textContent = "Return to this client’s workspace";
+        back.style.color = "#7aceff";
+        back.target = "_top";
+        panel.append(back);
+      }
       tell("motion-atlas-context", {
         client_id: context.client.id,
         region_id: r.id,
@@ -172,9 +252,7 @@ if (query.get("platform") === "1") {
           return r.json();
         };
         const me = await req("/platform/me");
-        const c = await req(
-          "/platform/client?id=" + encodeURIComponent(query.get("client")),
-        );
+        const c = await selectedClient();
         const region =
           me.regions.find((r) => r.id === query.get("region")) || me.regions[0];
         await apply({
