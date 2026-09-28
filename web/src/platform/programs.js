@@ -4,11 +4,13 @@ import {
   notice, mediaURL, safeURL, upload, date, dt, exerciseIllustration,
 } from "./core.js";
 import { exerciseStep, configureStep, reorderStep, removeStep } from "./program-sequence.js";
+import { openCoachCamera } from "./program-camera.js";
 
 const phaseChoices = ["Assessment", "Foundation", "Mobility", "Strength", "Control", "Progression", "Maintenance"];
 const statuses = ["Draft", "Active", "Completed", "Archived"];
 const mediaKinds = [
   ["coach_demonstration", "Coach demonstration"],
+  ["coach_photo", "Coach photo"],
   ["exercise_library", "Exercise library media"],
   ["client_capture", "Client capture"],
   ["demo_media", "Demo media"],
@@ -21,6 +23,26 @@ const sid = () => crypto.randomUUID().replaceAll("-", "");
 const isVideo = (m) => (m?.mime || "").startsWith("video/");
 const mediaLabel = (kind) => mediaKinds.find((k) => k[0] === kind)?.[1] || "Exercise media";
 const duration = (steps) => Math.round(steps.reduce((n, s) => n + Number(s.sets || 1) * (Number(s.seconds || 0) + Number(s.rest || 0)), 0) / 60);
+export const planPhaseFromForm = (formData) => formData.get("current_program_phase");
+export function revisionSourceLink(version, clientId, notes = []) {
+  if (!version.source_id) return "";
+  if (version.source_kind === "analysis")
+    return `<a href="${href("report", {id:version.source_id,client:clientId})}">Source assessment</a>`;
+  if (["coach_observation","client_feedback"].includes(version.source_kind) && clientId) {
+    const note = notes.find((item) => item.id === version.source_id);
+    if (note) return `<a href="${href("client", {client:clientId,tab:"notes",region:note.region_id || ""})}">Source coach feedback${note.text ? ` · ${esc(note.text.slice(0,70))}` : ""}</a>`;
+  }
+  return `<span>Source record ${esc(version.source_id.slice(0,8))}</span>`;
+}
+export function appendCoachMedia(entries, file, mediaId, {caption = "", primary = false} = {}) {
+  const video = file.type.startsWith("video/");
+  const makePrimary = video && (primary || !entries.some((entry) => entry.primary));
+  return [
+    ...entries.map((entry) => makePrimary ? {...entry, primary:false} : entry),
+    {media_id:mediaId,kind:video ? "coach_demonstration" : "coach_photo",
+      caption,primary:makePrimary,visibility:"student",stage:"other"},
+  ];
+}
 function targetButtons(selected) {
   return `<div class="pd-target-grid" role="group" aria-label="Target body regions">${regions().map((r) => `<button type="button" class="pd-target ${selected.includes(r.id) ? "selected" : ""}" data-target="${esc(r.id)}" aria-pressed="${selected.includes(r.id)}"><span>${esc(r.name)}</span><small>${esc(r.side || "")}</small></button>`).join("")}</div><p class="muted">These are coaching targets, not a diagnosis or a measurement of internal tissue. Select them here or click a mapped structure in the 3D body.</p>`;
 }
@@ -142,7 +164,7 @@ export async function programDetail(root, id) {
     panel.innerHTML = `<div class="loading">Loading program history…</div>`;
     try {
       const result = await api("program/versions?id=" + encodeURIComponent(id));
-      panel.innerHTML = `<section class="panel"><h2>Version history</h2><p>Every saved revision remains available for review. Current changes do not erase the earlier plan.</p>${result.items.map((v) => `<details class="pd-version"><summary>Version ${esc(v.version)} · ${dt(v.created_at)} · ${esc(state.me.coaches.find((c) => c.id === v.actor_id)?.name || state.me.user.name || "Coach")}</summary><p><strong>Why it changed:</strong> ${esc(v.reason || "No reason recorded")}</p><p><strong>Source:</strong> ${esc(v.source_kind || "Manual coach decision")}${v.source_id ? ` · <a href="${href("report", { id: v.source_id, client: clientId })}">Source assessment</a>` : ""}</p><p>${esc(v.snapshot?.name || "Program")} · ${(v.snapshot?.steps || []).length} movements</p>${(v.snapshot?.steps || []).map((s, i) => `<div class="pd-version-step">${i + 1}. ${esc(s.exercise_name || exercises.get(s.exercise_id)?.name || s.exercise_id)} · ${esc(s.sets)} sets × ${esc(s.reps)} reps · ${esc(stepDetail(s).section || s.phase || "Practice")}</div>`).join("")}</details>`).join("") || "<p>No prior revisions yet. The first saved version appears after an edit.</p>"}</section>`;
+      panel.innerHTML = `<section class="panel"><h2>Version history</h2><p>Every saved revision remains available for review. Current changes do not erase the earlier plan.</p>${result.items.map((v) => `<details class="pd-version"><summary>Version ${esc(v.version)} · ${dt(v.created_at)} · ${esc(state.me.coaches.find((c) => c.id === v.actor_id)?.name || state.me.user.name || "Coach")}</summary><p><strong>Why it changed:</strong> ${esc(v.reason || "No reason recorded")}</p><p><strong>Source:</strong> ${esc(v.source_kind || "Manual coach decision")}${v.source_id ? ` · ${revisionSourceLink(v, clientId, state.client?.notes || [])}` : ""}</p><p>${esc(v.snapshot?.name || "Program")} · ${(v.snapshot?.steps || []).length} movements</p>${(v.snapshot?.steps || []).map((s, i) => `<div class="pd-version-step">${i + 1}. ${esc(s.exercise_name || exercises.get(s.exercise_id)?.name || s.exercise_id)} · ${esc(s.sets)} sets × ${esc(s.reps)} reps · ${esc(stepDetail(s).section || s.phase || "Practice")}</div>`).join("")}</details>`).join("") || "<p>No prior revisions yet. The first saved version appears after an edit.</p>"}</section>`;
     } catch (e) { panel.innerHTML = notice(e.message); }
   };
   if (params().get("history") === "1") root.querySelector("#pd-history").click();
@@ -179,7 +201,7 @@ function equipmentEditor(selected, inventory, locations) {
 function stepEditor(step, exercise, allSections, targets, phaseNames, clientMedia, inventory) {
   const d = stepDetail(step);
   const dose = `${step.sets || 1} × ${step.reps ?? 8}${step.seconds ? ` · ${step.seconds}s` : ""}`;
-  return `<article class="pd-edit-step" draggable="true" data-step="${esc(step._uid)}"><div class="pd-edit-step-head"><span class="pd-drag" title="Drag to reorder">⋮⋮</span><div><small>${esc(exercise.category || "Movement")}</small><strong>${esc(exercise.name)}</strong><span>${esc(dose)}</span></div><div class="pd-card-actions"><button type="button" data-step-move="-1" aria-label="Move ${esc(exercise.name)} up">↑</button><button type="button" data-step-move="1" aria-label="Move ${esc(exercise.name)} down">↓</button><button type="button" data-step-copy>Duplicate</button><button type="button" data-step-remove>Remove</button></div></div><details class="pd-step-details"><summary>Configure movement</summary><div class="pd-step-body"><div class="pd-fields-four">${field("Sets", "sets", step.sets ?? 1, "number", 'min="1" max="100"')}${field("Repetitions", "reps", step.reps ?? 8, "number", 'min="0" max="7200"')}${field("Duration · seconds", "seconds", step.seconds ?? 60, "number", 'min="0" max="7200"')}${field("Rest · seconds", "rest", step.rest ?? 20, "number", 'min="0" max="7200"')}</div><div class="pd-fields-two">${select("Section", "section", allSections.map((x) => [x,x]), d.section || step.phase || "Practice", null)}${select("Body side", "side", [["Both","Both"],["Left","Left"],["Right","Right"]], d.side || "Both", null)}</div>${area("Why this movement is assigned", "purpose", d.purpose || step.notes)}${area("Student instructions", "student_instructions", d.student_instructions || exercise.detail?.instructions)}${area("Coach cue", "coach_cue", d.coach_cue)}${select("Program phase", "program_phase", ["All phases", ...phaseNames].map((x)=>[x,x]), d.program_phase || "All phases", null)}<details class="pd-advanced"><summary>Advanced coaching details</summary><div class="pd-fields-two">${field("Tempo", "tempo", d.tempo)}${select("Difficulty", "difficulty", ["Foundation","Intermediate","Advanced"].map((x) => [x,x]), d.difficulty || exercise.difficulty || "Foundation", null)}${select("Position", "position", ["Standing","Seated","Supine","Prone","Kneeling","Side-lying","Other"].map((x) => [x,x]), d.position || "Standing", null)}${field("Primary muscles · educational", "primary_muscles", d.primary_muscles || exercise.detail?.muscles)}</div>${field("Secondary muscles · optional", "secondary_muscles", d.secondary_muscles)}${field("Resistance / band setting", "resistance", d.resistance)}<h4>Equipment for this movement</h4>${equipmentEditor(Array.isArray(d.equipment) ? d.equipment : exercise.equipment?.map((item)=>({equipment_id:item.equipment_id,quantity:item.quantity})), inventory, state.me.locations)}${area("Coach-only instruction", "coach_instructions", d.coach_instructions)}${area("Common mistake", "common_mistake", d.common_mistake)}${area("Success criteria", "success_criteria", d.success_criteria)}${area("Progression", "progression", d.progression)}${area("Regression", "regression", d.regression)}${area("Precautions", "precautions", d.precautions)}${area("Change reason / step note", "notes", step.notes)}</details><details class="pd-advanced"><summary>Body areas and evidence</summary><button type="button" data-step-atlas="${esc(step._uid)}">Select this movement’s body targets on 3D anatomy</button>${targetButtons(d.target_region_ids?.length ? d.target_region_ids : targets)}${d.source?.id ? `<p>Linked to <a href="${href("report", { id: d.source.id })}">source assessment →</a></p>` : ""}</details><details class="pd-advanced"><summary>Photos, videos and references</summary><p class="muted">Attach images and clips from this exercise or upload your own. A shared movement is copied privately before your media is added. Labels tell students whether this is a coach demonstration or library reference.</p><div class="pd-step-media">${(d.media || []).map((m,i) => mediaEditor(m,exercise,i,clientMedia)).join("")}</div><div class="pd-fields-two">${select("Existing exercise media", "existing_media", (exercise.media || []).map((m)=>[m.id,m.filename]), "", "Select photo or video")}${select("Media label", "new_media_kind", mediaKinds.filter((pair)=>pair[0]!=="client_capture"), "exercise_library", null)}</div><button type="button" data-add-existing>Add selected media</button>${clientMedia.length ? `${select("Client capture", "client_capture", clientMedia.map((m)=>[m.id,m.filename]), "", "Choose a capture from this client")}${field("Caption for client capture", "client_capture_caption")}<button type="button" data-add-client>Attach client capture</button>` : ""}<label>Upload your photo or demonstration video<input type="file" name="step_files" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" multiple></label><p class="pd-file-status" role="status"></p><div class="pd-step-references">${(d.references || []).map(referenceEditor).join("")}</div><button type="button" data-add-reference>+ Reference video or link</button></details></div></details></article>`;
+  return `<article class="pd-edit-step" draggable="true" data-step="${esc(step._uid)}"><div class="pd-edit-step-head"><span class="pd-drag" title="Drag to reorder">⋮⋮</span><div><small>${esc(exercise.category || "Movement")}</small><strong>${esc(exercise.name)}</strong><span>${esc(dose)}</span></div><div class="pd-card-actions"><button type="button" data-step-move="-1" aria-label="Move ${esc(exercise.name)} up">↑</button><button type="button" data-step-move="1" aria-label="Move ${esc(exercise.name)} down">↓</button><button type="button" data-step-copy>Duplicate</button><button type="button" data-step-remove>Remove</button></div></div><details class="pd-step-details"><summary>Configure movement</summary><div class="pd-step-body"><div class="pd-fields-four">${field("Sets", "sets", step.sets ?? 1, "number", 'min="1" max="100"')}${field("Repetitions", "reps", step.reps ?? 8, "number", 'min="0" max="7200"')}${field("Duration · seconds", "seconds", step.seconds ?? 60, "number", 'min="0" max="7200"')}${field("Rest · seconds", "rest", step.rest ?? 20, "number", 'min="0" max="7200"')}</div><div class="pd-fields-two">${select("Section", "section", allSections.map((x) => [x,x]), d.section || step.phase || "Practice", null)}${select("Body side", "side", [["Both","Both"],["Left","Left"],["Right","Right"]], d.side || "Both", null)}</div>${area("Why this movement is assigned", "purpose", d.purpose || step.notes)}${area("Student instructions", "student_instructions", d.student_instructions || exercise.detail?.instructions)}${area("Coach cue", "coach_cue", d.coach_cue)}${select("Program phase", "program_phase", ["All phases", ...phaseNames].map((x)=>[x,x]), d.program_phase || "All phases", null)}<details class="pd-advanced"><summary>Advanced coaching details</summary><div class="pd-fields-two">${field("Tempo", "tempo", d.tempo)}${select("Difficulty", "difficulty", ["Foundation","Intermediate","Advanced"].map((x) => [x,x]), d.difficulty || exercise.difficulty || "Foundation", null)}${select("Position", "position", ["Standing","Seated","Supine","Prone","Kneeling","Side-lying","Other"].map((x) => [x,x]), d.position || "Standing", null)}${field("Primary muscles · educational", "primary_muscles", d.primary_muscles || exercise.detail?.muscles)}</div>${field("Secondary muscles · optional", "secondary_muscles", d.secondary_muscles)}${field("Resistance / band setting", "resistance", d.resistance)}<h4>Equipment for this movement</h4>${equipmentEditor(Array.isArray(d.equipment) ? d.equipment : exercise.equipment?.map((item)=>({equipment_id:item.equipment_id,quantity:item.quantity})), inventory, state.me.locations)}${area("Coach-only instruction", "coach_instructions", d.coach_instructions)}${area("Common mistake", "common_mistake", d.common_mistake)}${area("Success criteria", "success_criteria", d.success_criteria)}${area("Progression", "progression", d.progression)}${area("Regression", "regression", d.regression)}${area("Precautions", "precautions", d.precautions)}${area("Change reason / step note", "notes", step.notes)}</details><details class="pd-advanced"><summary>Body areas and evidence</summary><button type="button" data-step-atlas="${esc(step._uid)}">Select this movement’s body targets on 3D anatomy</button>${targetButtons(d.target_region_ids?.length ? d.target_region_ids : targets)}${d.source?.id ? `<p>Linked to <a href="${href("report", { id: d.source.id })}">source assessment →</a></p>` : ""}</details><details class="pd-advanced"><summary>Photos, videos and references</summary><p class="muted">Attach images and clips from this exercise or upload your own. A shared movement is copied privately before your media is added. Labels tell students whether this is a coach demonstration or library reference.</p><div class="pd-step-media">${(d.media || []).map((m,i) => mediaEditor(m,exercise,i,clientMedia)).join("")}</div><div class="pd-fields-two">${select("Existing exercise media", "existing_media", (exercise.media || []).map((m)=>[m.id,m.filename]), "", "Select photo or video")}${select("Media label", "new_media_kind", mediaKinds.filter((pair)=>pair[0]!=="client_capture"), "exercise_library", null)}</div><button type="button" data-add-existing>Add selected media</button>${clientMedia.length ? `${select("Client capture", "client_capture", clientMedia.map((m)=>[m.id,m.filename]), "", "Choose a capture from this client")}${field("Caption for client capture", "client_capture_caption")}<button type="button" data-add-client>Attach client capture</button>` : ""}<label>Upload your photo or demonstration video<input type="file" name="step_files" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" multiple></label><button type="button" data-record-video>Record a short coach demonstration</button><div class="pd-recorder" hidden><video autoplay muted playsinline></video><p>Show the full movement. Recording stops after 45 seconds. The clip is attached when you save this program.</p><div class="actions"><button type="button" data-record-start>Start recording</button><button type="button" data-record-stop disabled>Stop and use clip</button><button type="button" data-record-cancel>Cancel camera</button></div><p class="pd-record-status" role="status"></p></div><div class="pd-pending-media"></div><p class="pd-file-status" role="status"></p><div class="pd-step-references">${(d.references || []).map(referenceEditor).join("")}</div><button type="button" data-add-reference>+ Reference video or link</button></details></div></details></article>`;
 }
 
 export async function programEditor(id, copy = false, addPhase = false) {
@@ -205,34 +227,46 @@ export async function programEditor(id, copy = false, addPhase = false) {
   let steps = (source.steps || []).map((s) => ({...structuredClone(s), _uid:sid(), detail:stepDetail(s)}));
   let phases = structuredClone(base.phases?.length ? base.phases : [{name:base.phase || "Foundation",weeks_start:1,weeks_end:base.duration_weeks || 4,goal:""}]);
   const pendingFiles = new Map();
+  const pendingPreviews = new Map();
+  let cameraController = null;
+  let cameraToken = 0;
   const formatName = copy ? `Copy of ${source.name || ""}` : source.name || "";
-  const html = `<div class="program-designer"><div class="pd-editor-lead"><div class="pd-eyebrow">COACH PROGRAM DESIGNER ${clientId ? `· ${esc(state.client?.name || "Selected client")}` : ""}</div><p>Build a plan that explains the movement, its body targets, the coach’s reasoning and how to practice it.</p></div><section class="pd-editor-section"><div class="pd-section-title"><span>01</span><div><h3>Plan</h3><p>Give the client a clear goal and a realistic schedule.</p></div></div>${field("Program name", "name", formatName, "text", "required")}${area("Main goal", "goal", source.goal)}<div class="pd-fields-two">${area("Description", "description", base.description)}${area("Coach planning notes · staff only", "coach_notes", base.coach_notes)}</div><details class="pd-advanced"><summary>Schedule, phase and status</summary><div class="pd-fields-four">${field("Start date", "start_date", base.start_date || new Date().toISOString().slice(0,10), "date")}${field("Expected duration · weeks", "duration_weeks", base.duration_weeks || 4, "number", 'min="1" max="104"')}${field("Sessions each week", "sessions_per_week", base.sessions_per_week || 2, "number", 'min="1" max="14"')}${select("Status", "status", statuses.map((x)=>[x,x]), base.status || "Draft", null)}</div><div class="pd-fields-two">${select("Program phase", "program_phase", phaseChoices.map((x)=>[x,x]), base.phase || "Foundation", null)}${select("Location", "location_id", state.me.locations, source.location_id || state.client?.location_ids?.[0], "Any assigned location")}</div><div id="pd-phase-rows"></div><button type="button" id="pd-add-phase">+ Program phase</button><label class="check"><input type="checkbox" name="template" ${base.template ? "checked" : ""}> Save as an editable template</label></details></section><section class="pd-editor-section"><div class="pd-section-title"><span>02</span><div><h3>Body targets</h3><p>Select the regions discussed in your analysis and coaching feedback.</p></div></div><div id="pd-target-picker">${targetButtons(selectedTargets)}</div><details class="pd-atlas-disclosure"><summary>Select on 3D anatomy</summary><button type="button" id="pd-atlas-plan-target">Select for whole plan</button>${clientId ? `<iframe class="pd-atlas" title="Select program target body areas" loading="lazy" data-src="/anatomy.html?${new URLSearchParams({ platform: "1", client: clientId, region: selectedTargets[0] || regions()[0]?.id || "" })}"></iframe><p class="muted" id="pd-atlas-status">Click an anatomical structure to add its mapped body region. The region buttons above work if 3D is unavailable.</p>` : `<p>Select a client before using the connected 3D body. The region buttons above remain available.</p>`}</details></section><section class="pd-editor-section"><div class="pd-section-title"><span>03</span><div><h3>Sequence</h3><p>Drag movement cards to reorder. Open a card for prescription, guidance, photos, video and references.</p></div></div><div class="pd-builder-toolbar"><div>${field("Search the exercise library", "exercise_search", "", "search")}${select("Movement to add", "exercise_id", [...exerciseMap.values()], "", "Choose a movement")}</div><button type="button" id="pd-add-exercise" class="primary">+ Add movement</button><button type="button" id="pd-add-section">+ Section</button><button type="button" id="pd-add-note">+ Note</button><button type="button" id="pd-new-exercise">+ Custom exercise</button></div><div id="pd-custom-exercise" hidden><h4>Create a custom movement</h4><div class="pd-fields-two">${field("Movement name", "custom_name")}${select("Category", "custom_category", ["Yoga","Pilates","Mobility","Flexibility","Strength","Balance","Breathing","Recovery"].map((x)=>[x,x]), "Mobility", null)}${select("Main body region", "custom_region", regions(), sourceRegion)}${select("Save to", "custom_scope", [["program","Only this client program"],["private","My exercise library"],["organization","Organization exercise library"]], "program", null)}</div>${area("What should the student do?", "custom_instruction")}<button type="button" class="primary" id="pd-save-custom">Create and add</button><p id="pd-custom-status" role="status"></p></div><div id="pd-sections"></div></section><section class="pd-editor-section"><div class="pd-section-title"><span>04</span><div><h3>Change context</h3><p>Explain why you changed an active plan. Each save creates a reviewable version.</p></div></div><div class="pd-fields-two">${field("Reason for this version · optional", "change_reason", "")}${select("Reason source", "change_kind", [["manual","Manual coach decision"],["analysis","Movement or posture analysis"],["coach_observation","Coach observation"],["client_feedback","Client feedback"]], sourceReport ? "analysis" : "manual", null)}</div>${select("Related assessment or feedback", "change_source_id", [], sourceReport, "Choose a source record")}${sourceReport ? `<p class="pd-source-link">Connected to <a href="${href("report", { id: sourceReport, client: clientId })}">assessment ${esc(sourceReport.slice(0,8))}</a>${sourceFinding ? ` · ${esc(sourceFinding.replaceAll("_"," "))}` : ""}</p>` : ""}</section><p id="pd-upload-status" role="status"></p></div>`;
+  const html = `<div class="program-designer"><div class="pd-editor-lead"><div class="pd-eyebrow">COACH PROGRAM DESIGNER ${clientId ? `· ${esc(state.client?.name || "Selected client")}` : ""}</div><p>Build a plan that explains the movement, its body targets, the coach’s reasoning and how to practice it.</p></div><section class="pd-editor-section"><div class="pd-section-title"><span>01</span><div><h3>Plan</h3><p>Give the client a clear goal and a realistic schedule.</p></div></div>${field("Program name", "name", formatName, "text", "required")}${area("Main goal", "goal", source.goal)}<div class="pd-fields-two">${area("Description", "description", base.description)}${area("Coach planning notes · staff only", "coach_notes", base.coach_notes)}</div><details class="pd-advanced"><summary>Schedule, phase and status</summary><div class="pd-fields-four">${field("Start date", "start_date", base.start_date || new Date().toISOString().slice(0,10), "date")}${field("Expected duration · weeks", "duration_weeks", base.duration_weeks || 4, "number", 'min="1" max="104"')}${field("Sessions each week", "sessions_per_week", base.sessions_per_week || 2, "number", 'min="1" max="14"')}${select("Status", "status", statuses.map((x)=>[x,x]), base.status || "Draft", null)}</div><div class="pd-fields-two">${select("Program phase", "current_program_phase", phaseChoices.map((x)=>[x,x]), base.phase || "Foundation", null)}${select("Location", "location_id", state.me.locations, source.location_id || state.client?.location_ids?.[0], "Any assigned location")}</div><div id="pd-phase-rows"></div><button type="button" id="pd-add-phase">+ Program phase</button><label class="check"><input type="checkbox" name="template" ${base.template ? "checked" : ""}> Save as an editable template</label></details></section><section class="pd-editor-section"><div class="pd-section-title"><span>02</span><div><h3>Body targets</h3><p>Select the regions discussed in your analysis and coaching feedback.</p></div></div><div id="pd-target-picker">${targetButtons(selectedTargets)}</div><details class="pd-atlas-disclosure"><summary>Select on 3D anatomy</summary><button type="button" id="pd-atlas-plan-target">Select for whole plan</button>${clientId ? `<iframe class="pd-atlas" title="Select program target body areas" loading="lazy" data-src="/anatomy.html?${new URLSearchParams({ platform: "1", client: clientId, region: selectedTargets[0] || regions()[0]?.id || "" })}"></iframe><p class="muted" id="pd-atlas-status">Click an anatomical structure to add its mapped body region. The region buttons above work if 3D is unavailable.</p>` : `<p>Select a client before using the connected 3D body. The region buttons above remain available.</p>`}</details></section><section class="pd-editor-section"><div class="pd-section-title"><span>03</span><div><h3>Sequence</h3><p>Drag movement cards to reorder. Open a card for prescription, guidance, photos, video and references.</p></div></div><div class="pd-builder-toolbar"><div>${field("Search the exercise library", "exercise_search", "", "search")}${select("Movement to add", "exercise_id", [...exerciseMap.values()], "", "Choose a movement")}</div><button type="button" id="pd-add-exercise" class="primary">+ Add movement</button><button type="button" id="pd-add-section">+ Section</button><button type="button" id="pd-add-note">+ Note</button><button type="button" id="pd-new-exercise">+ Custom exercise</button></div><div id="pd-custom-exercise" hidden><h4>Create a custom movement</h4><div class="pd-fields-two">${field("Movement name", "custom_name")}${select("Category", "custom_category", ["Yoga","Pilates","Mobility","Flexibility","Strength","Balance","Breathing","Recovery"].map((x)=>[x,x]), "Mobility", null)}${select("Main body region", "custom_region", regions(), sourceRegion)}${select("Save to", "custom_scope", [["program","Only this client program"],["private","My exercise library"],["organization","Organization exercise library"]], "program", null)}</div>${area("What should the student do?", "custom_instruction")}<button type="button" class="primary" id="pd-save-custom">Create and add</button><p id="pd-custom-status" role="status"></p></div><div id="pd-sections"></div></section><section class="pd-editor-section"><div class="pd-section-title"><span>04</span><div><h3>Change context</h3><p>Explain why you changed an active plan. Each save creates a reviewable version.</p></div></div><div class="pd-fields-two">${field("Reason for this version · optional", "change_reason", "")}${select("Reason source", "change_kind", [["manual","Manual coach decision"],["analysis","Movement or posture analysis"],["coach_observation","Coach observation"],["client_feedback","Client feedback"]], sourceReport ? "analysis" : "manual", null)}</div>${select("Related assessment or feedback", "change_source_id", [], sourceReport, "Choose a source record")}${sourceReport ? `<p class="pd-source-link">Connected to <a href="${href("report", { id: sourceReport, client: clientId })}">assessment ${esc(sourceReport.slice(0,8))}</a>${sourceFinding ? ` · ${esc(sourceFinding.replaceAll("_"," "))}` : ""}</p>` : ""}</section><p id="pd-upload-status" role="status"></p></div>`;
   const dialog = modal(copy ? "Duplicate program" : id ? "Edit program" : "Create program", html, async (formData, form) => {
+    if (cameraController?.recording) throw Error("Stop and use the coach recording before saving the program.");
     readAll();
     dialog.querySelectorAll("[data-target-reason]").forEach((input)=>targetReasons[input.dataset.targetReason]=input.value);
     const values = Object.fromEntries(formData);
     readPhases();
-    if (!phases.some((phase)=>phase.name===values.program_phase)) throw Error("Choose a current phase from the phase schedule.");
+    if (!phases.some((phase)=>phase.name===planPhaseFromForm(formData))) throw Error("Choose a current phase from the phase schedule.");
     if (!steps.some((s)=>s.exercise_id)) throw Error("Add at least one movement before saving the program.");
     if (!selectedTargets.length) throw Error("Select at least one target body region.");
     for (const step of steps) {
       const files = pendingFiles.get(step._uid) || [];
       if (!files.length) continue;
       const exercise = await editableExerciseForUpload(step, exerciseMap);
-      for (const file of files) {
+      for (const entry of [...files]) {
+        const {file} = entry;
         form.querySelector("#pd-upload-status").textContent = `Uploading ${file.name}…`;
         const media = await upload(file,{kind:"exercise",exercise_id:step.exercise_id},n => form.querySelector("#pd-upload-status").textContent = `Uploading ${file.name} · ${n}%`);
-        const kind = "coach_demonstration";
-        step.detail.media = [...(step.detail.media || []), {media_id:media.id, kind, caption:"", primary:file.type.startsWith("video/") && !(step.detail.media || []).some((m)=>m.primary), visibility:"student", stage:"other"}];
+        step.detail.media = appendCoachMedia(step.detail.media || [], file, media.id, entry);
+        exercise.media = [...(exercise.media || []), media];
+        const preview = pendingPreviews.get(file);
+        if (preview) URL.revokeObjectURL(preview);
+        pendingPreviews.delete(file);
+        files.shift();
+        if (!files.length) pendingFiles.delete(step._uid);
+        // A later upload or revision error must leave the successful media in
+        // the editor, so retrying does not upload a second copy or lose it.
+        draw();
       }
-      pendingFiles.delete(step._uid);
     }
     const ordered = sections.flatMap((section) => steps.filter((step) => (step.section || step.detail?.section || step.phase || "Practice") === section));
     const cleaned = ordered.map(({_uid,...step},i) => ({...step,position:i,phase:step.detail?.section || step.section || step.phase || "Practice"}));
     const detail = {
       ...base, copied_from:copy ? source.id : base.copied_from,
       description:values.description,coach_notes:values.coach_notes,
-      status:values.status,phase:values.program_phase,start_date:values.start_date,
+      status:values.status,phase:planPhaseFromForm(formData),start_date:values.start_date,
       duration_weeks:Number(values.duration_weeks),sessions_per_week:Number(values.sessions_per_week),
       target_region_ids:selectedTargets,target_explanations:targetReasons,sections,phases,template:form.querySelector('[name=template]').checked,
       student_id:clientId || base.student_id || null,
@@ -266,6 +300,61 @@ export async function programEditor(id, copy = false, addPhase = false) {
   });
   dialog.classList.add("pd-dialog");
   const find = (s) => dialog.querySelector(s);
+  function closeCamera() {
+    cameraToken++;
+    cameraController?.dispose();
+    cameraController = null;
+  }
+  const cleanup = () => {
+    closeCamera();
+    pendingPreviews.forEach((url) => URL.revokeObjectURL(url));
+    pendingPreviews.clear();
+  };
+  let closed = false;
+  dialog.addEventListener("close", () => { closed = true; cleanup(); }, {once:true});
+  state.dispose.push(() => { if (!closed) { if (dialog.open) dialog.close(); else cleanup(); } });
+  function queueFile(el, file) {
+    const uid = el.dataset.step;
+    const items = pendingFiles.get(uid) || [];
+    const existing = steps.find((step) => step._uid === uid)?.detail?.media || [];
+    const valid = ["image/jpeg","image/png","image/webp","video/mp4","video/webm"].includes(file.type);
+    if (!valid) { el.querySelector(".pd-file-status").textContent = "Use a JPEG, PNG, WebP, MP4 or WebM file."; return false; }
+    if (file.size > (file.type.startsWith("image/") ? 12 : 64) * 1024 * 1024) {
+      el.querySelector(".pd-file-status").textContent = "This file is too large for exercise media."; return false;
+    }
+    if (items.length + existing.length >= 16) {
+      el.querySelector(".pd-file-status").textContent = "Attach at most 16 photos or videos to one movement."; return false;
+    }
+    items.push({file,caption:"",primary:file.type.startsWith("video/") && !existing.some((m)=>m.primary) && !items.some((m)=>m.primary)});
+    pendingFiles.set(uid, items);
+    renderPending(el);
+    return true;
+  }
+  function renderPending(el) {
+    const items = pendingFiles.get(el.dataset.step) || [];
+    el.querySelector(".pd-pending-media").innerHTML = items.map((item, index) => {
+      const video = item.file.type.startsWith("video/");
+      if (video && !pendingPreviews.has(item.file)) pendingPreviews.set(item.file, URL.createObjectURL(item.file));
+      return `<div class="pd-pending-item" data-pending="${index}"><strong>${esc(item.file.name)}</strong>${video ? `<video controls preload="metadata" src="${esc(pendingPreviews.get(item.file))}"></video>` : ""}${field("Caption for this media", "pending_caption", item.caption)}${video ? `<label class="check"><input type="checkbox" name="pending_primary" ${item.primary ? "checked" : ""}> Primary demonstration</label>` : ""}<button type="button" data-remove-pending="${index}">Remove queued file</button></div>`;
+    }).join("");
+    el.querySelector(".pd-file-status").textContent = items.length ? `${items.length} file(s) ready to attach when you save this program.` : "";
+    el.querySelectorAll(".pd-pending-item").forEach((row) => {
+      const index = Number(row.dataset.pending);
+      row.querySelector('[name=pending_caption]').oninput = (event) => { items[index].caption = event.target.value; };
+      if (row.querySelector('[name=pending_primary]')) row.querySelector('[name=pending_primary]').onchange = (event) => {
+        items.forEach((item, i) => { item.primary = event.target.checked && i === index; });
+        renderPending(el);
+      };
+      row.querySelector('[data-remove-pending]').onclick = () => {
+        const [removed] = items.splice(index,1);
+        const preview = pendingPreviews.get(removed.file);
+        if (preview) URL.revokeObjectURL(preview);
+        pendingPreviews.delete(removed.file);
+        if (!items.length) pendingFiles.delete(el.dataset.step);
+        renderPending(el);
+      };
+    });
+  }
   const updateSource = () => {
     const kind = find("[name=change_kind]").value;
     const entries = kind === "analysis" ? (state.client?.analyses || []).map((a)=>[a.id, `${a.kind || "Assessment"} · ${date(a.created_at)}`]) : kind === "coach_observation" || kind === "client_feedback" ? (state.client?.notes || []).map((n)=>[n.id, `${regionName(n.region_id)} · ${n.text?.slice(0,50) || "Coach feedback"}`]) : [];
@@ -343,8 +432,8 @@ export async function programEditor(id, copy = false, addPhase = false) {
   }
   function drawPhases() {
     find("#pd-phase-rows").innerHTML = phases.map((phase,index)=>`<div class="pd-phase-row"><div class="pd-fields-four">${field("Phase name", "phase_name", phase.name)}${field("From week", "phase_start", phase.weeks_start || 1, "number", "min=\"1\"")}${field("Through week", "phase_end", phase.weeks_end || 4, "number", "min=\"1\"")}${field("Phase goal", "phase_goal", phase.goal)}</div><button type="button" data-remove-phase="${index}" ${phases.length === 1 ? "disabled" : ""}>Remove phase</button></div>`).join("");
-    const currentPhase = find("[name=program_phase]").value;
-    find("[name=program_phase]").innerHTML = options(phases.map((p)=>[p.name,p.name]), phases.some((p)=>p.name===currentPhase) ? currentPhase : (base.phase || phases[0]?.name), null);
+    const currentPhase = find("[name=current_program_phase]").value;
+    find("[name=current_program_phase]").innerHTML = options(phases.map((p)=>[p.name,p.name]), phases.some((p)=>p.name===currentPhase) ? currentPhase : (base.phase || phases[0]?.name), null);
     find("#pd-phase-rows").querySelectorAll("[data-remove-phase]").forEach((b)=>b.onclick=()=>{readAll();readPhases();phases.splice(Number(b.dataset.removePhase),1);drawPhases();draw();});
     find("#pd-phase-rows").querySelectorAll("[name=phase_name]").forEach((input)=>input.onchange=()=>{readAll();readPhases();drawPhases();draw();});
   }
@@ -396,6 +485,7 @@ export async function programEditor(id, copy = false, addPhase = false) {
   function readAll() { dialog.querySelectorAll(".pd-edit-step").forEach(readStep); }
   let dragged = null;
   function draw() {
+    closeCamera();
     const groups = sections.map((name)=>({name,steps:steps.filter((s)=>(s.section || s.detail?.section || s.phase || "Practice")===name)}));
     find("#pd-sections").innerHTML = groups.map((g)=>`<section class="pd-builder-section" data-section="${esc(g.name)}"><header><div><span>${esc(g.name)}</span><small>${g.steps.length} movements</small></div><button type="button" data-rename-section="${esc(g.name)}">Rename</button><button type="button" data-remove-section="${esc(g.name)}" ${g.steps.length ? "disabled title=\"Move exercises to another section first\"" : ""}>Remove</button></header><div class="pd-section-drop" data-drop="${esc(g.name)}">${g.steps.map((s)=>s.type === "note" ? `<article class="pd-edit-step pd-edit-note" draggable="true" data-step="${esc(s._uid)}"><div class="pd-edit-step-head"><span class="pd-drag">⋮⋮</span><strong>Coaching note between movements</strong><div class="pd-card-actions"><button type="button" data-step-move="-1">↑</button><button type="button" data-step-move="1">↓</button><button type="button" data-step-copy>Duplicate</button><button type="button" data-step-remove>Remove</button></div></div><div class="pd-note-fields">${area("Note text", "note_text", s.text)}<div class="pd-fields-two">${select("Section", "note_section", sections.map((x)=>[x,x]), s.section || "Practice", null)}${select("Visible to", "note_visibility", [["student","Student and coach"],["coach","Coach only"]], s.visibility || "student", null)}</div></div></article>` : stepEditor(s,exerciseMap.get(s.exercise_id)||{name:"Unavailable exercise",detail:{}},sections,selected(),phases.map((phase)=>phase.name),clientMedia,inventory)).join("") || '<p class="pd-drop-empty">Drag a movement here or choose one from the library.</p>'}</div></section>`).join("");
     if (targetStepUid && !steps.some((step)=>step._uid===targetStepUid)) targetStepUid = null;
@@ -416,7 +506,47 @@ export async function programEditor(id, copy = false, addPhase = false) {
       el.querySelector('[data-step-move="1"]').onclick=()=>moveStep(el,1);
       el.querySelector('[data-step-copy]').onclick=()=>{readAll(); const i=steps.findIndex((s)=>s._uid===el.dataset.step); const clone=structuredClone(steps[i]);clone._uid=sid();steps.splice(i+1,0,clone);draw();};
       el.querySelector('[data-step-remove]').onclick=()=>{readAll();steps=removeStep(steps,el.dataset.step);pendingFiles.delete(el.dataset.step);draw();};
-      if (el.querySelector('[name=step_files]')) el.querySelector('[name=step_files]').onchange=(event)=>{pendingFiles.set(el.dataset.step,[...(pendingFiles.get(el.dataset.step)||[]),...event.target.files]);el.querySelector('.pd-file-status').textContent=`${pendingFiles.get(el.dataset.step).length} file(s) ready to upload when you save.`;};
+      if (el.querySelector('[name=step_files]')) el.querySelector('[name=step_files]').onchange=(event)=>{[...event.target.files].forEach((file)=>queueFile(el,file));event.target.value="";};
+      if (el.querySelector('[data-record-video]')) el.querySelector('[data-record-video]').onclick=async()=>{
+        closeCamera();
+        const token = cameraToken;
+        const panel = el.querySelector('.pd-recorder');
+        const message = panel.querySelector('.pd-record-status');
+        panel.hidden = false;
+        message.textContent = "Opening your camera…";
+        panel.querySelector('[data-record-start]').disabled = true;
+        panel.querySelector('[data-record-stop]').disabled = true;
+        try {
+          const controller = await openCoachCamera(panel.querySelector('video'), {
+            onTick: (seconds) => { message.textContent = `Recording ${seconds} of 45 seconds…`; },
+            onRecorded: (file) => {
+              if (token !== cameraToken || !dialog.open) return;
+              const queued = queueFile(el,file);
+              message.textContent = queued
+                ? "Clip ready. Add a caption, then save the program to share it with the student."
+                : el.querySelector('.pd-file-status').textContent;
+              panel.querySelector('[data-record-stop]').disabled = true;
+              cameraController = null;
+            },
+            onError: (error) => { message.textContent = error; panel.querySelector('[data-record-stop]').disabled = true; cameraController = null; },
+          });
+          if (token !== cameraToken || !dialog.open) { controller.dispose(); return; }
+          cameraController = controller;
+          message.textContent = "Camera ready. Start when the movement is in frame.";
+          panel.querySelector('[data-record-start]').disabled = false;
+        } catch (error) { message.textContent = error.message; }
+        panel.querySelector('[data-record-start]').onclick=()=>{
+          try { cameraController?.start(); panel.querySelector('[data-record-start]').disabled=true; panel.querySelector('[data-record-stop]').disabled=false; }
+          catch (error) { message.textContent=error.message; closeCamera(); }
+        };
+        panel.querySelector('[data-record-stop]').onclick=()=>{
+          panel.querySelector('[data-record-stop]').disabled=true;
+          message.textContent="Preparing the clip…";
+          cameraController?.stop();
+        };
+        panel.querySelector('[data-record-cancel]').onclick=()=>{closeCamera();panel.hidden=true;};
+      };
+      if (el.querySelector('.pd-pending-media')) renderPending(el);
       if (el.querySelector('[data-add-existing]')) el.querySelector('[data-add-existing]').onclick=()=>{readStep(el);const step=steps.find((s)=>s._uid===el.dataset.step);const mid=el.querySelector('[name=existing_media]').value;if(!mid)return;const kind=el.querySelector('[name=new_media_kind]').value;step.detail.media=[...(step.detail.media||[]),{media_id:mid,kind,caption:"",primary:isVideo((exerciseMap.get(step.exercise_id)?.media || []).find((m)=>m.id===mid)) && !(step.detail.media||[]).some((m)=>m.primary),visibility:"student",stage:"other"}];draw();};
       if (el.querySelector('[data-add-client]')) el.querySelector('[data-add-client]').onclick=()=>{readStep(el);const step=steps.find((s)=>s._uid===el.dataset.step);const mid=el.querySelector('[name=client_capture]').value;if(!mid)return;step.detail.media=[...(step.detail.media||[]),{media_id:mid,kind:"client_capture",caption:el.querySelector('[name=client_capture_caption]').value,primary:false,visibility:"student",stage:"other"}];draw();};
       if (el.querySelector('[data-add-reference]')) el.querySelector('[data-add-reference]').onclick=()=>{readStep(el);const step=steps.find((s)=>s._uid===el.dataset.step);step.detail.references=[...(step.detail.references||[]),{title:"",url:"",type:"video",visibility:"student"}];draw();};

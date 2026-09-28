@@ -1364,3 +1364,34 @@ td {
 .pd-more-actions[open] { z-index: 10; }
 .pd-more-actions[open] > button, .pd-more-actions[open] > a { display: block; width: 100%; margin-top: 5px; text-align: left; }
 .pd-more-actions > button, .pd-more-actions > a { display: none; }
+
+.pd-recorder {
+  display: grid;
+  gap: 10px;
+  max-width: 620px;
+  margin: 12px 0;
+  padding: 14px;
+  border: 1px solid #4b719c;
+  border-radius: 10px;
+  background: #0d1e34;
+}
+.pd-recorder[hidden] { display: none; }
+.pd-recorder video, .pd-pending-item video {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  border-radius: 8px;
+  background: #071322;
+}
+.pd-recorder p { margin: 0; }
+.pd-pending-media { display: grid; gap: 10px; margin-top: 12px; }
+.pd-pending-item {
+  display: grid;
+  gap: 8px;
+  max-width: 620px;
+  padding: 12px;
+  border: 1px solid #456689;
+  border-radius: 8px;
+  background: #172d47;
+}
+.pd-pending-item > strong { overflow-wrap: anywhere; }
