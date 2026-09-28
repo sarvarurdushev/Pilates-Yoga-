@@ -788,9 +788,11 @@ async function sessionDetail(root, sessionId, assessmentId) {
     } else if (event.type === "scan") {
       title = "Linked scan added";
       body = `<p>${esc(event.record.name)}</p><a href="${workspaceHref("scans", { scan: event.id, region: event.record.region_id, id: event.record.analysis_id })}">Open scan →</a>`;
-    } else if (event.type === "finding") {
-      title = "Body finding recorded";
-      body = `<p>${esc(event.record.text)}</p>${event.record.region_id ? `<a href="${workspaceHref("anatomy", { region: event.record.region_id, id: event.record.analysis_id || connections.scans.find((scan) => scan.id === event.record.scan_id)?.analysis_id })}">${esc(regionName(event.record.region_id))} on body map →</a>` : ""}`;
+    } else if (event.type === "findings") {
+      const findings = event.record;
+      title = `${findings.length} body finding${findings.length === 1 ? "" : "s"} recorded`;
+      const rows = findings.map((finding) => `<li><span>${esc(finding.text)}</span>${finding.region_id ? ` <a href="${workspaceHref("anatomy", { region: finding.region_id, id: finding.analysis_id || connections.scans.find((scan) => scan.id === finding.scan_id)?.analysis_id })}">${esc(regionName(finding.region_id))} →</a>` : ""}</li>`).join("");
+      body = findings.length > 2 ? `<details class="session-findings"><summary>Inspect ${findings.length} measurements and linked regions</summary><ul>${rows}</ul></details>` : `<ul class="session-findings">${rows}</ul>`;
     } else if (event.type === "note") {
       title = event.record.scan_id && !event.record.analysis_id ? "Scan-linked coach note" : "Coach feedback";
       body = `<p>${esc(event.record.text)}</p><a href="${workspaceHref("notes", { region: event.record.region_id, id: event.record.analysis_id || connections.scans.find((scan) => scan.id === event.record.scan_id)?.analysis_id })}">Open linked feedback →</a>`;

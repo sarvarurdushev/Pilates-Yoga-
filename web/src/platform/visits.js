@@ -79,8 +79,14 @@ export function visitTimeline(visit, connections) {
     add("capture", analysis.id, analysis.created_at, analysis, 1);
   for (const scan of connections.scans)
     add("scan", scan.id, scan.captured_at, scan, 2);
-  for (const observation of connections.observations)
-    add("finding", observation.id, observation.created_at, observation, 3);
+  const findingGroups = new Map();
+  for (const observation of connections.observations) {
+    const key = `${observation.analysis_id || observation.scan_id || observation.id}:${String(observation.created_at || "").slice(0, 10)}`;
+    if (!findingGroups.has(key)) findingGroups.set(key, []);
+    findingGroups.get(key).push(observation);
+  }
+  for (const [key, findings] of findingGroups)
+    add("findings", key, findings.map((finding) => finding.created_at).sort()[0], findings, 3);
   for (const note of connections.notes)
     add("note", note.id, note.created_at, note, 4);
   for (const analysis of visit.analyses || (visit.analysis ? [visit.analysis] : [])) {

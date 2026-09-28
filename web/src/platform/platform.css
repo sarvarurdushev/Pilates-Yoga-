@@ -1502,3 +1502,9 @@ td {
   .session-visit-nav { flex-wrap: wrap; }
   .session-visit-nav a, .session-visit-nav span { flex: 1 1 100%; }
 }
+.session-findings { margin: 8px 0 0; }
+.session-findings summary { color: #a6cbff; cursor: pointer; }
+.session-findings ul,
+ul.session-findings { padding-left: 18px; }
+.session-findings li { margin: 8px 0; line-height: 1.5; }
+.session-findings li a { margin-left: 4px; }

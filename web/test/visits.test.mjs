@@ -98,6 +98,21 @@ test('visit evidence follows exact capture and scan IDs, never a matching date o
   assert.deepEqual(connected.programChanges.map((x) => x.id), ['v2']);
   assert.deepEqual(connected.regions.sort(), ['left_shoulder', 'right_hip']);
   assert.deepEqual(visitTimeline(visit, connected).map((event) => event.type), [
-    'capture', 'capture', 'scan', 'finding', 'note', 'note', 'review', 'program', 'assignment',
+    'capture', 'capture', 'scan', 'findings', 'note', 'note', 'review', 'program', 'assignment',
   ]);
+});
+
+
+test('same-capture findings recorded on one date form one inspectable timeline event', () => {
+  const visit = { analyses: [{ id: 'a1', created_at: '2026-09-28T09:00:00Z' }], session: null };
+  const connected = visitConnections({
+    scans: [], notes: [], program_history: [],
+    observations: [
+      { id: 'o1', analysis_id: 'a1', created_at: '2026-09-28T09:01:00Z' },
+      { id: 'o2', analysis_id: 'a1', created_at: '2026-09-28T09:02:00Z' },
+      { id: 'o3', analysis_id: 'a1', created_at: '2026-09-29T09:02:00Z' },
+    ],
+  }, visit);
+  const findings = visitTimeline(visit, connected).filter((event) => event.type === 'findings');
+  assert.deepEqual(findings.map((event) => event.record.map((item) => item.id)), [['o1', 'o2'], ['o3']]);
 });
