@@ -19,6 +19,7 @@ import {
   bindButtons,
   exerciseIllustration,
 } from "./core.js";
+import { cameraLabels, metricCopy } from "./explain.js";
 const categories = [
   "Yoga",
   "Pilates",
@@ -155,7 +156,44 @@ export async function library(root, collection = "exercises", own = false) {
   await draw();
 }
 
-function programProgressCard(client, assignment, program) {
+const programUnitNames = {
+  deg: "degrees (°)",
+  ratio: "ratio (unitless)",
+  cycles: "completed movement cycles",
+};
+
+export function programMeasurementCopy(entry) {
+  const [camera = "", id = ""] = String(entry.metric || "").split(":");
+  const name = id.replace(/_rom$/, " range of motion").replaceAll("_", " ");
+  const kind = entry.kind === "movement" ? "movement video" : "posture photograph";
+  const cameraName = cameraLabels[camera] || camera.replaceAll("_", " ") || "Recorded view";
+  const origin = entry.demo
+    ? "Simulated pose coordinates in a labelled demo scenario. Sample imagery is illustrative and was not measured."
+    : `Accepted visible pose landmarks from the uploaded ${kind}.`;
+  let definition = metricCopy({ id, name }).definition;
+  let meaning = "A difference means this camera-plane measurement changed between comparable captures; it does not by itself show benefit, harm or a diagnosis.";
+  if (id.endsWith("_rom")) {
+    meaning = "A larger value means the recorded joint angle swept through a wider visible range; a smaller value means a narrower sweep. Neither is automatically better.";
+  } else if (id.endsWith("_tempo_cv")) {
+    definition = "Variation in detected repetition durations divided by their average duration.";
+    meaning = "A smaller ratio means the detected repetitions took more similar amounts of time; a larger ratio means more timing variation. This does not measure movement quality by itself.";
+  } else if (id.endsWith("_rep_rom_sd")) {
+    definition = "The spread of the measured angle range across detected repetitions.";
+    meaning = "A smaller number means the detected repetitions used more similar visible ranges; a larger number means their ranges varied more. This is not a strength score.";
+  } else if (id.endsWith("_repetitions")) {
+    definition = "Number of complete movement cycles detected in the accepted video frames.";
+    meaning = "A larger number means more complete cycles were detected in that clip. It does not indicate better form or a larger joint range.";
+  }
+  return {
+    name,
+    definition,
+    source: `${entry.protocol || "Recorded assessment"} · ${cameraName} · ${origin}`,
+    unit: programUnitNames[entry.unit] || entry.unit || "unitless value",
+    meaning,
+  };
+}
+
+export function programProgressCard(client, assignment, program) {
   const startedOn = assignment?.starts_on || program.detail?.start_date;
   const series = comparableProgramMeasurements(client, assignment, program);
   const paired = series.filter((entry) => entry.rows.length > 1);
@@ -165,11 +203,11 @@ function programProgressCard(client, assignment, program) {
   let body = `<p>From ${esc(date(startedOn))}. Each trace uses one measurement, capture protocol, camera view and source type. Changes describe the recorded movement or posture; they do not prove the program caused them.</p>`;
   if (selected.length) {
     body += `<div class="grid two">${selected.map((entry) => {
-      const name = entry.metric.replace(/^[^:]+:/, "").replace(/_rom$/, " ROM").replaceAll("_", " ");
-      const view = entry.metric.includes(":") ? entry.metric.split(":")[0].replaceAll("_", " ") + " view" : "Recorded view";
+      const copy = programMeasurementCopy(entry);
       const delta = entry.latest.value - entry.first.value;
       const points = entry.rows.map((row) => [new Date(row.recorded_at).getTime(), row.value]);
-      return `<article class="panel"><h4>${esc(name)}</h4><p class="muted">${esc(entry.protocol)} · ${esc(view)} · ${entry.demo ? "Demo simulation" : "Uploaded capture"} · ${entry.rows.length} visits</p><p><strong>${esc(num(entry.first.value, entry.unit))} → ${esc(num(entry.latest.value, entry.unit))}</strong><br>Measured change ${delta > 0 ? "+" : ""}${esc(num(delta, entry.unit))}</p>${spark(points, {label: name, unit: entry.unit, xLabel: (value) => date(new Date(value))})}<div class="actions"><a href="${href("client", {client: client.id, tab: "sessions", assessment: entry.first.analysis_id})}">First source</a><a href="${href("client", {client: client.id, tab: "sessions", assessment: entry.latest.analysis_id})}">Latest source</a></div></article>`;
+      const direction = delta === 0 ? "stayed the same" : delta > 0 ? "increased" : "decreased";
+      return `<article class="panel"><h4>${esc(copy.name)}</h4><p class="muted">${esc(entry.rows.length)} matching assessments since this plan began</p><dl><div><dt>Before · ${esc(date(entry.first.recorded_at))}</dt><dd>${esc(num(entry.first.value, entry.unit))}</dd></div><div><dt>Latest · ${esc(date(entry.latest.recorded_at))}</dt><dd>${esc(num(entry.latest.value, entry.unit))}</dd></div></dl><p><strong>Measured change:</strong> ${esc(num(Math.abs(delta), entry.unit))} ${direction} from the first to latest assessment.</p><p><strong>What is measured:</strong> ${esc(copy.definition)}</p><p><strong>Source:</strong> ${esc(copy.source)}</p><p><strong>Unit:</strong> ${esc(copy.unit)}</p><p><strong>What the change means:</strong> ${esc(copy.meaning)}</p>${spark(points, {label: copy.name, unit: entry.unit, xLabel: (value) => date(new Date(value))})}<div class="actions"><a href="${href("client", {client: client.id, tab: "sessions", assessment: entry.first.analysis_id})}">Open before assessment</a><a href="${href("client", {client: client.id, tab: "sessions", assessment: entry.latest.analysis_id})}">Open latest assessment</a></div></article>`;
     }).join("")}</div>`;
   } else if (series.length) {
     body += notice("One matching measurement was recorded since this plan began. Repeat the same capture setup to see a comparison.") +
