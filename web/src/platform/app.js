@@ -32,10 +32,11 @@ import {
   regionName,
   regions,
   relatedRegion,
+  mediaURL,
 } from "./core.js";
 import { edit } from "./forms.js";
 import { metricCopy, explainedChart } from "./explain.js";
-import { visitsForClient, visitPracticeLabel, recordedByLabel } from "./visits.js";
+import { visitsForClient, visitPracticeLabel, recordedByLabel, visitConnections, visitTimeline } from "./visits.js";
 // One client workspace is the entrance to all scoped records. Older tab URLs
 // still resolve below; these tabs group the information by the user's task.
 const workspaceTabs = [
@@ -639,16 +640,16 @@ async function sessions(root) {
     ? table(
         ["When", "Assessment", "Practice", "Recorded by", "Visit"],
         visits.map((visit) => {
-          const a = visit.analysis;
-          const s = visit.session;
-          const link = workspaceHref("sessions", s ? { session: s.id } : { assessment: a.id });
+          const captures = visit.analyses || (visit.analysis ? [visit.analysis] : []);
+          const link = workspaceHref("sessions", visit.session
+            ? { session: visit.session.id } : { assessment: visit.analysis.id });
           return [
             `<a href="${link}">${dt(visit.occurredAt)}</a>`,
-            a
-              ? `${esc(a.protocol)}<small class="block">${esc(a.kind === "movement" ? "Movement analysis" : "Posture assessment")}</small>`
+            captures.length
+              ? captures.map((analysis) => `${esc(analysis.protocol)}<small class="block">${esc(analysis.kind === "movement" ? "Movement analysis" : "Posture assessment")}</small>`).join("")
               : "No assessment recorded",
             esc(visitPracticeLabel(visit)),
-            esc(recordedByLabel(a)),
+            esc([...new Set(captures.map(recordedByLabel))].join(", ") || "Not recorded"),
             `<a href="${link}">Open visit →</a>`,
           ];
         }),
@@ -666,109 +667,176 @@ async function sessions(root) {
 }
 async function sessionDetail(root, sessionId, assessmentId) {
   const c = state.client;
-  let practice = c.sessions.find((s) => s.id === sessionId);
-  let assessment = c.analyses.find((a) => a.id === assessmentId);
-  if (assessment && !practice)
-    practice = c.sessions.find((s) => s.analysis_id === assessment.id);
-  if (practice && !assessment)
-    assessment = c.analyses.find((a) => a.id === practice.analysis_id);
-  if (!practice && !assessment) {
-    root.innerHTML = empty(
-      "Session not found",
-      "This session is no longer available in the selected client's record.",
-      `<a class="button" href="${workspaceHref("sessions")}">Return to sessions</a>`,
-    );
+  const visitList = visitsForClient(c);
+  const bySession = sessionId ? visitList.find((visit) => visit.session?.id === sessionId) : null;
+  const byAssessment = assessmentId ? visitList.find((visit) =>
+    visit.analyses.some((analysis) => analysis.id === assessmentId)) : null;
+  // Two unrelated IDs must never construct a fictional combined visit.
+  if ((sessionId && !bySession) || (assessmentId && !byAssessment) ||
+      (bySession && byAssessment && bySession !== byAssessment)) {
+    root.innerHTML = empty("Session not found", "These records do not belong to one visit.",
+      `<a class="button" href="${workspaceHref("sessions")}">Return to sessions</a>`);
     return;
   }
-  const reservationId = practice?.reservation_id || assessment?.detail?.reservation_id;
-  const reservation = reservationId
-    ? c.reservations.find((r) => r.id === reservationId)
-    : null;
-  const linkedNotes = assessment
-    ? c.notes.filter((n) => n.analysis_id === assessment.id)
-    : [];
-  const assignedCoach = reservation?.coach_id
-    ? state.me.coaches.find((coach) => coach.id === reservation.coach_id)
-    : null;
-  const coachLabel = reservation?.coach_id
-    ? assignedCoach?.name || "Coach record unavailable"
-    : "No coach recorded";
-  const observations = assessment
-    ? c.observations.filter((o) => o.analysis_id === assessment.id)
-    : [];
-  const linkedScans = assessment ? c.scans.filter((scan) => scan.analysis_id === assessment.id) : [];
-  const regionIds = [...new Set([
-    ...observations.map((o) => o.region_id),
-    ...linkedNotes.map((n) => n.region_id),
+  const visit = bySession || byAssessment;
+  if (!visit) {
+    root.innerHTML = empty("Session not found", "This session is no longer available in the selected client's record.",
+      `<a class="button" href="${workspaceHref("sessions")}">Return to sessions</a>`);
+    return;
+  }
+  const practice = visit.session;
+  const analyses = visit.analyses;
+  const assessment = analyses.find((item) => item.id === assessmentId) || analyses[0] || null;
+  const initial = visitConnections(c, visit);
+  const programIds = [...new Set([
+    practice?.program_id,
+    ...initial.assignments.map((assignment) => assignment.program_id),
   ].filter(Boolean))];
-  const steps = Array.isArray(practice?.completed) ? practice.completed : [];
+  const reservationId = practice?.reservation_id || assessment?.detail?.reservation_id;
+  const reservation = reservationId ? c.reservations.find((r) => r.id === reservationId) : null;
   const roomId = reservation?.room_id || assessment?.detail?.room_id;
   const roomLocationId = reservation?.location_id || assessment?.location_id;
-  const [program, roomLocation] = await Promise.all([
-    practice?.program_id ? record("programs", practice.program_id).catch(() => null) : null,
+  const [analysisRecords, roomLocation, ...programData] = await Promise.all([
+    Promise.all(analyses.map((item) => record("analyses", item.id).catch(() => null))),
     roomId && roomLocationId ? record("locations", roomLocationId).catch(() => null) : null,
+    ...programIds.map(async (id) => ({
+      id,
+      program: await record("programs", id).catch(() => null),
+      versions: await api("program/versions?id=" + encodeURIComponent(id)).then((x) => x.items).catch(() => []),
+    })),
   ]);
-  let programAtSession = program;
-  if (program && practice?.program_version) {
-    try {
-      const versions = await api("program/versions?id=" + encodeURIComponent(program.id));
-      programAtSession = versions.items.find((v) => v.version === practice.program_version)?.snapshot || program;
-    } catch { /* Preserve the session even when an older version cannot load. */ }
-  }
+  if (!root.isConnected) return;
+  const programsById = new Map(programData.map((entry) => [entry.id, entry]));
+  const program = programsById.get(practice?.program_id)?.program || null;
+  const programVersions = programData.flatMap((entry) => entry.versions);
+  const connections = visitConnections(c, visit, programVersions);
+  const timeline = visitTimeline(visit, connections);
+  const programAtSession = program && practice?.program_version
+    ? programsById.get(program.id)?.versions.find((v) => v.version === practice.program_version)?.snapshot || null
+    : program;
   const historicalSteps = programAtSession?.steps || [];
-  const completionRows = steps.map((key) => {
-    const matched = historicalSteps.find((step) => step.id === key) ||
-      historicalSteps.find((step) => step.exercise_id === key);
-    return { exerciseId: matched?.exercise_id || key, name: matched?.exercise_name || "" };
+  const completed = Array.isArray(practice?.completed) ? practice.completed : [];
+  const completionRows = completed.map((key) => {
+    const step = historicalSteps.find((item) => item.id === key) ||
+      historicalSteps.find((item) => item.exercise_id === key);
+    return { exerciseId: step?.exercise_id || key, name: step?.exercise_name || "" };
   });
   const exercises = await Promise.all(completionRows.map((row) =>
     record("exercises", row.exerciseId).catch(() => null)));
   if (!root.isConnected) return;
+  const exerciseRows = completionRows.map((row, index) =>
+    `<li>${exercises[index] ? `<a href="${href("exercise", { id: row.exerciseId })}">${esc(row.name || exercises[index].name)}</a>` : esc(row.name || "Historical movement record unavailable")} <small>Logged</small></li>`,
+  ).join("");
+  const index = visitList.indexOf(visit);
+  const ordinal = index < 0 ? "Visit" : `Visit ${visitList.length - index}`;
+  const linkFor = (candidate) => workspaceHref("sessions", candidate.session
+    ? { session: candidate.session.id } : { assessment: candidate.analysis.id });
+  const previous = index >= 0 ? visitList[index + 1] : null;
+  const next = index > 0 ? visitList[index - 1] : null;
+  const earlierProtocol = assessment ? c.analyses.find((item) =>
+    !analyses.some((current) => current.id === item.id) && item.kind === assessment.kind &&
+    item.protocol === assessment.protocol && item.created_at < assessment.created_at) : null;
   const locationId = reservation?.location_id || assessment?.location_id;
-  const locationSource = reservation?.location_id ? "reservation" : "assessment";
   const assessmentLocationDiffers = reservation?.location_id && assessment?.location_id &&
     reservation.location_id !== assessment.location_id;
   const roomName = roomLocation?.rooms?.find((room) => room.id === roomId)?.name;
-  const whoAndWhere = `<dl class="session-facts"><div><dt>Client</dt><dd>${esc(c.name)}</dd></div><div><dt>Recorded by</dt><dd>${esc(recordedByLabel(assessment))}</dd></div><div><dt>Assigned coach</dt><dd>${esc(coachLabel)}</dd></div><div><dt>Location</dt><dd>${locationId ? `${esc(locationName(locationId))}<small class="block">From ${locationSource}</small>` : "No location recorded"}${assessmentLocationDiffers ? `<small class="block">Capture recorded at ${esc(locationName(assessment.location_id))}</small>` : ""}</dd></div>${roomId ? `<div><dt>Room</dt><dd>${esc(roomName || "Linked room; name unavailable")}<small class="block">From ${reservation?.room_id ? "reservation" : "assessment"}</small></dd></div>` : ""}<div><dt>Reservation</dt><dd>${reservation ? esc(dt(reservation.starts_at) + " · " + reservation.status) : "No reservation linked"}</dd></div></dl>`;
-  const when = assessment?.created_at || practice?.performed_at;
-  const source = assessment
-    ? badge(assessment.demo ? "Demo simulation" : "Uploaded capture", assessment.demo ? "demo" : "")
-    : badge("Practice record");
+  const assignedCoach = reservation?.coach_id
+    ? state.me.coaches.find((coach) => coach.id === reservation.coach_id) : null;
+  const captureCoach = assessment?.coach_id
+    ? state.me.coaches.find((coach) => coach.id === assessment.coach_id) : null;
+  const coachLabel = reservation?.coach_id
+    ? assignedCoach?.name || "Coach record unavailable"
+    : captureCoach?.name || "No coach recorded";
+  const coachSource = reservation?.coach_id ? "Reservation coach" :
+    captureCoach ? "Capture coach" : "No coach linked";
+  const when = visit.occurredAt;
   const reportLink = assessment
-    ? `<a class="button primary" href="${href("report", { id: assessment.id })}">Open ${esc(assessment.kind === "movement" ? "movement analysis" : "posture assessment")} →</a>`
-    : "";
-  const exerciseRows = completionRows.map((row, index) =>
-    `<li>${exercises[index] ? `<a href="${href("exercise", { id: row.exerciseId })}">${esc(row.name || exercises[index].name)}</a>` : esc(row.name || "Historical movement record unavailable")} <small>Completed</small></li>`,
-  ).join("");
-  const summary = [
-    assessment
-      ? `<p><strong>What was captured:</strong> ${esc(assessment.protocol)} · ${esc(assessment.kind === "movement" ? "movement analysis" : "posture assessment")}.</p>`
-      : "<p>No posture or movement assessment was linked to this practice.</p>",
-    steps.length
-      ? `<p><strong>What was practiced:</strong> ${steps.length} movement${steps.length === 1 ? "" : "s"} logged${programAtSession ? ` in ${esc(programAtSession.name)}` : ""}.</p>`
-      : assessment
-        ? "<p><strong>Practice:</strong> No exercises were logged for this assessment visit.</p>"
-        : "<p><strong>Practice:</strong> No exercises were logged for this visit.</p>",
-    `<p><strong>Coach feedback:</strong> ${linkedNotes.length ? linkedNotes.length + (linkedNotes.length === 1 ? " linked feedback entry" : " linked feedback entries") : "No feedback linked to this assessment yet"}.</p>`,
-  ].join("");
-  const scansCard = linkedScans.length ? card(
-    "Associated scans",
-    linkedScans.map((scan) =>
-      `<a class="record-link" href="${workspaceHref("scans", { scan: scan.id, region: scan.region_id, id: assessment.id })}"><strong>${esc(scan.name)}</strong><small>${esc(scan.detail?.demo ? "Educational reference · not this client's X-ray" : scan.scan_type + " · " + date(scan.captured_at))}</small></a>`,
-    ).join(""),
-  ) : "";
+    ? `<a class="button primary" href="${href("report", { id: assessment.id })}">Open selected analysis →</a>` : "";
+  const reportLinks = analyses.map((item) => `<a class="record-link" href="${href("report", { id: item.id })}"><strong>${esc(item.protocol)}</strong><span>${esc(item.kind === "movement" ? "Movement analysis" : "Posture assessment")} · ${dt(item.created_at)} →</span></a>`).join("");
+  const whoAndWhere = `<dl class="session-facts"><div><dt>Client</dt><dd>${esc(c.name)}</dd></div><div><dt>Coach</dt><dd>${esc(coachLabel)}<small class="block">${esc(coachSource)}</small></dd></div><div><dt>Recorded by</dt><dd>${esc([...new Set(analyses.map(recordedByLabel))].join(", ") || "Not recorded")}</dd></div><div><dt>Location</dt><dd>${locationId ? `${esc(locationName(locationId))}<small class="block">From ${reservation?.location_id ? "reservation" : "assessment"}</small>` : "No location recorded"}${assessmentLocationDiffers ? `<small class="block">Capture recorded at ${esc(locationName(assessment.location_id))}</small>` : ""}</dd></div>${roomId ? `<div><dt>Room</dt><dd>${esc(roomName || "Linked room; name unavailable")}</dd></div>` : ""}<div><dt>Reservation</dt><dd>${reservation ? esc(dt(reservation.starts_at) + " · " + reservation.status) : "No reservation linked"}</dd></div></dl>`;
+  const mediaViews = analysisRecords.flatMap((record, index) =>
+    (record?.result?.views || []).filter((view) => view.media_id)
+      .map((view) => ({ id: view.media_id, view: view.view, analysis: analyses[index] })));
+  const mediaEvidence = mediaViews.length ? `<div class="session-media-grid">${mediaViews.map((item) =>
+    `<figure>${item.analysis.kind === "movement" && !item.analysis.demo
+      ? `<video controls preload="metadata" src="${mediaURL(item.id)}" aria-label="${esc(item.view.replaceAll("_", " "))} source video"></video>`
+      : `<img src="${mediaURL(item.id)}" alt="${esc(item.view.replaceAll("_", " "))} ${item.analysis.demo ? "generated scenario illustration" : "source photograph"}" loading="lazy">`}
+      <figcaption>${esc(item.analysis.protocol)} · ${esc(item.view.replaceAll("_", " "))} · ${item.analysis.demo ? "Generated scenario illustration; measurements use separate simulated coordinates" : "Original uploaded capture"}</figcaption></figure>`,
+  ).join("")}</div>` : notice("No source media is available in this visit record. Open the analysis for the saved landmark evidence.");
+  const demoCaptures = analyses.filter((item) => item.demo).length;
+  const source = analyses.length
+    ? `${demoCaptures ? badge(`${demoCaptures} demo simulation${demoCaptures === 1 ? "" : "s"}`, "demo") : ""}${analyses.length > demoCaptures ? badge(`${analyses.length - demoCaptures} uploaded capture${analyses.length - demoCaptures === 1 ? "" : "s"}`) : ""}`
+    : badge("Practice record");
+  const summary = `<div class="session-story-lead"><p>${analyses.length
+    ? `${analyses.length} ${analyses.length === 1 ? "capture was" : "captures were"} recorded: ${analyses.map((item) => esc(item.protocol)).join(", ")}.`
+    : "No movement or posture assessment is linked to this visit."}</p><p>${completed.length
+    ? `${completed.length} movement${completed.length === 1 ? "" : "s"} were logged${programAtSession ? ` in ${esc(programAtSession.name)}` : ""}.`
+    : "No exercises were logged for this visit."} ${connections.notes.length
+    ? `${connections.notes.length} coach feedback entr${connections.notes.length === 1 ? "y" : "ies"} linked.`
+    : "No coach feedback is linked yet."}</p></div>`;
+  const facts = `<div class="session-story-stats"><div><strong>${completed.length}</strong><span>Exercises</span></div><div><strong>${analyses.filter((item) => item.kind === "movement").length}</strong><span>Movement analyses</span></div><div><strong>${analyses.filter((item) => item.kind === "posture").length}</strong><span>Posture assessments</span></div><div><strong>${connections.notes.length}</strong><span>Coach notes</span></div><div><strong>${connections.regions.length}</strong><span>Body regions</span></div></div>`;
+  const eventHTML = (event) => {
+    const timestamp = event.at.length <= 10 ? date(event.at) : dt(event.at);
+    let title = "";
+    let body = "";
+    if (event.type === "practice") {
+      title = "Practice recorded";
+      body = `${exerciseRows ? `<ol class="session-exercises">${exerciseRows}</ol>` : "No movements were logged."}${practice?.notes ? `<p>${esc(practice.notes)}</p>` : ""}${programAtSession ? `<a href="${href("program", { id: program.id, history: "1" })}">${esc(programAtSession.name)} · version ${esc(practice.program_version || "not recorded")}</a>` : ""}`;
+    } else if (event.type === "capture") {
+      title = event.record.kind === "movement" ? "Movement capture analyzed" : "Posture capture analyzed";
+      body = `<p>${esc(event.record.protocol)} · ${esc(event.record.status)}</p><a href="${href("report", { id: event.id })}">Open source measurements and media →</a>`;
+    } else if (event.type === "scan") {
+      title = "Linked scan added";
+      body = `<p>${esc(event.record.name)}</p><a href="${workspaceHref("scans", { scan: event.id, region: event.record.region_id, id: event.record.analysis_id })}">Open scan →</a>`;
+    } else if (event.type === "finding") {
+      title = "Body finding recorded";
+      body = `<p>${esc(event.record.text)}</p>${event.record.region_id ? `<a href="${workspaceHref("anatomy", { region: event.record.region_id, id: event.record.analysis_id || connections.scans.find((scan) => scan.id === event.record.scan_id)?.analysis_id })}">${esc(regionName(event.record.region_id))} on body map →</a>` : ""}`;
+    } else if (event.type === "note") {
+      title = event.record.scan_id && !event.record.analysis_id ? "Scan-linked coach note" : "Coach feedback";
+      body = `<p>${esc(event.record.text)}</p><a href="${workspaceHref("notes", { region: event.record.region_id, id: event.record.analysis_id || connections.scans.find((scan) => scan.id === event.record.scan_id)?.analysis_id })}">Open linked feedback →</a>`;
+    } else if (event.type === "review") {
+      title = "Coach reviewed the assessment";
+      const reviewer = state.me.coaches.find((coach) => coach.id === event.record.detail.reviewed_by)?.name ||
+        (state.me.user.id === event.record.detail.reviewed_by ? state.me.user.name : "Studio reviewer");
+      body = `<p>${esc(reviewer)} reviewed the captured evidence.</p><a href="${href("report", { id: event.id })}">Open reviewed assessment →</a>`;
+    } else if (event.type === "assignment") {
+      title = "Program assigned from this assessment";
+      body = `<p>${esc(event.record.name || "Assigned program")}</p><a href="${href("program", { id: event.record.program_id, history: "1" })}">Open assignment and versions →</a>`;
+    } else if (event.type === "program") {
+      title = "Program version connected to this assessment";
+      body = `<p>${esc(event.record.reason || "A coach saved a new version using this assessment as its reason source.")}</p><a href="${href("program", { id: event.record.program_id, history: "1" })}">Open version ${esc(event.record.version)} →</a>`;
+    }
+    return `<li class="session-event"><span class="session-event-dot" aria-hidden="true"></span><div><small>${esc(timestamp)}</small><h3>${esc(title)}</h3>${body}</div></li>`;
+  };
+  const timelineHTML = timeline.length
+    ? `<ol class="session-timeline">${timeline.map(eventHTML).join("")}</ol>`
+    : notice("No time-stamped activity is available for this visit.");
+  const regionAnalysis = (region) => connections.observations.find((item) => item.region_id === region)?.analysis_id ||
+    connections.notes.find((item) => item.region_id === region)?.analysis_id ||
+    connections.scans.find((item) => item.region_id === region)?.analysis_id || assessment?.id;
+  const regionsHTML = connections.regions.length
+    ? connections.regions.map((region) => `<a class="session-region" href="${workspaceHref("anatomy", { region, id: regionAnalysis(region) })}">${esc(regionName(region))} →</a>`).join("")
+    : notice("No body-region finding or feedback is linked to this visit.");
+  const scansHTML = connections.scans.length
+    ? connections.scans.map((scan) => `<a class="record-link" href="${workspaceHref("scans", { scan: scan.id, region: scan.region_id, id: scan.analysis_id })}"><strong>${esc(scan.name)}</strong><small>${esc(scan.detail?.demo ? "Educational reference · not this client's X-ray" : scan.scan_type + " · " + date(scan.captured_at))}</small></a>`).join("")
+    : notice("No scan is linked to this assessment.");
+  const programHTML = program
+    ? `<p><strong>${esc(programAtSession?.name || program.name)}</strong>${practice?.program_version ? ` · version ${esc(practice.program_version)} used at this visit` : ""}</p>${practice?.program_version && !programAtSession ? `<p>The historical version could not be loaded; current plan details are not used as visit evidence.</p>` : ""}<a class="button" href="${href("program", { id: program.id, history: "1" })}">Open program history →</a>`
+    : connections.assignments.length
+      ? connections.assignments.map((assignment) => `<a class="record-link" href="${href("program", { id: assignment.program_id, history: "1" })}">${esc(assignment.name || "Program assigned from this assessment")} →</a>`).join("")
+      : notice("No program is linked to this visit.");
   root.innerHTML =
-    head(
-      assessment
-        ? assessment.kind === "movement" ? "Movement session" : "Posture session"
-        : "Practice session",
-      `${c.name} · ${assessment ? dt(when) : date(when)}`,
-      `<a class="button" href="${workspaceHref("sessions")}">← All sessions</a>${reportLink}`,
-    ) +
-    `<div class="session-source">${source}${assessment ? badge(assessment.detail?.reviewed_at ? "Reviewed" : "Awaiting review") : ""}</div>` +
-    card("Session summary", summary) +
-    `<div class="grid two">${card("Who and where", whoAndWhere)}${card("Capture and assessment", assessment ? `<p><strong>Protocol:</strong> ${esc(assessment.protocol)}</p><p><strong>Type:</strong> ${esc(assessment.kind === "movement" ? "Movement analysis" : "Posture assessment")}</p><p><strong>Status:</strong> ${esc(assessment.status)}</p>${reportLink}` : notice("This practice has no linked movement or posture capture. Ask a coach to record an assessment if one is needed."))}${card("Completed exercises", exerciseRows ? `<ol class="session-exercises">${exerciseRows}</ol><p>${esc(practice?.notes || "")}</p>` : notice(assessment ? "No exercises were logged for this assessment visit." : "No exercises were logged for this visit."))}${card("Program", program ? `<p>${esc(programAtSession?.name || program.name)}${practice?.program_version ? ` · version ${esc(practice.program_version)} at this visit` : ""}</p><a class="button" href="${href("program", { id: program.id, history: "1" })}">Open program history →</a>` : notice("No program is linked to this session."))}${card("Coach feedback", linkedNotes.length ? notesHTML(linkedNotes) : notice("No coach feedback has been linked to this assessment yet."))}${card("Body regions", regionIds.length ? regionIds.map((region) => `<a class="record-link" href="${workspaceHref("anatomy", { region, id: assessment?.id })}">${esc(regionName(region))} →</a>`).join("") : notice("No body-region finding or feedback has been linked to this session."))}${scansCard}</div>`;
+    head(`${ordinal} · ${analyses.length ? "Assessment & practice" : "Practice"}`,
+      `${c.name} · ${date(when)}`,
+      `<a class="button" href="${workspaceHref("sessions")}">← All sessions</a>${reportLink}`) +
+    `<div class="session-source">${source}${analyses.length ? badge(analyses.every((item) => item.detail?.reviewed_at) ? "Reviewed" : analyses.some((item) => item.detail?.reviewed_at) ? "Partly reviewed" : "Awaiting coach review") : ""}</div>` +
+    summary + facts +
+    `<div class="session-visit-nav">${previous ? `<a href="${linkFor(previous)}">← Previous visit · ${date(previous.occurredAt)}</a>` : "<span>First recorded visit</span>"}${next ? `<a href="${linkFor(next)}">Next visit · ${date(next.occurredAt)} →</a>` : "<span>Latest recorded visit</span>"}</div>` +
+    `<div class="grid two session-story-grid"><div>${card("Visit & follow-up timeline", `${timelineHTML}<p class="muted">Movements are shown as one saved practice log because individual start times are not recorded. Later linked notes, scans and program changes appear on their own dates.</p>`)}</div><div>${card("Who and where", whoAndWhere)}${card("Source captures and measurements", analyses.length ? `${reportLinks}${mediaEvidence}` : notice("This practice has no linked assessment capture."))}</div></div>` +
+    `<div class="grid two">${card("Program at this visit", programHTML)}${card("Body regions", regionsHTML)}${card("Coach feedback", connections.notes.length ? notesHTML(connections.notes) : notice("No coach feedback is linked to this assessment yet."))}${card("Scans", scansHTML)}</div>` +
+    (earlierProtocol ? card("Earlier same-protocol capture", `<p>${esc(earlierProtocol.protocol)} · ${date(earlierProtocol.created_at)}. Check that the camera view and capture setup match before interpreting a change.</p><a class="button" href="${workspaceHref("sessions", { assessment: earlierProtocol.id })}">Open earlier source visit →</a><a class="button" href="${href("report", { id: assessment.id })}">Compare in assessment report →</a>`) : "");
 }
+
 function progress(root) {
   const c = state.client;
   if (!c.progress.length || !c.analyses.length) {
