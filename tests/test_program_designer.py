@@ -243,7 +243,9 @@ def test_step_equipment_resistance_and_location_are_validated(tmp_path):
     student = repo.actor(repo.demo_login(key, "student"))
     band = next(item for item in repo.list(coach, "equipment")["items"]
                 if item["name"] == "Resistance band")
-    exercise = repo.list(coach, "exercises")["items"][0]
+    exercise = next(item for item in repo.list(coach, "exercises")["items"]
+                    if repo.get(coach, "exercises", item["id"])["equipment"])
+    inherited_equipment = repo.get(coach, "exercises", exercise["id"])["equipment"][0]
     step = {
         "exercise_id": exercise["id"], "sets": 2, "reps": 8,
         "detail": {
@@ -280,6 +282,14 @@ def test_step_equipment_resistance_and_location_are_validated(tmp_path):
     visible = repo.get(student, "programs", program["id"])["steps"][0]["detail"]
     assert visible["equipment"] == detail["equipment"]
     assert visible["resistance"] == detail["resistance"]
+    without_gear = repo.save(coach, "programs", {
+        **item, "name": "Equipment-free variant", "steps": [{
+            **step, "detail": {**step["detail"], "equipment": []},
+        }],
+    })
+    with repo.db() as db:
+        demand = repo.program_equipment(db, without_gear["id"])
+    assert inherited_equipment["name"].lower() not in demand
 
     def rejected(equipment, *, location_id=None):
         invalid = {**item, "name": "Invalid inventory plan", "steps": [
