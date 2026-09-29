@@ -1,12 +1,10 @@
-# Render blueprint. Free, no card, and honest about what free buys.
-#
-# The previous version asked for `plan: starter` and a persistent disk, and
-# Render answered it with a payment form -- which was not the deal. This one
-# needs no card: `plan: free`, no disk, nothing chargeable.
-#
-#   1. Push this branch.
-#   2. Render -> New -> Blueprint -> pick this repository.
-#   3. Open the URL.
+# Legacy free Render blueprint. The user's existing service is
+# srv-daf50ov40ujc739kfh4g at https://pilates-yoga-j1kz.onrender.com/.
+# Keep that service and URL; do not create a new Blueprint to deploy this repo.
+# Verify the Blueprint-to-service mapping in Render before changing this file:
+# the name below predates the displayed service name. The current free config
+# writes SQLite and uploads under /tmp, so a deploy/restart erases them.
+# See docs/PLATFORM_HOSTING.md for backup and durable-storage migration steps.
 #
 # **Read this before you press Record on it.** Render's free instance is 0.1 CPU
 # and 512 MB, and it cannot attach a disk. Two consequences, both measured
