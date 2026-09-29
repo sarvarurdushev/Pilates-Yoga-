@@ -30,7 +30,7 @@ export function revisionSourceLink(version, clientId, notes = []) {
     return `<a href="${href("report", {id:version.source_id,client:clientId})}">Source assessment</a>`;
   if (["coach_observation","client_feedback"].includes(version.source_kind) && clientId) {
     const note = notes.find((item) => item.id === version.source_id);
-    if (note) return `<a href="${href("client", {client:clientId,tab:"notes",region:note.region_id || ""})}">Source coach feedback${note.text ? ` · ${esc(note.text.slice(0,70))}` : ""}</a>`;
+    if (note) return `<a href="${href("client", {client:clientId,tab:"notes",region:note.region_id || "",note:note.id})}">Source coach feedback${note.text ? ` · ${esc(note.text.slice(0,70))}` : ""}</a>`;
   }
   return `<span>Source record ${esc(version.source_id.slice(0,8))}</span>`;
 }

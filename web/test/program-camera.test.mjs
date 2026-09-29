@@ -10,6 +10,7 @@ import {
   planPhaseFromForm,
   revisionSourceLink,
 } from "../src/platform/programs.js";
+import { visibleFeedback } from "../src/platform/feedback-navigation.js";
 
 class FakeRecorder {
   static isTypeSupported(type) { return type === "video/webm"; }
@@ -99,5 +100,21 @@ test("version history links analysis and coach feedback to their distinct record
   assert.match(feedback, /page=client/);
   assert.match(feedback, /tab=notes/);
   assert.match(feedback, /right_shoulder/);
+  const route = new URLSearchParams(feedback.match(/href="([^"]+)"/)[1].slice(1));
+  assert.equal(route.get("client"), "client-a");
+  assert.equal(route.get("note"), "note-a");
   assert.doesNotMatch(feedback, /page=report/);
+});
+
+test("source feedback resolves the exact note, not another visit in the same region", () => {
+  const clientNotes = [
+    {id:"older",region_id:"right_shoulder",text:"Earlier visit"},
+    {id:"source",region_id:"right_shoulder",text:"Revision source"},
+    {id:"elsewhere",region_id:"left_knee",text:"Different region"},
+  ];
+  assert.deepEqual(visibleFeedback(clientNotes, {noteId:"source",regionId:"right_shoulder"}).map((note) => note.id), ["source"]);
+  assert.deepEqual(visibleFeedback(clientNotes, {regionId:"right_shoulder"}).map((note) => note.id), ["older","source"]);
+  assert.deepEqual(visibleFeedback(clientNotes, {noteId:"older",regionId:"left_knee"}), []);
+  assert.deepEqual(visibleFeedback(clientNotes, {noteId:"removed",regionId:"right_shoulder"}), []);
+  assert.deepEqual(visibleFeedback([], {noteId:"source"}), []);
 });
