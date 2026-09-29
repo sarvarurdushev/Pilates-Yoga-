@@ -19,7 +19,8 @@ import {
   bindButtons,
   exerciseIllustration,
 } from "./core.js";
-import { cameraLabels, metricCopy } from "./explain.js";
+import { cameraLabels, metricCopy, explainedChart } from "./explain.js";
+import { targetMetricRelevance, informativeMetric } from "./progress-selection.js";
 const categories = [
   "Yoga",
   "Pilates",
@@ -63,12 +64,13 @@ export function comparableProgramMeasurements(client, assignment, program) {
     series.rows.sort((a, b) => String(a.recorded_at).localeCompare(String(b.recorded_at)));
     series.first = series.rows[0];
     series.latest = series.rows.at(-1);
-    series.targetMatch = targets.some((id) => series.metric.includes(id) ||
-      series.metric.includes(id.replace(/^(left|right|both)_/, "")));
+    series.targetMatch = targetMetricRelevance(series.metric, targets);
+    series.informative = informativeMetric(series.metric, series.rows);
     return series;
   }).sort((a, b) =>
-    Number(b.rows.length > 1) - Number(a.rows.length > 1) ||
-    Number(b.targetMatch) - Number(a.targetMatch) ||
+    Number(b.informative && b.rows.length > 1) - Number(a.informative && a.rows.length > 1) ||
+    b.targetMatch - a.targetMatch ||
+    Number(b.informative) - Number(a.informative) ||
     Number(b.metric.endsWith("_rom")) - Number(a.metric.endsWith("_rom")) ||
     String(b.latest.recorded_at).localeCompare(String(a.latest.recorded_at))
   );
@@ -196,8 +198,11 @@ export function programMeasurementCopy(entry) {
 export function programProgressCard(client, assignment, program) {
   const startedOn = assignment?.starts_on || program.detail?.start_date;
   const series = comparableProgramMeasurements(client, assignment, program);
-  const paired = series.filter((entry) => entry.rows.length > 1);
-  const selected = paired.slice(0, 2);
+  const targets = (program?.detail?.target_region_ids?.length
+    ? program.detail.target_region_ids : [program?.region_id]).filter(Boolean);
+  const relevant = series.filter((entry) =>
+    entry.informative && (!targets.length || entry.targetMatch > 0));
+  const selected = relevant.filter((entry) => entry.rows.length > 1).slice(0, 2);
   const progressLink = href("client", {client: client.id, tab: "progress",
     ...(selected[0] ? {metric: selected[0].metric} : {})});
   let body = `<p>From ${esc(date(startedOn))}. Each trace uses one measurement, capture protocol, camera view and source type. Changes describe the recorded movement or posture; they do not prove the program caused them.</p>`;
@@ -207,11 +212,25 @@ export function programProgressCard(client, assignment, program) {
       const delta = entry.latest.value - entry.first.value;
       const points = entry.rows.map((row) => [new Date(row.recorded_at).getTime(), row.value]);
       const direction = delta === 0 ? "stayed the same" : delta > 0 ? "increased" : "decreased";
-      return `<article class="panel"><h4>${esc(copy.name)}</h4><p class="muted">${esc(entry.rows.length)} matching assessments since this plan began</p><dl><div><dt>Before · ${esc(date(entry.first.recorded_at))}</dt><dd>${esc(num(entry.first.value, entry.unit))}</dd></div><div><dt>Latest · ${esc(date(entry.latest.recorded_at))}</dt><dd>${esc(num(entry.latest.value, entry.unit))}</dd></div></dl><p><strong>Measured change:</strong> ${esc(num(Math.abs(delta), entry.unit))} ${direction} from the first to latest assessment.</p><p><strong>What is measured:</strong> ${esc(copy.definition)}</p><p><strong>Source:</strong> ${esc(copy.source)}</p><p><strong>Unit:</strong> ${esc(copy.unit)}</p><p><strong>What the change means:</strong> ${esc(copy.meaning)}</p>${spark(points, {label: copy.name, unit: entry.unit, xLabel: (value) => date(new Date(value))})}<div class="actions"><a href="${href("client", {client: client.id, tab: "sessions", assessment: entry.first.analysis_id})}">Open before assessment</a><a href="${href("client", {client: client.id, tab: "sessions", assessment: entry.latest.analysis_id})}">Open latest assessment</a></div></article>`;
+      return explainedChart({
+        title: copy.name,
+        definition: copy.definition,
+        why: `${copy.meaning} A change while this plan is active does not prove the program caused it.`,
+        notice: `${entry.rows.length} matching assessments since this plan began. Review the first and latest source visits before interpreting the trace.`,
+        current: entry.latest.value,
+        previous: entry.first.value,
+        unit: entry.unit,
+        source: copy.source,
+        comparisonNote: `First since plan start ${date(entry.first.recorded_at)} → latest ${date(entry.latest.recorded_at)}; measured change ${num(Math.abs(delta), entry.unit)} ${direction}.`,
+        chart: `<dl><div><dt>First since plan start · ${esc(date(entry.first.recorded_at))}</dt><dd>${esc(num(entry.first.value, entry.unit))}</dd></div><div><dt>Latest · ${esc(date(entry.latest.recorded_at))}</dt><dd>${esc(num(entry.latest.value, entry.unit))}</dd></div></dl><p><strong>Unit:</strong> ${esc(copy.unit)}</p>${spark(points, {label: copy.name, unit: entry.unit, xLabel: (value) => date(new Date(value))})}`,
+        sessionLink: `<a href="${href("client", {client: client.id, tab: "sessions", assessment: entry.first.analysis_id})}">Open first assessment</a><a href="${href("client", {client: client.id, tab: "sessions", assessment: entry.latest.analysis_id})}">Open latest assessment</a>`,
+      });
     }).join("")}</div>`;
+  } else if (relevant.length) {
+    body += notice("Only one comparable target-area measurement was recorded since this plan began. Repeat the same capture setup to see a trend.") +
+      `<a class="button" href="${href("client", {client: client.id, tab: "sessions", assessment: relevant[0].latest.analysis_id})}">Open source session →</a>`;
   } else if (series.length) {
-    body += notice("One matching measurement was recorded since this plan began. Repeat the same capture setup to see a comparison.") +
-      `<a class="button" href="${href("client", {client: client.id, tab: "sessions", assessment: series[0].latest.analysis_id})}">Open source session →</a>`;
+    body += notice("Assessments were recorded, but none provides a comparable, usable measurement for this plan's selected body area. Other measurements remain in the source reports.");
   } else {
     body += notice("No measured assessment has been recorded since this plan began. A future capture with the same setup will create a comparable trend.");
   }
@@ -259,7 +278,7 @@ async function clientProgramWorkspace(root) {
     (!student && program ? card("Program decisions", `<p><strong>Coach note:</strong> ${esc(details.coach_notes || "No coach planning note yet.")}</p><p><strong>Related assessment:</strong> ${details.source_analysis_id ? `<a href="${href("report", { id: details.source_analysis_id, client: client.id })}">Open source analysis →</a>` : "No assessment linked yet."}</p><p><strong>Historical versions:</strong> ${history.length} saved revision${history.length === 1 ? "" : "s"}.</p><a class="button" href="${href("program", { id: program.id, client: client.id })}">View version history</a>`) : "") +
     (!student && templates.length ? card("Start from an editable template", `<div class="pd-template-grid">${templates.slice(0,6).map((t) => `<article><small>${esc(t.detail?.phase || "Foundation")}</small><h3>${esc(t.name)}</h3><p>${esc(t.goal || t.detail?.description || "Adapt this plan to the client.")}</p><button data-template="${esc(t.id)}">Use for ${esc(client.name)}</button></article>`).join("")}</div>`) : "") +
     (priorPrograms.length ? card("Earlier programs", `<p>Previous plans remain available with their saved versions and practice records.</p><div class="pd-history-list">${priorPrograms.map((assignment) => `<div><span>${esc(date(assignment.starts_on))}</span><strong>${esc(assignment.name || "Earlier plan")}</strong><small>${String(assignment.notes || "").includes("Completed:") ? "Completed" : "Previous assignment"}</small><a href="${href("program", { id: assignment.program_id, client: client.id, history: "1" })}">Open plan and versions →</a></div>`).join("")}</div>`) : "") +
-    (practiceHistory.length ? card("Practice history", `<div class="pd-history-list">${practiceHistory.slice(0,10).map((s) => `<div><span>${esc(date(s.performed_at))}</span><strong>${esc(s.completed?.length || 0)} movements completed</strong>${s.program_id ? `<a href="${href("program", { id: s.program_id, client: client.id, history: "1" })}">Open saved program →</a>` : ""}${s.analysis_id ? `<a href="${href("report", { id: s.analysis_id, client: client.id })}">Related assessment →</a>` : ""}</div>`).join("")}</div>`) : "");
+    (practiceHistory.length ? card("Practice history", `<div class="pd-history-list">${practiceHistory.slice(0,10).map((s) => `<div><span>${esc(date(s.performed_at))}</span><strong>${esc(s.completed?.length || 0)} ${s.completed?.length === 1 ? "movement" : "movements"} completed</strong>${s.program_id ? `<a href="${href("program", { id: s.program_id, client: client.id, history: "1" })}">Open saved program →</a>` : ""}${s.analysis_id ? `<a href="${href("report", { id: s.analysis_id, client: client.id })}">Related assessment →</a>` : ""}</div>`).join("")}</div>`) : "");
   bindButtons(root);
   for (const selector of ["#pd-add-movement", "#pd-change-phase"]) if (root.querySelector(selector)) root.querySelector(selector).onclick = async () => {
     try { const { edit } = await import("./forms.js"); await edit("programs", program.id); } catch (e) { toast(e.message); }

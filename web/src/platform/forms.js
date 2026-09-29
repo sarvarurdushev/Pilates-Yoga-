@@ -28,6 +28,10 @@ import {
   dt,
   exerciseIllustration,
 } from "./core.js";
+import {
+  initialVisitId, visitFormOptions, compatibleAssessments,
+  compatibleScans, compatibleFindings, sessionForAnalysis,
+} from "./visit-form-links.js";
 const asObject = (f) => Object.fromEntries(f);
 const checks = (title, name, rows, selected = []) =>
   `<fieldset><legend>${esc(title)}</legend>${rows.map((r) => `<label class="check"><input type="checkbox" name="${name}" value="${esc(r.id)}" ${selected.includes(r.id) ? "checked" : ""}>${esc(r.name)}</label>`).join("")}</fieldset>`;
@@ -248,32 +252,43 @@ export async function edit(kind, id, copy = false) {
     if (item.exercise_id && !exercises.some((exercise) => exercise.id === item.exercise_id))
       exercises.push(await record("exercises", item.exercise_id));
     const route = params();
-    const assessmentId = item.analysis_id || route.get("report") ||
-      route.get("assessment") || route.get("id") || "";
     const observationId = item.detail?.observation_id || route.get("observation") || "";
     const observations = c.observations || [];
+    const selectedFinding = observations.find((o) => o.id === observationId);
+    const assessmentId = item.analysis_id || route.get("report") ||
+      route.get("assessment") || route.get("id") || selectedFinding?.analysis_id || "";
+    const scanId = item.scan_id || route.get("scan") || selectedFinding?.scan_id || "";
+    const visitId = initialVisitId(c, item, route, assessmentId, scanId);
+    const visibleScans = compatibleScans(c, visitId, assessmentId);
+    const visibleScanId = visibleScans.some((scan) => scan.id === scanId) ? scanId : "";
+    const visibleAssessments = compatibleAssessments(c, visitId, visibleScanId);
+    const visibleAssessmentId = visibleAssessments.some((a) => a.id === assessmentId)
+      ? assessmentId : "";
     const observationName = (o) =>
       [dt(o.created_at), o.kind || "Finding", o.text || regionName(o.region_id)].join(" · ").slice(0, 180);
     html =
       select("Body region", "region_id", regions(), item.region_id || route.get("region")) +
+      select("Recorded visit", "session_id", visitFormOptions(c), visitId,
+        c.sessions?.length ? "No linked visit · general feedback" : "No visit recorded yet") +
       select(
         "Related movement or posture assessment",
         "analysis_id",
-        c.analyses.map((a) => ({
+        visibleAssessments.map((a) => ({
           id: a.id,
           name: dt(a.created_at) + " · " + (a.protocol || a.kind),
         })),
-        assessmentId,
+        visibleAssessmentId,
         "General coach feedback",
       ) +
       select(
         "Linked finding / observation",
         "observation_id",
-        observations.map((o) => ({ id: o.id, name: observationName(o) })),
+        compatibleFindings(c, visitId, visibleAssessmentId)
+          .map((o) => ({ id: o.id, name: observationName(o) })),
         observationId,
         "No specific finding",
       ) +
-      select("Related scan", "scan_id", c.scans, item.scan_id || route.get("scan"), "No scan") +
+      select("Related scan", "scan_id", visibleScans, visibleScanId, "No scan") +
       select(
         "Related program",
         "program_id",
@@ -310,33 +325,69 @@ export async function edit(kind, id, copy = false) {
     : (id ? "Edit " + kind : "New " + kind);
   const d = modal(title, html, save);
   if (kind === "notes") {
+    const c = state.client;
+    const visit = d.querySelector('[name="session_id"]');
     const analysis = d.querySelector('[name="analysis_id"]');
     const finding = d.querySelector('[name="observation_id"]');
     const region = d.querySelector('[name="region_id"]');
     const scan = d.querySelector('[name="scan_id"]');
-    const observations = state.client.observations || [];
-    const name = (o) =>
+    const observationName = (o) =>
       [dt(o.created_at), o.kind || "Finding", o.text || regionName(o.region_id)].join(" · ").slice(0, 180);
-    const filterFindings = () => {
-      const selected = finding.value;
-      finding.innerHTML = options(
-        observations.filter((o) => !analysis.value || o.analysis_id === analysis.value)
-          .map((o) => ({ id: o.id, name: name(o) })),
-        selected,
-        "No specific finding",
-      );
+    const updateScans = () => {
+      const rows = compatibleScans(c, visit.value, analysis.value);
+      const current = scan.value;
+      scan.innerHTML = options(rows, current, "No scan");
+      if (!rows.some((entry) => entry.id === current)) scan.value = "";
     };
-    analysis.onchange = filterFindings;
+    const updateAssessments = () => {
+      const rows = compatibleAssessments(c, visit.value, scan.value);
+      const current = analysis.value;
+      analysis.innerHTML = options(rows.map((a) => ({
+        id: a.id, name: dt(a.created_at) + " · " + (a.protocol || a.kind),
+      })), current, "General coach feedback");
+      if (!rows.some((entry) => entry.id === current)) analysis.value = "";
+    };
+    const updateFindings = () => {
+      const rows = compatibleFindings(c, visit.value, analysis.value);
+      const current = finding.value;
+      finding.innerHTML = options(rows.map((o) => ({
+        id: o.id, name: observationName(o),
+      })), current, "No specific finding");
+      if (!rows.some((entry) => entry.id === current)) finding.value = "";
+    };
+    visit.onchange = () => {
+      updateScans();
+      updateAssessments();
+      updateScans();
+      updateFindings();
+    };
+    analysis.onchange = () => {
+      updateScans();
+      updateFindings();
+    };
+    scan.onchange = () => {
+      const selected = c.scans.find((entry) => entry.id === scan.value);
+      if (selected?.session_id && !visit.value) visit.value = selected.session_id;
+      if (selected?.analysis_id && !analysis.value) analysis.value = selected.analysis_id;
+      updateAssessments();
+      updateScans();
+      updateFindings();
+    };
     finding.onchange = () => {
-      const selected = observations.find((o) => o.id === finding.value);
+      const selected = (c.observations || []).find((o) => o.id === finding.value);
       if (!selected) return;
-      if (selected.analysis_id) analysis.value = selected.analysis_id;
+      if (selected.analysis_id) {
+        analysis.value = selected.analysis_id;
+        if (!visit.value) visit.value = sessionForAnalysis(c, selected.analysis_id)?.id || "";
+      }
       if (selected.region_id) region.value = selected.region_id;
       if (selected.scan_id) scan.value = selected.scan_id;
-      filterFindings();
+      updateAssessments();
+      updateScans();
+      updateFindings();
     };
-    if (finding.value) finding.onchange();
-    else filterFindings();
+    updateScans();
+    updateFindings();
   }
   wireRemove(d, kind, id);
 }

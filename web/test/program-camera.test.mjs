@@ -9,6 +9,7 @@ import {
   appendCoachMedia,
   planPhaseFromForm,
   revisionSourceLink,
+  programDurationEstimate,
 } from "../src/platform/programs.js";
 import { visibleFeedback } from "../src/platform/feedback-navigation.js";
 
@@ -117,4 +118,19 @@ test("source feedback resolves the exact note, not another visit in the same reg
   assert.deepEqual(visibleFeedback(clientNotes, {noteId:"older",regionId:"left_knee"}), []);
   assert.deepEqual(visibleFeedback(clientNotes, {noteId:"removed",regionId:"right_shoulder"}), []);
   assert.deepEqual(visibleFeedback([], {noteId:"source"}), []);
+});
+
+
+test("session duration counts rest only between timed sets and identifies untimed work", () => {
+  assert.deepEqual(programDurationEstimate([
+    {exercise_id:"timed", sets:2, seconds:60, rest:30},
+  ]), {minutes:3,untimed:0});
+  assert.deepEqual(programDurationEstimate([
+    {exercise_id:"rep-only", sets:3, seconds:0, rest:30},
+  ]), {minutes:0,untimed:1});
+  assert.deepEqual(programDurationEstimate([
+    {type:"note", text:"Pause as needed"},
+    {exercise_id:"timed", sets:1, seconds:45, rest:30},
+    {exercise_id:"rep-only", sets:3, seconds:0, rest:30},
+  ]), {minutes:1,untimed:1});
 });

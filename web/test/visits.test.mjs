@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { visitsForClient, visitPracticeLabel, recordedByLabel, visitConnections, visitTimeline } from '../src/platform/visits.js';
+import { visitsForClient, visitPracticeLabel, recordedByLabel, visitRecorderLabel, visitConnections, visitTimeline } from '../src/platform/visits.js';
 
 test('one linked assessment and practice appears as one visit with its exercises', () => {
   const client = {
@@ -17,6 +17,16 @@ test('one linked assessment and practice appears as one visit with its exercises
   assert.equal(visits[0].analysis.id, 'a1');
   assert.equal(visitPracticeLabel(visits[0]), '1 movement logged');
   assert.equal(recordedByLabel(visits[0].analysis), 'Ari · Admin');
+});
+
+test('a student practice record names the recorder without inventing a capture', () => {
+  const visit = visitsForClient({
+    analyses: [],
+    sessions: [{ id: 'student-practice', performed_at: '2026-09-28T09:00:00Z',
+      completed: ['bird-dog'], recorded_by: { name: 'Sarah Kim', role: 'student' } }],
+  })[0];
+  assert.equal(visitRecorderLabel(visit), 'Sarah Kim · Student');
+  assert.equal(visitPracticeLabel(visit), '1 movement logged');
 });
 
 test('assessment-only records are not described as completed practice', () => {
@@ -115,4 +125,50 @@ test('same-capture findings recorded on one date form one inspectable timeline e
   }, visit);
   const findings = visitTimeline(visit, connected).filter((event) => event.type === 'findings');
   assert.deepEqual(findings.map((event) => event.record.map((item) => item.id)), [['o1', 'o2'], ['o3']]);
+});
+
+
+test('stationary joints from a movement capture remain in the report without becoming visit findings', () => {
+  const visit = { analyses: [{ id: 'a1', created_at: '2026-09-28T09:00:00Z' }] };
+  const connected = visitConnections({ observations: [
+    { id: 'still', analysis_id: 'a1', kind: 'movement', text: 'left hip ROM: 0.0 deg in the front view.', region_id: 'left_hip', created_at: '2026-09-28T09:00:00Z' },
+    { id: 'target', analysis_id: 'a1', kind: 'movement', text: 'left shoulder ROM: 104.9 deg in the front view.', region_id: 'left_shoulder', created_at: '2026-09-28T09:00:00Z' },
+  ] }, visit);
+  assert.deepEqual(connected.observations.map((item) => item.id), ['target']);
+  assert.deepEqual(connected.regions, ['left_shoulder']);
+});
+
+test('a practice-only visit includes explicitly attached scan, feedback and note-sourced plan revision', () => {
+  const visit = { session: { id: 'practice-1', performed_at: '2026-09-29T10:00:00Z', completed: ['bridge'] }, analyses: [] };
+  const client = {
+    scans: [
+      { id: 'scan-1', session_id: 'practice-1', region_id: 'right_hip', captured_at: '2026-09-29T11:00:00Z' },
+      { id: 'scan-2', session_id: 'practice-2', region_id: 'left_hip', captured_at: '2026-09-29T11:00:00Z' },
+    ],
+    notes: [
+      { id: 'note-1', session_id: 'practice-1', region_id: 'right_hip', created_at: '2026-09-29T11:10:00Z' },
+      { id: 'scan-note', scan_id: 'scan-1', created_at: '2026-09-29T11:12:00Z' },
+      { id: 'wrong-visit', session_id: 'practice-2', created_at: '2026-09-29T11:13:00Z' },
+    ],
+  };
+  const revisions = [
+    { id: 'revision-1', source_kind: 'coach_observation', source_id: 'note-1', created_at: '2026-09-29T11:20:00Z' },
+    { id: 'revision-2', source_kind: 'coach_observation', source_id: 'wrong-visit', created_at: '2026-09-29T11:20:00Z' },
+  ];
+  const linked = visitConnections(client, visit, revisions);
+  assert.deepEqual(linked.scans.map((item) => item.id), ['scan-1']);
+  assert.deepEqual(linked.notes.map((item) => item.id), ['note-1', 'scan-note']);
+  assert.deepEqual(linked.programChanges.map((item) => item.id), ['revision-1']);
+  assert.deepEqual(visitTimeline(visit, linked).map((event) => event.type),
+    ['practice', 'scan', 'note', 'note', 'program']);
+});
+
+test('explicit session link wins over a legacy matching assessment link', () => {
+  const visit = { session: { id: 'visit-a' }, analyses: [{ id: 'analysis-a' }] };
+  const linked = visitConnections({
+    scans: [{ id: 'wrong-scan', session_id: 'visit-b', analysis_id: 'analysis-a' }],
+    notes: [{ id: 'wrong-note', session_id: 'visit-b', analysis_id: 'analysis-a' }],
+  }, visit);
+  assert.deepEqual(linked.scans, []);
+  assert.deepEqual(linked.notes, []);
 });

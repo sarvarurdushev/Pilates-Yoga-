@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 globalThis.location = { search: '' };
-const { fullscreenRegionURL, contextForRegion } = await import('../src/platform/anatomy-bridge.js');
+const { fullscreenRegionURL, contextForRegion, scanLinkedNotes } = await import('../src/platform/anatomy-bridge.js');
 
 test('full-screen anatomy selection preserves client and assessment while changing region', () => {
   const url = fullscreenRegionURL(
@@ -38,4 +38,17 @@ test('full-screen region context shows only feedback for the selected region', (
   assert.equal(context.layer, 'region');
   assert.equal(context.exercise, null);
   assert.deepEqual(context.notes, ['Use a supported hinge.', 'Keep the pelvis level.']);
+});
+
+
+test('scan detail includes only its own notes or exact source-assessment feedback', () => {
+  const scan = { id: 'scan-20', analysis_id: 'visit-20', region_id: 'right_shoulder' };
+  const notes = [
+    { id: 'scan', scan_id: 'scan-20' },
+    { id: 'visit', analysis_id: 'visit-20' },
+    { id: 'old', analysis_id: 'visit-19', region_id: 'right_shoulder' },
+    { id: 'different-scan', scan_id: 'scan-19', analysis_id: 'visit-20' },
+    { id: 'conflict', scan_id: 'scan-20', analysis_id: 'visit-19' },
+  ];
+  assert.deepEqual(scanLinkedNotes(notes, scan).map((note) => note.id), ['scan', 'visit']);
 });

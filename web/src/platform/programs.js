@@ -22,7 +22,24 @@ const stepDetail = (step) => ({ ...(step.detail || {}) });
 const sid = () => crypto.randomUUID().replaceAll("-", "");
 const isVideo = (m) => (m?.mime || "").startsWith("video/");
 const mediaLabel = (kind) => mediaKinds.find((k) => k[0] === kind)?.[1] || "Exercise media";
-const duration = (steps) => Math.round(steps.reduce((n, s) => n + Number(s.sets || 1) * (Number(s.seconds || 0) + Number(s.rest || 0)), 0) / 60);
+export function programDurationEstimate(steps) {
+  let timedSeconds = 0, untimed = 0;
+  for (const step of steps) {
+    if (!step.exercise_id) continue;
+    const sets = Math.max(1, Number(step.sets) || 1);
+    const workSeconds = Math.max(0, Number(step.seconds) || 0);
+    const restSeconds = Math.max(0, Number(step.rest) || 0);
+    if (workSeconds) timedSeconds += sets * workSeconds + (sets - 1) * restSeconds;
+    else untimed += 1;
+  }
+  return { minutes: timedSeconds ? Math.ceil(timedSeconds / 60) : 0, untimed };
+}
+const duration = (steps) => programDurationEstimate(steps).minutes;
+const durationLabel = (steps) => {
+  const estimate = programDurationEstimate(steps);
+  if (!estimate.minutes) return "Timing not set";
+  return `${estimate.untimed ? "At least" : "About"} ${estimate.minutes} min`;
+};
 export const planPhaseFromForm = (formData) => formData.get("current_program_phase");
 export function revisionSourceLink(version, clientId, notes = []) {
   if (!version.source_id) return "";
@@ -129,7 +146,7 @@ export async function programDetail(root, id) {
   const canEdit = !student && own(item);
   root.innerHTML = head(student ? "Today’s program" : item.name, student ? item.name : d.description || item.goal,
     student ? "" : `<div class="pd-head-actions">${canEdit ? '<button id="pd-edit" class="primary">Edit program</button>' : ""}<button id="pd-duplicate">Duplicate</button><button id="pd-template">Save as template</button><button id="pd-history">Version history</button><button id="pd-assign" class="primary">Assign to client</button>${clientId ? `<a class="button" href="${href("client", { client: clientId, tab: "programs" })}">← Client program</a>` : ""}</div>`) +
-    `<div class="pd-program-summary"><div class="pd-summary-intro"><small>${esc(d.status || "Active")} · ${esc(d.phase || "Foundation")}</small><h2>${esc(student ? item.name : item.goal || item.name)}</h2><p>${esc(student ? item.goal || d.description : d.description || item.goal)}</p>${sourceContext(d)}${d.copied_from ? `<a class="pd-evidence" href="${href("program", { id: d.copied_from, client: clientId })}">Previous program phase →</a>` : ""}</div><div class="pd-summary-facts"><div><strong>${esc(d.sessions_per_week || d.frequency || "Coach-set")}</strong><small>sessions per week</small></div><div><strong>${esc(d.duration_weeks || "—")}</strong><small>weeks planned</small></div><div><strong>${esc(duration(visibleSteps))} min</strong><small>estimated session</small></div><div><strong>${esc(visibleSteps.filter((s)=>s.exercise_id).length)}</strong><small>movements</small></div></div></div>` +
+    `<div class="pd-program-summary"><div class="pd-summary-intro"><small>${esc(d.status || "Active")} · ${esc(d.phase || "Foundation")}</small><h2>${esc(student ? item.name : item.goal || item.name)}</h2><p>${esc(student ? item.goal || d.description : d.description || item.goal)}</p>${sourceContext(d)}${d.copied_from ? `<a class="pd-evidence" href="${href("program", { id: d.copied_from, client: clientId })}">Previous program phase →</a>` : ""}</div><div class="pd-summary-facts"><div><strong>${esc(d.sessions_per_week || d.frequency || "Coach-set")}</strong><small>sessions per week</small></div><div><strong>${esc(d.duration_weeks || "—")}</strong><small>weeks planned</small></div><div><strong>${esc(durationLabel(visibleSteps))}</strong><small>estimated session</small></div><div><strong>${esc(visibleSteps.filter((s)=>s.exercise_id).length)}</strong><small>movements</small></div></div></div>` +
     `${(d.phases || []).length ? `<div class="pd-phase-track">${d.phases.map((phase) => `<span class="${phase.name === d.phase ? "active" : ""}">${esc(phase.name)} <small>Weeks ${esc(phase.weeks_start || "?")}–${esc(phase.weeks_end || "?")}</small></span>`).join("")}</div>` : ""}<section class="pd-target-summary"><div><small>TARGET BODY AREAS</small><h2>What this plan focuses on</h2><p>These areas connect coaching decisions to the body map. They are educational targets rather than a diagnosis.</p></div><div class="pd-target-explanations">${selected.map((id)=>`<article><a class="pd-region-chip" href="${href("client", { client: clientId, tab: "anatomy", region: id, id: d.source_analysis_id || "" })}">${esc(regionName(id))} · Explore in 3D</a><p>${esc(d.target_explanations?.[id] || "A coach-selected area for this program.")}</p></article>`).join("") || "<span>Your coach has not chosen a specific body area.</span>"}</div></section>` +
     (groups.length ? groups.map((group) => `<section class="pd-practice-section"><div class="pd-section-heading"><span>${esc(group.name)}</span><small>${group.steps.filter((s)=>s.exercise_id).length} movement${group.steps.filter((s)=>s.exercise_id).length === 1 ? "" : "s"}</small></div>${group.steps.map((s) => s.type === "note" ? `<div class="pd-sequence-note"><strong>${s.visibility === "coach" ? "Coach planning note" : "Practice reminder"}</strong><p>${esc(s.text)}</p></div>` : stepTile(s, exercises.get(s.exercise_id) || {name:"Unavailable exercise",detail:{}}, visibleSteps.filter((x)=>x.exercise_id).indexOf(s), clientId, student, clientMedia)).join("")}</section>`).join("") : notice("No exercises have been added yet. A coach can edit this program to build a sequence.")) +
     (!student && d.coach_notes ? card("Coach planning notes", `<p class="preserve">${esc(d.coach_notes)}</p>`) : "") +

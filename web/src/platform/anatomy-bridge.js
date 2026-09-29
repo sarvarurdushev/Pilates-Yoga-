@@ -273,3 +273,12 @@ if (query.get("platform") === "1") {
   };
   start();
 }
+
+// A note belongs on a scan when it names that scan or its source assessment.
+// Sharing only the same body region is not an evidence link.
+export function scanLinkedNotes(notes, scan) {
+  return (notes || []).filter((note) =>
+    note.scan_id === scan.id
+      ? (!note.analysis_id || !scan.analysis_id || note.analysis_id === scan.analysis_id)
+      : !note.scan_id && Boolean(scan.analysis_id) && note.analysis_id === scan.analysis_id);
+}

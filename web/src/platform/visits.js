@@ -33,6 +33,16 @@ export function visitPracticeLabel(visit) {
   return (visit.analyses?.length || visit.analysis) ? "No exercises logged for this assessment" : "No exercises logged";
 }
 
+export function visitRecorderLabel(visit) {
+  const sources = [
+    visit.session?.recorded_by ? { detail: { recorded_by: visit.session.recorded_by } } : null,
+    ...(visit.analyses || (visit.analysis ? [visit.analysis] : [])),
+  ];
+  const labels = [...new Set(sources.filter(Boolean).map(recordedByLabel)
+    .filter((label) => label !== "Not recorded"))];
+  return labels.join(", ") || "Not recorded";
+}
+
 export function recordedByLabel(analysis) {
   const recorder = analysis?.detail?.recorded_by;
   if (!recorder || typeof recorder !== "object" || !recorder.name) return "Not recorded";
@@ -48,18 +58,28 @@ export function recordedByLabel(analysis) {
 export function visitConnections(client, visit, revisions = []) {
   const analysisIds = new Set((visit.analyses || (visit.analysis ? [visit.analysis] : []))
     .map((analysis) => analysis.id));
-  const scans = (client.scans || []).filter((scan) => analysisIds.has(scan.analysis_id));
+  const sessionId = visit.session?.id || "";
+  // A deliberate session link is authoritative. Legacy records still join by
+  // exact analysis or scan ID; dates and shared reservations never join them.
+  const scans = (client.scans || []).filter((scan) => scan.session_id
+    ? scan.session_id === sessionId : analysisIds.has(scan.analysis_id));
   const scanIds = new Set(scans.map((scan) => scan.id));
-  const connected = (item) => Boolean(analysisIds.size && (
-    analysisIds.has(item.analysis_id) ||
-    (!item.analysis_id && item.scan_id && scanIds.has(item.scan_id))
-  ));
+  const connected = (item) => item.session_id
+    ? Boolean(sessionId && item.session_id === sessionId)
+    : Boolean(analysisIds.has(item.analysis_id) ||
+      (!item.analysis_id && item.scan_id && scanIds.has(item.scan_id)));
   const notes = (client.notes || []).filter(connected);
-  const observations = (client.observations || []).filter(connected);
+  const noteIds = new Set(notes.map((note) => note.id));
+  // An unmoving joint in an unrelated exercise can yield a valid 0° ROM
+  // measurement. Keep it in the source report, but do not call it a visit
+  // finding or a targeted body region.
+  const observations = (client.observations || []).filter((item) =>
+    connected(item) && !(item.kind === "movement" && /\bROM:\s*0(?:\.0+)?\s*deg\b/i.test(item.text || "")));
   const assignments = (client.program_history || []).filter((assignment) =>
     analysisIds.has(assignment.analysis_id));
   const programChanges = revisions.filter((revision) =>
-    analysisIds.has(revision.source_id) && revision.source_kind === "analysis");
+    (analysisIds.has(revision.source_id) && revision.source_kind === "analysis") ||
+    (noteIds.has(revision.source_id) && ["coach_observation", "client_feedback"].includes(revision.source_kind)));
   const regions = [...new Set([
     ...notes.map((note) => note.region_id),
     ...observations.map((observation) => observation.region_id),

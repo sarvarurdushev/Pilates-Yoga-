@@ -4041,6 +4041,10 @@ export function selectStructure(id, { auto = false } = {}) {
   revealSelection();
   if (id != null && !auto) flyTo(id);
   ui.showStructure(id);
+  if (id != null && !auto)
+    document.dispatchEvent(new CustomEvent('motion-anatomy-selection', {
+      detail: { structure_id: id },
+    }));
   /* The way back appears the moment there is something to come back from -- see `vbWhole`. */
   ui?.syncControls?.();
 }

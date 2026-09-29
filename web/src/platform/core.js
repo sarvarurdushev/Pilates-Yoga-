@@ -123,12 +123,16 @@ export function relatedRegion(a, b) {
 }
 export const params = () => new URLSearchParams(location.hash.slice(1));
 export function href(page, extra = {}) {
-  const p = new URLSearchParams({
+  const values = {
     page,
     ...(params().get("client") ? { client: params().get("client") } : {}),
     ...extra,
-  });
-  for (const [k, v] of [...p]) if (!v) p.delete(k);
+  };
+  const p = new URLSearchParams();
+  for (const [key, value] of Object.entries(values)) {
+    if (value !== undefined && value !== null && value !== "")
+      p.set(key, String(value));
+  }
   return "#" + p;
 }
 export function go(page, extra = {}) {

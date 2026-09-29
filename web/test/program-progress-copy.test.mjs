@@ -60,13 +60,14 @@ test("the rendered program chart labels first and latest comparable assessments"
   const html = programProgressCard(client, {starts_on: "2026-05-01"}, {
     region_id: "right_shoulder", detail: {target_region_ids: ["right_shoulder"]},
   });
-  assert.match(html, /Before · May 1, 2026<\/dt><dd>61°/);
+  assert.match(html, /First since plan start · May 1, 2026<\/dt><dd>61°/);
   assert.match(html, /Latest · May 10, 2026<\/dt><dd>68°/);
-  assert.match(html, /Measured change:<\/strong> 7° increased/);
-  assert.match(html, /What is measured:/);
-  assert.match(html, /Source:<\/strong> Arm raise · Front view/);
+  assert.match(html, /measured change 7° increased/);
+  assert.match(html, /What this measures/);
+  assert.match(html, /What to notice/);
+  assert.match(html, /What does this mean\?/);
+  assert.match(html, /Source: Arm raise · Front view/);
   assert.match(html, /Unit:<\/strong> degrees \(°\)/);
-  assert.match(html, /What the change means:/);
   assert.match(html, /assessment=one/);
   assert.match(html, /assessment=two/);
   assert.doesNotMatch(html, /99°/);
