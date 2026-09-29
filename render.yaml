@@ -37,7 +37,8 @@
 #       mountPath: /var/data
 #       sizeGB: 2
 #
-# ...and point --db and XDG_CACHE_HOME at /var/data instead of the paths below.
+# ...and set STUDIO_DB_PATH=/var/data/studio.db and
+# XDG_CACHE_HOME=/var/data/cache on the existing service.
 services:
   - type: web
     name: pilates-yoga
@@ -45,8 +46,10 @@ services:
     plan: free
     buildCommand: pip install -r requirements.txt
     # --host 0.0.0.0 because the platform's router is a different machine, and
-    # $PORT is honoured by the server itself.
-    startCommand: python -m pilates web --host 0.0.0.0 --db /tmp/studio.db
+    # $PORT is honoured by the server itself. STUDIO_DB_PATH can be set in the
+    # existing service after a persistent disk is attached; /tmp remains the
+    # free-instance fallback.
+    startCommand: sh deploy/render-start.sh
     healthCheckPath: /capabilities
     envVars:
       # Where rtmlib caches the pose model. Ephemeral here, like everything
