@@ -48,7 +48,7 @@ def test_program_revisions_media_and_student_projection(studio):
         "detail": {"student_id": sid, "description": "Client-specific foundation", "status": "Draft", "start_date": "2026-09-24", "duration_weeks": 4, "sessions_per_week": 2, "target_region_ids": ["right_shoulder"], "coach_notes": "Private discussion", "phases": [{"name": "Foundation", "weeks_start": 1, "weeks_end": 4}]},
         "steps": [{"exercise_id": exercise["id"], "phase": "Foundation", "sets": 2, "reps": 6, "seconds": 40, "rest": 25, "detail": {
             "section": "MOBILITY", "student_instructions": "Move gently", "coach_instructions": "Observe scapular rhythm", "coach_cue": "Keep your breath easy", "precautions": "Stop if uncomfortable", "why_assigned": "Shoulder movement observation", "target_region_ids": ["right_shoulder"],
-            "media": [{"media_id": photo["id"], "kind": "coach_demonstration", "caption": "Start position", "stage": "start", "visibility": "coach"}, {"media_id": video["id"], "kind": "coach_demonstration", "caption": "Watch the shoulder", "primary": True, "visibility": "student"}],
+            "media": [{"media_id": photo["id"], "kind": "coach_photo", "caption": "Start position", "stage": "start", "visibility": "coach"}, {"media_id": video["id"], "kind": "coach_demonstration", "caption": "Watch the shoulder", "primary": True, "visibility": "student"}],
             "references": [{"title": "Technique", "url": "https://example.org/shoulder", "type": "video", "visibility": "student"}],
             "source": {"kind": "analysis", "id": analysis_id},
         }}, {"type": "note", "text": "Pause after the mobility drill", "phase": "Foundation", "section": "MOBILITY", "visibility": "student"}, {"type": "note", "text": "Coach checks range", "phase": "Foundation", "section": "MOBILITY", "visibility": "coach"}],
@@ -57,6 +57,7 @@ def test_program_revisions_media_and_student_projection(studio):
     assert program["version"] == 1
     assert program["steps"][0]["exercise_name"] == exercise["name"]
     assert len(program["steps"][0]["detail"]["media"]) == 2
+    assert program["steps"][0]["detail"]["media"][0]["kind"] == "coach_photo"
     repo.assign_program(coach, {"program_id": program["id"], "student_id": sid, "analysis_id": analysis_id})
     assigned = repo.get(student, "programs", program["id"])
     assert assigned["detail"]["description"] == "Client-specific foundation"
@@ -268,6 +269,8 @@ def test_step_equipment_resistance_and_location_are_validated(tmp_path):
     assert detail["equipment"] == [{"equipment_id": band["id"], "quantity": 2,
                                     "name": "Resistance band"}]
     assert detail["resistance"] == "Light band, comfortable tension"
+    with pytest.raises(Refused, match="historical programs"):
+        repo.delete(admin, "equipment", band["id"])
     with repo.db() as db:
         assert repo.program_equipment(db, program["id"])["resistance band"] >= 2
     repo.save(admin, "equipment", {"id": band["id"], "available": 1})

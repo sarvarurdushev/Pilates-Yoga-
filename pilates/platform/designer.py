@@ -10,7 +10,7 @@ from .repository import Refused, encode, now, uid, unpack
 
 STATUSES = {"Draft", "Active", "Completed", "Archived"}
 MEDIA_KINDS = {
-    "coach_demonstration", "exercise_library", "client_capture",
+    "coach_demonstration", "coach_photo", "exercise_library", "client_capture",
     "ai_generated_visual", "demo_media",
 }
 REFERENCE_TYPES = {"youtube", "vimeo", "research", "article", "pdf", "website", "video", "other"}

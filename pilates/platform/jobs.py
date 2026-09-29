@@ -25,8 +25,23 @@ class Jobs:
             )
 
     def submit(self, actor, payload):
+        payload = dict(payload)
         student = payload.get("student_id")
         self.repo.assert_student(actor, student, True)
+        reservation_id = payload.get("reservation_id") or None
+        if reservation_id:
+            reservation = self.repo.get(actor, "reservations", reservation_id)
+            if reservation["student_id"] != student:
+                raise Refused("Choose a reservation for this client.")
+            if payload.get("location_id") and payload["location_id"] != reservation["location_id"]:
+                raise Refused("The selected location must match the reservation.")
+            payload["location_id"] = reservation["location_id"]
+        location_id = payload.get("location_id") or None
+        if location_id:
+            self.repo.get(actor, "locations", location_id)
+            with self.repo.db() as db:
+                if not db.execute("SELECT 1 FROM p_student_locations WHERE student_id=? AND location_id=?", (student, location_id)).fetchone():
+                    raise Refused("Choose a location assigned to this client.")
         if payload.get("kind") not in ("posture", "movement"):
             raise Refused("Select photo or movement analysis.")
         captures = payload.get("captures", [])
@@ -156,6 +171,7 @@ class Jobs:
                     "target_angle": payload.get("target_angle"),
                     "capture_in_demo_workspace": actor.demo,
                 },
+                reservation_id=payload.get("reservation_id") or None,
             )
             self.update(
                 identifier,

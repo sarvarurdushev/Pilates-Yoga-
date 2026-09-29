@@ -20,6 +20,7 @@ def source_digest():
     digest = hashlib.sha256()
     for path in [
         ROOT / "seed.py",
+        ROOT / "demo_scenarios.py",
         ROOT / "kinematics.py",
         *[
             ROOT.parent / (name + ".py")
@@ -28,6 +29,17 @@ def source_digest():
     ]:
         digest.update(path.read_bytes())
     return digest.hexdigest()
+
+
+def _stable(value):
+    """Normalize insignificant BLAS/NumPy floating-point drift in packaged fixtures."""
+    if isinstance(value, dict):
+        return {key: _stable(item) for key, item in value.items()}
+    if isinstance(value, (tuple, list)):
+        return [_stable(item) for item in value]
+    if isinstance(value, float):
+        return round(value, 7)
+    return value
 
 
 def calculate(client, visit):
@@ -52,7 +64,7 @@ def calculate(client, visit):
                 for frame in frames
             ]
         frames_by_view[view["view"]] = people
-    return {
+    return _stable({
         "source_digest": source_digest(),
         "report": report,
         "coordinates": frames_by_view,
@@ -61,10 +73,10 @@ def calculate(client, visit):
             if kind == "movement"
             else {}
         ),
-    }
+    })
 
 
-@lru_cache(maxsize=36)
+@lru_cache(maxsize=120)
 def compressed(scenario, visit):
     path = ROOT / "demo_scenarios" / f"{scenario}-{visit}.json.gz"
     return path.read_bytes() if path.exists() else None
@@ -88,14 +100,14 @@ def build():
     folder.mkdir(exist_ok=True)
     for scenario in range(6):
         client = next(i for i in range(34) if scenario_for(i) == scenario)
-        for visit in range(6):
+        for visit in range(20):
             data = json.dumps(
                 calculate(client, visit), allow_nan=False, separators=(",", ":")
             ).encode()
             (folder / f"{scenario}-{visit}.json.gz").write_bytes(
                 gzip.compress(data, compresslevel=9, mtime=0)
             )
-    print("Built 36 reproducible demo scenarios.")
+    print("Built 120 reproducible demo scenarios.")
 
 
 if __name__ == "__main__":

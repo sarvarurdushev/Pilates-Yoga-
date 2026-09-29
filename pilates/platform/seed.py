@@ -443,14 +443,63 @@ def _seed(repo, org):
                                 "Keep the range comfortable; review the linked region note.",
                             ),
                         )
+        # Organization-wide starting plans are editable examples, not assignments or
+        # records of any fictional client's measured findings.
+        template_specs = [
+            ("Shoulder Mobility Foundation", 0, "Build comfortable shoulder range and control."),
+            ("Hip Stability Foundation", 3, "Practice supported hip control on both sides."),
+            ("Posture Control Program", 2, "Explore a repeatable, comfortable standing setup."),
+            ("Beginner Pilates Foundation", 1, "Learn foundational mat movement and breathing."),
+            ("Lower-Body Mobility", 3, "Practice comfortable hip and lower-body mobility."),
+            ("Balance Development", 5, "Build steady balance with support nearby."),
+        ]
+        template_actor = Actor(coaches[0], org, "coach", True)
+        for title, source_index, goal in template_specs:
+            source = repo.get(template_actor, "programs", prefix + f"program0-{source_index}")
+            steps = [
+                {
+                    "exercise_id": step["exercise_id"],
+                    "phase": "Foundation",
+                    "sets": step["sets"],
+                    "reps": step["reps"],
+                    "seconds": step["seconds"],
+                    "rest": step["rest"],
+                    "detail": {
+                        "section": step["phase"],
+                        "target_region_ids": [source["region_id"]],
+                        "student_instructions": "Move within a comfortable range and follow your coach's guidance.",
+                        "why_assigned": "General foundation template; adapt to this client's goals and observations.",
+                    },
+                }
+                for step in source["steps"] if step.get("exercise_id")
+            ]
+            repo.save(template_actor, "programs", {
+                "name": title,
+                "goal": goal,
+                "region_id": source["region_id"],
+                "detail": {
+                    "template": True,
+                    "template_visibility": "organization",
+                    "status": "Draft",
+                    "description": "Editable starting point. Choose exercises, dose and body targets with the client before assigning.",
+                    "phase": "Foundation",
+                    "phases": [{"name": "Foundation", "weeks_start": 1, "weeks_end": 4}],
+                    "duration_weeks": 4,
+                    "sessions_per_week": 2,
+                    "target_region_ids": [source["region_id"]],
+                },
+                "steps": steps,
+                "change_reason": "Created as an editable organization demo template",
+            })
         from .analysis import save_analysis
 
         for i, sid, ci, region, asset in student_data:
             actor = Actor(coaches[ci], org, "coach", True)
             pid = prefix + f"program{ci}-{scenario_for(i)}"
             aids = []
-            for visit in range(6):
-                date = today - timedelta(days=(5 - visit) * 7 + 2)
+            visits = 20 if i < 7 else 6
+            for visit in range(visits):
+                date = today - timedelta(days=(visits - 1 - visit) * 7 + 2)
                 from .demo_scenarios import prepared_scenario
 
                 prepared = prepared_scenario(i, visit)
@@ -477,7 +526,7 @@ def _seed(repo, org):
                                 encode(
                                     {
                                         "generated": True,
-                                        "panel": 0 if visit < 3 else 1,
+                                        "panel": 0 if visit < visits // 2 else 1,
                                         "provenance": "Fictional before/after illustration. Coordinates are a separate demo simulation, not measurements from this picture.",
                                     }
                                 ),
@@ -513,7 +562,7 @@ def _seed(repo, org):
                             140 if scenario_for(i) in (0, 4) and visit % 2 else None
                         ),
                         "asset": asset,
-                        "panel": 0 if visit < 3 else 1,
+                        "panel": 0 if visit < visits // 2 else 1,
                     },
                     prepared=prepared,
                 )
@@ -539,8 +588,12 @@ def _seed(repo, org):
                             f"Demo visit {visit+1}: "
                             + (
                                 "establish a comfortable baseline."
-                                if visit == 0
-                                else "repeat the same capture setup and review the linked trend."
+                                if visit == 0 else
+                                "repeat the capture after a supported practice block."
+                                if visit < visits // 3 else
+                                "compare the current movement with the previous block and adjust the range."
+                                if visit < 2 * visits // 3 else
+                                "review control and consistency before the next phase."
                             ),
                         ),
                     )
@@ -558,13 +611,17 @@ def _seed(repo, org):
                             steps[min(1, len(steps) - 1)],
                             f"Demo visit {visit+1}: "
                             + (
-                                "begin with a supported range."
-                                if visit < 2
-                                else "Observed simulation is becoming more consistent. Continue comfortable practice and compare the next session."
+                                "begin with a supported range and a repeatable camera setup."
+                                if visit < 3 else
+                                "the simulated range varied this week; keep the range comfortable and review the next visit."
+                                if visit % 5 == 0 else
+                                "practice the assigned sequence and compare the same view next session."
+                                if visit < 2 * visits // 3 else
+                                "the simulated movement is more consistent overall, with normal visit-to-visit variation."
                             ),
                             "student",
                             date.isoformat(),
-                            "{}",
+                            encode({"source": "demo_coach_feedback", "simulation": True}),
                         ),
                     )
             repo.assign_program(
@@ -576,6 +633,10 @@ def _seed(repo, org):
                     "notes": "Use the latest assessment to review the target region.",
                 },
             )
+            if i < 7:
+                from .demo_program_history import seed_featured_program_history
+
+                pid = seed_featured_program_history(repo, actor, sid, pid, aids)
             for slot in range(3):
                 start = today + timedelta(days=1 + slot * 7, hours=(i % 10))
                 repo.save(
@@ -665,7 +726,9 @@ def simulation(client, visit, kind):
     from ..studio import summarize, movement_summary
 
     scenario = scenario_for(client)
-    trend = 1 - visit * 0.12
+    # Gradual, bounded scenario progression with setbacks. Do not imply a
+    # fabricated treatment effect from these explicitly simulated coordinates.
+    trend = max(0.45, 1 - visit * 0.027 + 0.055 * math.sin(visit * 1.7))
     base = np.array(
         [
             [500, 110],
@@ -746,21 +809,21 @@ def simulation(client, visit, kind):
             phase = (1 - math.cos(t * math.pi / 2)) / 2
             points = base.copy()
             if scenario in (0, 4):
-                amplitude = (90 + visit * 7) if scenario == 0 else (65 + visit * 8)
+                amplitude = (90 + min(visit, 19) * 2.4 + 2.5 * math.sin(visit * 1.4)) if scenario == 0 else (65 + min(visit, 19) * 2.7 + 2 * math.sin(visit * 1.4))
                 for shoulder, elbow, wrist, sign in [(5, 7, 9, 1), (6, 8, 10, -1)]:
                     angle = math.radians(
-                        amplitude * phase * (1 if sign == 1 else 0.85 + visit * 0.025)
+                        amplitude * phase * (1 if sign == 1 else min(0.99, 0.85 + visit * 0.007))
                     )
                     direction = np.array([math.sin(angle) * sign, math.cos(angle)])
                     points[elbow] = points[shoulder] + direction * 145
                     points[wrist] = points[elbow] + direction * 140
             elif scenario == 1:
-                depth = (90 + visit * 7) * phase
+                depth = (90 + min(visit, 19) * 2.3 + 3 * math.sin(visit * 1.3)) * phase
                 points[:11] += np.array([-depth * 0.45, depth])
                 points[[11, 12]] += np.array([-depth * 0.6, depth])
                 points[[13, 14]] += np.array([depth * 0.7, depth * 0.2])
             elif scenario == 2:
-                angle = math.radians((30 + visit * 4) * phase)
+                angle = math.radians((30 + min(visit, 19) * 1.2 + 1.8 * math.sin(visit * 1.2)) * phase)
                 centre = points[[11, 12]].mean(axis=0)
                 rotation = np.array(
                     [
@@ -770,14 +833,14 @@ def simulation(client, visit, kind):
                 )
                 points[:11] = (points[:11] - centre) @ rotation.T + centre
             elif scenario == 3:
-                angle = math.radians((30 + visit * 4) * phase)
+                angle = math.radians((30 + min(visit, 19) * 1.2 + 1.8 * math.sin(visit * 1.2)) * phase)
                 points[13] = (
                     points[11] + np.array([math.sin(angle), math.cos(angle)]) * 190
                 )
                 points[15] = points[13] + np.array([-20, 200])
                 points[15, 1] = min(points[15, 1], 890)
             else:
-                sway = (13 - visit * 1.5) * math.sin(t * math.pi / 2)
+                sway = (max(4, 13 - visit * 0.42) + 0.7 * math.sin(visit * 1.4)) * math.sin(t * math.pi / 2)
                 points[:13, 0] += sway
                 points[13] = points[11] + np.array([55, 145])
                 points[15] = points[13] + np.array([-35, 150])

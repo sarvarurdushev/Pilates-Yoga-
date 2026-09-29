@@ -226,6 +226,8 @@ def dispatch(h, method, route):
                     result = repo.delete(actor, body.get("collection"), body.get("id"))
                 elif action == "assign":
                     result = repo.assign_program(actor, body)
+                elif action == "program/retire":
+                    result = repo.retire_program(actor, body)
                 elif action == "program/duplicate":
                     from .designer import duplicate
 

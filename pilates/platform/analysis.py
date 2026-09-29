@@ -1,6 +1,6 @@
 """Persist algorithm output as linked sessions, frames, coordinates and observations."""
 
-from .repository import uid, now, encode
+from .repository import Refused, uid, now, encode
 from .regions import region_for
 from .kinematics import coordinates, temporal
 
@@ -17,6 +17,7 @@ def save_analysis(
     created_at=None,
     detail=None,
     prepared=None,
+    reservation_id=None,
 ):
     if prepared is not None and not synthetic:
         raise ValueError("Prepared scenarios are only allowed for labelled demo data.")
@@ -64,9 +65,24 @@ def save_analysis(
     )
     with repo.db() as db:
         repo._linked(actor, {"location_id": location_id}, db)
+        if location_id and not db.execute(
+            "SELECT 1 FROM p_student_locations WHERE student_id=? AND location_id=?",
+            (student_id, location_id),
+        ).fetchone():
+            raise Refused("Choose a location assigned to this client.")
+        if reservation_id:
+            reservation = repo.get(actor, "reservations", reservation_id, db)
+            if reservation["student_id"] != student_id or reservation["location_id"] != location_id:
+                raise Refused("Choose a reservation for this client and location.")
+        recorder = db.execute("SELECT name FROM p_users WHERE id=?", (actor.user_id,)).fetchone()
         meta = {
             **(detail or {}),
             "synthetic": synthetic,
+            "reservation_id": reservation_id,
+            "recorded_by": {
+                "id": actor.user_id, "name": recorder["name"] if recorder else "Studio member",
+                "role": actor.role,
+            },
             "source": (
                 "Demo simulation from scenario coordinates"
                 if synthetic
@@ -243,6 +259,29 @@ def save_analysis(
         publish_progress(
             db, identifier, student_id, report, meta, created_at, synthetic
         )
+        if not synthetic:
+            # Each independently analysed capture belongs to exactly one visit.
+            # A booked visit can contain several posture/movement assessments;
+            # the first is retained in the legacy analysis_id column.
+            linked = db.execute(
+                "SELECT id,analysis_id FROM p_training_sessions WHERE student_id=? AND reservation_id=? "
+                "ORDER BY performed_at DESC LIMIT 1",
+                (student_id, reservation_id),
+            ).fetchone() if reservation_id else None
+            if linked:
+                session_id = linked["id"]
+                if linked["analysis_id"] is None:
+                    db.execute("UPDATE p_training_sessions SET analysis_id=? WHERE id=?", (identifier, session_id))
+            else:
+                session_id = uid()
+                db.execute(
+                    "INSERT INTO p_training_sessions VALUES (?,?,?,?,?,?,?,?)",
+                    (session_id, student_id, reservation_id, None, identifier, created_at, "[]", ""),
+                )
+            db.execute(
+                "INSERT INTO p_session_analyses(session_id,analysis_id) VALUES (?,?)",
+                (session_id, identifier),
+            )
         repo.audit(
             db,
             actor,

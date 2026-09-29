@@ -89,6 +89,8 @@ def test_no_repetition_can_bridge_an_unobserved_interval():
     values = [90 - 70 * np.cos(t * 2 * np.pi / 2) for t in times]
     full = ev.analyse_series(times, values)
     assert full["repetitions"] >= 1 and full["tempo_s"] == pytest.approx(2, abs=0.3)
+    plotted = [value for _, value in full["smoothed_series"] if value is not None]
+    assert full["rom"] == pytest.approx(max(plotted) - min(plotted), abs=0.11)
     for i, t in enumerate(times):
         if 0.8 < t < 1.3 or 2.8 < t < 3.3 or 4.8 < t < 5.3:
             values[i] = None
@@ -218,6 +220,7 @@ def test_video_pipeline_runs_on_decoded_frames_without_inventing_cycles(tmp_path
         writer.write(np.zeros((900, 800, 3), np.uint8))
     writer.release()
     monkeypatch.setattr(api, "pose_backend", lambda: lambda f: [standing()])
+    monkeypatch.setenv("PILATES_VIDEO_SAMPLE_FPS", "3")
     r = ev.video(path, view="front", protocol="hold")
     assert r["tracking"]["stable"] and r["people"][0]["suitable"]
     assert r["duration"] == 3
