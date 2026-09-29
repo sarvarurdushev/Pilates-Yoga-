@@ -120,6 +120,9 @@ WRITABLE = {
     ),
 }
 
+# Separate link tables preserve the positional layout of existing note and scan rows.
+VISIT_LINKS = {"notes": ("p_session_notes", "note_id"), "scans": ("p_session_scans", "scan_id")}
+
 
 def password_hash(password):
     if not isinstance(password, str) or not 10 <= len(password) <= 1024:
@@ -481,6 +484,9 @@ class Repository:
                 if collection != "analyses"
                 else "id,org_id,student_id,coach_id,location_id,kind,protocol,created_at,status,demo,detail"
             )
+            if collection in VISIT_LINKS:
+                link_table, key = VISIT_LINKS[collection]
+                fields += f", (SELECT session_id FROM {link_table} WHERE {key}={TABLES[collection]}.id) AS session_id"
             rows = [
                 unpack(r)
                 for r in db.execute(
@@ -510,8 +516,12 @@ class Repository:
             with self.db() as conn:
                 return self.get(actor, collection, identifier, conn)
         where, args = self._scope(actor, collection, db)
+        fields = "*"
+        if collection in VISIT_LINKS:
+            link_table, key = VISIT_LINKS[collection]
+            fields += f", (SELECT session_id FROM {link_table} WHERE {key}={TABLES[collection]}.id) AS session_id"
         row = db.execute(
-            f"SELECT * FROM {TABLES[collection]} WHERE ({where}) AND id=?",
+            f"SELECT {fields} FROM {TABLES[collection]} WHERE ({where}) AND id=?",
             args + [identifier],
         ).fetchone()
         if not row:
@@ -867,6 +877,59 @@ class Repository:
             if not row or row[0] != data.get("location_id"):
                 raise Refused("The room must belong to the selected location.")
 
+    @staticmethod
+    def _analysis_in_visit(db, session_id, analysis_id):
+        return bool(db.execute(
+            "SELECT 1 FROM p_training_sessions WHERE id=? AND analysis_id=? "
+            "UNION SELECT 1 FROM p_session_analyses WHERE session_id=? AND analysis_id=?",
+            (session_id, analysis_id, session_id, analysis_id),
+        ).fetchone())
+
+    def _check_visit_link(self, actor, collection, identifier, record, session_id, db):
+        if session_id:
+            session = db.execute(
+                "SELECT ts.id FROM p_training_sessions ts "
+                "JOIN p_users u ON u.id=ts.student_id "
+                "WHERE ts.id=? AND ts.student_id=? AND u.org_id=?",
+                (session_id, record.get("student_id"), actor.org_id),
+            ).fetchone()
+            if not session:
+                raise Refused("Choose a visit belonging to this client.")
+            if record.get("analysis_id") and not self._analysis_in_visit(
+                db, session_id, record["analysis_id"]
+            ):
+                raise Refused("The assessment belongs to a different visit.")
+        if collection == "notes" and session_id and record.get("scan_id"):
+            scan = self.get(actor, "scans", record["scan_id"], db)
+            if scan["session_id"] and scan["session_id"] != session_id:
+                raise Refused("The scan belongs to a different visit.")
+            if scan["analysis_id"] and not self._analysis_in_visit(
+                db, session_id, scan["analysis_id"]
+            ):
+                raise Refused("The scan assessment belongs to a different visit.")
+        if collection == "scans":
+            # A note explicitly tied to this scan and visit cannot be stranded by
+            # moving or clearing the scan's own visit link.
+            conflicting = db.execute(
+                "SELECT 1 FROM p_notes n JOIN p_session_notes sn ON sn.note_id=n.id "
+                "WHERE n.scan_id=? AND sn.session_id IS NOT ? LIMIT 1",
+                (identifier, session_id),
+            ).fetchone()
+            if conflicting:
+                raise Refused("Move linked coach notes before changing this scan's visit.")
+
+    @staticmethod
+    def _save_visit_link(collection, identifier, session_id, db):
+        link_table, key = VISIT_LINKS[collection]
+        if session_id:
+            db.execute(
+                f"INSERT INTO {link_table}({key},session_id) VALUES (?,?) "
+                f"ON CONFLICT({key}) DO UPDATE SET session_id=excluded.session_id",
+                (identifier, session_id),
+            )
+        else:
+            db.execute(f"DELETE FROM {link_table} WHERE {key}=?", (identifier,))
+
     def save(self, actor, collection, item):
         if collection not in WRITABLE:
             raise Refused("This record is created by its workflow.", 403)
@@ -890,6 +953,14 @@ class Repository:
             ):
                 raise Refused("Duplicate this shared content before editing it.", 403)
             fields = {k: item[k] for k in WRITABLE[collection] if k in item}
+            session_id = None
+            if collection in VISIT_LINKS:
+                session_id = item.get("session_id", existing.get("session_id"))
+                if session_id is not None and (
+                    not isinstance(session_id, str) or len(session_id) > 100
+                ):
+                    raise Refused("Choose a valid visit.")
+                session_id = session_id or None
             if collection == "notes":
                 detail = fields.get("detail", existing.get("detail", {}))
                 if not isinstance(detail, dict):
@@ -938,6 +1009,8 @@ class Repository:
             if collection == "programs" and not str(merged.get("name") or "").strip():
                 raise Refused("Name the program.")
             self._linked(actor, merged, db, merged.get("student_id"))
+            if collection in VISIT_LINKS:
+                self._check_visit_link(actor, collection, identifier, merged, session_id, db)
             for f in ("name", "text"):
                 if f in fields and not str(fields[f]).strip():
                     raise Refused(f"Enter {f}.")
@@ -980,6 +1053,8 @@ class Repository:
                     + ")",
                     list(fields.values()),
                 )
+            if collection in VISIT_LINKS:
+                self._save_visit_link(collection, identifier, session_id, db)
             if collection == "programs" and "steps" in item:
                 self._steps(actor, identifier, item["steps"], db)
             if collection == "programs":

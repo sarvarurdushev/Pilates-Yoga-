@@ -108,7 +108,7 @@ def restore_archive(repo, actor, archive):
             meta = schema(db)
             tables = manifest.get("tables", [])
             expected = set(meta) - PUBLIC
-            optional_new = {"p_program_step_details", "p_program_step_notes", "p_program_revisions", "p_resource_details", "p_training_session_program_versions", "p_session_analyses", "p_session_recorders"}
+            optional_new = {"p_program_step_details", "p_program_step_notes", "p_program_revisions", "p_resource_details", "p_training_session_program_versions", "p_session_analyses", "p_session_recorders", "p_session_notes", "p_session_scans"}
             missing = expected - set(tables)
             if (set(tables) - expected) or (missing - optional_new) or len(tables) != len(set(tables)):
                 raise Refused(
