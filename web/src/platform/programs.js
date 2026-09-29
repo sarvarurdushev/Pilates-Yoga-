@@ -41,6 +41,19 @@ const durationLabel = (steps) => {
   return `${estimate.untimed ? "At least" : "About"} ${estimate.minutes} min`;
 };
 export const planPhaseFromForm = (formData) => formData.get("current_program_phase");
+export function nextProgramPhase(phases) {
+  if (phases.length >= 16) throw Error("A program can have at most 16 phases.");
+  const lastWeek = Math.max(0, ...phases.map((phase) => Number(phase.weeks_end) || 0));
+  if (lastWeek >= 104) throw Error("A program cannot extend beyond week 104.");
+  let number = phases.length + 1;
+  while (phases.some((phase) => phase.name === `Phase ${number}`)) number++;
+  return {
+    name: `Phase ${number}`,
+    weeks_start: lastWeek + 1,
+    weeks_end: Math.min(104, lastWeek + 4),
+    goal: "",
+  };
+}
 export function revisionSourceLink(version, clientId, notes = []) {
   if (!version.source_id) return "";
   if (version.source_kind === "analysis")
@@ -454,7 +467,18 @@ export async function programEditor(id, copy = false, addPhase = false) {
     find("#pd-phase-rows").querySelectorAll("[data-remove-phase]").forEach((b)=>b.onclick=()=>{readAll();readPhases();phases.splice(Number(b.dataset.removePhase),1);drawPhases();draw();});
     find("#pd-phase-rows").querySelectorAll("[name=phase_name]").forEach((input)=>input.onchange=()=>{readAll();readPhases();drawPhases();draw();});
   }
-  find("#pd-add-phase").onclick=()=>{readAll();readPhases();phases.push({name:`Phase ${phases.length+1}`,weeks_start:(phases.at(-1)?.weeks_end || 0)+1,weeks_end:(phases.at(-1)?.weeks_end || 0)+4,goal:""});drawPhases();draw();};
+  find("#pd-add-phase").onclick=()=>{
+    readAll();
+    readPhases();
+    let next;
+    try { next = nextProgramPhase(phases); } catch (error) { return toast(error.message); }
+    phases.push(next);
+    drawPhases();
+    find("[name=current_program_phase]").value = next.name;
+    const durationInput = find("[name=duration_weeks]");
+    durationInput.value = String(Math.max(Number(durationInput.value) || 0, next.weeks_end));
+    draw();
+  };
   drawPhases();
   if (addPhase) {
     find(".pd-advanced").open = true;

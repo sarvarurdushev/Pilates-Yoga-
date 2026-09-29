@@ -8,6 +8,7 @@ import {
 import {
   appendCoachMedia,
   planPhaseFromForm,
+  nextProgramPhase,
   revisionSourceLink,
   programDurationEstimate,
 } from "../src/platform/programs.js";
@@ -77,6 +78,19 @@ test("plan phase cannot be overwritten by a movement's phase during save", () =>
   data.append("program_phase", "All phases");
   data.append("program_phase", "Mobility");
   assert.equal(planPhaseFromForm(data), "Foundation");
+});
+
+test("creating the next program phase chooses a unique name and the next unused weeks", () => {
+  const original = [
+    {name:"Foundation",weeks_start:1,weeks_end:4,goal:"Establish a comfortable range"},
+    {name:"Phase 3",weeks_start:5,weeks_end:8,goal:"Build control"},
+  ];
+  const next = nextProgramPhase(original);
+  assert.deepEqual(next, {name:"Phase 4",weeks_start:9,weeks_end:12,goal:""});
+  assert.equal(original.length, 2, "a draft phase must not mutate the saved phase schedule");
+  assert.deepEqual(nextProgramPhase([{name:"Progression",weeks_start:101,weeks_end:103}]),
+    {name:"Phase 2",weeks_start:104,weeks_end:104,goal:""});
+  assert.throws(() => nextProgramPhase([{name:"Final",weeks_start:100,weeks_end:104}]), /week 104/);
 });
 
 test("uploaded coach photos and videos retain distinct provenance and one primary video", () => {
