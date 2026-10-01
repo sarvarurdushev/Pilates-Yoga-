@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { withSavedProgressEvidence } from "./progress-fixtures.mjs";
 import { programMeasurementCopy, programProgressCard } from "../src/platform/library.js";
 
 globalThis.location = { hash: "" };
@@ -57,7 +58,7 @@ test("the rendered program chart labels first and latest comparable assessments"
       {analysis_id: "other", recorded_at: "2026-05-11T10:00:00", metric: "front:right_shoulder_rom", value: 99, unit: "deg"},
     ],
   };
-  const html = programProgressCard(client, {starts_on: "2026-05-01"}, {
+  const html = programProgressCard(withSavedProgressEvidence(client), {starts_on: "2026-05-01"}, {
     region_id: "right_shoulder", detail: {target_region_ids: ["right_shoulder"]},
   });
   assert.match(html, /First since plan start · May 1, 2026<\/dt><dd>61°/);

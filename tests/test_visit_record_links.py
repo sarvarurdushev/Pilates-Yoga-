@@ -103,3 +103,83 @@ def test_analysis_conflicts_and_backup_round_trip(tmp_path):
     assert restored_scan["session_id"] != visit
     with repo.db() as db:
         assert not db.execute("PRAGMA foreign_key_check").fetchall()
+
+
+def test_client_visit_scan_list_carries_saved_markers_and_authors(tmp_path):
+    repo, admin, first, second, visit, _, _, media = studio(tmp_path)
+    scan = repo.save(admin, "scans", {
+        "student_id": first, "media_id": media["id"], "name": "Client scan",
+        "scan_type": "Image", "captured_at": "2026-09-25", "session_id": visit,
+    })
+    marker = repo.annotate(admin, {
+        "scan_id": scan["id"], "x": 0.25, "y": 0.5,
+        "frame_index": 0, "text": "Saved visual observation",
+    })
+    source = repo.get(admin, "scans", scan["id"])["findings"][0]
+    stored = next(item for item in repo.client(admin, first)["scans"] if item["id"] == scan["id"])
+    assert stored["session_id"] == visit
+    assert len(stored["findings"]) == 1
+    finding = stored["findings"][0]
+    assert finding["id"] == marker["id"] == source["id"]
+    assert finding["scan_id"] == scan["id"]
+    assert finding["frame_index"] == source["frame_index"] == 0
+    assert finding["created_at"] == source["created_at"]
+    assert finding["author_id"] == admin.user_id
+    assert finding["author_name"] == "Owner"
+    assert finding["text"] == "Saved visual observation"
+    assert repo.client(admin, second)["scans"] == []
+
+
+def test_note_sources_cannot_claim_different_recorded_visits(tmp_path):
+    repo, admin, client_id, _, first, later, _, media = studio(tmp_path)
+    with repo.db() as db:
+        for identifier, visit in (
+            ("assessment-first", first),
+            ("assessment-first-second", first),
+            ("assessment-later", later),
+        ):
+            db.execute(
+                "INSERT INTO p_analyses(id,org_id,student_id,kind,protocol,created_at,status) "
+                "VALUES (?,?,?,?,?,?,?)",
+                (identifier, admin.org_id, client_id, "posture", "Standing",
+                 "2026-09-25", "complete"),
+            )
+            db.execute("INSERT INTO p_session_analyses VALUES (?,?)", (visit, identifier))
+
+    later_scan = repo.save(admin, "scans", {
+        "student_id": client_id, "media_id": media["id"],
+        "analysis_id": "assessment-later", "session_id": later,
+        "name": "Later scan", "scan_type": "Image", "captured_at": "2026-09-25",
+    })
+    with pytest.raises(Refused, match="scan and assessment do not share"):
+        repo.save(admin, "notes", {
+            "student_id": client_id, "analysis_id": "assessment-first",
+            "scan_id": later_scan["id"], "text": "Conflicting sources",
+        })
+
+    first_scan = repo.save(admin, "scans", {
+        "student_id": client_id, "media_id": media["id"],
+        "analysis_id": "assessment-first", "session_id": first,
+        "name": "First scan", "scan_type": "Image", "captured_at": "2026-09-25",
+    })
+    compatible = repo.save(admin, "notes", {
+        "student_id": client_id, "analysis_id": "assessment-first-second",
+        "scan_id": first_scan["id"], "text": "Same visit, two assessments",
+    })
+    assert compatible["session_id"] is None
+    assert compatible["scan_id"] == first_scan["id"]
+
+    # A scan without its own analysis can still be linked to an exact visit.
+    # Do not let a later scan edit strand an already saved two-source note.
+    plain_scan = repo.save(admin, "scans", {
+        "student_id": client_id, "media_id": media["id"], "session_id": first,
+        "name": "Visit scan", "scan_type": "Image", "captured_at": "2026-09-25",
+    })
+    note = repo.save(admin, "notes", {
+        "student_id": client_id, "analysis_id": "assessment-first",
+        "scan_id": plain_scan["id"], "text": "Both sources belong to first visit",
+    })
+    assert note["session_id"] is None
+    with pytest.raises(Refused, match="linked coach note assessment"):
+        repo.save(admin, "scans", {"id": plain_scan["id"], "session_id": later})
+    assert repo.get(admin, "scans", plain_scan["id"])["session_id"] == first

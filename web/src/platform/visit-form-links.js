@@ -89,3 +89,16 @@ export function compatibleFindings(client, sessionId = "", analysisId = "") {
     (!allowed || allowed.has(finding.analysis_id)) &&
     (!analysisId || finding.analysis_id === analysisId));
 }
+
+// Feedback may be shared with a student. Its program link must therefore come
+// from that student's assigned plans, rather than the coach's wider library.
+export function assignedProgramOptions(client) {
+  return [...new Map([
+    ...(client?.program_history || []), ...(client?.programs || []),
+  ]
+    .filter((assignment) => assignment.program_id)
+    .map((assignment) => [assignment.program_id, {
+      id: assignment.program_id,
+      name: assignment.name || "Assigned program",
+    }])).values()];
+}

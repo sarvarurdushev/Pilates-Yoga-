@@ -30,8 +30,9 @@ import {
 } from "./core.js";
 import {
   initialVisitId, visitFormOptions, compatibleAssessments,
-  compatibleScans, compatibleFindings, sessionForAnalysis,
+  compatibleScans, compatibleFindings, sessionForAnalysis, assignedProgramOptions,
 } from "./visit-form-links.js";
+import { markCompletion, completedEventPayload } from "./completed-events.js";
 const asObject = (f) => Object.fromEntries(f);
 const checks = (title, name, rows, selected = []) =>
   `<fieldset><legend>${esc(title)}</legend>${rows.map((r) => `<label class="check"><input type="checkbox" name="${name}" value="${esc(r.id)}" ${selected.includes(r.id) ? "checked" : ""}>${esc(r.name)}</label>`).join("")}</fieldset>`;
@@ -245,10 +246,8 @@ export async function edit(kind, id, copy = false) {
     if (!state.client)
       throw Error("Select a client before adding coach feedback.");
     const c = state.client;
-    const [programs, exercises] = await Promise.all([
-      list("programs").then((result) => result.items),
-      list("exercises").then((result) => result.items),
-    ]);
+    const programs = assignedProgramOptions(c);
+    const exercises = (await list("exercises")).items;
     if (item.exercise_id && !exercises.some((exercise) => exercise.id === item.exercise_id))
       exercises.push(await record("exercises", item.exercise_id));
     const route = params();
@@ -663,7 +662,7 @@ export async function detailPage(root, kind, id) {
       );
     if (state.me.role === "student")
       root.innerHTML +=
-        '<button id="complete-session" class="primary">Save completed practice</button>';
+        '<p class="muted">Checking a movement records when you marked it complete in the app.</p><button id="complete-session" class="primary">Save completed practice</button>';
   }
   if ($("#edit-content"))
     $("#edit-content").onclick = () => edit(collection, id);
@@ -689,15 +688,16 @@ export async function detailPage(root, kind, id) {
                     ?.latest_analysis?.id || null,
           }),
       );
-  if ($("#complete-session"))
+  if ($("#complete-session")) {
+    root.querySelectorAll(".completed-step").forEach((input) => {
+      input.onchange = () => markCompletion(input);
+    });
     $("#complete-session").onclick = async () => {
       try {
         await api("complete-session", {
           student_id: state.me.user.id,
           program_id: id,
-          completed: [...root.querySelectorAll(".completed-step:checked")].map(
-            (e) => e.value,
-          ),
+          ...completedEventPayload(root.querySelectorAll(".completed-step")),
         });
         toast("Practice saved to your history");
         go("client", { tab: "sessions" });
@@ -705,4 +705,5 @@ export async function detailPage(root, kind, id) {
         toast(e.message);
       }
     };
+  }
 }

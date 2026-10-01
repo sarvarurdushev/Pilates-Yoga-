@@ -1,3 +1,5 @@
+import { scanAnnotationMarkers } from "./scan-markers.js";
+
 // A capture can create a visit record before any exercises are logged. Link by
 // analysis ID only: sharing a reservation does not make two captures the same visit.
 export function visitsForClient(client) {
@@ -77,28 +79,53 @@ export function visitConnections(client, visit, revisions = []) {
     connected(item) && !(item.kind === "movement" && /\bROM:\s*0(?:\.0+)?\s*deg\b/i.test(item.text || "")));
   const assignments = (client.program_history || []).filter((assignment) =>
     analysisIds.has(assignment.analysis_id));
-  const programChanges = revisions.filter((revision) =>
-    (analysisIds.has(revision.source_id) && revision.source_kind === "analysis") ||
-    (noteIds.has(revision.source_id) && ["coach_observation", "client_feedback"].includes(revision.source_kind)));
+  const programChanges = revisions.filter((revision) => revision.session_id
+    ? Boolean(sessionId && revision.session_id === sessionId)
+    : (analysisIds.has(revision.source_id) && revision.source_kind === "analysis") ||
+      (noteIds.has(revision.source_id) && ["coach_observation", "client_feedback"].includes(revision.source_kind)));
   const regions = [...new Set([
     ...notes.map((note) => note.region_id),
     ...observations.map((observation) => observation.region_id),
-    ...scans.map((scan) => scan.region_id),
+    ...scans.filter((scan) => !scan.detail?.demo).map((scan) => scan.region_id),
   ].filter(Boolean))];
   return { scans, notes, observations, assignments, programChanges, regions };
 }
 
 export function visitTimeline(visit, connections) {
   const events = [];
-  const add = (type, id, at, record, rank) => {
-    if (at) events.push({ type, id, at, record, rank });
+  const add = (type, id, at, record, rank, order = 0) => {
+    if (at) events.push({ type, id, at, record, rank, order });
   };
-  if (visit.session?.completed?.length || visit.session?.notes)
+  if (visit.session?.completed?.length || visit.session?.notes) {
     add("practice", visit.session.id, visit.session.performed_at, visit.session, 0);
+    // New records preserve the time the client marked a movement, or just the
+    // server log time. Legacy arrays have neither; show only session context.
+    const saved = Array.isArray(visit.session.exercise_events) && visit.session.exercise_events.length
+      ? visit.session.exercise_events
+      : (visit.session.completed || []).map((key, index) => ({
+          id: `${visit.session.id}:exercise:${index + 1}`,
+          session_id: visit.session.id, completed_key: key, sequence: index + 1,
+        }));
+    saved.forEach((event, index) => {
+      const time_source = event.completed_at ? "marked" : event.logged_at ? "logged" : "session";
+      add("exercise", event.id, event.completed_at || event.logged_at || visit.session.performed_at,
+        { ...event, time_source }, 1, index);
+    });
+  }
   for (const analysis of visit.analyses || (visit.analysis ? [visit.analysis] : []))
-    add("capture", analysis.id, analysis.created_at, analysis, 1);
-  for (const scan of connections.scans)
-    add("scan", scan.id, scan.captured_at, scan, 2);
+    add("capture", analysis.id, analysis.created_at, analysis, 2);
+  for (const scan of connections.scans) {
+    // Public educational demo images are reference material, not evidence of
+    // this client's imaging acquisition or marker history.
+    if (scan.detail?.demo) continue;
+    add("scan", scan.id, scan.captured_at, scan, 3);
+    for (const marker of scanAnnotationMarkers(Array.isArray(scan.findings) ? scan.findings : [])) {
+      if (marker.scan_id !== scan.id) continue;
+      // A marker without its own saved time cannot borrow the scan date.
+      add("scan_marker", marker.id, marker.created_at,
+        { ...marker, scan_id: scan.id, scan_name: scan.name }, 4);
+    }
+  }
   const findingGroups = new Map();
   for (const observation of connections.observations) {
     const key = `${observation.analysis_id || observation.scan_id || observation.id}:${String(observation.created_at || "").slice(0, 10)}`;
@@ -106,18 +133,18 @@ export function visitTimeline(visit, connections) {
     findingGroups.get(key).push(observation);
   }
   for (const [key, findings] of findingGroups)
-    add("findings", key, findings.map((finding) => finding.created_at).sort()[0], findings, 3);
+    add("findings", key, findings.map((finding) => finding.created_at).sort()[0], findings, 4);
   for (const note of connections.notes)
-    add("note", note.id, note.created_at, note, 4);
+    add("note", note.id, note.created_at, note, 5);
   for (const analysis of visit.analyses || (visit.analysis ? [visit.analysis] : [])) {
     if (analysis.detail?.reviewed_at)
-      add("review", analysis.id, analysis.detail.reviewed_at, analysis, 5);
+      add("review", analysis.id, analysis.detail.reviewed_at, analysis, 6);
   }
   for (const assignment of connections.assignments)
-    add("assignment", assignment.id, assignment.starts_on, assignment, 6);
+    add("assignment", assignment.id, assignment.starts_on, assignment, 7);
   for (const revision of connections.programChanges)
-    add("program", revision.id, revision.created_at, revision, 7);
+    add("program", revision.id, revision.created_at, revision, 8);
   return events.sort((a, b) =>
-    String(a.at).localeCompare(String(b.at)) || a.rank - b.rank ||
+    String(a.at).localeCompare(String(b.at)) || a.rank - b.rank || a.order - b.order ||
     String(a.id).localeCompare(String(b.id)));
 }

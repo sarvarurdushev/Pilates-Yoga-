@@ -14,24 +14,32 @@ real captures and custom programs require durable storage.
 
 A practical configuration for the tested inference workload is one CPU / 2 GB
 RAM ($25/month) plus a 2 GB persistent disk ($0.50/month), before applicable taxes
-or usage overages. Prices checked September 23, 2026 on
+or usage overages. Prices rechecked October 1, 2026 on
 https://render.com/pricing. A $7/month 512 MB service also supports disks, but the
 measured 460.2 MB inference peak leaves little headroom for concurrent work.
 
 1. Download an organization archive under Admin → Storage & backup before any
    redeployment. Repeat for every real organization. Do not assume `/tmp` survives.
-2. Upgrade the existing service; attach a disk named `studio` at `/var/data`, 2 GB.
-3. Confirm the existing service uses the checked-in start command
+2. Before changing hosting, verify each downloaded archive offline with
+   `python -m pilates.platform.backup_verify /path/to/motion-yoga-backup.zip`.
+   Keep its receipt (organization ID, SHA-256, per-table counts and media
+   count) with the archive, and compare counts against Admin → System data.
+   The check reads every ZIP member and fully restores into a temporary
+   local studio, then deletes that copy. Allow free disk space for the
+   expanded archive. It never modifies the connected Render service.
+   An archive that fails this check is not a safe migration source.
+3. Upgrade the existing service; attach a disk named `studio` at `/var/data`, 2 GB.
+4. Confirm the existing service uses the checked-in start command
    `sh deploy/render-start.sh` and set `STUDIO_DB_PATH=/var/data/studio.db` in
    its environment. If its Blueprint mapping has not synced, update this
    command on the existing service rather than creating a second service.
-4. Set `XDG_CACHE_HOME=/var/data/cache`. The repository automatically stores media
+5. Set `XDG_CACHE_HOME=/var/data/cache`. The repository automatically stores media
    alongside the database at `/var/data/studio.db.media`.
-5. Deploy, register the intended studio administrator, and restore that
+6. Deploy, register the intended studio administrator, and restore that
    organization's archive into the empty studio. Accounts require fresh sign-in
    credentials because backup files deliberately exclude password hashes and
    session tokens.
-6. Verify a saved analysis, original media, note, program and reservation; redeploy
+7. Verify a saved analysis, original media, note, program and reservation; redeploy
    once more and verify the same IDs/media survive. `storage.ephemeral` must be
    false. Only then mark hosted durability complete.
 

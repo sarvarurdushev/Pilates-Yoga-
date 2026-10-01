@@ -205,3 +205,49 @@ def test_http_routes_keep_selected_client_and_private_media_scoped(workspace):
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_feedback_program_must_be_assigned_to_selected_client(workspace):
+    repo, coach, admin, student, other_student, other_coach, outsider = workspace
+    sid = student.user_id
+    another = next(p["id"] for p in repo.people(coach) if p["id"] != sid)
+    foreign = repo.save(coach, "programs", {
+        "name": "Another client's personal plan",
+        "detail": {"student_id": another, "status": "Active"},
+        "steps": [],
+    })
+    repo.assign_program(coach, {"program_id": foreign["id"], "student_id": another})
+    own = repo.save(coach, "programs", {
+        "name": "Selected client's plan",
+        "detail": {"student_id": sid, "status": "Active"},
+        "steps": [],
+    })
+    note_data = {
+        "student_id": sid, "text": "Review this client's comfortable range.",
+        "visibility": "student", "region_id": "right_shoulder",
+    }
+    for actor in (coach, admin):
+        with pytest.raises(Refused, match="Assign the program to this client"):
+            repo.save(actor, "notes", {**note_data, "program_id": foreign["id"]})
+        with pytest.raises(Refused, match="Assign the program to this client"):
+            repo.save(actor, "notes", {**note_data, "program_id": own["id"]})
+    repo.assign_program(coach, {"program_id": own["id"], "student_id": sid})
+    note = repo.save(coach, "notes", {**note_data, "program_id": own["id"]})
+    assert repo.get(student, "notes", note["id"])["program_id"] == own["id"]
+    assert repo.get(student, "programs", own["id"])["id"] == own["id"]
+    with pytest.raises(Refused, match="Assign the program to this client"):
+        repo.save(coach, "notes", {"id": note["id"], "program_id": foreign["id"]})
+    assert repo.get(student, "notes", note["id"])["program_id"] == own["id"]
+    replacement = repo.save(coach, "programs", {
+        "name": "Selected client's next plan",
+        "detail": {"student_id": sid, "status": "Active"},
+        "steps": [],
+    })
+    repo.assign_program(coach, {"program_id": replacement["id"], "student_id": sid})
+    historical = repo.save(coach, "notes", {
+        "id": note["id"], "text": "Earlier assigned plan remains linked to this feedback.",
+    })
+    assert historical["program_id"] == own["id"]
+    assert repo.get(student, "programs", own["id"])["id"] == own["id"]
+    general = repo.save(coach, "notes", note_data)
+    assert general["program_id"] is None

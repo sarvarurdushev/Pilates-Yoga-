@@ -158,6 +158,20 @@ textarea:focus-visible {
   line-height: 1.6;
   font-size: 12px;
 }
+.person-choice canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 600px;
+  margin: 18px auto;
+  border: 1px solid #314866;
+  border-radius: 7px;
+}
+.person-choice video {
+  display: block;
+  max-width: 100%;
+  max-height: 360px;
+  margin: 18px auto;
+}
 .loading {
   padding: 60px;
   text-align: center;
@@ -848,6 +862,7 @@ dialog::backdrop {
   }
   .nav-open #sidebar {
     transform: translateX(0);
+    visibility: visible;
     box-shadow: 10px 0 70px #0009;
   }
   #workspace {

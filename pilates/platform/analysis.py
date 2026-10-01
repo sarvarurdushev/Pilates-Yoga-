@@ -3,6 +3,7 @@
 from .repository import Refused, uid, now, encode
 from .regions import region_for
 from .kinematics import coordinates, temporal
+from .progress_evidence import selected_progress_measurements
 
 
 def save_analysis(
@@ -65,22 +66,31 @@ def save_analysis(
     )
     with repo.db() as db:
         repo._linked(actor, {"location_id": location_id}, db)
-        if location_id and not db.execute(
-            "SELECT 1 FROM p_student_locations WHERE student_id=? AND location_id=?",
-            (student_id, location_id),
-        ).fetchone():
+        if (
+            location_id
+            and not db.execute(
+                "SELECT 1 FROM p_student_locations WHERE student_id=? AND location_id=?",
+                (student_id, location_id),
+            ).fetchone()
+        ):
             raise Refused("Choose a location assigned to this client.")
         if reservation_id:
             reservation = repo.get(actor, "reservations", reservation_id, db)
-            if reservation["student_id"] != student_id or reservation["location_id"] != location_id:
+            if (
+                reservation["student_id"] != student_id
+                or reservation["location_id"] != location_id
+            ):
                 raise Refused("Choose a reservation for this client and location.")
-        recorder = db.execute("SELECT name FROM p_users WHERE id=?", (actor.user_id,)).fetchone()
+        recorder = db.execute(
+            "SELECT name FROM p_users WHERE id=?", (actor.user_id,)
+        ).fetchone()
         meta = {
             **(detail or {}),
             "synthetic": synthetic,
             "reservation_id": reservation_id,
             "recorded_by": {
-                "id": actor.user_id, "name": recorder["name"] if recorder else "Studio member",
+                "id": actor.user_id,
+                "name": recorder["name"] if recorder else "Studio member",
                 "role": actor.role,
             },
             "source": (
@@ -263,20 +273,36 @@ def save_analysis(
             # Each independently analysed capture belongs to exactly one visit.
             # A booked visit can contain several posture/movement assessments;
             # the first is retained in the legacy analysis_id column.
-            linked = db.execute(
-                "SELECT id,analysis_id FROM p_training_sessions WHERE student_id=? AND reservation_id=? "
-                "ORDER BY performed_at DESC LIMIT 1",
-                (student_id, reservation_id),
-            ).fetchone() if reservation_id else None
+            linked = (
+                db.execute(
+                    "SELECT id,analysis_id FROM p_training_sessions WHERE student_id=? AND reservation_id=? "
+                    "ORDER BY performed_at DESC LIMIT 1",
+                    (student_id, reservation_id),
+                ).fetchone()
+                if reservation_id
+                else None
+            )
             if linked:
                 session_id = linked["id"]
                 if linked["analysis_id"] is None:
-                    db.execute("UPDATE p_training_sessions SET analysis_id=? WHERE id=?", (identifier, session_id))
+                    db.execute(
+                        "UPDATE p_training_sessions SET analysis_id=? WHERE id=?",
+                        (identifier, session_id),
+                    )
             else:
                 session_id = uid()
                 db.execute(
                     "INSERT INTO p_training_sessions VALUES (?,?,?,?,?,?,?,?)",
-                    (session_id, student_id, reservation_id, None, identifier, created_at, "[]", ""),
+                    (
+                        session_id,
+                        student_id,
+                        reservation_id,
+                        None,
+                        identifier,
+                        created_at,
+                        "[]",
+                        "",
+                    ),
                 )
             db.execute(
                 "INSERT INTO p_session_analyses(session_id,analysis_id) VALUES (?,?)",
@@ -298,82 +324,46 @@ def publish_progress(db, identifier, student_id, report, detail, created_at, syn
         "DELETE FROM p_observations WHERE analysis_id=? AND source IN ('Demo scenario','Image-plane measurement','Tracked movement')",
         (identifier,),
     )
-    for view in report["views"]:
-        camera = view["view"]
-        candidates = [p for p in view["report"].get("people", []) if p.get("suitable")]
-        selected = detail.get("selected_people", {}).get(camera)
-        person = (
-            next((p for p in candidates if str(p["person_id"]) == str(selected)), None)
-            if selected is not None
-            else candidates[0] if len(candidates) == 1 else None
-        )
-        if person is None:
+    for metric, evidence in selected_progress_measurements(report, detail).items():
+        if not evidence["supported"]:
             continue
-        values = [
-            (m["id"], m["name"], m.get("value"), m.get("unit", "deg"), "posture")
-            for m in (person.get("metrics", []) if report["kind"] == "posture" else [])
-        ]
-        for name, signal in person.get("signals", {}).items():
-            values.append(
+        key, name = evidence["metric_id"], evidence["name"]
+        camera, value, unit = evidence["view"], evidence["value"], evidence["unit"]
+        kind = report["kind"]
+        db.execute(
+            "INSERT INTO p_progress_records VALUES (?,?,?,?,?,?,?,?)",
+            (
+                uid(),
+                student_id,
+                identifier,
+                metric,
+                value,
+                unit,
+                created_at,
+                int(synthetic),
+            ),
+        )
+        if key.endswith(("_tempo_cv", "_rep_rom_sd", "_repetitions")):
+            continue
+        db.execute(
+            "INSERT INTO p_observations VALUES (?,?,?,?,?,?,?,?,?)",
+            (
+                uid(),
+                student_id,
+                identifier,
+                region_for(name),
+                None,
+                kind,
+                f"{name}: {value} {unit} in the {camera} view.",
                 (
-                    name + "_rom",
-                    name.replace("_", " ") + " ROM",
-                    signal.get("rom"),
-                    "deg",
-                    "movement",
-                )
-            )
-            for key, unit in [
-                ("tempo_cv", "ratio"),
-                ("rep_rom_sd", "deg"),
-                ("repetitions", "cycles"),
-            ]:
-                values.append(
-                    (
-                        name + "_" + key,
-                        name.replace("_", " ") + " " + key,
-                        signal.get(key),
-                        unit,
-                        "movement",
+                    "Demo scenario"
+                    if synthetic
+                    else (
+                        "Tracked movement"
+                        if kind == "movement"
+                        else "Image-plane measurement"
                     )
-                )
-        for key, name, value, unit, kind in values:
-            if value is None:
-                continue
-            db.execute(
-                "INSERT INTO p_progress_records VALUES (?,?,?,?,?,?,?,?)",
-                (
-                    uid(),
-                    student_id,
-                    identifier,
-                    camera + ":" + key,
-                    value,
-                    unit,
-                    created_at,
-                    int(synthetic),
                 ),
-            )
-            if key.endswith(("_tempo_cv", "_rep_rom_sd", "_repetitions")):
-                continue
-            db.execute(
-                "INSERT INTO p_observations VALUES (?,?,?,?,?,?,?,?,?)",
-                (
-                    uid(),
-                    student_id,
-                    identifier,
-                    region_for(name),
-                    None,
-                    kind,
-                    f"{name}: {value} {unit} in the {camera} view.",
-                    (
-                        "Demo scenario"
-                        if synthetic
-                        else (
-                            "Tracked movement"
-                            if kind == "movement"
-                            else "Image-plane measurement"
-                        )
-                    ),
-                    created_at,
-                ),
-            )
+                created_at,
+            ),
+        )

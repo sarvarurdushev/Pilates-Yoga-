@@ -252,6 +252,54 @@ def snapshot(repo, program_id, db):
     return program
 
 
+def _revision_visit(repo, actor, value, student_id, source_kind, source_id, db):
+    if value in (None, ""):
+        return None
+    if not isinstance(value, str) or len(value) > 100:
+        raise Refused("Choose a valid client visit.")
+    if not student_id:
+        raise Refused("Assign this plan to one client before linking a visit.")
+    repo.assert_student(actor, student_id, True, db)
+    visit = db.execute(
+        "SELECT ts.student_id FROM p_training_sessions ts "
+        "JOIN p_users u ON u.id=ts.student_id WHERE ts.id=? AND u.org_id=?",
+        (value, actor.org_id),
+    ).fetchone()
+    if not visit or visit["student_id"] != student_id:
+        raise Refused("Choose a visit belonging to this program's client.")
+    if source_kind == "analysis" and not repo._analysis_in_visit(db, value, source_id):
+        raise Refused("The source assessment belongs to a different visit.")
+    if source_kind in ("coach_observation", "client_feedback"):
+        note = db.execute(
+            "SELECT n.analysis_id,n.scan_id,sn.session_id FROM p_notes n "
+            "LEFT JOIN p_session_notes sn ON sn.note_id=n.id WHERE n.id=?",
+            (source_id,),
+        ).fetchone()
+        if not note:
+            raise Refused("Select the related coach feedback.")
+        if note["session_id"]:
+            linked = note["session_id"] == value
+        elif note["analysis_id"]:
+            linked = bool(repo._analysis_in_visit(db, value, note["analysis_id"]))
+        elif note["scan_id"]:
+            scan = db.execute(
+                "SELECT s.analysis_id,ss.session_id FROM p_scans s "
+                "LEFT JOIN p_session_scans ss ON ss.scan_id=s.id WHERE s.id=?",
+                (note["scan_id"],),
+            ).fetchone()
+            if not scan:
+                linked = False
+            elif scan["session_id"]:
+                linked = scan["session_id"] == value
+            else:
+                linked = bool(scan["analysis_id"] and repo._analysis_in_visit(db, value, scan["analysis_id"]))
+        else:
+            linked = False
+        if not linked:
+            raise Refused("The source feedback belongs to a different visit.")
+    return value
+
+
 def record_revision(repo, actor, program_id, item, db):
     state = snapshot(repo, program_id, db)
     student_id = state["detail"].get("student_id")
@@ -260,16 +308,26 @@ def record_revision(repo, actor, program_id, item, db):
         raise Refused("This plan is assigned to another client. Duplicate it first.")
     if len(assignments) > 1 and item.get("id"):
         raise Refused("This plan is shared by multiple clients. Duplicate it before editing.", 409)
-    source_kind, source_id = _source(repo, actor, item.get("change_source"), db, student_id or (assignments[0] if len(assignments) == 1 else None))
+    client_id = student_id or (assignments[0] if len(assignments) == 1 else None)
+    source_kind, source_id = _source(repo, actor, item.get("change_source"), db, client_id)
+    visit_id = _revision_visit(repo, actor, item.get("change_visit_id"), client_id, source_kind, source_id, db)
     reason = _short(item.get("change_reason"), 2000)
     version = db.execute("SELECT COALESCE(MAX(version),0)+1 FROM p_program_revisions WHERE program_id=?", (program_id,)).fetchone()[0]
-    db.execute("INSERT INTO p_program_revisions VALUES (?,?,?,?,?,?,?,?,?)", (uid(), program_id, version, now(), actor.user_id, reason, source_kind, source_id, encode(state)))
+    revision_id = uid()
+    db.execute("INSERT INTO p_program_revisions VALUES (?,?,?,?,?,?,?,?,?)", (revision_id, program_id, version, now(), actor.user_id, reason, source_kind, source_id, encode(state)))
+    if visit_id:
+        db.execute("INSERT INTO p_program_revision_visits(revision_id,session_id) VALUES (?,?)", (revision_id, visit_id))
 
 
 def versions(repo, actor, program_id):
     repo.get(actor, "programs", program_id)
     with repo.db() as db:
-        rows = [dict(r) for r in db.execute("SELECT * FROM p_program_revisions WHERE program_id=? ORDER BY version DESC", (program_id,))]
+        rows = [dict(r) for r in db.execute(
+            "SELECT r.*,rv.session_id,u.name AS actor_name FROM p_program_revisions r "
+            "LEFT JOIN p_program_revision_visits rv ON rv.revision_id=r.id "
+            "LEFT JOIN p_users u ON u.id=r.actor_id "
+            "WHERE r.program_id=? ORDER BY r.version DESC", (program_id,)
+        )]
     for row in rows:
         row["snapshot"] = json.loads(row["snapshot"])
         if actor.role == "student":
@@ -290,6 +348,9 @@ def duplicate(repo, actor, item):
         raise Refused("Your coach designs programs.", 403)
     source = repo.get(actor, "programs", item.get("program_id"))
     student_id = item.get("student_id")
+    assign = item.get("assign", True)
+    if not isinstance(assign, bool):
+        raise Refused("Assignment choice must be true or false.")
     if student_id:
         repo.assert_student(actor, student_id, True)
     detail = dict(source["detail"])
@@ -353,7 +414,7 @@ def duplicate(repo, actor, item):
                     for medium in step.get("detail", {}).get("media", []):
                         medium["media_id"] = remap.get(medium["media_id"], medium["media_id"])
             result = repo.save(actor, "programs", fields)
-            if student_id:
+            if student_id and assign:
                 repo.assign_program(actor, {"program_id": result["id"], "student_id": student_id, "replace": item.get("replace", True)})
     except Exception:
         for path in created_paths:

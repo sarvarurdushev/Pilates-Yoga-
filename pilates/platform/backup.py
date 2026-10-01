@@ -10,11 +10,19 @@ import json
 import shutil
 import tempfile
 import zipfile
-from .repository import Refused, uid, now, encode
+from .repository import Refused, uid, now, encode, backfill_session_exercise_events
 from .inspection import schema, scope, PUBLIC
 
 MAX_ARCHIVE = 256 * 1024 * 1024
 MAX_EXPANDED = 1024 * 1024 * 1024
+# Tables added since the first organization archive format. Old archives may
+# omit these; all other current private tables are required on restore.
+OPTIONAL_RESTORE_TABLES = {
+    "p_program_step_details", "p_program_step_notes", "p_program_revisions",
+    "p_program_revision_visits", "p_resource_details",
+    "p_training_session_program_versions", "p_session_analyses",
+    "p_session_recorders", "p_session_exercise_events", "p_session_notes", "p_session_scans",
+}
 
 
 def admin_only(actor):
@@ -108,7 +116,7 @@ def restore_archive(repo, actor, archive):
             meta = schema(db)
             tables = manifest.get("tables", [])
             expected = set(meta) - PUBLIC
-            optional_new = {"p_program_step_details", "p_program_step_notes", "p_program_revisions", "p_resource_details", "p_training_session_program_versions", "p_session_analyses", "p_session_recorders", "p_session_notes", "p_session_scans"}
+            optional_new = OPTIONAL_RESTORE_TABLES
             missing = expected - set(tables)
             if (set(tables) - expected) or (missing - optional_new) or len(tables) != len(set(tables)):
                 raise Refused(
@@ -235,6 +243,8 @@ def restore_archive(repo, actor, archive):
                             row[key] = mapping[(table, value)]
                         elif table == "p_program_revisions" and key == "source_id" and value:
                             row[key] = text_ids.get(value, value)
+                        elif table == "p_session_exercise_events" and key == "completed_key" and value:
+                            row[key] = text_ids.get(value, value)
                         elif key in {"detail", "result", "summary", "completed", "snapshot"}:
                             row[key] = encode(remap_json(json.loads(value)))
                     if table == "p_users":
@@ -273,6 +283,7 @@ def restore_archive(repo, actor, archive):
                         list(row.values()),
                     )
                     count += 1
+            backfill_session_exercise_events(db)
             if db.execute("PRAGMA foreign_key_check").fetchone():
                 raise Refused("The restored archive contains a broken relationship.")
             repo.audit(

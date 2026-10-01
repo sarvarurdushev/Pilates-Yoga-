@@ -85,6 +85,33 @@ def test_program_revisions_media_and_student_projection(studio):
     assert "coach_notes" not in versions(repo, student, program["id"])["items"][0]["snapshot"]["detail"]
 
 
+
+def test_duplicate_draft_keeps_current_assignment_until_coach_assigns(tmp_path):
+    repo = Repository(tmp_path / "studio.db")
+    key = "b" * 32
+    coach = repo.actor(repo.demo_login(key, "coach"))
+    student = repo.actor(repo.demo_login(key, "student"))
+    sid = student.user_id
+    current = repo.client(coach, sid)["programs"][0]["program_id"]
+    draft = duplicate(repo, coach, {
+        "program_id": current, "student_id": sid, "assign": False,
+        "name": "Draft next phase",
+    })
+    assert draft["detail"]["status"] == "Draft"
+    assert draft["detail"]["student_id"] == sid
+    assert draft["assignments"] == []
+    assert repo.client(coach, sid)["programs"][0]["program_id"] == current
+    with pytest.raises(Refused):
+        repo.get(student, "programs", draft["id"])
+    repo.assign_program(coach, {
+        "program_id": draft["id"], "student_id": sid, "replace": True,
+    })
+    assert repo.client(coach, sid)["programs"][0]["program_id"] == draft["id"]
+    with pytest.raises(Refused):
+        duplicate(repo, coach, {
+            "program_id": current, "student_id": sid, "assign": "false",
+        })
+
 def test_duplicate_template_client_scope_and_invalid_sources(studio):
     repo, coach, admin, student = studio
     source = next(p for p in repo.list(coach, "programs")["items"] if p["name"] == "Shoulder control · Phase 1")
@@ -311,3 +338,223 @@ def test_step_equipment_resistance_and_location_are_validated(tmp_path):
     })
     rejected([{"equipment_id": band["id"], "quantity": 1}],
              location_id=other_location["id"])
+
+
+def test_manual_revision_belongs_to_exact_practice_visit(tmp_path):
+    repo = Repository(tmp_path / "revision-visit.db")
+    key = "e" * 32
+    coach = repo.actor(repo.demo_login(key, "coach"))
+    student = repo.actor(repo.demo_login(key, "student"))
+    client = repo.client(coach, student.user_id)
+    program_id = client["programs"][0]["program_id"]
+    program = repo.get(coach, "programs", program_id)
+    step = next(step for step in program["steps"] if step.get("exercise_id"))
+    practice_id = repo.complete_session(student, {
+        "student_id": student.user_id, "program_id": program_id,
+        "completed": [step["id"]],
+    })["id"]
+    assert not next(s for s in repo.client(coach, student.user_id)["sessions"]
+                    if s["id"] == practice_id)["analysis_id"]
+
+    revised = repo.save(coach, "programs", {
+        "id": program_id, "change_reason": "Client completed a comfortable practice",
+        "change_source": {"kind": "manual"}, "change_visit_id": practice_id,
+    })
+    history = versions(repo, coach, program_id)
+    assert history["items"][0]["version"] == revised["version"]
+    assert history["items"][0]["session_id"] == practice_id
+    assert history["items"][0]["source_kind"] == "manual"
+    assert history["items"][0]["source_id"] == ""
+    assert history["items"][0]["reason"] == "Client completed a comfortable practice"
+    with repo.db() as db:
+        author_name = db.execute("SELECT name FROM p_users WHERE id=?", (coach.user_id,)).fetchone()[0]
+    assert history["items"][0]["actor_id"] == coach.user_id
+    assert history["items"][0]["actor_name"] == author_name
+    assert versions(repo, student, program_id)["items"][0]["session_id"] == practice_id
+
+    note = repo.save(coach, "notes", {
+        "student_id": student.user_id, "session_id": practice_id,
+        "text": "Completed supported range during this practice.",
+    })
+    repo.save(coach, "programs", {
+        "id": program_id, "change_reason": "Coach saw a comfortable range",
+        "change_source": {"kind": "coach_observation", "id": note["id"]},
+        "change_visit_id": practice_id,
+    })
+    assert versions(repo, coach, program_id)["items"][0]["session_id"] == practice_id
+    image = _image()
+    medium = upload(repo, coach, BytesIO(image), len(image), "practice-scan.png", "image/png", "scan", student_id=student.user_id)
+    scan = repo.save(coach, "scans", {
+        "student_id": student.user_id, "session_id": practice_id, "media_id": medium["id"],
+        "name": "Visit-linked scan", "scan_type": "Reference", "captured_at": "2026-09-29T09:00:00Z",
+    })
+    scan_note = repo.save(coach, "notes", {
+        "student_id": student.user_id, "scan_id": scan["id"], "text": "Feedback on the scan linked to this practice.",
+    })
+    repo.save(coach, "programs", {
+        "id": program_id, "change_source": {"kind": "client_feedback", "id": scan_note["id"]},
+        "change_visit_id": practice_id,
+    })
+    assert versions(repo, coach, program_id)["items"][0]["session_id"] == practice_id
+
+    existing_count = versions(repo, coach, program_id)["total"]
+    other_analysis = client["analyses"][0]["id"]
+    with pytest.raises(Refused, match="different visit"):
+        repo.save(coach, "programs", {
+            "id": program_id, "change_source": {"kind": "analysis", "id": other_analysis},
+            "change_visit_id": practice_id,
+        })
+    other_visit = next(s["id"] for s in client["sessions"] if s["id"] != practice_id)
+    with pytest.raises(Refused, match="different visit"):
+        repo.save(coach, "programs", {
+            "id": program_id, "change_source": {"kind": "coach_observation", "id": note["id"]},
+            "change_visit_id": other_visit,
+        })
+    other_client = next(person["id"] for person in repo.people(coach)
+                        if person["id"] != student.user_id)
+    other_session = repo.client(coach, other_client)["sessions"][0]["id"]
+    with pytest.raises(Refused, match="program's client"):
+        repo.save(coach, "programs", {
+            "id": program_id, "change_source": {"kind": "manual"},
+            "change_visit_id": other_session,
+        })
+    with pytest.raises(Refused, match="valid client visit"):
+        repo.save(coach, "programs", {"id": program_id, "change_visit_id": 7})
+    foreign_student = repo.actor(repo.demo_login("9" * 32, "student"))
+    foreign_visit = repo.client(foreign_student, foreign_student.user_id)["sessions"][0]["id"]
+    with pytest.raises(Refused, match="program's client"):
+        repo.save(coach, "programs", {"id": program_id, "change_visit_id": foreign_visit})
+    with pytest.raises(Refused, match="one client"):
+        repo.save(coach, "programs", {"name": "Reusable plan", "change_visit_id": practice_id})
+    assert versions(repo, coach, program_id)["total"] == existing_count
+    repo.save(coach, "programs", {"id": program_id, "change_reason": "Planning without a source visit"})
+    history = versions(repo, coach, program_id)["items"]
+    assert history[0]["session_id"] is None
+    assert history[1]["session_id"] == practice_id
+    assert history[2]["session_id"] == practice_id
+    with repo.db() as db:
+        assert not db.execute("PRAGMA foreign_key_check").fetchall()
+
+
+def test_revision_visit_link_survives_backup_restore(tmp_path):
+    from pilates.platform.backup import export_archive, restore_archive
+
+    repo = Repository(tmp_path / "revision-visit-archive.db")
+    key = "b" * 32
+    coach = repo.actor(repo.demo_login(key, "coach"))
+    admin = repo.actor(repo.demo_login(key, "admin"))
+    student = repo.actor(repo.demo_login(key, "student"))
+    client = repo.client(coach, student.user_id)
+    program_id = client["programs"][0]["program_id"]
+    visit_id = client["sessions"][0]["id"]
+    repo.save(coach, "programs", {
+        "id": program_id, "name": "Visit archive sentinel plan",
+        "change_reason": "Review linked to a specific visit",
+        "change_source": {"kind": "manual"}, "change_visit_id": visit_id,
+    })
+    fresh = repo.actor(repo.create_org(
+        "Fresh visit archive", "visit-restore@example.org",
+        "a-strong-password", "New Studio",
+    ))
+    with export_archive(repo, admin) as archive:
+        restore_archive(repo, fresh, archive)
+    restored = next(p for p in repo.list(fresh, "programs", limit=200)["items"]
+                    if p["name"] == "Visit archive sentinel plan")
+    revision = versions(repo, fresh, restored["id"])["items"][0]
+    assert revision["reason"] == "Review linked to a specific visit"
+    assert revision["session_id"] != visit_id
+    with repo.db() as db:
+        session = db.execute("SELECT student_id FROM p_training_sessions WHERE id=?",
+                             (revision["session_id"],)).fetchone()
+        assert session and session["student_id"] == restored["detail"]["student_id"]
+        assert not db.execute("PRAGMA foreign_key_check").fetchall()
+
+    # A pre-feature archive has no visit link table. Its immutable program
+    # history remains readable, with the missing relationship left unavailable.
+    import json
+    import zipfile
+    legacy_archive = tmp_path / "pre-revision-visits.zip"
+    with export_archive(repo, admin) as archive, zipfile.ZipFile(archive) as original, zipfile.ZipFile(legacy_archive, "w") as legacy:
+        for entry in original.infolist():
+            if entry.filename == "records/p_program_revision_visits.jsonl":
+                continue
+            content = original.read(entry.filename)
+            if entry.filename == "manifest.json":
+                manifest = json.loads(content)
+                manifest["tables"].remove("p_program_revision_visits")
+                content = json.dumps(manifest).encode()
+            legacy.writestr(entry, content)
+    legacy_owner = repo.actor(repo.create_org(
+        "Legacy visit archive", "visit-legacy-restore@example.org", "a-strong-password", "Legacy Studio",
+    ))
+    restore_archive(repo, legacy_owner, legacy_archive)
+    legacy_program = next(p for p in repo.list(legacy_owner, "programs", limit=200)["items"]
+                          if p["name"] == "Visit archive sentinel plan")
+    legacy_revision = versions(repo, legacy_owner, legacy_program["id"])["items"][0]
+    assert legacy_revision["reason"] == "Review linked to a specific visit"
+    assert legacy_revision["session_id"] is None
+
+
+def test_program_save_http_returns_explicit_visit_link(tmp_path):
+    import json
+    import threading
+    import urllib.request
+    from pilates.serve import serve
+
+    repo = Repository(tmp_path / "revision-visit-http.db")
+    key = "f" * 32
+    coach = repo.actor(repo.demo_login(key, "coach"))
+    student = repo.actor(repo.demo_login(key, "student"))
+    client = repo.client(coach, student.user_id)
+    program_id = client["programs"][0]["program_id"]
+    visit_id = client["sessions"][0]["id"]
+    server, url = serve(None, port=0, db=str(repo.path))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = url.rsplit("/", 1)[0]
+    token = repo.issue(coach.user_id, "coach")
+    try:
+        data = json.dumps({
+            "collection": "programs", "item": {"id": program_id,
+                "change_source": {"kind": "manual"}, "change_visit_id": visit_id,
+                "change_reason": "Coach reviewed the exact visit"},
+        }).encode()
+        request = urllib.request.Request(
+            base + "/platform/save", data=data,
+            headers={"Cookie": "motion_session=" + token,
+                     "Content-Type": "application/json", "X-Platform-Request": "1"},
+        )
+        with urllib.request.urlopen(request, timeout=30) as response:
+            assert response.status == 200
+            saved = json.loads(response.read())
+        request = urllib.request.Request(
+            base + "/platform/program/versions?id=" + program_id,
+            headers={"Cookie": "motion_session=" + token},
+        )
+        with urllib.request.urlopen(request, timeout=30) as response:
+            history = json.loads(response.read())
+        assert history["items"][0]["version"] == saved["version"]
+        assert history["items"][0]["session_id"] == visit_id
+        assert history["items"][0]["reason"] == "Coach reviewed the exact visit"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_client_discovers_visit_linked_unassigned_program_without_student_leak(tmp_path):
+    repo = Repository(tmp_path / "revision-visit-discovery.db")
+    key = "5" * 32
+    coach = repo.actor(repo.demo_login(key, "coach"))
+    admin = repo.actor(repo.demo_login(key, "admin"))
+    student = repo.actor(repo.demo_login(key, "student"))
+    visit_id = repo.client(coach, student.user_id)["sessions"][0]["id"]
+    private_plan = repo.save(coach, "programs", {
+        "name": "Coach draft from exact visit", "detail": {"student_id": student.user_id},
+        "change_source": {"kind": "manual"}, "change_visit_id": visit_id,
+    })
+    assert private_plan["id"] in repo.client(coach, student.user_id)["visit_program_ids"]
+    assert private_plan["id"] in repo.client(admin, student.user_id)["visit_program_ids"]
+    assert private_plan["id"] not in repo.client(student, student.user_id)["visit_program_ids"]
+    repo.assign_program(coach, {"program_id": private_plan["id"], "student_id": student.user_id, "replace": False})
+    assert private_plan["id"] in repo.client(student, student.user_id)["visit_program_ids"]
+    other_student = next(person["id"] for person in repo.people(coach) if person["id"] != student.user_id)
+    assert private_plan["id"] not in repo.client(coach, other_student)["visit_program_ids"]

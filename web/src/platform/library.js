@@ -20,7 +20,8 @@ import {
   exerciseIllustration,
 } from "./core.js";
 import { cameraLabels, metricCopy, explainedChart } from "./explain.js";
-import { targetMetricRelevance, informativeMetric } from "./progress-selection.js";
+import { targetMetricRelevance, informativeMetric, comparableProgressSeries } from "./progress-selection.js";
+import { currentPhaseSteps } from "./programs.js";
 const categories = [
   "Yoga",
   "Pilates",
@@ -41,27 +42,18 @@ const categories = [
   "Posture",
 ];
 // Only compare observations captured after this assignment began with the
-// same measurement, protocol and source type. The metric contains the camera
-// view, so a front photograph cannot be pooled with a side photograph.
+// same supported measurement, status, capture-local selected person, protocol,
+// source and unit. The metric contains the camera view; saved evidence is required.
 export function comparableProgramMeasurements(client, assignment, program) {
   const startedOn = String(assignment?.starts_on || program?.detail?.start_date || "").slice(0, 10);
-  const sources = new Map((client.analyses || []).map((analysis) => [analysis.id, analysis]));
-  const grouped = new Map();
-  for (const row of client.progress || []) {
-    const source = sources.get(row.analysis_id);
-    const observedOn = String(row.recorded_at || "").slice(0, 10);
-    if (!source || !/^\d{4}-\d{2}-\d{2}$/.test(observedOn) ||
-        !Number.isFinite(Date.parse(row.recorded_at)) ||
-        (startedOn && observedOn < startedOn) || !Number.isFinite(row.value) || !row.metric) continue;
-    const key = [source.demo ? "demo" : "capture", source.kind, source.protocol, row.metric, row.unit].join("\u001f");
-    if (!grouped.has(key)) grouped.set(key, {metric: row.metric, kind: source.kind, protocol: source.protocol,
-      demo: Boolean(source.demo), unit: row.unit || "", rows: []});
-    grouped.get(key).rows.push(row);
-  }
+  const grouped = comparableProgressSeries({
+    ...client,
+    progress: (client.progress || []).filter((row) =>
+      !startedOn || String(row.recorded_at || "").slice(0, 10) >= startedOn),
+  });
   const targets = (program?.detail?.target_region_ids?.length
     ? program.detail.target_region_ids : [program?.region_id]).filter(Boolean);
-  return [...grouped.values()].map((series) => {
-    series.rows.sort((a, b) => String(a.recorded_at).localeCompare(String(b.recorded_at)));
+  return grouped.map((series) => {
     series.first = series.rows[0];
     series.latest = series.rows.at(-1);
     series.targetMatch = targetMetricRelevance(series.metric, targets);
@@ -72,7 +64,7 @@ export function comparableProgramMeasurements(client, assignment, program) {
     b.targetMatch - a.targetMatch ||
     Number(b.informative) - Number(a.informative) ||
     Number(b.metric.endsWith("_rom")) - Number(a.metric.endsWith("_rom")) ||
-    String(b.latest.recorded_at).localeCompare(String(a.latest.recorded_at))
+    Date.parse(b.latest.recorded_at) - Date.parse(a.latest.recorded_at)
   );
 }
 export async function library(root, collection = "exercises", own = false) {
@@ -238,6 +230,67 @@ export function programProgressCard(client, assignment, program) {
     `<div class="actions"><a class="button" href="${progressLink}">Explore all measured progress →</a></div>`);
 }
 
+export function programSessionsForAssignment(sessions, assignment) {
+  if (!assignment?.program_id) return [];
+  const startedOn = String(assignment.starts_on || "").slice(0, 10);
+  return (sessions || []).filter((session) =>
+    session.program_id === assignment.program_id &&
+    Array.isArray(session.completed) && session.completed.length > 0 &&
+    (!startedOn || String(session.performed_at || "").slice(0, 10) >= startedOn))
+    .sort((a, b) => String(b.performed_at || "").localeCompare(String(a.performed_at || "")));
+}
+
+export function latestProgramSessionCompletion(session, versions = [], programId = "") {
+  if (!session) return { value: "—", detail: "No practice recorded for this assignment" };
+  const logged = Array.isArray(session.completed)
+    ? [...new Set(session.completed.filter((id) => typeof id === "string" && id.trim()))]
+    : [];
+  if (!logged.length) return { value: "—", detail: "No completed movements logged in the latest visit" };
+  const countOnly = (reason) => ({
+    value: `${logged.length} logged`,
+    detail: `${reason}; completion share unavailable`,
+  });
+  const version = Number(session.program_version);
+  if (!Number.isSafeInteger(version) || version < 1)
+    return countOnly("Saved program version unavailable");
+  const revision = versions.find((entry) => Number(entry.version) === version);
+  const snapshot = revision?.snapshot;
+  if (!snapshot || (snapshot.id && programId && snapshot.id !== programId))
+    return countOnly("Saved program snapshot unavailable");
+  const allSteps = (snapshot.steps || []).filter((step) => step.exercise_id);
+  const phaseSteps = currentPhaseSteps(allSteps, snapshot.detail?.phase);
+  if (!phaseSteps.length) return countOnly("No planned movements in the saved phase");
+  const stepIds = phaseSteps.map((step) => step.id);
+  if (stepIds.some((id) => !id) || new Set(stepIds).size !== stepIds.length)
+    return countOnly("Saved movement step IDs unavailable");
+  const allByStepId = new Map(allSteps.filter((step) => step.id).map((step) => [step.id, step]));
+  const allByExerciseId = new Map();
+  for (const step of allSteps) {
+    const matches = allByExerciseId.get(step.exercise_id) || [];
+    matches.push(step);
+    allByExerciseId.set(step.exercise_id, matches);
+  }
+  const relevantIds = new Set(stepIds);
+  const completedIds = new Set();
+  for (const token of logged) {
+    let matched = allByStepId.get(token);
+    if (!matched) {
+      const matches = allByExerciseId.get(token) || [];
+      if (matches.length !== 1 || !matches[0].id)
+        return countOnly("A logged movement cannot be matched to one saved step");
+      matched = matches[0];
+    }
+    if (relevantIds.has(matched.id)) completedIds.add(matched.id);
+  }
+  if (!completedIds.size)
+    return countOnly("No current-phase movement was logged in the latest visit");
+  const count = completedIds.size;
+  return {
+    value: `${Math.round(count / phaseSteps.length * 100)}%`,
+    detail: `${count} of ${phaseSteps.length} current-phase movements in saved version ${version}`,
+  };
+}
+
 async function clientProgramWorkspace(root) {
   const client = state.client;
   const student = state.me.role === "student";
@@ -258,22 +311,23 @@ async function clientProgramWorkspace(root) {
   const report = new URLSearchParams(location.hash.slice(1)).get("report");
   const finding = new URLSearchParams(location.hash.slice(1)).get("finding");
   const related = contextRegion || program?.region_id;
-  const practice = client.sessions?.filter((s) => s.program_id === active?.program_id) || [];
+  const practice = programSessionsForAssignment(client.sessions, active);
   const practiceHistory = client.sessions || [];
   const latest = practice[0];
   const priorPrograms = [...(client.program_history || [])]
     .filter((assignment) => !assignment.active)
     .sort((a, b) => String(b.starts_on || "").localeCompare(String(a.starts_on || "")));
   const details = program?.detail || {};
-  const total = (program?.steps || []).filter((step) => step.exercise_id && (!step.detail?.program_phase || step.detail.program_phase === (details.phase || "Foundation"))).length;
-  const completed = latest?.completed?.length || 0;
+  const total = currentPhaseSteps(program?.steps, details.phase).filter((step) => step.exercise_id).length;
+  const completion = latestProgramSessionCompletion(latest, history, program?.id);
+  const completionLabel = latest ? `Latest logged practice for this plan · ${date(latest.performed_at)}` : "Latest logged practice for this plan";
   root.innerHTML = head(
     student ? "Your current program" : `${client.name} · program`,
     student ? "See what your coach assigned and why each movement matters." : "A client-specific plan linked to analysis, body areas and past practice.",
     student ? "" : '<button data-edit="programs" class="primary">+ Create program</button>',
   ) +
     (report || finding || contextRegion ? `<div class="pd-context-callout"><strong>From your client review</strong><p>${finding ? `Finding: ${esc(finding.replaceAll("_", " "))}. ` : ""}${contextRegion ? `Body area: ${esc(regionName(contextRegion))}. ` : ""}New and edited plans will retain this assessment connection.</p>${report ? `<a href="${href("report", { id: report, client: client.id })}">Return to assessment →</a>` : ""}</div>` : "") +
-    (program ? `<section class="pd-current-dashboard"><div class="pd-current-main"><small>CURRENT PROGRAM · ${esc(details.status || "Active")}</small><h2><a href="${href("program", { id: program.id, client: client.id })}">${esc(program.name)}</a></h2><p>${esc(program.goal || details.description || "Follow your coach’s planned movement practice.")}</p><div class="pd-target-links">${(details.target_region_ids?.length ? details.target_region_ids : [program.region_id]).filter(Boolean).map((id) => `<a class="pd-region-chip" href="${href("client", { client: client.id, tab: "anatomy", region: id })}">${esc(regionName(id))} · Body map</a>`).join("")}</div><div class="actions"><a class="button primary" href="${href("program", { id: program.id, client: client.id })}">${student ? "Open today’s practice" : "Open full program"}</a>${student ? "" : `<button data-edit="programs" data-id="${esc(program.id)}">Edit program</button><details class="pd-more-actions"><summary>More program actions</summary><button id="pd-add-movement" type="button">Add exercise</button><button id="pd-new-phase" type="button">Create next phase</button><button id="pd-change-phase" type="button">Change phase</button><a class="button" href="${href("program", { id: program.id, client: client.id, history: "1" })}">View history</a><button id="pd-duplicate-client" type="button">Duplicate program</button><button id="pd-complete-program" type="button">Complete program</button></details>`}</div></div><div class="pd-current-facts"><div><strong>${esc(details.phase || "Foundation")}</strong><small>Current phase</small></div><div><strong>${esc(total)}</strong><small>Assigned movements</small></div><div><strong>${esc(practice.length)}</strong><small>Practice sessions</small></div><div><strong>${esc(total ? `${Math.round(completed / total * 100)}%` : "—")}</strong><small>Most recent session completed</small></div><div><strong>${esc(date(active?.starts_on || details.start_date))}</strong><small>Plan start</small></div><div><strong>${esc(history[0] ? date(history[0].created_at) : "—")}</strong><small>Latest revision</small></div></div></section>` : `<section class="pd-empty-plan"><h2>${student ? "No program assigned yet" : "Build a plan for this client"}</h2><p>${student ? "Your coach will assign exercises here. Previous completed sessions remain in your history." : "Start with this client’s findings, choose body targets, then create a sequence with clear instructions."}</p>${student ? "" : '<button data-edit="programs" class="primary">Create program</button>'}</section>`) +
+    (program ? `<section class="pd-current-dashboard"><div class="pd-current-main"><small>CURRENT PROGRAM · ${esc(details.status || "Active")}</small><h2><a href="${href("program", { id: program.id, client: client.id })}">${esc(program.name)}</a></h2><p>${esc(program.goal || details.description || "Follow your coach’s planned movement practice.")}</p><div class="pd-target-links">${(details.target_region_ids?.length ? details.target_region_ids : [program.region_id]).filter(Boolean).map((id) => `<a class="pd-region-chip" href="${href("client", { client: client.id, tab: "anatomy", region: id })}">${esc(regionName(id))} · Body map</a>`).join("")}</div><div class="actions"><a class="button primary" href="${href("program", { id: program.id, client: client.id })}">${student ? "Open today’s practice" : "Open full program"}</a>${student ? "" : `<button data-edit="programs" data-id="${esc(program.id)}">Edit program</button><details class="pd-more-actions"><summary>More program actions</summary><button id="pd-add-movement" type="button">Add exercise</button><button id="pd-new-phase" type="button">Create next phase</button><button id="pd-change-phase" type="button">Change phase</button><a class="button" href="${href("program", { id: program.id, client: client.id, history: "1" })}">View history</a><button id="pd-duplicate-client" type="button">Duplicate program</button><button id="pd-complete-program" type="button">Complete program</button></details>`}</div></div><div class="pd-current-facts"><div><strong>${esc(details.phase || "Foundation")}</strong><small>Current phase</small></div><div><strong>${esc(total)}</strong><small>Assigned movements · current phase</small></div><div><strong>${esc(practice.length)}</strong><small>Practice visits with movement logs</small></div><div><strong>${esc(completion.value)}</strong><small>${esc(completionLabel)}</small><small>${esc(completion.detail)}</small></div><div><strong>${esc(date(active?.starts_on || details.start_date))}</strong><small>Plan start</small></div><div><strong>${esc(history[0] ? date(history[0].created_at) : "—")}</strong><small>Latest revision</small></div></div></section>` : `<section class="pd-empty-plan"><h2>${student ? "No program assigned yet" : "Build a plan for this client"}</h2><p>${student ? "Your coach will assign exercises here. Previous completed sessions remain in your history." : "Start with this client’s findings, choose body targets, then create a sequence with clear instructions."}</p>${student ? "" : '<button data-edit="programs" class="primary">Create program</button>'}</section>`) +
     (program ? programProgressCard(client, active, program) : "") +
     (!student && program ? card("Program decisions", `<p><strong>Coach note:</strong> ${esc(details.coach_notes || "No coach planning note yet.")}</p><p><strong>Related assessment:</strong> ${details.source_analysis_id ? `<a href="${href("report", { id: details.source_analysis_id, client: client.id })}">Open source analysis →</a>` : "No assessment linked yet."}</p><p><strong>Historical versions:</strong> ${history.length} saved revision${history.length === 1 ? "" : "s"}.</p><a class="button" href="${href("program", { id: program.id, client: client.id })}">View version history</a>`) : "") +
     (!student && templates.length ? card("Start from an editable template", `<div class="pd-template-grid">${templates.slice(0,6).map((t) => `<article><small>${esc(t.detail?.phase || "Foundation")}</small><h3>${esc(t.name)}</h3><p>${esc(t.goal || t.detail?.description || "Adapt this plan to the client.")}</p><button data-template="${esc(t.id)}">Use for ${esc(client.name)}</button></article>`).join("")}</div>`) : "") +
@@ -284,7 +338,7 @@ async function clientProgramWorkspace(root) {
     try { const { edit } = await import("./forms.js"); await edit("programs", program.id); } catch (e) { toast(e.message); }
   };
   if (root.querySelector("#pd-duplicate-client")) root.querySelector("#pd-duplicate-client").onclick = async () => {
-    try { const copy = await api("program/duplicate", {program_id:program.id,student_id:client.id,replace:true,name:program.name + " · copy"}); location.hash = href("program",{id:copy.id,client:client.id}); } catch (e) { toast(e.message); }
+    try { const copy = await api("program/duplicate", {program_id:program.id,student_id:client.id,assign:false,name:program.name + " · copy"}); location.hash = href("program",{id:copy.id,client:client.id}); } catch (e) { toast(e.message); }
   };
   if (root.querySelector("#pd-complete-program")) root.querySelector("#pd-complete-program").onclick = () => {
     const dialog = modal("Complete this client's program?", notice("This ends only this client's assignment. The program, its saved versions and practice history remain available; other clients sharing the plan keep their assignment.") +

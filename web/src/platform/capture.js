@@ -106,6 +106,13 @@ export async function capture(root) {
     files: {},
     view: "front",
   };
+  if (params().get("retry") === "1") {
+    const requestedProtocol = params().get("protocol");
+    const requestedKind = params().get("kind");
+    if (protocols.includes(requestedProtocol)) draft.protocol = requestedProtocol;
+    if (["posture", "movement"].includes(requestedKind)) draft.kind = requestedKind;
+    draft.files = {};
+  }
   const requestedReservation = params().get("reservation_id") || params().get("reservation");
   const requestedBooking = requestedReservation
     ? reservations.find((row) => row.id === requestedReservation && row.student_id === cid &&

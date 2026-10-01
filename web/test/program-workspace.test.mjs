@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { comparableProgramMeasurements } from "../src/platform/library.js";
+import { withSavedProgressEvidence } from "./progress-fixtures.mjs";
+import { comparableProgramMeasurements, latestProgramSessionCompletion, programSessionsForAssignment } from "../src/platform/library.js";
+import { clientCaptureOptions, currentPhaseSteps, programDurationEstimate, revisionVisitOptions, revisionVisitLink, revisionSourceOptions, revisionAuthorLabel, revisionStepsHTML } from "../src/platform/programs.js";
 
 const analysis = (id, protocol, demo = false, kind = "movement") =>
   ({id, protocol, demo, kind});
@@ -30,7 +32,7 @@ test("program progress compares only the same sourced metric after assignment st
     ],
   };
   const groups = comparableProgramMeasurements(
-    client,
+    withSavedProgressEvidence(client),
     {starts_on: "2026-05-01"},
     {region_id: "right_shoulder", detail: {target_region_ids: ["right_shoulder"]}},
   );
@@ -46,12 +48,205 @@ test("program progress compares only the same sourced metric after assignment st
 
 test("one measurement remains visible without inventing a trend", () => {
   const groups = comparableProgramMeasurements(
-    {analyses: [analysis("only", "squat")],
-      progress: [measure("only", "2026-07-02T08:30:00", "side_left:knee_rom", 90)]},
+    withSavedProgressEvidence({analyses: [analysis("only", "squat")],
+      progress: [measure("only", "2026-07-02T08:30:00", "side_left:knee_rom", 90)]}),
     {starts_on: "2026-07-01"},
     {region_id: "left_knee", detail: {}},
   );
   assert.equal(groups.length, 1);
   assert.equal(groups[0].rows.length, 1);
   assert.equal(groups[0].first, groups[0].latest);
+});
+
+
+test("a coach can choose a practice-only visit without assigning an unrelated assessment", () => {
+  const entries = revisionVisitOptions({
+    analyses: [
+      {id: "capture-one", created_at: "2026-09-29T09:00:00Z"},
+      {id: "unlinked-capture", created_at: "2026-09-30T09:00:00Z"},
+    ],
+    sessions: [
+      {id: "practice-only", performed_at: "2026-09-29T10:00:00Z", completed: ["bridge"]},
+      {id: "captured-visit", performed_at: "2026-09-29T09:00:00Z", analysis_id: "capture-one", completed: []},
+    ],
+  });
+  assert.deepEqual(entries.map(([id]) => id), ["practice-only", "captured-visit"]);
+  assert.match(entries[0][1], /1 movement/);
+  assert.doesNotMatch(entries[0][1], /assessment/);
+  assert.match(entries[1][1], /1 assessment/);
+  assert.deepEqual(revisionVisitOptions(null), []);
+});
+
+test("version history links to the exact saved source visit rather than guessing a date", () => {
+  globalThis.location = {hash: "#page=program&client=student"};
+  const html = revisionVisitLink({session_id: "practice-only"}, "student");
+  assert.match(html, /page=client/);
+  assert.match(html, /client=student/);
+  assert.match(html, /tab=sessions/);
+  assert.match(html, /session=practice-only/);
+  assert.match(html, />Source visit<\/a>/);
+  assert.equal(revisionVisitLink({session_id: null}, "student"), "");
+  assert.equal(revisionVisitLink({session_id: "visit"}, null), "");
+});
+
+
+test("visit-linked revision sources stay within the selected visit", () => {
+  const client = {
+    analyses:[{id:"analysis-a",kind:"posture",created_at:"2026-09-29T09:00:00Z"}],
+    sessions:[
+      {id:"visit-a",analysis_id:"analysis-a",performed_at:"2026-09-29T09:00:00Z"},
+      {id:"practice-b",performed_at:"2026-09-29T10:00:00Z"},
+    ],
+    notes:[
+      {id:"legacy-note-a",analysis_id:"analysis-a",text:"Legacy feedback for this capture"},
+      {id:"note-b",session_id:"practice-b",text:"Feedback for the practice visit"},
+      {id:"unlinked-note",text:"General feedback"},
+    ],
+  };
+  assert.deepEqual(revisionSourceOptions(client,"analysis","visit-a").map(([id])=>id),["analysis-a"]);
+  assert.deepEqual(revisionSourceOptions(client,"analysis","practice-b"),[]);
+  assert.deepEqual(revisionSourceOptions(client,"coach_observation","visit-a").map(([id])=>id),["legacy-note-a"]);
+  assert.deepEqual(revisionSourceOptions(client,"client_feedback","practice-b").map(([id])=>id),["note-b"]);
+  assert.deepEqual(revisionSourceOptions(client,"analysis","unknown-visit"),[]);
+  assert.deepEqual(revisionSourceOptions(client,"coach_observation").map(([id])=>id),["legacy-note-a","note-b","unlinked-note"]);
+});
+
+
+test("program history uses the actual revision author instead of the current viewer", () => {
+  const viewer = {id:"coach-viewer",name:"Viewing Coach"};
+  assert.equal(revisionAuthorLabel({actor_id:"admin-author",actor_name:"Studio Admin"},viewer),"Studio Admin");
+  assert.equal(revisionAuthorLabel({actor_id:"other-coach"},viewer,[{id:"other-coach",name:"Original Coach"}]),"Original Coach");
+  assert.equal(revisionAuthorLabel({actor_id:"coach-viewer"},viewer),"Viewing Coach");
+  assert.equal(revisionAuthorLabel({actor_id:"missing-author"},viewer),"Author unavailable");
+});
+
+
+test("historical coaching notes render as notes without blank exercise doses", () => {
+  const html = revisionStepsHTML([
+    {exercise_id:"arm",exercise_name:"Arm Arcs",sets:2,reps:10,phase:"Warm-up"},
+    {type:"note",text:"Pause and review the comfortable range.",visibility:"coach",section:"Warm-up"},
+    {exercise_id:"bridge",exercise_name:"Bridge",sets:1,reps:8,phase:"Practice"},
+  ]);
+  assert.match(html, /1\. Arm Arcs · 2 sets × 10 reps/);
+  assert.match(html, /Coach planning note · Warm-up/);
+  assert.match(html, /Pause and review the comfortable range/);
+  assert.match(html, /2\. Bridge · 1 set × 8 reps/);
+  assert.doesNotMatch(html, /undefined|3\. Bridge|·  sets ×  reps/);
+});
+
+
+test("the current-phase movement count and session estimate use the same steps for every role", () => {
+  const steps = [
+    {id:"foundation",exercise_id:"breathing",sets:2,seconds:60,rest:30,detail:{program_phase:"Foundation"}},
+    {id:"shared",exercise_id:"bridge",sets:1,seconds:45,detail:{}},
+    {id:"later",exercise_id:"squat",sets:2,seconds:120,detail:{program_phase:"Strength"}},
+    {id:"note",type:"note",text:"Check comfort",detail:{program_phase:"Foundation"}},
+  ];
+  const current = currentPhaseSteps(steps, "Foundation");
+  assert.deepEqual(current.map((step) => step.id), ["foundation","shared","note"]);
+  assert.equal(current.filter((step) => step.exercise_id).length, 2);
+  assert.deepEqual(programDurationEstimate(current), {minutes:4,untimed:0});
+  assert.equal(steps.filter((step) => step.exercise_id).length, 3, "all-phase total remains separate");
+  assert.deepEqual(currentPhaseSteps(steps, "Strength").map((step) => step.id), ["shared","later"]);
+  assert.deepEqual(currentPhaseSteps(steps, "").map((step) => step.id), ["foundation","shared","note"]);
+});
+
+test("latest practice uses its exact historical version, not the revised current plan", () => {
+  const old = {version:2,snapshot:{
+    id:"program-a",detail:{phase:"Foundation"},
+    steps:[
+      {id:"old-a",exercise_id:"breathing",detail:{program_phase:"Foundation"}},
+      {id:"old-b",exercise_id:"bridge",detail:{}},
+      {id:"later",exercise_id:"squat",detail:{program_phase:"Strength"}},
+    ],
+  }};
+  const current = {version:3,snapshot:{
+    id:"program-a",detail:{phase:"Strength"},
+    steps:[
+      {id:"new-a",exercise_id:"squat",detail:{program_phase:"Strength"}},
+      {id:"new-b",exercise_id:"balance",detail:{program_phase:"Strength"}},
+      {id:"new-c",exercise_id:"lunge",detail:{program_phase:"Strength"}},
+    ],
+  }};
+  assert.deepEqual(
+    latestProgramSessionCompletion({program_version:2,completed:["old-a","old-a","old-b","later"]},[current,old],"program-a"),
+    {value:"100%",detail:"2 of 2 current-phase movements in saved version 2"},
+  );
+  assert.deepEqual(
+    latestProgramSessionCompletion({program_version:2,completed:["old-a"]},[current,old],"program-a"),
+    {value:"50%",detail:"1 of 2 current-phase movements in saved version 2"},
+  );
+  assert.deepEqual(
+    latestProgramSessionCompletion({program_version:2,completed:["breathing"]},[current,old],"program-a"),
+    {value:"50%",detail:"1 of 2 current-phase movements in saved version 2"},
+    "an unambiguous legacy exercise ID can map to its one saved step",
+  );
+});
+
+test("missing and ambiguous practice evidence never produces a percentage", () => {
+  const repeated = {version:1,snapshot:{
+    id:"program-a",detail:{phase:"Foundation"},
+    steps:[
+      {id:"one",exercise_id:"bridge",detail:{}},
+      {id:"two",exercise_id:"bridge",detail:{}},
+    ],
+  }};
+  assert.deepEqual(latestProgramSessionCompletion(null,[repeated],"program-a"),
+    {value:"—",detail:"No practice recorded for this assignment"});
+  assert.deepEqual(latestProgramSessionCompletion({program_version:1,completed:[]},[repeated],"program-a"),
+    {value:"—",detail:"No completed movements logged in the latest visit"});
+  assert.match(latestProgramSessionCompletion({program_version:null,completed:["one","one"]},[repeated],"program-a").value,/^1 logged$/);
+  assert.match(latestProgramSessionCompletion({program_version:1,completed:["bridge"]},[repeated],"program-a").detail,/cannot be matched/);
+  assert.match(latestProgramSessionCompletion({program_version:7,completed:["one"]},[repeated],"program-a").detail,/snapshot unavailable/);
+  assert.match(latestProgramSessionCompletion({program_version:1,completed:["one"]},[repeated],"another-program").detail,/snapshot unavailable/);
+  assert.match(latestProgramSessionCompletion({program_version:1,completed:["unknown"]},[repeated],"program-a").detail,/cannot be matched/);
+  assert.deepEqual(latestProgramSessionCompletion({program_version:1,completed:["one","one","two"]},[repeated],"program-a"),
+    {value:"100%",detail:"2 of 2 current-phase movements in saved version 1"});
+});
+
+
+test("program dashboard ignores sessions before the current assignment", () => {
+  const sessions = [
+    {id:"old-assignment",program_id:"program-a",performed_at:"2026-05-01T09:00:00Z",completed:["step"]},
+    {id:"current-assignment",program_id:"program-a",performed_at:"2026-09-15T09:00:00Z",completed:["step"]},
+    {id:"different-program",program_id:"program-b",performed_at:"2026-09-16T09:00:00Z",completed:["other"]},
+    {id:"capture-only",program_id:"program-a",performed_at:"2026-09-17T09:00:00Z",completed:[]},
+  ];
+  assert.deepEqual(programSessionsForAssignment(sessions,{program_id:"program-a",starts_on:"2026-09-15"}).map((s)=>s.id),["current-assignment"]);
+  assert.deepEqual(programSessionsForAssignment(sessions,{program_id:"program-a",starts_on:"2026-10-01"}),[]);
+  assert.deepEqual(programSessionsForAssignment(sessions,null),[]);
+  assert.deepEqual(programSessionsForAssignment([
+    {id:"earlier",program_id:"program-a",performed_at:"2026-09-16T09:00:00Z",completed:["step"]},
+    {id:"latest",program_id:"program-a",performed_at:"2026-09-18T09:00:00Z",completed:["step"]},
+  ],{program_id:"program-a",starts_on:"2026-09-15"}).map((s)=>s.id),["latest","earlier"]);
+});
+
+test("client capture choices keep exact IDs and distinguish repeated filenames", () => {
+  const uploaded = "2026-09-30T09:30:00Z";
+  const options = clientCaptureOptions([
+    {id:"abcdef00-one",filename:"sarah.png",created_at:uploaded,mime:"image/png",
+      capture_view:"front",capture_protocol:"Neutral standing posture"},
+    {id:"abcdef11-two",filename:"sarah.png",created_at:uploaded,mime:"image/png",
+      capture_view:"rear",capture_protocol:"Neutral standing posture"},
+    {id:"legacy-three",filename:"sarah.png",created_at:null,mime:"image/png"},
+  ]);
+  assert.deepEqual(options.map(([id])=>id), ["abcdef00-one","abcdef11-two","legacy-three"]);
+  assert.equal(new Set(options.map(([,label])=>label)).size, options.length);
+  assert.match(options[0][1], /Photo · Front view · Neutral standing posture · uploaded .*2026.* · sarah\.png · #abcdef00/);
+  assert.match(options[1][1], /Back view/);
+  assert.match(options[1][1], /#abcdef11/);
+  assert.match(options[2][1], /upload date unavailable · sarah\.png · #legacy/);
+  assert.doesNotMatch(options[2][1], /Front view|Neutral standing posture|Invalid Date/);
+});
+
+test("capture choice labels only show view and protocol saved on that media row", () => {
+  const [withSource, reused, video] = clientCaptureOptions([
+    {id:"linked-media",mime:"image/png",filename:"pose.png",capture_view:"side_left",
+      capture_protocol:"Controlled squat",created_at:"2026-09-30T09:30:00Z"},
+    {id:"reused-media",mime:"image/png",filename:"pose.png",created_at:"2026-09-30T09:30:00Z"},
+    {id:"video-media",mime:"video/mp4",filename:"movement.mp4",created_at:"bad-timestamp"},
+  ]);
+  assert.match(withSource[1], /Left side view · Controlled squat/);
+  assert.doesNotMatch(reused[1], /Left side view|Controlled squat/);
+  assert.match(video[1], /^Video · upload date unavailable · movement\.mp4/);
 });

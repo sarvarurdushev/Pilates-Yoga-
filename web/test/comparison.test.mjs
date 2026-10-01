@@ -32,6 +32,7 @@ test("prior metadata is sorted by actual time and excludes other clients, kinds,
 test("a recorded person wins only when suitable; multiple unselected people are ambiguous", () => {
   const earlier = summary("earlier", "2026-09-10T12:00:00Z");
   assert.equal(selectedComparablePerson(full(earlier, "front", [person("1"), person("2")]), "front"), null);
+  assert.equal(selectedComparablePerson(full(earlier, "front", [person("1"), person("2", [], false)]), "front"), null);
   assert.equal(selectedComparablePerson(full(earlier, "back", [person("1")]), "front"), null);
   assert.equal(selectedComparablePerson(full(earlier, "front", [person("1"), person("2", [], false)], "2"), "front"), null);
   assert.equal(selectedComparablePerson(full(earlier, "front", [person("1"), person("2")], "2"), "front").person.person_id, "2");

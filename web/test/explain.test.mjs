@@ -35,6 +35,8 @@ test('still poses and recorder roles are described accurately', () => {
   assert.match(captureSummary('posture', 'Squat'), /does not measure movement range/);
   assert.match(captureSummary('posture', 'Standing posture'), /standing posture photograph/);
   assert.match(captureSummary('movement', 'Squat'), /frame by frame/);
+  assert.match(captureSummary('movement', 'Squat', 'needs_capture'), /not tracked reliably enough/);
+  assert.match(captureSummary('posture', 'Standing posture', 'needs_capture'), /not clear enough/);
   assert.equal(recordedByLabel({detail:{recorded_by:{name:'Jules',role:'admin'}}}), 'Jules · administrator');
   assert.equal(recordedByLabel({coach_id:'coach-1'}, [{id:'coach-1',name:'Hana'}]), 'Hana · coach');
   assert.equal(recordedByLabel({coach_id:'admin-1'}, [{id:'coach-1',name:'Hana'}]), 'Studio member not identified');
@@ -49,4 +51,30 @@ test('single-capture chart can omit a misleading prior comparison', () => {
   assert.match(html, /Single &lt;video&gt; trace; no earlier clip is compared/);
   assert.doesNotMatch(html, /Previous 5/);
   assert.doesNotMatch(html, /<video>/);
+});
+
+
+test('timing variation, cycle range spread and repetitions have distinct meanings', () => {
+  const tempo = metricCopy({id:'left_knee_tempo_cv'});
+  const spread = metricCopy({id:'left_knee_rep_rom_sd'});
+  const cycles = metricCopy({id:'left_knee_repetitions'});
+  assert.match(tempo.definition, /unitless ratio/);
+  assert.match(tempo.why, /similar amounts of time/);
+  assert.doesNotMatch(tempo.definition, /angle ranges/);
+  assert.match(spread.definition, /Standard deviation.*angle ranges.*degrees/);
+  assert.match(spread.why, /not a strength score/);
+  assert.match(cycles.definition, /complete outward-and-return movement cycles/);
+  assert.match(cycles.why, /does not indicate better form/);
+});
+
+
+test('posture fractions identify the body scale and directional meaning', () => {
+  const head = metricCopy({id:'side_left:forward_head'});
+  const knee = metricCopy({id:'rear:left_knee_deviation'});
+  assert.match(head.definition, /ear from the shoulder divided by visible torso height/);
+  assert.match(head.why, /Positive means the ear is forward/);
+  assert.match(head.why, /not a distance in centimetres/);
+  assert.match(knee.definition, /hip-to-ankle line divided by that leg.*projected length/);
+  assert.match(knee.why, /Positive means the knee is inward/);
+  assert.match(knee.why, /does not diagnose knee alignment/);
 });

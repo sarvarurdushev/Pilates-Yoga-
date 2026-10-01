@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   visitFormOptions, initialVisitId, compatibleAssessments,
-  compatibleScans, compatibleFindings,
+  compatibleScans, compatibleFindings, assignedProgramOptions,
 } from '../src/platform/visit-form-links.js';
 
 const client = {
@@ -69,4 +69,30 @@ test('scan choices exclude other visits but allow another capture in same visit'
   assert.deepEqual(ids(compatibleScans(client, 's3')), []);
   assert.deepEqual(ids(compatibleAssessments(client, '', 'same')), ['a1', 'a2']);
   assert.deepEqual(ids(compatibleAssessments(client, '', 'unlinked-same-capture')), ['a1', 'a2']);
+});
+
+
+test('feedback program options use assigned program IDs and exclude library-only plans', () => {
+  const selectedClient = { programs: [
+    { id: 'assignment-1', program_id: 'sarah-plan', name: "Sarah's current plan" },
+    { id: 'assignment-2', program_id: 'sarah-earlier', name: "Sarah's earlier plan", active: 0 },
+    { id: 'assignment-3', program_id: 'sarah-plan', name: "Sarah's current plan" },
+    { id: 'invalid-assignment', name: 'Missing program' },
+  ] };
+  assert.deepEqual(assignedProgramOptions(selectedClient), [
+    { id: 'sarah-plan', name: "Sarah's current plan" },
+    { id: 'sarah-earlier', name: "Sarah's earlier plan" },
+  ]);
+  assert.deepEqual(assignedProgramOptions({
+    programs: [{ id: 'current-assignment', program_id: 'current', name: 'Current plan' }],
+    program_history: [
+      { id: 'old-assignment', program_id: 'earlier', name: 'Earlier plan', active: 0 },
+      { id: 'current-assignment', program_id: 'current', name: 'Current plan', active: 1 },
+    ],
+  }), [
+    { id: 'earlier', name: 'Earlier plan' },
+    { id: 'current', name: 'Current plan' },
+  ]);
+  assert.deepEqual(assignedProgramOptions({ programs: [] }), []);
+  assert.deepEqual(assignedProgramOptions(null), []);
 });

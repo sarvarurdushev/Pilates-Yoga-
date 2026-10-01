@@ -113,10 +113,6 @@ class Jobs:
             self.update(
                 identifier, state="running", progress="Preparing the analysis models"
             )
-            # Startup remains responsive; weights are prepared only when needed.
-            from ..deployment import prepare_render
-
-            prepare_render()
             views = []
             media_ids = {}
             for index, c in enumerate(payload["captures"]):

@@ -24,7 +24,8 @@ import {
   regions,
   badge,
   coachName,
-  num,
+  date,
+  spark,
   bindButtons,
   toast,
   dt,
@@ -32,8 +33,10 @@ import {
   safeURL,
 } from "./core.js";
 import { metricRegion } from "./reports.js";
-import { comparisonText, metricCopy } from "./explain.js";
+import { cameraLabels, explainedChart, metricCopy } from "./explain.js";
+import { comparableProgressSeries } from "./progress-selection.js";
 import { scanLinkedNotes } from "./anatomy-bridge.js";
+import { scanAnnotationMarkers, scanFrameIndex } from "./scan-markers.js";
 import {
   initialVisitId, visitFormOptions, compatibleAssessments, sessionForAnalysis,
 } from "./visit-form-links.js";
@@ -48,21 +51,16 @@ function choose(root) {
 function linkedNotes(notes, client, emptyMessage) {
   return notes.map((n) => `<article class="note"><p class="eyebrow">${esc(n.detail?.simulation || n.detail?.source === "demo_coach_feedback" || (client.detail?.demo && !n.detail?.source) ? "DEMO COACH FEEDBACK" : "COACH FEEDBACK")}</p><p>${esc(n.text)}</p><small>${esc(coachName(n.author_id))} · ${esc(dt(n.created_at))} · ${n.visibility === "student" ? "Shared with student" : "Coach only"}</small><div class="actions">${n.session_id ? `<a href="${href("client", { tab: "sessions", session: n.session_id })}">Source visit →</a>` : n.analysis_id ? `<a href="${href("client", { tab: "sessions", assessment: n.analysis_id })}">Source session →</a>` : ""}${n.program_id ? `<a href="${href("program", { id: n.program_id, client: client.id })}">Related program →</a>` : ""}${n.exercise_id ? `<a href="${href("exercise", { id: n.exercise_id, client: client.id })}">Related exercise →</a>` : ""}${n.detail?.updated_at ? `<small>Last edited ${esc(dt(n.detail.updated_at))}</small>` : ""}</div></article>`).join("") || `<p>${esc(emptyMessage || (client.detail?.demo ? "No simulated coach feedback is linked to this region." : "No coach feedback is linked to this region yet."))}</p>`;
 }
-function regionHistory(client, region) {
+export function regionHistory(client, region) {
   const observations = client.observations.filter((o) => relatedRegion(o.region_id, region.id));
   const notes = client.notes.filter((n) => relatedRegion(n.region_id, region.id))
     .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
-  const progress = client.progress.filter((entry) =>
-    relatedRegion(metricRegion(entry.metric.replaceAll("_", " ")), region.id) && Number.isFinite(entry.value));
-  const grouped = new Map();
-  for (const entry of progress) {
-    if (!grouped.has(entry.metric)) grouped.set(entry.metric, []);
-    grouped.get(entry.metric).push(entry);
-  }
-  const series = [...grouped.values()].sort((a, b) => b.length - a.length)[0] || [];
-  const connected = new Set([...observations.map((o) => o.analysis_id), ...progress.map((r) => r.analysis_id)].filter(Boolean));
-  const sessions = client.analyses.filter((a) => connected.has(a.id)).sort((a, b) => b.created_at.localeCompare(a.created_at));
-  return { observations, notes, series, sessions };
+  const series = comparableProgressSeries(client, (metric) =>
+    relatedRegion(metricRegion(metric.replaceAll("_", " ")), region.id));
+  const connected = new Set([...observations.map((o) => o.analysis_id),
+    ...series.flatMap((group) => group.rows.map((row) => row.analysis_id))].filter(Boolean));
+  const sessions = client.analyses.filter((a) => connected.has(a.id)).sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
+  return { observations, notes, trend: series[0] || null, sessions };
 }
 function bodyMapMarkers(client, selected, programs) {
   const noteIds = new Set(client.notes.map((note) => note.region_id).filter(Boolean));
@@ -102,9 +100,24 @@ export async function anatomy(root) {
     ))
     .map((step) => ({ ...step, program })));
   const scans = c.scans.filter((scan) => relatedRegion(scan.region_id, region.id));
-  const recent = history.series.at(-1), earlier = history.series.length > 1 ? history.series.at(-2) : null;
-  const measure = recent ? metricCopy({ id: recent.metric, name: recent.metric.replaceAll("_", " ") }) : null;
-  const metricHistory = recent ? `<p><strong>${esc(recent.metric.replaceAll("_", " "))}</strong> · ${esc(num(recent.value, recent.unit))}</p><p>${esc(comparisonText(recent.value, earlier?.value, recent.unit))}</p><p>${esc(measure.definition)}</p><small>${recent.demo ? "DEMO SIMULATION" : "SYSTEM MEASUREMENT"} · same metric across recorded visits</small><div class="actions"><a href="${href("client", { tab: "sessions", assessment: recent.analysis_id })}">Source session →</a><a href="${href("client", { tab: "progress", metric: recent.metric })}">Full history →</a></div>` : "<p>No comparable measurements from this region are available yet.</p>";
+  const trend = history.trend;
+  const measure = trend ? metricCopy({ id: trend.metric.split(":").at(-1),
+    name: trend.metric.replace(/[:_]/g, " ") }) : null;
+  const camera = trend ? cameraLabels[trend.metric.split(":")[0]] || trend.metric.split(":")[0].replaceAll("_", " ") : "";
+  const metricHistory = trend ? explainedChart({
+    title: trend.metric.split(":").at(-1).replaceAll("_", " "),
+    definition: measure.definition, why: measure.why,
+    notice: trend.previous
+      ? `Compare only the same ${trend.protocol} capture and ${camera}. Open both source visits to check camera setup and visibility. A measured change alone does not show benefit or harm.`
+      : "Only one matching measurement is available for this capture setup. Repeat it to see a trend.",
+    current: trend.latest.value, previous: trend.previous?.value, unit: trend.unit,
+    source: `${trend.demo ? "Demo simulated coordinates" : "Uploaded media landmarks"} · ${trend.kind === "movement" ? "movement video" : "posture photograph"} · ${trend.protocol} · ${camera}. Check confidence and measurement status in each source report before interpreting change.`,
+    chart: trend.previous ? spark(trend.rows.map((row) => [Date.parse(row.recorded_at), row.value]), {
+      label: trend.metric.split(":").at(-1).replaceAll("_", " ") + " across matched visits",
+      unit: trend.unit, xLabel: (value) => date(new Date(value)),
+    }) : "",
+    sessionLink: `<a href="${href("client", { tab: "sessions", assessment: trend.latest.analysis_id })}">Latest source visit →</a>${trend.previous ? `<a href="${href("client", { tab: "sessions", assessment: trend.previous.analysis_id })}">Previous source visit →</a>` : ""}<a href="${href("client", { tab: "progress", metric: trend.metric, assessment: trend.latest.analysis_id })}">Full history →</a>`,
+  }) : card("Measured region history", "<p>No comparable measurements from this region are available yet.</p>");
   const sourceAnalysis = c.analyses.find((analysis) => analysis.id === aid);
   const sourceText = sourceAnalysis ? `${sourceAnalysis.kind === "movement" ? "Movement analysis" : "Posture assessment"} · ${dt(sourceAnalysis.created_at)}` : "All visits";
   root.innerHTML =
@@ -114,7 +127,7 @@ export async function anatomy(root) {
     `<div class="filter-row">${select("Body region", "body-region", regions().map((r) => [r.id, r.name + (c.notes.some((n) => n.region_id === r.id) ? " · coach feedback" : "")]), region.id, null)}${select("Anatomy view", "anatomy-layer", [["region", "Relevant region"], ["bones_full", "Skeleton"], ["muscles_full", "Muscles"], ["connective", "Connective structures"], ["nervous", "Nerves"], ["whole", "Whole body"]], "region", null)}<button id="anatomy-refocus">Focus region</button></div>` +
     `<div class="anatomy-workspace"><div class="anatomy-view-stage"><div id="anatomy-status" role="status" class="notice">Loading the existing anatomy viewer…</div><iframe class="anatomy-frame" id="atlas" title="${esc(c.name)} · ${esc(region.name)} anatomy" src="/anatomy.html?${query}"></iframe>${bodyMapMarkers(c, region, programs)}</div><aside class="anatomy-context">` +
     `<section class="panel anatomy-region-summary"><p class="eyebrow">${esc(c.name)} · ${esc(region.side)} · ${esc(sourceText)}</p><h2>${esc(region.name)}</h2><p>${esc(region.explanation)}</p><div class="anatomy-counts"><span><strong>${history.observations.length}</strong> measured findings</span><span><strong>${history.notes.length}</strong> coach feedback</span><span><strong>${history.sessions.length}</strong> related assessments</span><span><strong>${exercises.length}</strong> assigned movements</span></div><p class="muted">The atlas is an educational reference, not a reconstruction of this client's internal anatomy.</p>${state.me.role !== "student" ? '<button data-edit="notes" class="primary">+ Add coach feedback here</button>' : ""}</section>` +
-    `${card("Latest measured trend", metricHistory)}` +
+    `${metricHistory}` +
     `${card("Coach feedback", linkedNotes(history.notes.slice(0, 3), c) + (history.notes.length > 3 ? `<a class="record-link" href="${href("client", { tab: "notes", region: region.id })}">Read all ${history.notes.length} notes for this region →</a>` : ""))}` +
     `${card("Assigned practice", exercises.slice(0, 6).map((step) => `<a class="record-link" href="${href("program", { id: step.program.id, client: c.id })}">${esc(step.exercise_name)} <small>${esc(step.program.name)} · ${esc(step.detail?.purpose || "Coach-assigned exercise")}</small></a>`).join("") || "<p>No assigned exercise targets this region yet.</p>")}` +
     `<details class="panel anatomy-more"><summary>Measured findings and related sessions</summary>${history.observations.slice(0, 8).map((observation) => `<article class="anatomy-observation"><p class="eyebrow">${esc(observation.source || "SYSTEM MEASUREMENT")}</p><a href="${href("client", { tab: "sessions", assessment: observation.analysis_id })}">${esc(observation.text)}</a><small>${esc(dt(observation.created_at))}</small></article>`).join("") || "<p>No measured findings linked yet.</p>"}${history.sessions.slice(0, 6).map((analysis) => `<a class="record-link" href="${href("client", { tab: "sessions", assessment: analysis.id })}">${esc(analysis.protocol)} · ${esc(dt(analysis.created_at))} →</a>`).join("")}</details>` +
@@ -234,10 +247,8 @@ export async function scans(root) {
   }
   const m = await record("media", scan.media_id),
     dicom = m.mime === "application/dicom";
-  let frameIndex = Math.min(
-    (m.detail.frames || 1) - 1,
-    Math.max(0, Number(params().get("scan_frame")) || 0),
-  );
+  const frameCount = m.detail.frames || 1;
+  let frameIndex = scanFrameIndex(params().get("scan_frame"), frameCount);
   const detail = $("#scan-detail");
   const credit = m.detail.attribution
     ? `<p class="muted">${esc(m.detail.attribution)}${safeURL(m.detail.source_url) ? ` · <a href="${esc(safeURL(m.detail.source_url))}" target="_blank" rel="noopener noreferrer">Original and license</a>` : ""}</p>`
@@ -245,16 +256,17 @@ export async function scans(root) {
   detail.innerHTML =
     card(
       scan.name,
-      `${notice(scan.detail.provenance || m.detail.provenance || "Supplied scan. Coach annotations are manual observations.")}${dicom ? `<div class="grid three">${field("Window centre", "center", m.detail.window_center || 0, "number")}${field("Window width", "width", m.detail.window_width || 0, "number", 'min="0"')}${field("Frame", "frame", 0, "number", `min="0" max="${(m.detail.frames || 1) - 1}"`)}</div><button id="window-apply">Apply window</button>` : `<label>Image contrast<input id="scan-contrast" type="range" min="50" max="180" value="100"></label>`}<div class="scan-image" id="scan-stage"><img id="scan-image" alt="${esc(scan.name)}"><svg id="scan-annotations" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-label="Manual scan annotations"></svg></div><p id="scan-hint">${state.me.role === "student" ? "View your coach’s saved markers." : "Click the image to place an anatomical annotation."}</p><div class="actions"><a class="button" href="${href("client", { tab: "anatomy", region: scan.region_id, id: scan.analysis_id })}">Explore linked anatomy</a>${scan.session_id ? `<a class="button" href="${href("client", { tab: "sessions", session: scan.session_id })}">Source visit</a>` : ""}${scan.analysis_id ? `<a class="button" href="${href("report", { id: scan.analysis_id })}">Source analysis</a>` : ""}${state.me.role === "student" ? "" : '<button data-edit="notes">+ Linked coach note</button>'}<a class="button" href="${mediaURL(m.id)}" download="${esc(m.filename)}">Download original</a></div>`,
+      `${notice(scan.detail.provenance || m.detail.provenance || "Supplied scan. Coach annotations are manual observations.")}${dicom ? `<div class="grid three">${field("Window centre · pixel intensity", "center", m.detail.window_center || 0, "number", 'step="any"')}${field("Window width · intensity range", "width", m.detail.window_width || 0, "number", 'min="0" step="any"')}${field("Frame index · starts at 0", "frame", frameIndex, "number", `min="0" max="${frameCount - 1}" step="1"`)}</div><button id="window-apply">Apply window</button><p class="muted" id="scan-frame-status"></p><details><summary>What do these image controls mean?</summary><p>Window centre selects the middle of the displayed pixel intensity range. Window width selects how much of that range is mapped from black to white; 0 uses the full range in the selected frame. These values use this file’s intensity scale after its rescale metadata is applied. They are display settings, rather than body measurements.</p><p>This file contains ${frameCount} frame${frameCount === 1 ? "" : "s"}. Frame index 0 is the first image; ${frameCount - 1} is the last. A frame index identifies an image in the file; it does not measure an anatomical angle or elapsed time.</p></details>` : `<label for="scan-contrast">Image contrast · <output id="scan-contrast-value" for="scan-contrast">100%</output><input id="scan-contrast" type="range" min="50" max="180" value="100"></label><details><summary>What does image contrast mean?</summary><p>100% displays the original contrast. Lower values soften contrast and higher values increase it for viewing. The original file and saved annotation positions remain unchanged.</p></details>`}<div class="scan-image" id="scan-stage"><img id="scan-image" alt="${esc(scan.name)}"><svg id="scan-annotations" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-label="Manual scan annotations"></svg></div><p id="scan-hint">${state.me.role === "student" ? "View your coach’s saved markers." : "Click the image to place an anatomical annotation."}</p><div class="actions"><a class="button" href="${href("client", { tab: "anatomy", region: scan.region_id, id: scan.analysis_id })}">Explore linked anatomy</a>${scan.session_id ? `<a class="button" href="${href("client", { tab: "sessions", session: scan.session_id })}">Source visit</a>` : ""}${scan.analysis_id ? `<a class="button" href="${href("report", { id: scan.analysis_id })}">Source analysis</a>` : ""}${state.me.role === "student" ? "" : '<button data-edit="notes">+ Linked coach note</button>'}<a class="button" href="${mediaURL(m.id)}" download="${esc(m.filename)}">Download original</a></div>`,
     ) +
     card(
       "Saved annotations",
-      table(
-        ["Region", "Coach annotation", "Frame"],
-        scan.findings.map((f) => [
+      "<p class=\"muted\">Marker numbers match the image and remain the same when you change frames. Positions are relative to the image, with 0–1 coordinates; they are not calibrated physical distances.</p>" + table(
+        ["Marker", "Region", "Coach annotation", "Frame index"],
+        scanAnnotationMarkers(scan.findings).map((f) => [
+          `#${f.marker}`,
           `<a href="${href("client", { tab: "anatomy", region: f.region_id, id: scan.analysis_id })}">${esc(regionName(f.region_id))}</a>`,
           esc(f.text),
-          f.frame_index,
+          dicom ? `<button type="button" data-scan-frame="${f.frame_index}">View frame ${f.frame_index}</button>` : "0 · Original image",
         ]),
       ),
     ) +
@@ -277,15 +289,18 @@ export async function scans(root) {
   }
   const image = $("#scan-image");
   const annotations = () => {
-    $("#scan-annotations").innerHTML = scan.findings
-      .filter((f) => f.frame_index === frameIndex)
+    $("#scan-annotations").innerHTML = scanAnnotationMarkers(scan.findings, frameIndex)
       .map(
-        (f, i) =>
-          `<g><circle cx="${f.x * 1000}" cy="${f.y * 1000}" r="13" fill="#53dbc0" stroke="#051522" stroke-width="4"/><text x="${f.x * 1000 + 18}" y="${f.y * 1000 + 8}" fill="#53dbc0" font-size="25">${i + 1}</text></g>`,
+        (f) =>
+          `<g><title>${esc(`Marker ${f.marker}: ${regionName(f.region_id)} · ${f.text}`)}</title><circle cx="${f.x * 1000}" cy="${f.y * 1000}" r="13" fill="#53dbc0" stroke="#051522" stroke-width="4"/><text x="${f.x * 1000 + 18}" y="${f.y * 1000 + 8}" fill="#53dbc0" font-size="25">${f.marker}</text></g>`,
       )
       .join("");
   };
   const source = () => {
+    if (dicom) {
+      detail.querySelector("[name=frame]").value = frameIndex;
+      $("#scan-frame-status").textContent = `Viewing frame index ${frameIndex} · ${frameCount} frame${frameCount === 1 ? "" : "s"} in this file.`;
+    }
     image.src = dicom
       ? "/platform/dicom?" +
         new URLSearchParams({
@@ -302,25 +317,27 @@ export async function scans(root) {
       "This scan could not render. Retry with default window values, or export an uncompressed DICOM/PNG from the source viewer.";
   };
   source();
-  if ($("#window-apply"))
-    $("#window-apply").onclick = () => {
-      frameIndex = Math.max(
-        0,
-        Math.min(
-          (m.detail.frames || 1) - 1,
-          Number(detail.querySelector("[name=frame]").value),
-        ),
-      );
-      const q = params();
-      q.set("scan_frame", frameIndex);
-      q.set("scan_center", detail.querySelector("[name=center]").value);
-      q.set("scan_width", detail.querySelector("[name=width]").value);
-      history.replaceState(null, "", "#" + q);
-      source();
+  const applyWindow = () => {
+    frameIndex = scanFrameIndex(detail.querySelector("[name=frame]").value, frameCount);
+    const q = params();
+    q.set("scan_frame", frameIndex);
+    q.set("scan_center", detail.querySelector("[name=center]").value);
+    q.set("scan_width", detail.querySelector("[name=width]").value);
+    history.replaceState(null, "", "#" + q);
+    source();
+  };
+  if ($("#window-apply")) $("#window-apply").onclick = applyWindow;
+  detail.querySelectorAll("[data-scan-frame]").forEach((button) => {
+    button.onclick = () => {
+      detail.querySelector("[name=frame]").value = button.dataset.scanFrame;
+      applyWindow();
     };
+  });
   if ($("#scan-contrast"))
-    $("#scan-contrast").oninput = (e) =>
-      (image.style.filter = `contrast(${e.target.value}%)`);
+    $("#scan-contrast").oninput = (e) => {
+      image.style.filter = `contrast(${e.target.value}%)`;
+      $("#scan-contrast-value").textContent = `${e.target.value}%`;
+    };
   if (state.me.role !== "student")
     $("#scan-stage").onclick = (e) => {
       const rect = image.getBoundingClientRect();

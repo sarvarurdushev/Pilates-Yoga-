@@ -78,9 +78,9 @@ const T = {
                 ko: '임상 정상 범위가 아닌 기능 기준입니다' },
   estimated:  { en: 'estimated', ko: '추정' },
   plan:       { en: 'What to work on', ko: '추천 운동' },
-  radar:      { en: 'Range measured against range expected', ko: '관절 가동 범위 비교' },
-  radarNote:  { en: 'The outer ring is the published reference. Each spoke is the side that travelled less, because a body with one stiff shoulder is a body with a stiff shoulder.',
-                ko: '바깥 원은 공개된 기준 범위입니다. 각 축은 덜 움직인 쪽을 표시합니다. 한쪽이 뻣뻣하면 그 몸은 뻣뻣한 쪽을 기준으로 봐야 하기 때문입니다.' },
+  radar:      { en: 'Camera-estimated movement against published references', ko: '관절 가동 범위 비교' },
+  radarNote:  { en: 'The outer ring is the published reference for each screen. Where both sides were measured, a spoke uses the smaller camera-estimated peak; otherwise it uses the single screened value. Camera setup, instructions, comfort or guarding can affect a shortfall; this chart does not establish its cause.',
+                ko: '바깥 원은 각 검사의 공개된 참고값입니다. 양쪽을 측정했다면 각 축은 카메라로 추정한 값 중 작은 쪽을, 한쪽 값만 있으면 그 값을 표시합니다. 촬영 조건, 동작 방법, 편안함이나 조심스러운 움직임이 부족분에 영향을 줄 수 있으며, 이 차트만으로 원인을 알 수 없습니다.' },
   showOn:     { en: 'Show on the body', ko: '신체에서 보기' },
   history:    { en: 'Earlier screenings', ko: '이전 검사' },
   change:     { en: 'Against the last one', ko: '이전 검사와 비교' },
@@ -556,9 +556,9 @@ export function radarHtml(report, lang) {
         .map((side) => payload[side]?.peak?.value)
         .filter((v) => v !== null && v !== undefined);
       if (!sides.length || !ceiling) return null;
-      /* The *lesser* side, not the mean. A shoulder that goes to 180 on one
-         side and 120 on the other is a body with a 120-degree shoulder, and
-         averaging it to 150 draws a chart of a person who does not exist. */
+      /* Show the lesser camera-estimated peak rather than averaging sides; the
+         raw side values remain available in their own cards. This chart alone
+         cannot explain the difference or diagnose a restriction. */
       const reached = Math.min(...sides);
       return {
         key,

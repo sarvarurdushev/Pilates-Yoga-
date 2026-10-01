@@ -22,11 +22,12 @@ export function matchingPriorSummaries(current, summaries = []) {
 
 export function selectedComparablePerson(analysis, cameraView) {
   const view = analysis?.result?.views?.find((entry) => entry.view === cameraView);
-  const suitable = view?.report?.people?.filter((person) => person.suitable) || [];
+  const people = view?.report?.people || [];
+  const suitable = people.filter((person) => person.suitable);
   const selected = analysis?.detail?.selected_people?.[cameraView];
   const person = selected != null
     ? suitable.find((candidate) => String(candidate.person_id) === String(selected))
-    : suitable.length === 1 ? suitable[0] : null;
+    : people.length === 1 && suitable.length === 1 ? suitable[0] : null;
   return person ? { view, person } : null;
 }
 

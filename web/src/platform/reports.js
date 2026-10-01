@@ -70,6 +70,12 @@ const labels = [
   "Pelvis centre",
   "Trunk / spine proxy",
 ];
+export function analysisStatusLabel(status) {
+  if (status === "needs_capture") return "Needs a clearer capture";
+  if (status === "complete") return "Analysis complete";
+  return String(status || "Analysis status unavailable").replaceAll("_", " ");
+}
+
 export function metricRegion(name) {
   name = (name || "").toLowerCase();
   const side = name.includes("left")
@@ -154,6 +160,18 @@ export function coordinateTraceChart({ axis, space, selected, trajectory = [], l
   });
 }
 
+export function movementTechnicalNumbers(signal = {}, kinematics = {}, person = {}, demo = false) {
+  const entries = [
+    ["Mean angular speed", kinematics.mean_speed_deg_s, "deg/s", "Mean absolute projected-angle change per second from accepted raw samples."],
+    ["Mean angular acceleration", kinematics.mean_acceleration_deg_s2, "deg/s²", "Mean absolute change in angular velocity per second from accepted raw samples."],
+    ["Tempo variation", signal.tempo_cv, "ratio", "Standard deviation of complete cycle durations divided by their mean duration; unitless."],
+    ["Cycle range variation", signal.rep_rom_sd, "deg", "Standard deviation of projected angle ranges across complete detected cycles."],
+    ["Angular speed variation", kinematics.speed_variation, "deg/s", "Standard deviation of absolute angular speeds. A variable-speed task can have a larger value without poorer form."],
+    ["Hip-centre trajectory variation / body span", person.trajectory_deviation_body_fraction, "ratio", "Spread of the tracked hip midpoint divided by the median projected body span; unitless and affected by camera motion."],
+  ];
+  return `<p class="report-source">${demo ? "DEMO SIMULATED LANDMARKS" : "UPLOADED VIDEO LANDMARKS"} · Selected joint and accepted frames from this clip only. No earlier clip is compared.</p><dl class="metric-technical">${entries.map(([name, value, unit, definition]) => `<div><dt>${esc(name)}</dt><dd>${esc(num(value, unit))}</dd><small>${esc(definition)}</small></div>`).join("")}</dl><p>These are camera-plane estimates and describe timing or variation. They do not measure force, true centre of mass or clinical balance.</p>`;
+}
+
 export function acceptedFrameSummary(frames = []) {
   const accepted = frames.filter((frame) => frame.suitable);
   const times = accepted.map((frame) => frame.time).filter(Number.isFinite);
@@ -200,6 +218,34 @@ export function selectPostureObservation(metrics = []) {
     available[0] || null;
 }
 
+// Detection numbers are local to one capture. Never silently bind the first
+// detected body to the client when other bodies are present.
+export function reportPersonIndex(view, selectedPeople = {}) {
+  const people = view?.report?.people || [];
+  const selected = selectedPeople?.[view?.view];
+  if (selected != null)
+    return people.findIndex((person) => String(person.person_id) === String(selected));
+  return people.length === 1 ? 0 : -1;
+}
+
+export function reviewedPersonSelection(view, index) {
+  const people = view?.report?.people || [];
+  const person = Number.isInteger(index) && index >= 0 ? people[index] : null;
+  if (!person) throw Error("Choose which detected person is this client before saving the review.");
+  if (!person.suitable)
+    throw Error("This detected person has insufficient visible body evidence. Retake the capture.");
+  return { [view.view]: person.person_id };
+}
+
+export function reportPersonUnverified(view, selectedPeople = {}, index = -1) {
+  const people = view?.report?.people || [];
+  if (people.length <= 1) return false;
+  const person = Number.isInteger(index) && index >= 0 ? people[index] : null;
+  const reviewed = selectedPeople?.[view.view];
+  return reviewed == null || !person?.suitable ||
+    String(person.person_id) !== String(reviewed);
+}
+
 export async function report(root, id) {
   const item = await record("analyses", id);
   if (!state.client || state.client.id !== item.student_id) {
@@ -208,7 +254,7 @@ export async function report(root, id) {
   }
   const result = item.result;
   let viewIndex = 0,
-    personIndex = 0,
+    personIndex = -1,
     frameIndex = 0,
     section = "summary",
     landmark = "5",
@@ -242,7 +288,7 @@ export async function report(root, id) {
       result.simulation_notice ||
         "Measurements come from visible pose landmarks. Depth is independently estimated only when confidence checks pass. A body model does not establish a diagnosis.",
     ) +
-    `<div class="report-meta">${badge(item.demo ? "DEMO SIMULATION" : "REAL CAPTURE", item.demo ? "demo" : "")}${badge(item.status)}<span id="review-state">${item.detail.reviewed_at ? "Coach reviewed · " + dt(item.detail.reviewed_at) : "Coach review pending"}</span></div><nav class="report-tabs">${[
+    `<div class="report-meta">${badge(item.demo ? "DEMO SIMULATION" : "REAL CAPTURE", item.demo ? "demo" : "")}${badge(analysisStatusLabel(item.status))}<span id="review-state">${item.detail.reviewed_at ? "Coach reviewed · " + dt(item.detail.reviewed_at) : "Coach review pending"}</span></div><nav class="report-tabs">${[
       ["summary", "Session summary"],
       ["evidence", "Capture & posture"],
       ...(item.kind === "movement" ? [["movement", "Movement detail"]] : []),
@@ -273,56 +319,53 @@ export async function report(root, id) {
   );
   root.querySelector("[name=report-view]").onchange = (e) => {
     viewIndex = +e.target.value;
-    personIndex = 0;
+    personIndex = -1;
     frameIndex = 0;
     people();
     draw();
   };
   root.querySelector("[name=report-person]").onchange = (e) => {
-    personIndex = +e.target.value;
+    personIndex = e.target.value === "" ? -1 : Number(e.target.value);
     frameIndex = 0;
     draw();
   };
   function people() {
-    const selected =
-      item.detail.selected_people?.[result.views[viewIndex].view];
-    if (selected != null) {
-      const index = result.views[viewIndex].report.people.findIndex(
-        (p) => String(p.person_id) === String(selected),
-      );
-      if (index >= 0) personIndex = index;
-    }
+    const view = result.views[viewIndex];
+    const detected = view.report.people || [];
+    personIndex = reportPersonIndex(view, item.detail.selected_people);
     root.querySelector("[name=report-person]").innerHTML = options(
-      result.views[viewIndex].report.people.map((p, i) => [
+      detected.map((p, i) => [
         i,
-        "Person " +
-          p.person_id +
+        "Person " + p.person_id +
           (p.suitable ? " · visible body" : " · needs capture"),
       ]),
       personIndex,
-      null,
+      detected.length > 1 ? "Choose which detected person is " + state.client.name :
+        detected.length ? null : "No person detected",
     );
+  }
+  function identityUnverified(view = result.views[viewIndex]) {
+    return reportPersonUnverified(view, item.detail.selected_people, personIndex);
   }
   people();
   if ($("#review-session"))
     $("#review-session").onclick = async () => {
       try {
-        const p = result.views[viewIndex].report.people[personIndex];
-        await api("review", {
-          analysis_id: id,
-          selection: { [result.views[viewIndex].view]: p.person_id },
-        });
+        const view = result.views[viewIndex];
+        const selection = reviewedPersonSelection(view, personIndex);
+        await api("review", { analysis_id: id, selection });
+        item.detail.selected_people ||= {};
+        Object.assign(item.detail.selected_people, selection);
         item.detail.reviewed_at = new Date().toISOString();
-        $("#review-state").textContent =
-          "Reviewed · saved to " + state.client.name;
         draw();
-        toast("Reviewed session saved to this client");
+        toast("Reviewed person saved to " + state.client.name);
       } catch (e) {
         toast(e.message);
       }
     };
   function chosen() {
-    return result.views[viewIndex].report.people[personIndex];
+    return personIndex >= 0
+      ? result.views[viewIndex].report.people[personIndex] : null;
   }
   function currentFrame() {
     const p = chosen();
@@ -334,6 +377,53 @@ export async function report(root, id) {
           pose3d: p.pose3d,
           suitable: p.suitable,
         };
+  }
+  function paintPersonChoices(body, view) {
+    const canvas = body.querySelector("#person-choices");
+    if (!canvas) return;
+    canvas.width = view.report.width || 640;
+    canvas.height = view.report.height || 960;
+    const paint = (image) => {
+      if (!canvas.isConnected) return;
+      const ctx = canvas.getContext("2d");
+      const width = canvas.width, height = canvas.height;
+      ctx.fillStyle = "#091322";
+      ctx.fillRect(0, 0, width, height);
+      if (image) ctx.drawImage(image, 0, 0, width, height);
+      (view.report.people || []).forEach((person, index) => {
+        const landmarks = person.frames?.find((frame) => frame.landmarks)?.landmarks ||
+          person.landmarks;
+        const points = (landmarks?.keypoints || []).filter((point, i) =>
+          (landmarks?.scores?.[i] ?? 0) >= 0.35 &&
+          Number.isFinite(point?.[0]) && Number.isFinite(point?.[1]));
+        if (!points.length) return;
+        const xs = points.map((point) => point[0]);
+        const ys = points.map((point) => point[1]);
+        const pad = Math.max(10, width / 80);
+        const left = Math.max(0, Math.min(...xs) - pad);
+        const top = Math.max(0, Math.min(...ys) - pad);
+        const right = Math.min(width, Math.max(...xs) + pad);
+        const bottom = Math.min(height, Math.max(...ys) + pad);
+        const color = ["#62d9ee", "#ffcf72", "#d6a6ff", "#8ee1a6"][index % 4];
+        ctx.lineWidth = Math.max(3, width / 300);
+        ctx.strokeStyle = color;
+        ctx.strokeRect(left, top, right - left, bottom - top);
+        const label = "Person " + person.person_id;
+        ctx.font = Math.max(15, width / 52) + "px system-ui";
+        const labelWidth = ctx.measureText(label).width + 16;
+        const labelTop = Math.max(0, top - 28);
+        ctx.fillStyle = "#07111eea";
+        ctx.fillRect(left, labelTop, labelWidth, 28);
+        ctx.fillStyle = color;
+        ctx.fillText(label, left + 8, labelTop + 20);
+      });
+    };
+    paint(null);
+    if (item.kind === "posture" && view.media_id && !item.demo) {
+      const image = new Image();
+      image.onload = () => paint(image);
+      image.src = mediaURL(view.media_id);
+    }
   }
   function draw() {
     poseCanvas?.dispose();
@@ -347,10 +437,56 @@ export async function report(root, id) {
       v = result.views[viewIndex],
       p = chosen();
     const version = ++drawVersion;
+    const detected = v.report.people || [];
+    const unverified = identityUnverified(v);
+    const reviewButton = $("#review-session");
+    if (reviewButton) {
+      reviewButton.disabled = !p?.suitable;
+      reviewButton.textContent = detected.length > 1
+        ? "Confirm selected person is " + state.client.name
+        : "Save reviewed session";
+    }
+    $("#review-state").textContent = unverified
+      ? "Client identity unverified for this camera view"
+      : item.detail.selected_people?.[v.view] != null
+        ? "Reviewed person · saved to " + state.client.name
+        : item.detail.reviewed_at ? "Coach reviewed · " + dt(item.detail.reviewed_at)
+          : "Coach review pending";
     if (!p) {
-      body.innerHTML = notice(
-        "No person was detected. Use a clear full-body image or shorter video and try again.",
-      );
+      const retake = item.status === "needs_capture"
+        ? `<div class="actions"><a class="button primary" href="${href("capture", { client: state.client.id, protocol: item.protocol, kind: item.kind, retry: "1" })}">Retake this capture →</a></div>`
+        : "";
+      if (detected.length > 1) {
+        body.innerHTML = '<section class="panel person-choice"><h2>Which detected person is ' +
+          esc(state.client.name) + '?</h2><p>The image contains ' + detected.length +
+          ' detected people. Use the numbered outlines and original media to choose the client above. Detection numbers only identify bodies within this capture. No measurements from this view are assigned to the client until a coach confirms one.</p>' +
+          '<canvas id="person-choices" aria-label="Numbered detected bodies in the source capture"></canvas>' +
+          '<div class="actions">' + detected.map((person, index) =>
+            '<button type="button" data-pick-person="' + index + '">Preview Person ' +
+            esc(person.person_id) + (person.suitable ? '' : ' · needs recapture') +
+            '</button>').join('') + '</div>' +
+          (item.kind === "movement" && v.media_id
+            ? '<video controls preload="metadata" src="' + mediaURL(v.media_id) + '" aria-label="Original movement video"></video>'
+            : '') +
+          '<p class="muted">If the client cannot be identified confidently, leave this view unreviewed and recapture one person at a time.</p>' + retake + '</section>';
+        paintPersonChoices(body, v);
+        body.querySelectorAll("[data-pick-person]").forEach((button) => {
+          button.onclick = () => {
+            personIndex = Number(button.dataset.pickPerson);
+            root.querySelector("[name=report-person]").value = String(personIndex);
+            draw();
+          };
+        });
+      } else {
+        body.innerHTML = notice(
+          "No person was detected. Use a clear full-body image or shorter video and try again.",
+        ) + retake;
+      }
+      return;
+    }
+    if (unverified && ["comparison", "anatomy", "coaching"].includes(section)) {
+      body.innerHTML = notice("This detected person has not been confirmed as " +
+        state.client.name + ". Confirm their identity above before connecting measurements to client history, anatomy notes or a program.");
       return;
     }
     const render = () => {
@@ -384,8 +520,15 @@ export async function report(root, id) {
     }
     bindButtons(body);
     if (section === "coaching") wireTargetedProgram(p);
+    if (unverified) body.insertAdjacentHTML("afterbegin", notice(
+      "Previewing detected Person " + p.person_id + " only. The coach has not confirmed that this body is " +
+      state.client.name + ". These measurements are not in the client's progress history. Confirm the correct person above or recapture one person at a time."
+    ));
     };
-    if (["summary", "evidence", "movement", "comparison"].includes(section)) {
+    if (unverified) {
+      comparableVisits = [];
+      render();
+    } else if (["summary", "evidence", "movement", "comparison"].includes(section)) {
       body.innerHTML = notice("Checking earlier comparable captures…");
       findComparableVisits(item, p, v.view, state.client.analyses, loadPrior)
         .then((visits) => {
@@ -442,6 +585,7 @@ export async function report(root, id) {
     return nearestComparableMeasurement(comparableVisits, metricId)?.metric.previous ?? null;
   }
   function summary(body, v, p) {
+    const unverified = identityUnverified(v);
     const metric = primaryMeasurement(p);
     const observationBasis = item.kind === "posture"
       ? metric?.unit === "deg" && POSTURE_ANGLE_IDS.includes(metric.id) && metric.value !== 0 && (metric.status === "measured" || metric.status === "available")
@@ -462,11 +606,11 @@ export async function report(root, id) {
       exercise?.detail?.equipment || "Not recorded for this capture";
     const relevantNotes = availableNotes.filter((n) => n.analysis_id === id);
     const note = relevantNotes[0] || availableNotes.find((n) => !n.analysis_id);
-    const sourceSession = `<a class="button" href="${href("client", { tab: "sessions", assessment: id })}">Open this session →</a>`;
-    const anatomyLink = region ? `<a class="button" href="${href("client", { tab: "anatomy", region, id })}">Why this body region? →</a>` : "";
-    const programLink = region && state.me.role !== "student"
+    const sourceSession = `<a class="button" href="${href("client", { tab: "sessions", assessment: id })}">Open this session →</a>${item.status === "needs_capture" ? `<a class="button primary" href="${href("capture", { client: state.client.id, protocol: item.protocol, kind: item.kind, retry: "1" })}">Retake this capture →</a>` : ""}`;
+    const anatomyLink = region && !unverified ? `<a class="button" href="${href("client", { tab: "anatomy", region, id })}">Why this body region? →</a>` : "";
+    const programLink = region && !unverified && state.me.role !== "student"
       ? `<a class="button" href="${href("client", { tab: "programs", region, report: id, finding: metric.id })}">Add finding to program →</a>` : "";
-    body.innerHTML = `<div class="report-summary"><section class="panel"><p class="eyebrow">WHAT DID ${state.me.role === "student" ? "YOU" : "THE CLIENT"} DO?</p><h2>${esc(item.protocol)}</h2><p>${esc(captureSummary(item.kind, item.protocol))}</p><dl><div><dt>Client</dt><dd>${esc(state.client.name)}</dd></div><div><dt>Recorded by</dt><dd>${esc(recordedByLabel(item, state.me.coaches))}</dd></div><div><dt>Recorded</dt><dd>${esc(dt(item.created_at))}</dd></div><div><dt>Location</dt><dd>${esc(locationName(item.location_id))}</dd></div><div><dt>Exercise category</dt><dd>${esc(exercise?.category || (item.kind === "movement" ? "Movement assessment" : "Posture assessment"))}</dd></div><div><dt>Capture source</dt><dd>${esc(source)}</dd></div><div><dt>Body side analyzed</dt><dd>${esc(side)}</dd></div><div><dt>Equipment</dt><dd>${esc(equipment)}</dd></div>${item.kind === "movement" ? `<div><dt>Accepted frame span</dt><dd>${esc(timeSpan)}<small>First to last accepted frame; gaps may remain.</small></dd></div><div><dt>Accepted frames</dt><dd>${accepted} of ${frames.length}</dd></div><div><dt>Complete cycles for selected joint</dt><dd>${metric?.repetitions ?? "Not detected"}</dd></div>` : ""}<div><dt>AI measurement status</dt><dd>${p.suitable ? "Visible landmarks measured" : "Capture needs review"}</dd></div><div><dt>Coach review</dt><dd>${item.detail.reviewed_at ? "Reviewed" : "Pending"}</dd></div></dl><div class="actions">${sourceSession}</div></section><section class="panel"><p class="eyebrow">HOW WAS IT RECORDED?</p>${cameraGuide(v.view, item.protocol)}</section></div>${metric ? `<section class="report-finding"><p class="eyebrow">MAIN OBSERVATION · ${esc(item.demo ? "DEMO DATA" : "SYSTEM MEASUREMENT")}</p><h3>${esc(metric.name)}</h3><p>The visible landmark ${metric.status === "estimated" ? "estimate" : "measurement"} was <strong>${esc(num(metric.value, metric.unit))}</strong> in this ${esc(cameraLabels[v.view] || v.view)}. ${esc(metricCopy(metric).definition)}</p><small>${esc(observationBasis)}</small><p>${esc(comparisonText(metric.value, prior, metric.unit))}</p><small>Uses the nearest earlier same-protocol capture with a matching camera view, suitable selected person, measurement unit and evidence status. ${priorSource} Open Compare sessions to inspect other visits.</small><p>${esc(metricCopy(metric).why)}</p><div class="actions">${anatomyLink}${programLink}<button type="button" id="summary-detail">View captured evidence →</button></div></section>` : notice(p.warnings?.join(" ") || "No reliable landmark measurement was available. Review the capture before planning from it.")}${card("Coach feedback", note ? `<p class="eyebrow">${esc(item.demo ? "DEMO COACH FEEDBACK" : "COACH-WRITTEN FEEDBACK")}</p><p>${esc(note.text)}</p><small>${esc(coachName(note.author_id))} · ${esc(dt(note.created_at))}${note.analysis_id ? " · This assessment" : " · General client note"}</small><div class="actions"><a class="button" href="${href("client", { tab: "notes", region: note.region_id, note: note.id, id })}">Read linked feedback →</a></div>` : `<p>${state.me.role === "student" ? "Your coach has not added feedback for this session." : "No coach feedback is linked to this session yet."}</p>${state.me.role === "student" ? "" : `<a class="button" href="${href("client", { tab: "anatomy", region: region || "thorax", id })}">Add feedback on the body map →</a>`}`)}${notice("This summary describes visible pose evidence. It does not diagnose injury, infer muscle weakness or establish a medical normal range.")}`;
+    body.innerHTML = `<div class="report-summary"><section class="panel"><p class="eyebrow">WHAT DID ${unverified ? "THIS DETECTED PERSON" : state.me.role === "student" ? "YOU" : "THE CLIENT"} DO?</p><h2>${esc(item.protocol)}</h2><p>${esc(captureSummary(item.kind, item.protocol, item.status))}</p><dl><div><dt>Linked client record</dt><dd>${esc(state.client.name)}${unverified ? " · detected person not confirmed" : ""}</dd></div><div><dt>Recorded by</dt><dd>${esc(recordedByLabel(item, state.me.coaches))}</dd></div><div><dt>Recorded</dt><dd>${esc(dt(item.created_at))}</dd></div><div><dt>Location</dt><dd>${esc(locationName(item.location_id))}</dd></div><div><dt>Exercise category</dt><dd>${esc(exercise?.category || (item.kind === "movement" ? "Movement assessment" : "Posture assessment"))}</dd></div><div><dt>Capture source</dt><dd>${esc(source)}</dd></div><div><dt>Body side analyzed</dt><dd>${esc(side)}</dd></div><div><dt>Equipment</dt><dd>${esc(equipment)}</dd></div>${item.kind === "movement" ? `<div><dt>Accepted frame span</dt><dd>${esc(timeSpan)}<small>First to last accepted frame; gaps may remain.</small></dd></div><div><dt>Accepted frames</dt><dd>${accepted} of ${frames.length}</dd></div><div><dt>Complete cycles for selected joint</dt><dd>${metric?.repetitions ?? "Not detected"}</dd></div>` : ""}<div><dt>AI measurement status</dt><dd>${p.suitable ? "Visible landmarks measured" : "Capture needs review"}</dd></div><div><dt>Coach review</dt><dd>${unverified ? "Identity pending for this view" : item.detail.reviewed_at ? "Reviewed" : "Pending"}</dd></div></dl><div class="actions">${sourceSession}</div></section><section class="panel"><p class="eyebrow">HOW WAS IT RECORDED?</p>${cameraGuide(v.view, item.protocol)}</section></div>${metric ? `<section class="report-finding"><p class="eyebrow">MAIN OBSERVATION · ${unverified ? "UNVERIFIED PERSON PREVIEW" : esc(item.demo ? "DEMO DATA" : "SYSTEM MEASUREMENT")}</p><h3>${esc(metric.name)}</h3><p>The visible landmark ${metric.status === "estimated" ? "estimate" : "measurement"} was <strong>${esc(num(metric.value, metric.unit))}</strong> in this ${esc(cameraLabels[v.view] || v.view)}. ${esc(metricCopy(metric).definition)}</p><small>${esc(observationBasis)}</small><p>${esc(comparisonText(metric.value, prior, metric.unit))}</p><small>Uses the nearest earlier same-protocol capture with a matching camera view, suitable selected person, measurement unit and evidence status. ${priorSource} Open Compare sessions to inspect other visits.</small><p>${esc(metricCopy(metric).why)}</p><div class="actions">${anatomyLink}${programLink}<button type="button" id="summary-detail">View captured evidence →</button></div></section>` : notice(p.warnings?.join(" ") || "No reliable landmark measurement was available. Review the capture before planning from it.")}${card("Coach feedback", unverified ? notice("Confirm which detected person is this client before connecting coach feedback to this view.") : note ? `<p class="eyebrow">${esc(item.demo ? "DEMO COACH FEEDBACK" : "COACH-WRITTEN FEEDBACK")}</p><p>${esc(note.text)}</p><small>${esc(coachName(note.author_id))} · ${esc(dt(note.created_at))}${note.analysis_id ? " · This assessment" : " · General client note"}</small><div class="actions"><a class="button" href="${href("client", { tab: "notes", region: note.region_id, note: note.id, id })}">Read linked feedback →</a></div>` : `<p>${state.me.role === "student" ? "Your coach has not added feedback for this session." : "No coach feedback is linked to this session yet."}</p>${state.me.role === "student" || unverified ? "" : `<a class="button" href="${href("client", { tab: "anatomy", region: region || "thorax", id })}">Add feedback on the body map →</a>`}`)}${notice("This summary describes visible pose evidence. It does not diagnose injury, infer muscle weakness or establish a medical normal range.")}`;
     const detail = body.querySelector("#summary-detail");
     if (detail) detail.onclick = () => { section = "evidence"; draw(); };
   }
@@ -493,9 +637,9 @@ export async function report(root, id) {
         notice: "Compare the same stance and camera view across visits.", current: m.value,
         previous: previousMeasurement(v.view, m.id), unit: m.unit,
         source: synthetic ? "Simulated pose coordinates" : "Original photograph landmarks",
-        regionLink: `<a class="button" href="${href("client", { tab: "anatomy", region: metricRegion(m.name), id })}">Explore linked body region →</a>`,
+        regionLink: identityUnverified(v) ? "" : `<a class="button" href="${href("client", { tab: "anatomy", region: metricRegion(m.name), id })}">Explore linked body region →</a>`,
       });
-    }).join("") || notice("No reliable posture measurements were available for this view.")}</div>` : `<section class="panel"><h3>Movement measurement</h3><p>Joint range, timing and repetition findings are in Movement detail. This frame view shows the evidence used to calculate them.</p><button type="button" id="evidence-movement-detail">See movement findings →</button></section>`}<details class="report-advanced"><summary>Technical measurement table</summary>${metricsTable(p.metrics || [])}</details>`;
+    }).join("") || notice("No reliable posture measurements were available for this view.")}</div>` : `<section class="panel"><h3>Movement measurement</h3><p>Joint range, timing and repetition findings are in Movement detail. This frame view shows the evidence used to calculate them.</p><button type="button" id="evidence-movement-detail">See movement findings →</button></section>`}<details class="report-advanced"><summary>Technical measurement table</summary><p>Model confidence describes landmark support, not a probability of medical correctness. Values retain their units; unavailable measurements are not scored.</p>${metricsTable(p.metrics || [])}</details>`;
     const movementDetail = body.querySelector("#evidence-movement-detail");
     if (movementDetail) movementDetail.onclick = () => { section = "movement"; draw(); };
     let photo = null;
@@ -564,7 +708,7 @@ export async function report(root, id) {
   }
   function metricsTable(metrics) {
     return table(
-      ["Measurement", "Value", "Confidence", "Evidence / region"],
+      ["Measurement", "Value", "Model confidence", "Evidence / region"],
       metrics.map((m) => [
         esc(m.name),
         num(m.value, m.unit),
@@ -614,14 +758,14 @@ export async function report(root, id) {
       const selected = at.find((c) => c.landmark_id === landmark);
       const trajectory = rows.filter((c) => c.landmark_id === landmark);
       $("#coordinate-detail").innerHTML =
-        `<div class="panel"><h3>${esc(labels[+landmark])}</h3><p>${esc(selected?.reason || "Unavailable for this frame.")}</p><p>${esc(selected?.method || "")}</p><a class="button" href="${href("client", { tab: "anatomy", region: selected?.region_id || metricRegion(labels[+landmark]), id })}">Explore this anatomical region</a></div><div class="grid three">${["x", "y", "z"].map((axis) =>
+        `<div class="panel"><h3>${esc(labels[+landmark])}</h3><p>${esc(selected?.reason || "Unavailable for this frame.")}</p><p>${esc(selected?.method || "")}</p>${identityUnverified(v) ? "" : `<a class="button" href="${href("client", { tab: "anatomy", region: selected?.region_id || metricRegion(labels[+landmark]), id })}">Explore this anatomical region</a>`}</div><div class="grid three">${["x", "y", "z"].map((axis) =>
           coordinateTraceChart({
             axis, space, selected, trajectory,
             landmarkName: labels[+landmark], demo: item.demo, kind: item.kind,
           })
         ).join("")}</div>`;
       $("#coordinate-table").innerHTML = `<details class="report-advanced"><summary>All landmark values for this frame</summary>${table(
-        ["Landmark", "X", "Y", "Z", "Confidence", "Time / frame", "Status"],
+        ["Landmark", `X · ${space === "image_px" ? "px" : "estimated m"}`, `Y · ${space === "image_px" ? "px" : "estimated m"}`, `Z · ${space === "image_px" ? "unavailable" : "estimated m"}`, "Model confidence", "Time · seconds / sampled frame", "Status"],
         at.map((c) => [
           `<button class="text-button" data-landmark="${c.landmark_id}">${esc(c.name)}</button>`,
           coordinateNumber(c.x),
@@ -672,7 +816,7 @@ export async function report(root, id) {
         : signal.startsWith("right_") ? "left_" + signal.slice(6) : null;
       const region = metricRegion(signal);
       const name = signal.replaceAll("_", " ");
-      const technical = `<dl class="metric-technical"><div><dt>Mean angular speed</dt><dd>${num(k.mean_speed_deg_s, "deg/s")}</dd></div><div><dt>Mean angular acceleration</dt><dd>${num(k.mean_acceleration_deg_s2, "deg/s²")}</dd></div><div><dt>Tempo variation</dt><dd>${num(s.tempo_cv, "ratio")}</dd></div><div><dt>Cycle range variation</dt><dd>${num(s.rep_rom_sd, "deg")}</dd></div><div><dt>Angular speed variation</dt><dd>${num(k.speed_variation, "deg/s")}</dd></div><div><dt>Hip-centre trajectory variation / body span</dt><dd>${num(p.trajectory_deviation_body_fraction, "ratio")}</dd></div></dl><p>These are camera-plane estimates and describe timing or variation. They do not measure force, true centre of mass or clinical balance.</p>`;
+      const technical = movementTechnicalNumbers(s, k, p, item.demo);
       const main = explainedChart({ title: name + " range during " + item.protocol,
         definition: "Difference between the largest and smallest smoothed, accepted projected joint angles during this clip.",
         why: "This is a camera-view measurement, not the full anatomical range of the joint. The repeat count requires complete outward and return phases.",
@@ -680,8 +824,8 @@ export async function report(root, id) {
         current: s.rom, previous: previousMeasurement(v.view, signal), unit: "deg",
         source: item.demo ? "Demo simulated video landmarks" : "Uploaded video pose landmarks",
         chart: s.smoothed_series ? spark(s.smoothed_series, { label: "Smoothed projected joint angle over clip time (seconds)", unit: "deg" }) : `<details class="report-advanced"><summary>View archived raw angle trace</summary><p>This older record has no plotted smoothed trace; its reported range was calculated after smoothing, so raw peaks can differ.</p>${spark(s.series || [], { label: "Raw projected joint angle over clip time (seconds)", unit: "deg" })}</details>`,
-        regionLink: `<a class="button" href="${href("client", { tab: "anatomy", region, id })}">Explore ${esc(regionName(region))} →</a>`,
-        sessionLink: state.me.role !== "student" ? `<a class="button" href="${href("client", { tab: "programs", region, report: id, finding: signal })}">Use finding in program →</a>` : "",
+        regionLink: identityUnverified(v) ? "" : `<a class="button" href="${href("client", { tab: "anatomy", region, id })}">Explore ${esc(regionName(region))} →</a>`,
+        sessionLink: state.me.role !== "student" && !identityUnverified(v) ? `<a class="button" href="${href("client", { tab: "programs", region, report: id, finding: signal })}">Use finding in program →</a>` : "",
       });
       const peerSignal = peer ? signals[peer] : null;
       const peerCard = peerSignal ? explainedChart({ title: peer.replaceAll("_", " ") + " range", definition: "Projected angle range for the opposite side from the same clip.", why: "Camera perspective and side visibility can make these estimates incomparable; a difference alone does not indicate a problem.", notice: "Inspect both traces before interpreting a side-to-side difference.", current: peerSignal.rom, previous: previousMeasurement(v.view, peer), unit: "deg", source: item.demo ? "Demo simulated landmarks" : "Uploaded video pose landmarks", chart: peerSignal.smoothed_series ? spark(peerSignal.smoothed_series, { label: "Smoothed opposite-side projected angle over time (seconds)", unit: "deg", color: "#59d1b1" }) : `<details class="report-advanced"><summary>View archived raw opposite-side trace</summary><p>This older record has no plotted smoothed trace; raw peaks can differ from the range.</p>${spark(peerSignal.series || [], { label: "Raw opposite-side projected angle over time (seconds)", unit: "deg", color: "#59d1b1" })}</details>` }) : "";

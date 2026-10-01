@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { acceptedFrameSummary, coordinateTraceChart, movementDerivativeCharts, selectPostureObservation } from "../src/platform/reports.js";
+import { acceptedFrameSummary, analysisStatusLabel, coordinateTraceChart, movementDerivativeCharts, movementTechnicalNumbers, reportPersonIndex, reportPersonUnverified, reviewedPersonSelection, selectPostureObservation } from "../src/platform/reports.js";
 
 test("advanced movement derivatives label their absolute summaries and signed traces", () => {
   const html = movementDerivativeCharts({
@@ -128,4 +128,56 @@ test("equal visible angles have deterministic ordering without clinical cutoffs"
     { id: "shoulder_tilt", value: 3, unit: "deg", status: "measured" },
   ];
   assert.equal(selectPostureObservation(angles), angles[1]);
+});
+
+
+test("advanced movement numbers state formulas, units, scope, and nonclinical meaning", () => {
+  const html = movementTechnicalNumbers({tempo_cv:0.12,rep_rom_sd:3.6}, {
+    mean_speed_deg_s:14.2,mean_acceleration_deg_s2:8.1,speed_variation:4.7,
+  }, {trajectory_deviation_body_fraction:0.029}, true);
+  assert.match(html, /0.120 ratio/);
+  assert.match(html, /3.6°/);
+  assert.match(html, /4.7 deg\/s/);
+  assert.match(html, /0.029 ratio/);
+  assert.match(html, /Standard deviation of complete cycle durations divided by their mean/);
+  assert.match(html, /Standard deviation of projected angle ranges/);
+  assert.match(html, /median projected body span/);
+  assert.match(html, /variable-speed task.*without poorer form/);
+  assert.match(html, /DEMO SIMULATED LANDMARKS/);
+  assert.match(html, /No earlier clip is compared/);
+  assert.match(html, /do not measure force, true centre of mass or clinical balance/);
+});
+
+test("missing advanced movement values remain unavailable without an invented zero", () => {
+  const html = movementTechnicalNumbers();
+  assert.equal((html.match(/<dd>—<\/dd>/g) || []).length, 6);
+  assert.doesNotMatch(html, /<dd>0/);
+  assert.match(html, /UPLOADED VIDEO LANDMARKS/);
+});
+
+
+test("multi-person report has no default client body and review requires a suitable explicit choice", () => {
+  const front = { view: "front", report: { people: [
+    { person_id: "1", suitable: true },
+    { person_id: "2", suitable: false },
+  ] } };
+  assert.equal(reportPersonIndex(front, {}), -1);
+  assert.throws(() => reviewedPersonSelection(front, -1), /Choose which detected person/);
+  assert.throws(() => reviewedPersonSelection(front, 1), /insufficient visible body evidence/);
+  assert.deepEqual(reviewedPersonSelection(front, 0), { front: "1" });
+  assert.equal(reportPersonIndex(front, { front: "1" }), 0);
+  assert.equal(reportPersonIndex(front, { front: "2" }), 1);
+  assert.equal(reportPersonIndex(front, { front: "missing" }), -1);
+  assert.equal(reportPersonUnverified(front, {}, 0), true);
+  assert.equal(reportPersonUnverified(front, { front: "1" }, 0), false);
+  assert.equal(reportPersonUnverified(front, { front: "1" }, 1), true);
+  assert.equal(reportPersonUnverified(front, { front: "missing" }, -1), true);
+  assert.equal(reportPersonIndex({ view: "front", report: { people: [front.report.people[0]] } }, {}), 0);
+  assert.equal(reportPersonIndex({ view: "front", report: { people: [] } }, {}), -1);
+});
+
+test("report status explains when a capture needs repeating", () => {
+  assert.equal(analysisStatusLabel("needs_capture"), "Needs a clearer capture");
+  assert.equal(analysisStatusLabel("complete"), "Analysis complete");
+  assert.equal(analysisStatusLabel("unknown_status"), "unknown status");
 });

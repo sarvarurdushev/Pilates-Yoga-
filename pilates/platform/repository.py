@@ -3,7 +3,7 @@
 from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 import json
@@ -147,6 +147,18 @@ def password_ok(password, stored):
         return False
 
 
+def backfill_session_exercise_events(db):
+    """Link legacy completed keys to their session without inventing timestamps."""
+    for session in db.execute(
+        "SELECT id,completed FROM p_training_sessions ts WHERE NOT EXISTS "
+        "(SELECT 1 FROM p_session_exercise_events e WHERE e.session_id=ts.id)"
+    ):
+        for sequence, key in enumerate(json.loads(session["completed"] or "[]"), 1):
+            if isinstance(key, str):
+                db.execute("INSERT INTO p_session_exercise_events VALUES (?,?,?,?,?,?)",
+                           (uid(), session["id"], sequence, key, None, None))
+
+
 class Repository:
     def __init__(self, path, media_root=None):
         self.path = str(path)
@@ -160,6 +172,7 @@ class Repository:
                 "INSERT OR IGNORE INTO p_session_analyses(session_id,analysis_id) "
                 "SELECT id,analysis_id FROM p_training_sessions WHERE analysis_id IS NOT NULL"
             )
+            backfill_session_exercise_events(db)
         from .regions import seed_regions
 
         seed_regions(self)
@@ -497,6 +510,38 @@ class Repository:
             if collection == "media":
                 for row in rows:
                     row.pop("path", None)
+                capture_rows = [row for row in rows if row["kind"] == "capture"]
+                if capture_rows:
+                    by_id = {row["id"]: row for row in capture_rows}
+                    ids = list(by_id)
+                    marks = ",".join("?" for _ in ids)
+                    sources = {identifier: [] for identifier in ids}
+                    # The media upload predates analysis, so view and protocol
+                    # live on the saved image/video analysis links. Read only
+                    # those links for media already visible to this actor.
+                    for linked in db.execute(
+                        "SELECT source.media_id,source.view,a.protocol "
+                        "FROM ("
+                        f"SELECT media_id,view,analysis_id FROM p_image_analyses WHERE media_id IN ({marks}) "
+                        "UNION ALL "
+                        f"SELECT media_id,view,analysis_id FROM p_video_analyses WHERE media_id IN ({marks})"
+                        ") source JOIN p_analyses a ON a.id=source.analysis_id "
+                        "JOIN p_media m ON m.id=source.media_id "
+                        "WHERE a.org_id=? AND a.student_id=m.student_id",
+                        [*ids, *ids, actor.org_id],
+                    ):
+                        sources[linked["media_id"]].append(linked)
+                    for identifier, linked in sources.items():
+                        if not linked:
+                            continue
+                        views = {source["view"] for source in linked}
+                        protocols = {source["protocol"] for source in linked}
+                        # A capture can be reused. Do not describe it using
+                        # one arbitrary analysis if the linked records disagree.
+                        if len(views) == 1:
+                            by_id[identifier]["capture_view"] = next(iter(views))
+                        if len(protocols) == 1 and next(iter(protocols)):
+                            by_id[identifier]["capture_protocol"] = next(iter(protocols))
             if collection == "programs" and actor.role == "student":
                 for row in rows:
                     row["detail"].pop("coach_notes", None)
@@ -586,7 +631,7 @@ class Repository:
             result["findings"] = [
                 dict(r)
                 for r in db.execute(
-                    "SELECT * FROM p_scan_findings WHERE scan_id=?", (identifier,)
+                    "SELECT * FROM p_scan_findings WHERE scan_id=? ORDER BY created_at,rowid", (identifier,)
                 )
             ]
         if collection == "locations":
@@ -779,6 +824,17 @@ class Repository:
                     [session["analysis_id"]] if session["analysis_id"] else []
                 ))
             by_session = {session["id"]: session for session in client["sessions"]}
+            for session in client["sessions"]:
+                session["exercise_events"] = []
+            for event in db.execute(
+                "SELECT e.* FROM p_session_exercise_events e "
+                "JOIN p_training_sessions ts ON ts.id=e.session_id "
+                "WHERE ts.student_id=? ORDER BY ts.performed_at,e.sequence",
+                (identifier,),
+            ):
+                session = by_session.get(event["session_id"])
+                if session:
+                    session["exercise_events"].append(dict(event))
             for recorder in db.execute(
                 "SELECT sr.* FROM p_session_recorders sr "
                 "JOIN p_training_sessions ts ON ts.id=sr.session_id WHERE ts.student_id=?",
@@ -804,6 +860,22 @@ class Repository:
                     (identifier,),
                 )
             ]
+            client["visit_program_ids"] = []
+            for linked in db.execute(
+                "SELECT DISTINCT r.program_id FROM p_program_revision_visits rv "
+                "JOIN p_program_revisions r ON r.id=rv.revision_id "
+                "JOIN p_training_sessions ts ON ts.id=rv.session_id "
+                "JOIN p_programs p ON p.id=r.program_id "
+                "WHERE ts.student_id=? AND p.org_id=? ORDER BY r.program_id",
+                (identifier, actor.org_id),
+            ):
+                try:
+                    self.get(actor, "programs", linked["program_id"], db)
+                except Refused as error:
+                    if error.status not in (403, 404):
+                        raise
+                    continue
+                client["visit_program_ids"].append(linked["program_id"])
             client["progress"] = [
                 dict(r)
                 for r in db.execute(
@@ -811,6 +883,26 @@ class Repository:
                     (identifier,),
                 )
             ]
+            # Reconcile the compact progress index with archived source evidence.
+            # Older rows remain stored; unsupported/ambiguous values cannot become
+            # comparable merely because they have a number in this index.
+            from .progress_evidence import progress_evidence, selected_progress_measurements
+
+            progress_sources = {}
+            for source in db.execute(
+                "SELECT DISTINCT a.id,a.student_id,a.kind,a.protocol,a.status,a.demo,"
+                "a.created_at,a.result,a.detail FROM p_analyses a "
+                "JOIN p_progress_records pr ON pr.analysis_id=a.id "
+                "WHERE pr.student_id=? AND a.student_id=? AND a.org_id=?",
+                (identifier, identifier, actor.org_id),
+            ):
+                source = unpack(source)
+                progress_sources[source["id"]] = (
+                    source, selected_progress_measurements(source["result"], source["detail"])
+                )
+            for record in client["progress"]:
+                source, measurements = progress_sources.get(record["analysis_id"], (None, {}))
+                record["evidence"] = progress_evidence(record, source, measurements)
             client["observations"] = [
                 dict(r)
                 for r in db.execute(
@@ -833,6 +925,24 @@ class Repository:
                 client[collection].extend(page["items"])
                 if not page["items"] or len(client[collection]) >= page["total"]:
                     break
+        # The client hub needs saved markers for the exact visit timeline. Keep
+        # the scan-wide order used by get("scans") so marker numbers agree with
+        # the image and annotation table. Author names come from saved authors.
+        scans_by_id = {scan["id"]: scan for scan in client["scans"]}
+        for scan in scans_by_id.values():
+            scan["findings"] = []
+        with self.db() as db:
+            for finding in db.execute(
+                "SELECT f.*,u.name AS author_name FROM p_scan_findings f "
+                "JOIN p_scans s ON s.id=f.scan_id "
+                "LEFT JOIN p_users u ON u.id=f.author_id AND u.org_id=s.org_id "
+                "WHERE s.student_id=? AND s.org_id=? "
+                "ORDER BY f.scan_id,f.created_at,f.rowid",
+                (identifier, actor.org_id),
+            ):
+                scan = scans_by_id.get(finding["scan_id"])
+                if scan is not None:
+                    scan["findings"].append(dict(finding))
         return client
 
     def _linked(self, actor, data, db, student=None):
@@ -885,6 +995,27 @@ class Repository:
             (session_id, analysis_id, session_id, analysis_id),
         ).fetchone())
 
+    @staticmethod
+    def _analysis_visit_ids(db, analysis_id):
+        if not analysis_id:
+            return set()
+        return {row[0] for row in db.execute(
+            "SELECT id FROM p_training_sessions WHERE analysis_id=? "
+            "UNION SELECT session_id FROM p_session_analyses WHERE analysis_id=?",
+            (analysis_id, analysis_id),
+        )}
+
+    def _sources_share_visit(self, db, analysis_id, scan, scan_session_id):
+        """Different saved sources must not claim contradictory visits."""
+        assessment_visits = self._analysis_visit_ids(db, analysis_id)
+        scan_visits = ({scan_session_id} if scan_session_id else
+                       self._analysis_visit_ids(db, scan.get("analysis_id")))
+        if assessment_visits and scan_visits:
+            return bool(assessment_visits & scan_visits)
+        # Two different assessments cannot be called the same source before
+        # either is assigned to a visit; a source without a visit stays unknown.
+        return not scan.get("analysis_id") or scan["analysis_id"] == analysis_id
+
     def _check_visit_link(self, actor, collection, identifier, record, session_id, db):
         if session_id:
             session = db.execute(
@@ -899,14 +1030,18 @@ class Repository:
                 db, session_id, record["analysis_id"]
             ):
                 raise Refused("The assessment belongs to a different visit.")
-        if collection == "notes" and session_id and record.get("scan_id"):
+        if collection == "notes" and record.get("scan_id"):
             scan = self.get(actor, "scans", record["scan_id"], db)
-            if scan["session_id"] and scan["session_id"] != session_id:
+            if session_id and scan["session_id"] and scan["session_id"] != session_id:
                 raise Refused("The scan belongs to a different visit.")
-            if scan["analysis_id"] and not self._analysis_in_visit(
+            if session_id and scan["analysis_id"] and not self._analysis_in_visit(
                 db, session_id, scan["analysis_id"]
             ):
                 raise Refused("The scan assessment belongs to a different visit.")
+            if record.get("analysis_id") and not self._sources_share_visit(
+                db, record["analysis_id"], scan, scan["session_id"]
+            ):
+                raise Refused("The scan and assessment do not share a recorded visit.")
         if collection == "scans":
             # A note explicitly tied to this scan and visit cannot be stranded by
             # moving or clearing the scan's own visit link.
@@ -917,6 +1052,14 @@ class Repository:
             ).fetchone()
             if conflicting:
                 raise Refused("Move linked coach notes before changing this scan's visit.")
+            # A note without an explicit visit can still name both this scan
+            # and an assessment. Moving the scan must preserve that relation.
+            for note in db.execute(
+                "SELECT analysis_id FROM p_notes WHERE scan_id=? AND analysis_id IS NOT NULL",
+                (identifier,),
+            ):
+                if not self._sources_share_visit(db, note["analysis_id"], record, session_id):
+                    raise Refused("A linked coach note assessment would belong to a different visit.")
 
     @staticmethod
     def _save_visit_link(collection, identifier, session_id, db):
@@ -1009,6 +1152,13 @@ class Repository:
             if collection == "programs" and not str(merged.get("name") or "").strip():
                 raise Refused("Name the program.")
             self._linked(actor, merged, db, merged.get("student_id"))
+            if collection == "notes" and merged.get("program_id"):
+                assigned = db.execute(
+                    "SELECT 1 FROM p_program_assignments WHERE program_id=? AND student_id=?",
+                    (merged["program_id"], merged.get("student_id")),
+                ).fetchone()
+                if not assigned:
+                    raise Refused("Assign the program to this client before linking feedback.")
             if collection in VISIT_LINKS:
                 self._check_visit_link(actor, collection, identifier, merged, session_id, db)
             for f in ("name", "text"):
@@ -1608,6 +1758,11 @@ class Repository:
     def complete_session(self, actor, item):
         with self.db() as db:
             self.assert_student(actor, item["student_id"], True, db)
+            completed = item.get("completed", [])
+            if not isinstance(completed, list) or len(completed) > 200 or any(
+                not isinstance(value, str) or not value for value in completed
+            ):
+                raise Refused("Choose valid completed movements.")
             if item.get("program_id"):
                 program = self.get(actor, "programs", item["program_id"], db)
                 if program.get("detail", {}).get("status") == "Completed":
@@ -1623,7 +1778,7 @@ class Repository:
                     value for step in program["steps"] if step.get("exercise_id")
                     for value in (step["exercise_id"], step["id"])
                 }
-                if any(x not in allowed for x in item.get("completed", [])):
+                if any(x not in allowed for x in completed):
                     raise Refused("Completed movements must belong to the program.")
 
             reservation_id = item.get("reservation_id") or None
@@ -1655,9 +1810,29 @@ class Repository:
             linked = by_analysis or by_reservation
             if linked and linked["program_id"] and item.get("program_id") and linked["program_id"] != item["program_id"]:
                 raise Refused("This visit is already linked to another program.")
-            completed = item.get("completed", [])
-            if not isinstance(completed, list) or any(not isinstance(value, str) for value in completed):
-                raise Refused("Choose valid completed movements.")
+            submitted_events = item.get("completed_events")
+            if submitted_events is not None and (
+                not isinstance(submitted_events, list) or len(submitted_events) != len(completed)
+            ):
+                raise Refused("Movement event order must match completed movements.")
+            event_times = []
+            for index, key in enumerate(completed):
+                entry = submitted_events[index] if submitted_events is not None else None
+                if entry is not None and (not isinstance(entry, dict) or entry.get("key") != key):
+                    raise Refused("Movement event order must match completed movements.")
+                value = entry.get("completed_at") if entry is not None else None
+                if value in (None, ""):
+                    event_times.append(None)
+                    continue
+                if not isinstance(value, str):
+                    raise Refused("Choose a valid movement completion time.")
+                try:
+                    marked = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                except ValueError as exc:
+                    raise Refused("Choose a valid movement completion time.") from exc
+                if marked.tzinfo is None or marked > datetime.now(timezone.utc) + timedelta(minutes=5):
+                    raise Refused("Choose a valid movement completion time.")
+                event_times.append(marked.astimezone(timezone.utc).isoformat())
             if linked:
                 identifier = linked["id"]
                 db.execute(
@@ -1680,6 +1855,24 @@ class Repository:
                         item.get("program_id") or None, analysis_id,
                         now(), encode(completed), str(item.get("notes", ""))[:3000],
                     ),
+                )
+            previous_events = db.execute(
+                "SELECT * FROM p_session_exercise_events WHERE session_id=? ORDER BY sequence",
+                (identifier,),
+            ).fetchall()
+            existing_by_key = {}
+            for event in previous_events:
+                existing_by_key.setdefault(event["completed_key"], []).append(event)
+            db.execute("DELETE FROM p_session_exercise_events WHERE session_id=?", (identifier,))
+            logged_at = now()
+            for sequence, (key, completed_at) in enumerate(zip(completed, event_times), 1):
+                pool = existing_by_key.get(key, [])
+                old = pool.pop(0) if pool else None
+                db.execute(
+                    "INSERT INTO p_session_exercise_events VALUES (?,?,?,?,?,?)",
+                    (old["id"] if old else uid(), identifier, sequence, key,
+                     (old["logged_at"] or logged_at) if old else logged_at,
+                     completed_at or (old["completed_at"] if old else None)),
                 )
             recorder = db.execute(
                 "SELECT name FROM p_users WHERE id=? AND org_id=?",

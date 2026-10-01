@@ -9,7 +9,10 @@ export const cameraLabels = {
   three_quarter: "45° view",
 };
 
-export function captureSummary(kind, protocol = "") {
+export function captureSummary(kind, protocol = "", status = "complete") {
+  if (status === "needs_capture") return kind === "movement"
+    ? "The video was checked frame by frame, but the visible body was not tracked reliably enough to measure this movement. Record a clearer clip and try again."
+    : "The photograph was checked, but the visible body was not clear enough for a supported posture measurement. Capture a clearer view and try again.";
   if (kind === "movement") return "A recorded movement was analyzed frame by frame.";
   if (String(protocol).trim().toLowerCase() === "standing posture")
     return "A standing posture photograph was analyzed for visible landmark positions.";
@@ -71,16 +74,40 @@ const definitions = {
     "Projected forward or backward angle of the shoulder-to-hip axis.",
     "It requires a suitable side view and does not measure vertebral alignment.",
   ],
+  left_knee_deviation: [
+    "Perpendicular offset of the left knee from the visible hip-to-ankle line divided by that leg's projected length; a unitless ratio.",
+    "Positive means the knee is inward of the line; negative means outward. This frontal-view position proxy does not diagnose knee alignment or measure side-view knee bend.",
+  ],
+  right_knee_deviation: [
+    "Perpendicular offset of the right knee from the visible hip-to-ankle line divided by that leg's projected length; a unitless ratio.",
+    "Positive means the knee is inward of the line; negative means outward. This frontal-view position proxy does not diagnose knee alignment or measure side-view knee bend.",
+  ],
   forward_head: [
-    "Visible head offset relative to torso height in a side view.",
-    "This is a 2D position proxy; camera perspective affects it.",
+    "Forward offset of the visible ear from the shoulder divided by visible torso height; a unitless ratio.",
+    "Positive means the ear is forward of the shoulder; negative means behind it in this side view. It is not a distance in centimetres, and camera perspective affects it.",
   ],
 };
 export function metricCopy(metric = {}) {
-  if (definitions[metric.id]) {
-    const [definition, why] = definitions[metric.id];
+  const id = String(metric.id || "").split(":").at(-1);
+  if (definitions[id]) {
+    const [definition, why] = definitions[id];
     return { definition, why };
   }
+  if (id.endsWith("_tempo_cv"))
+    return {
+      definition: "Standard deviation of detected repetition durations divided by their average duration; a unitless ratio.",
+      why: "A smaller value means the detected cycles took more similar amounts of time. It is not a movement-quality or strength score; camera and cycle detection can change it.",
+    };
+  if (id.endsWith("_rep_rom_sd"))
+    return {
+      definition: "Standard deviation of the measured projected angle ranges across detected repetitions, in degrees.",
+      why: "A smaller value means the detected repetitions used more similar visible ranges. It is not a strength score, and an isolated difference is not an improvement claim.",
+    };
+  if (id.endsWith("_repetitions"))
+    return {
+      definition: "Number of complete outward-and-return movement cycles detected in accepted video frames.",
+      why: "A larger count means more complete cycles were detected in this clip. It does not indicate better form or a larger joint range.",
+    };
   const name = String(metric.name || metric.id || "measurement").toLowerCase();
   if (name.includes("rom") || name.includes("range of motion") || name.includes(" range"))
     return {
