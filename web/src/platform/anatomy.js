@@ -17,6 +17,7 @@ import {
   upload,
   head,
   card,
+  empty,
   notice,
   table,
   mediaURL,
@@ -40,13 +41,16 @@ import { scanAnnotationMarkers, scanFrameIndex } from "./scan-markers.js";
 import {
   initialVisitId, visitFormOptions, compatibleAssessments, sessionForAnalysis,
 } from "./visit-form-links.js";
+export function anatomyClientChoice(students, role) {
+  if (!students.length) return role === "student"
+    ? empty("Your client record is not linked", "Ask your coach or studio administrator to connect your account before you open your body map.")
+    : empty("No clients available here", "Add a client or ask an administrator to assign clients to your location.", `<a class="button" href="${href("clients", { client: "" })}">Open clients →</a>`);
+  return `<div class="client-grid">${students.map((c) => `<a class="client-card" href="${href("client", { client: c.id, tab: "anatomy" })}">${esc(c.name)} →</a>`).join("")}</div>`;
+}
 function choose(root) {
   root.innerHTML =
-    head(
-      "Choose a client",
-      "Select a client to explore their body regions, scan records and coach notes.",
-    ) +
-    `<div class="client-grid">${state.me.students.map((c) => `<a class="client-card" href="${href("client", { client: c.id, tab: "anatomy" })}">${esc(c.name)} →</a>`).join("")}</div>`;
+    head("Choose a client", "Select a client to explore their body regions, scan records and coach notes.") +
+    anatomyClientChoice(state.me.students, state.me.role);
 }
 function linkedNotes(notes, client, emptyMessage) {
   return notes.map((n) => `<article class="note"><p class="eyebrow">${esc(n.detail?.simulation || n.detail?.source === "demo_coach_feedback" || (client.detail?.demo && !n.detail?.source) ? "DEMO COACH FEEDBACK" : "COACH FEEDBACK")}</p><p>${esc(n.text)}</p><small>${esc(coachName(n.author_id))} · ${esc(dt(n.created_at))} · ${n.visibility === "student" ? "Shared with student" : "Coach only"}</small><div class="actions">${n.session_id ? `<a href="${href("client", { tab: "sessions", session: n.session_id })}">Source visit →</a>` : n.analysis_id ? `<a href="${href("client", { tab: "sessions", assessment: n.analysis_id })}">Source session →</a>` : ""}${n.program_id ? `<a href="${href("program", { id: n.program_id, client: client.id })}">Related program →</a>` : ""}${n.exercise_id ? `<a href="${href("exercise", { id: n.exercise_id, client: client.id })}">Related exercise →</a>` : ""}${n.detail?.updated_at ? `<small>Last edited ${esc(dt(n.detail.updated_at))}</small>` : ""}</div></article>`).join("") || `<p>${esc(emptyMessage || (client.detail?.demo ? "No simulated coach feedback is linked to this region." : "No coach feedback is linked to this region yet."))}</p>`;
@@ -117,7 +121,7 @@ export async function anatomy(root) {
       unit: trend.unit, xLabel: (value) => date(new Date(value)),
     }) : "",
     sessionLink: `<a href="${href("client", { tab: "sessions", assessment: trend.latest.analysis_id })}">Latest source visit →</a>${trend.previous ? `<a href="${href("client", { tab: "sessions", assessment: trend.previous.analysis_id })}">Previous source visit →</a>` : ""}<a href="${href("client", { tab: "progress", metric: trend.metric, assessment: trend.latest.analysis_id })}">Full history →</a>`,
-  }) : card("Measured region history", "<p>No comparable measurements from this region are available yet.</p>");
+  }) : card("Measured region history", `<p>No supported measurement is linked to this body region yet. ${state.me.role === "student" ? "Your coach can add a suitable posture or movement capture." : "Capture a clear, suitable view to begin a measured history."}</p>${state.me.role === "student" ? "" : `<a class="button" href="${href("capture", { client: c.id })}">Start an assessment →</a>`}`);
   const sourceAnalysis = c.analyses.find((analysis) => analysis.id === aid);
   const sourceText = sourceAnalysis ? `${sourceAnalysis.kind === "movement" ? "Movement analysis" : "Posture assessment"} · ${dt(sourceAnalysis.created_at)}` : "All visits";
   root.innerHTML =
@@ -128,8 +132,8 @@ export async function anatomy(root) {
     `<div class="anatomy-workspace"><div class="anatomy-view-stage"><div id="anatomy-status" role="status" class="notice">Loading the existing anatomy viewer…</div><iframe class="anatomy-frame" id="atlas" title="${esc(c.name)} · ${esc(region.name)} anatomy" src="/anatomy.html?${query}"></iframe>${bodyMapMarkers(c, region, programs)}</div><aside class="anatomy-context">` +
     `<section class="panel anatomy-region-summary"><p class="eyebrow">${esc(c.name)} · ${esc(region.side)} · ${esc(sourceText)}</p><h2>${esc(region.name)}</h2><p>${esc(region.explanation)}</p><div class="anatomy-counts"><span><strong>${history.observations.length}</strong> measured findings</span><span><strong>${history.notes.length}</strong> coach feedback</span><span><strong>${history.sessions.length}</strong> related assessments</span><span><strong>${exercises.length}</strong> assigned movements</span></div><p class="muted">The atlas is an educational reference, not a reconstruction of this client's internal anatomy.</p>${state.me.role !== "student" ? '<button data-edit="notes" class="primary">+ Add coach feedback here</button>' : ""}</section>` +
     `${metricHistory}` +
-    `${card("Coach feedback", linkedNotes(history.notes.slice(0, 3), c) + (history.notes.length > 3 ? `<a class="record-link" href="${href("client", { tab: "notes", region: region.id })}">Read all ${history.notes.length} notes for this region →</a>` : ""))}` +
-    `${card("Assigned practice", exercises.slice(0, 6).map((step) => `<a class="record-link" href="${href("program", { id: step.program.id, client: c.id })}">${esc(step.exercise_name)} <small>${esc(step.program.name)} · ${esc(step.detail?.purpose || "Coach-assigned exercise")}</small></a>`).join("") || "<p>No assigned exercise targets this region yet.</p>")}` +
+    `${card("Coach feedback", history.notes.length ? linkedNotes(history.notes.slice(0, 3), c) + (history.notes.length > 3 ? `<a class="record-link" href="${href("client", { tab: "notes", region: region.id })}">Read all ${history.notes.length} notes for this region →</a>` : "") : `<p>${state.me.role === "student" ? "Your coach has not shared feedback for this body region." : "No coach feedback is linked to this body region. Add a specific observation with the button above."}</p>`)}` +
+    `${card("Assigned practice", exercises.slice(0, 6).map((step) => `<a class="record-link" href="${href("program", { id: step.program.id, client: c.id })}">${esc(step.exercise_name)} <small>${esc(step.program.name)} · ${esc(step.detail?.purpose || "Coach-assigned exercise")}</small></a>`).join("") || `<p>No assigned movement targets this body region yet.</p><a class="button" href="${href("client", { client: c.id, tab: "programs", region: region.id })}">${state.me.role === "student" ? "See your assigned program" : "Review this client's program"} →</a>`)}` +
     `<details class="panel anatomy-more"><summary>Measured findings and related sessions</summary>${history.observations.slice(0, 8).map((observation) => `<article class="anatomy-observation"><p class="eyebrow">${esc(observation.source || "SYSTEM MEASUREMENT")}</p><a href="${href("client", { tab: "sessions", assessment: observation.analysis_id })}">${esc(observation.text)}</a><small>${esc(dt(observation.created_at))}</small></article>`).join("") || "<p>No measured findings linked yet.</p>"}${history.sessions.slice(0, 6).map((analysis) => `<a class="record-link" href="${href("client", { tab: "sessions", assessment: analysis.id })}">${esc(analysis.protocol)} · ${esc(dt(analysis.created_at))} →</a>`).join("")}</details>` +
     `<details class="panel anatomy-more"><summary>Mapped structures and scans</summary><ul>${region.structures.map((structure) => `<li><button class="text-button" data-structure="${structure.id}">${esc(structure.name)}</button></li>`).join("")}</ul>${scans.map((scan) => `<a class="record-link" href="${href("client", { tab: "scans", scan: scan.id, region: region.id, id: scan.analysis_id })}">${esc(scan.name)} →</a>`).join("") || "<p>No scan linked to this region.</p>"}</details>` +
     `<div class="panel anatomy-next"><p class="eyebrow">NEXT STEP</p>${aid ? `<a class="record-link" href="${href("report", { id: aid })}">Return to source assessment →</a>` : ""}${state.me.role !== "student" ? `<a class="record-link" href="${href("client", { tab: "programs", region: region.id, report: aid || "" })}">Add this area to a program →</a>` : `<a class="record-link" href="${href("client", { tab: "programs" })}">See your assigned program →</a>`}</div></aside></div>`;
@@ -182,6 +186,19 @@ export async function anatomy(root) {
     );
   bindButtons(root);
 }
+export function scanEmptyCopy(role) {
+  return role === "student"
+    ? {
+        heading: "View imaging your coach has shared in your record.",
+        list: "No imaging records have been shared with you yet.",
+        detail: "Ask your coach if an existing scan should be added to your record. This page does not make a diagnosis.",
+      }
+    : {
+        heading: "Upload and annotate supplied imaging in this client's record.",
+        list: "No scans saved for this client. Use Upload scan / X-ray above to add an existing file.",
+        detail: "Upload an existing image or DICOM file, then link it to the relevant visit or body region.",
+      };
+}
 export async function scans(root) {
   if (!state.client) {
     const { pagedRecords } = await import("./paging.js");
@@ -205,12 +222,11 @@ export async function scans(root) {
     });
   }
   const c = state.client;
+  const noScan = scanEmptyCopy(state.me.role);
   root.innerHTML =
     head(
       "Scans & imaging records",
-      "Upload, view and annotate educational imaging within " +
-        c.name +
-        "’s record.",
+      c.name + " · " + noScan.heading,
       state.me.role === "student"
         ? ""
         : '<button id="scan-upload" class="primary">+ Upload scan / X-ray</button>',
@@ -218,13 +234,11 @@ export async function scans(root) {
     notice(
       "Medical images are displayed for educational review and manual coaching notes. No diagnostic or segmentation model is run on these records.",
     ) +
-    `<div class="scan-layout"><aside id="scan-list">${c.scans.map((s) => `<a class="record-link ${params().get("scan") === s.id ? "active" : ""}" href="${href("client", { tab: "scans", scan: s.id, region: s.region_id, id: s.analysis_id })}"><strong>${esc(s.name)}</strong><small>${esc(s.scan_type)} · ${esc(regionName(s.region_id))}</small></a>`).join("") || "<p>No scans saved yet.</p>"}</aside><div id="scan-detail"></div></div>`;
+    `<div class="scan-layout"><aside id="scan-list">${c.scans.map((s) => `<a class="record-link ${params().get("scan") === s.id ? "active" : ""}" href="${href("client", { tab: "scans", scan: s.id, region: s.region_id, id: s.analysis_id })}"><strong>${esc(s.name)}</strong><small>${esc(s.scan_type)} · ${esc(regionName(s.region_id))}</small></a>`).join("") || `<p>${esc(noScan.list)}</p>`}</aside><div id="scan-detail"></div></div>`;
   if ($("#scan-upload")) $("#scan-upload").onclick = () => scanUpload();
   const sid = params().get("scan") || c.scans[0]?.id;
   if (!sid) {
-    $("#scan-detail").innerHTML = notice(
-      "Add a supplied image or DICOM file to begin.",
-    );
+    $("#scan-detail").innerHTML = notice(noScan.detail);
     return;
   }
   const scan = await record("scans", sid);

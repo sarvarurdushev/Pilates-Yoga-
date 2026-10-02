@@ -67,6 +67,15 @@ export function comparableProgramMeasurements(client, assignment, program) {
     Date.parse(b.latest.recorded_at) - Date.parse(a.latest.recorded_at)
   );
 }
+export function repertoireEmptyState({ collection, own = false, role = "coach", filtered = false }) {
+  const name = collection === "exercises" ? "exercises" : "programs";
+  if (filtered) return notice(`No ${name} match these filters. Clear them to see the available ${name}.`) +
+    '<button type="button" id="repertoire-clear">Clear filters</button>';
+  if (role === "student") return notice(`No ${name} are available in your workspace yet. Ask your coach about the next practice.`);
+  return notice(own
+    ? `You have not saved any ${name} in My content. Use the create button above to add one.`
+    : `No ${name} have been added here yet. Use the create button above to begin.`);
+}
 export async function library(root, collection = "exercises", own = false) {
   const exercises = collection === "exercises";
   if (!exercises && state.client && !own) return clientProgramWorkspace(root);
@@ -75,12 +84,14 @@ export async function library(root, collection = "exercises", own = false) {
       own ? "My content" : exercises ? "Exercise repertoire" : "Programs",
       state.client && !exercises
         ? "Assigned to " + state.client.name
-        : "Search the full repertoire and open a movement to review its instructions, media and anatomy.",
+        : exercises
+          ? "Search exercises and open a movement to review its instructions, media and anatomy."
+          : "Search programs and open a plan to review its goal, sequence and saved versions.",
       state.me.role === "student"
         ? ""
         : `<button data-edit="${collection}" class="primary">+ ${exercises ? "Exercise" : "Program"}</button>`,
     ) +
-    `<div class="filter-row">${field("Search repertoire", "repertoire-search")}${
+    `<div class="filter-row">${field(exercises ? "Search exercises" : "Search programs", "repertoire-search")}${
       exercises
         ? select(
             "Category",
@@ -116,7 +127,20 @@ export async function library(root, collection = "exercises", own = false) {
             (e) =>
               `<a class="exercise-card" href="${href(exercises ? "exercise" : "program", { id: e.id })}">${exerciseIllustration(e)}<div class="exercise-tag">${esc(exercises ? e.category : "Program")} · ${esc(e.difficulty || e.detail.difficulty || "Coach adapted")}</div><h3>${esc(e.name)}</h3><p>${esc(e.detail.description || e.goal || "Coach-authored practice")}</p><small>${esc(regionName(e.region_id))} · ${esc(e.detail.equipment_type || e.detail.frequency || "")}</small><span>${exercises ? "Instructions, media & anatomy" : "Open sequence"} →</span></a>`,
           )
-          .join("") || notice("No matches. Change the search or filters.");
+          .join("") || repertoireEmptyState({
+            collection, own, role: state.me.role,
+            filtered: Boolean(find("[name=repertoire-search]").value.trim() ||
+              find("[name=region]").value ||
+              (exercises && find("[name=category]").value)),
+          });
+      const clear = find("#repertoire-clear");
+      if (clear) clear.onclick = () => {
+        find("[name=repertoire-search]").value = "";
+        find("[name=region]").value = "";
+        if (exercises) find("[name=category]").value = "";
+        offset = 0;
+        draw();
+      };
       find("#repertoire-count").textContent =
         `${result.total} ${exercises ? "exercises" : "programs"} · ${result.total ? offset + 1 : 0}–${Math.min(offset + size, result.total)} shown`;
       find("#repertoire-prev").disabled = offset === 0;
@@ -291,6 +315,11 @@ export function latestProgramSessionCompletion(session, versions = [], programId
   };
 }
 
+export function programAssignmentEmptyState(client, role, hasAssignment) {
+  const student = role === "student";
+  if (hasAssignment) return `<section class="pd-empty-plan"><h2>Assigned program could not be opened</h2><p>An assignment is saved for this client, but its program details are unavailable. ${student ? "Ask your coach to check the plan before practicing from it." : "Check the program record or ask an administrator to restore it before assigning a replacement."}</p><div class="actions"><button type="button" id="pd-retry-program">Retry loading program</button><a class="button" href="${href("client", { client: client.id, tab: "sessions" })}">${student ? "View your sessions" : "Review client visits"} →</a></div></section>`;
+  return `<section class="pd-empty-plan"><h2>${student ? "No program assigned yet" : "Build a plan for this client"}</h2><p>${student ? "Your coach will assign a plan here. You can still review your saved sessions." : "Start with this client's findings, choose body targets, then create a sequence with clear instructions."}</p>${student ? `<a class="button" href="${href("client", { client: client.id, tab: "sessions" })}">View your sessions →</a>` : '<button data-edit="programs" class="primary">Create program</button>'}</section>`;
+}
 async function clientProgramWorkspace(root) {
   const client = state.client;
   const student = state.me.role === "student";
@@ -324,16 +353,17 @@ async function clientProgramWorkspace(root) {
   root.innerHTML = head(
     student ? "Your current program" : `${client.name} · program`,
     student ? "See what your coach assigned and why each movement matters." : "A client-specific plan linked to analysis, body areas and past practice.",
-    student ? "" : '<button data-edit="programs" class="primary">+ Create program</button>',
+    student || (active && !program) ? "" : '<button data-edit="programs" class="primary">+ Create program</button>',
   ) +
     (report || finding || contextRegion ? `<div class="pd-context-callout"><strong>From your client review</strong><p>${finding ? `Finding: ${esc(finding.replaceAll("_", " "))}. ` : ""}${contextRegion ? `Body area: ${esc(regionName(contextRegion))}. ` : ""}New and edited plans will retain this assessment connection.</p>${report ? `<a href="${href("report", { id: report, client: client.id })}">Return to assessment →</a>` : ""}</div>` : "") +
-    (program ? `<section class="pd-current-dashboard"><div class="pd-current-main"><small>CURRENT PROGRAM · ${esc(details.status || "Active")}</small><h2><a href="${href("program", { id: program.id, client: client.id })}">${esc(program.name)}</a></h2><p>${esc(program.goal || details.description || "Follow your coach’s planned movement practice.")}</p><div class="pd-target-links">${(details.target_region_ids?.length ? details.target_region_ids : [program.region_id]).filter(Boolean).map((id) => `<a class="pd-region-chip" href="${href("client", { client: client.id, tab: "anatomy", region: id })}">${esc(regionName(id))} · Body map</a>`).join("")}</div><div class="actions"><a class="button primary" href="${href("program", { id: program.id, client: client.id })}">${student ? "Open today’s practice" : "Open full program"}</a>${student ? "" : `<button data-edit="programs" data-id="${esc(program.id)}">Edit program</button><details class="pd-more-actions"><summary>More program actions</summary><button id="pd-add-movement" type="button">Add exercise</button><button id="pd-new-phase" type="button">Create next phase</button><button id="pd-change-phase" type="button">Change phase</button><a class="button" href="${href("program", { id: program.id, client: client.id, history: "1" })}">View history</a><button id="pd-duplicate-client" type="button">Duplicate program</button><button id="pd-complete-program" type="button">Complete program</button></details>`}</div></div><div class="pd-current-facts"><div><strong>${esc(details.phase || "Foundation")}</strong><small>Current phase</small></div><div><strong>${esc(total)}</strong><small>Assigned movements · current phase</small></div><div><strong>${esc(practice.length)}</strong><small>Practice visits with movement logs</small></div><div><strong>${esc(completion.value)}</strong><small>${esc(completionLabel)}</small><small>${esc(completion.detail)}</small></div><div><strong>${esc(date(active?.starts_on || details.start_date))}</strong><small>Plan start</small></div><div><strong>${esc(history[0] ? date(history[0].created_at) : "—")}</strong><small>Latest revision</small></div></div></section>` : `<section class="pd-empty-plan"><h2>${student ? "No program assigned yet" : "Build a plan for this client"}</h2><p>${student ? "Your coach will assign exercises here. Previous completed sessions remain in your history." : "Start with this client’s findings, choose body targets, then create a sequence with clear instructions."}</p>${student ? "" : '<button data-edit="programs" class="primary">Create program</button>'}</section>`) +
+    (program ? `<section class="pd-current-dashboard"><div class="pd-current-main"><small>CURRENT PROGRAM · ${esc(details.status || "Active")}</small><h2><a href="${href("program", { id: program.id, client: client.id })}">${esc(program.name)}</a></h2><p>${esc(program.goal || details.description || "Follow your coach’s planned movement practice.")}</p><div class="pd-target-links">${(details.target_region_ids?.length ? details.target_region_ids : [program.region_id]).filter(Boolean).map((id) => `<a class="pd-region-chip" href="${href("client", { client: client.id, tab: "anatomy", region: id })}">${esc(regionName(id))} · Body map</a>`).join("")}</div><div class="actions"><a class="button primary" href="${href("program", { id: program.id, client: client.id })}">${student ? "Open today’s practice" : "Open full program"}</a>${student ? "" : `<button data-edit="programs" data-id="${esc(program.id)}">Edit program</button><details class="pd-more-actions"><summary>More program actions</summary><button id="pd-add-movement" type="button">Add exercise</button><button id="pd-new-phase" type="button">Create next phase</button><button id="pd-change-phase" type="button">Change phase</button><a class="button" href="${href("program", { id: program.id, client: client.id, history: "1" })}">View history</a><button id="pd-duplicate-client" type="button">Duplicate program</button><button id="pd-complete-program" type="button">Complete program</button></details>`}</div></div><div class="pd-current-facts"><div><strong>${esc(details.phase || "Foundation")}</strong><small>Current phase</small></div><div><strong>${esc(total)}</strong><small>Assigned movements · current phase</small></div><div><strong>${esc(practice.length)}</strong><small>Practice visits with movement logs</small></div><div><strong>${esc(completion.value)}</strong><small>${esc(completionLabel)}</small><small>${esc(completion.detail)}</small></div><div><strong>${esc(date(active?.starts_on || details.start_date))}</strong><small>Plan start</small></div><div><strong>${esc(history[0] ? date(history[0].created_at) : "—")}</strong><small>Latest revision</small></div></div></section>` : programAssignmentEmptyState(client, state.me.role, Boolean(active))) +
     (program ? programProgressCard(client, active, program) : "") +
     (!student && program ? card("Program decisions", `<p><strong>Coach note:</strong> ${esc(details.coach_notes || "No coach planning note yet.")}</p><p><strong>Related assessment:</strong> ${details.source_analysis_id ? `<a href="${href("report", { id: details.source_analysis_id, client: client.id })}">Open source analysis →</a>` : "No assessment linked yet."}</p><p><strong>Historical versions:</strong> ${history.length} saved revision${history.length === 1 ? "" : "s"}.</p><a class="button" href="${href("program", { id: program.id, client: client.id })}">View version history</a>`) : "") +
-    (!student && templates.length ? card("Start from an editable template", `<div class="pd-template-grid">${templates.slice(0,6).map((t) => `<article><small>${esc(t.detail?.phase || "Foundation")}</small><h3>${esc(t.name)}</h3><p>${esc(t.goal || t.detail?.description || "Adapt this plan to the client.")}</p><button data-template="${esc(t.id)}">Use for ${esc(client.name)}</button></article>`).join("")}</div>`) : "") +
+    (!student && templates.length && (!active || program) ? card("Start from an editable template", `<div class="pd-template-grid">${templates.slice(0,6).map((t) => `<article><small>${esc(t.detail?.phase || "Foundation")}</small><h3>${esc(t.name)}</h3><p>${esc(t.goal || t.detail?.description || "Adapt this plan to the client.")}</p><button data-template="${esc(t.id)}">Use for ${esc(client.name)}</button></article>`).join("")}</div>`) : "") +
     (priorPrograms.length ? card("Earlier programs", `<p>Previous plans remain available with their saved versions and practice records.</p><div class="pd-history-list">${priorPrograms.map((assignment) => `<div><span>${esc(date(assignment.starts_on))}</span><strong>${esc(assignment.name || "Earlier plan")}</strong><small>${String(assignment.notes || "").includes("Completed:") ? "Completed" : "Previous assignment"}</small><a href="${href("program", { id: assignment.program_id, client: client.id, history: "1" })}">Open plan and versions →</a></div>`).join("")}</div>`) : "") +
     (practiceHistory.length ? card("Practice history", `<div class="pd-history-list">${practiceHistory.slice(0,10).map((s) => `<div><span>${esc(date(s.performed_at))}</span><strong>${esc(s.completed?.length || 0)} ${s.completed?.length === 1 ? "movement" : "movements"} completed</strong>${s.program_id ? `<a href="${href("program", { id: s.program_id, client: client.id, history: "1" })}">Open saved program →</a>` : ""}${s.analysis_id ? `<a href="${href("report", { id: s.analysis_id, client: client.id })}">Related assessment →</a>` : ""}</div>`).join("")}</div>`) : "");
   bindButtons(root);
+  if (root.querySelector("#pd-retry-program")) root.querySelector("#pd-retry-program").onclick = () => location.reload();
   for (const selector of ["#pd-add-movement", "#pd-change-phase"]) if (root.querySelector(selector)) root.querySelector(selector).onclick = async () => {
     try { const { edit } = await import("./forms.js"); await edit("programs", program.id); } catch (e) { toast(e.message); }
   };
