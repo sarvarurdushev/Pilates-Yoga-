@@ -26,6 +26,29 @@ def _image():
     return buffer.getvalue()
 
 
+def test_program_source_records_its_actual_client_owner(studio):
+    repo, coach, _, student = studio
+    sid = student.user_id
+    analysis_id = repo.list(coach, "analyses", student_id=sid)["items"][0]["id"]
+    program = repo.save(coach, "programs", {
+        "name": "Source owner check", "goal": "Review a captured movement",
+        "detail": {"source_analysis_id": analysis_id},
+    })
+    assert program["detail"]["source_student_id"] == sid
+    other = next(person["id"] for person in repo.people(coach) if person["id"] != sid)
+    with pytest.raises(Refused, match="source analysis belongs to another client"):
+        repo.save(coach, "programs", {
+            "name": "Wrong source owner", "goal": "Invalid source",
+            "detail": {"source_analysis_id": analysis_id, "source_student_id": other},
+        })
+    copy = duplicate(repo, coach, {
+        "program_id": program["id"], "student_id": other, "assign": False,
+    })
+    assert copy["detail"]["student_id"] == other
+    assert "source_analysis_id" not in copy["detail"]
+    assert "source_student_id" not in copy["detail"]
+
+
 def test_program_revisions_media_and_student_projection(studio):
     repo, coach, admin, student = studio
     sid = student.user_id
@@ -125,6 +148,7 @@ def test_duplicate_template_client_scope_and_invalid_sources(studio):
     assert template["steps"][0]["exercise_id"] != repo.get(coach, "programs", source["id"])["steps"][0]["exercise_id"]
     copy = duplicate(repo, coach, {"program_id": template["id"], "student_id": other, "name": "Other client plan"})
     assert copy["detail"]["student_id"] == other
+    assert "source_student_id" not in copy["detail"]
     assert copy["assignments"][0]["student_id"] == other
     assert copy["detail"]["template"] is False
     assert len(copy["steps"]) == 3

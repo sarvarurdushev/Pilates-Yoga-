@@ -6,7 +6,7 @@ import {
 import { exerciseStep, configureStep, reorderStep, removeStep } from "./program-sequence.js";
 import { openCoachCamera } from "./program-camera.js";
 import { visitsForClient, visitConnections } from "./visits.js";
-import { programFirstScreenFacts } from "./first-screen-context.js";
+import { programFirstScreenFacts, programSourceId } from "./first-screen-context.js";
 import { programVersionChanges } from "./program-version-diff.js";
 import { markCompletion, completedEventPayload } from "./completed-events.js";
 
@@ -255,8 +255,8 @@ export async function programDetail(root, id) {
   const selected = d.target_region_ids?.length ? d.target_region_ids : [item.region_id].filter(Boolean);
   const canEdit = !student && own(item);
   const selectedClient = state.client?.id === clientId ? state.client : null;
-  const sourceRecord = selectedClient && d.source_analysis_id
-    ? await record("analyses", d.source_analysis_id).catch(() => null) : null;
+  const sourceId = programSourceId(item, selectedClient);
+  const sourceRecord = sourceId ? await record("analyses", sourceId).catch(() => null) : null;
   if (!root.isConnected) return;
   const contextFacts = programFirstScreenFacts(item, selectedClient, sourceRecord);
   const allowedSourceIds = new Set((selectedClient?.analyses || []).map((analysis) => analysis.id));

@@ -119,7 +119,8 @@ const shot = async (name) => {
   }
 };
 
-await page.goto(`http://127.0.0.1:${port}/index.html`);
+// The studio owns index.html; the standalone WebGL viewer lives here.
+await page.goto(`http://127.0.0.1:${port}/anatomy.html`);
 await page.waitForFunction('document.body.classList.contains("ready")', null, { timeout: 120000 });
 console.log('app ready');
 
@@ -2675,7 +2676,7 @@ phone.on('console', m => { if (m.type() === 'error') consoleError(m.text(), 'pho
 watch(phone, 'phone: ');
 // generous: this is a second WebGL context on a software rasteriser
 phone.setDefaultNavigationTimeout(180000);
-await phone.goto(`http://127.0.0.1:${port}/index.html`);
+await phone.goto(`http://127.0.0.1:${port}/anatomy.html`);
 await phone.waitForFunction('document.body.classList.contains("ready")', null, { timeout: 180000 });
 await phone.waitForTimeout(4000);
 const narrow = await phone.evaluate(() => {

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { programFirstScreenFacts, progressFirstScreenFacts } from "../src/platform/first-screen-context.js";
+import { programFirstScreenFacts, programSourceId, progressFirstScreenFacts } from "../src/platform/first-screen-context.js";
 
 const client = {
   id: "client-a", name: "Ari", programs: [{ program_id: "plan-a" }],
@@ -32,6 +32,55 @@ test("program context shows only a source assessment belonging to the selected c
   assert.equal(programFirstScreenFacts(plan, client, otherClientSource).source, null);
   assert.equal(programFirstScreenFacts({ ...plan, detail: { source_analysis_id: "capture-2", source_student_id: "client-b" } }, client, source).source, null);
   assert.equal(programFirstScreenFacts(plan, null, source).source, null);
+});
+
+test("program context follows the selected client's assignment assessment when plan detail has none", () => {
+  const other = { id: "client-b", name: "Bea", analyses: [], sessions: [] };
+  const plan = { id: "plan-a", detail: {}, assignments: [
+    { student_id: "client-b", analysis_id: "other-capture", active: 1 },
+    { student_id: "client-a", analysis_id: "old-capture", active: 0 },
+    { student_id: "client-a", analysis_id: "capture-1", active: 1 },
+  ] };
+  const source = { id: "capture-1", student_id: "client-a", protocol: "Standing posture",
+    created_at: "2026-06-01T10:00:00Z", result: { views: [{ view: "front" }] } };
+  assert.equal(programSourceId(plan, client), "capture-1");
+  assert.equal(programFirstScreenFacts(plan, client, source).source?.id, "capture-1");
+  assert.equal(programFirstScreenFacts(plan, client, source).sourceVisit?.session?.id, "visit-1");
+  assert.deepEqual(programFirstScreenFacts(plan, client, source).views, ["front"]);
+  assert.equal(programSourceId(plan, other), "other-capture");
+  assert.equal(programFirstScreenFacts(plan, other, source).source, null);
+  assert.equal(programFirstScreenFacts(plan, client, { ...source, student_id: "client-b" }).source, null);
+});
+
+test("a reusable plan does not borrow another client's unowned detail source", () => {
+  const other = { id: "client-b", name: "Bea", analyses: [
+    { id: "beas-capture", student_id: "client-b" },
+  ], sessions: [{ id: "beas-visit", analysis_ids: ["beas-capture"] }] };
+  const plan = { id: "plan-a", detail: { source_analysis_id: "capture-2" }, assignments: [
+    { student_id: "client-a", analysis_id: "capture-1", active: 1 },
+    { student_id: "client-b", analysis_id: "beas-capture", active: 1 },
+  ] };
+  const source = { id: "beas-capture", student_id: "client-b", result: { views: [{ view: "front" }] } };
+  assert.equal(programSourceId(plan, client), "capture-2");
+  assert.equal(programSourceId(plan, other), "beas-capture");
+  assert.equal(programFirstScreenFacts(plan, other, source).source?.id, "beas-capture");
+  assert.equal(programFirstScreenFacts(plan, other, source).sourceVisit?.session?.id, "beas-visit");
+});
+
+test("a plan's explicit source remains its source when assignment context differs", () => {
+  const plan = { id: "plan-a", detail: { source_analysis_id: "capture-2", source_student_id: "client-a" },
+    assignments: [{ student_id: "client-a", analysis_id: "capture-1", active: 1 }] };
+  assert.equal(programSourceId(plan, client), "capture-2");
+  assert.equal(programFirstScreenFacts(plan, client, client.analyses[1]).source?.id, "capture-2");
+});
+
+test("an unlinked current assignment does not borrow an older assessment", () => {
+  const plan = { id: "plan-a", detail: {}, assignments: [
+    { student_id: "client-a", analysis_id: "capture-1", active: 0 },
+    { student_id: "client-a", analysis_id: null, active: 1 },
+  ] };
+  assert.equal(programSourceId(plan, client), null);
+  assert.equal(programFirstScreenFacts(plan, client, client.analyses[0]).source, null);
 });
 
 test("progress context connects the latest measured capture and later practice-only coach decision", () => {

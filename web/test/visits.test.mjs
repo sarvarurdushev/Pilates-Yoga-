@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { visitsForClient, visitPracticeLabel, recordedByLabel, visitRecorderLabel, visitConnections, visitTimeline } from '../src/platform/visits.js';
+import { visitsForClient, visitKind, visitPracticeLabel, recordedByLabel, visitRecorderLabel, visitConnections, visitTimeline } from '../src/platform/visits.js';
 import { markCompletion, completedEventPayload } from '../src/platform/completed-events.js';
 
 test('one linked assessment and practice appears as one visit with its exercises', () => {
@@ -47,6 +47,23 @@ test('an assessment or empty practice does not gain fictional movement events', 
     scans: [], observations: [], notes: [], assignments: [], programChanges: [],
   });
   assert.deepEqual(events.map((event) => event.type), ['capture']);
+});
+
+test('a scan-review-only visit is never presented as exercise practice', () => {
+  const review = visitsForClient({ analyses: [], scans: [{ id: 'scan-1', session_id: 'scan-review' }], sessions: [{
+    id: 'scan-review', performed_at: '2026-10-02T12:00:00Z',
+    completed: [], notes: 'Scan review: educational sample discussed',
+  }] })[0];
+  assert.equal(visitKind(review), 'Scan review');
+  assert.equal(visitPracticeLabel(review), 'Scan review recorded · no exercises logged');
+  assert.deepEqual(visitTimeline(review, {
+    scans: [], observations: [], notes: [], assignments: [], programChanges: [],
+  }).map((event) => event.type), ['practice']);
+  assert.equal(visitKind({ ...review, session: { ...review.session, notes: 'Follow-up note' } }), 'Visit record');
+  assert.equal(visitKind({ ...review, exerciseCount: 1 }), 'Practice');
+  const unlinked = visitsForClient({ analyses: [], scans: [], sessions: [review.session] })[0];
+  assert.equal(visitKind(unlinked), 'Visit record');
+  assert.equal(visitPracticeLabel(unlinked), 'No exercises logged');
 });
 
 test('a student practice record names the recorder without inventing a capture', () => {
@@ -232,10 +249,11 @@ test('saved scan markers form separate exact-visit events with source frame and 
   const client = { scans: [
     { id: 'scan-a', session_id: 'visit-a', name: 'Uploaded scan',
       captured_at: '2026-09-28T09:05:00Z', detail: {}, findings: [
-        { id: 'marker-1', scan_id: 'scan-a', frame_index: 0, region_id: 'right_shoulder', text: 'First view', author_id: 'coach-1', author_name: 'Hana Lee', created_at: '2026-09-28T09:10:00Z' },
-        { id: 'marker-2', scan_id: 'scan-a', frame_index: 2, region_id: 'right_shoulder', text: 'Later frame', author_id: 'coach-1', author_name: 'Hana Lee', created_at: '2026-09-28T09:11:00Z' },
+        { id: 'marker-1', scan_id: 'scan-a', session_id: 'visit-a', frame_index: 0, region_id: 'right_shoulder', text: 'First view', author_id: 'coach-1', author_name: 'Hana Lee', created_at: '2026-09-28T09:10:00Z' },
+        { id: 'marker-2', scan_id: 'scan-a', session_id: 'visit-a', frame_index: 2, region_id: 'right_shoulder', text: 'Later frame', author_id: 'coach-1', author_name: 'Hana Lee', created_at: '2026-09-28T09:11:00Z' },
         { id: 'wrong-source', scan_id: 'scan-b', frame_index: 1, text: 'Never attach to this scan', created_at: '2026-09-28T09:12:00Z' },
         { id: 'no-time', scan_id: 'scan-a', frame_index: 0, text: 'No event time', created_at: null },
+        { id: 'legacy-unlinked', scan_id: 'scan-a', frame_index: 0, text: 'No saved visit', created_at: '2026-09-28T09:13:00Z' },
       ] },
     { id: 'scan-b', session_id: 'visit-b', captured_at: '2026-09-28T09:05:00Z', findings: [
       { id: 'other-visit', scan_id: 'scan-b', created_at: '2026-09-28T09:10:00Z' },

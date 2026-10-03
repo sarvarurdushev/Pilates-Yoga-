@@ -37,9 +37,10 @@ import { metricRegion } from "./reports.js";
 import { cameraLabels, explainedChart, metricCopy } from "./explain.js";
 import { comparableProgressSeries } from "./progress-selection.js";
 import { scanLinkedNotes } from "./anatomy-bridge.js";
-import { scanAnnotationMarkers, scanFrameIndex } from "./scan-markers.js";
+import { isEducationalScanReference, scanAnnotationMarkers, scanFrameIndex } from "./scan-markers.js";
 import {
   initialVisitId, visitFormOptions, compatibleAssessments, sessionForAnalysis,
+  scanVisitLinkOptions,
 } from "./visit-form-links.js";
 export function anatomyClientChoice(students, role) {
   if (!students.length) return role === "student"
@@ -129,7 +130,7 @@ export async function anatomy(root) {
       `<a class="button" href="/anatomy.html?${query}" target="_blank" rel="noopener">Full-screen anatomy ↗</a>`) +
     `<p class="muted">Select a marked region to see why it matters, the sessions behind it, coach feedback, and assigned practice.</p>` +
     `<div class="filter-row">${select("Body region", "body-region", regions().map((r) => [r.id, r.name + (c.notes.some((n) => n.region_id === r.id) ? " · coach feedback" : "")]), region.id, null)}${select("Anatomy view", "anatomy-layer", [["region", "Relevant region"], ["bones_full", "Skeleton"], ["muscles_full", "Muscles"], ["connective", "Connective structures"], ["nervous", "Nerves"], ["whole", "Whole body"]], "region", null)}<button id="anatomy-refocus">Focus region</button></div>` +
-    `<div class="anatomy-workspace"><div class="anatomy-view-stage"><div id="anatomy-status" role="status" class="notice">Loading the existing anatomy viewer…</div><iframe class="anatomy-frame" id="atlas" title="${esc(c.name)} · ${esc(region.name)} anatomy" src="/anatomy.html?${query}"></iframe>${bodyMapMarkers(c, region, programs)}</div><aside class="anatomy-context">` +
+    `<div class="anatomy-workspace"><div class="anatomy-view-stage"><div id="anatomy-status" role="status" class="notice">Loading the existing anatomy viewer…</div><iframe class="anatomy-frame" id="atlas" title="${esc(c.name)} · ${esc(region.name)} anatomy" src="/anatomy.html?${query}&embed=1"></iframe>${bodyMapMarkers(c, region, programs)}</div><aside class="anatomy-context">` +
     `<section class="panel anatomy-region-summary"><p class="eyebrow">${esc(c.name)} · ${esc(region.side)} · ${esc(sourceText)}</p><h2>${esc(region.name)}</h2><p>${esc(region.explanation)}</p><div class="anatomy-counts"><span><strong>${history.observations.length}</strong> measured findings</span><span><strong>${history.notes.length}</strong> coach feedback</span><span><strong>${history.sessions.length}</strong> related assessments</span><span><strong>${exercises.length}</strong> assigned movements</span></div><p class="muted">The atlas is an educational reference, not a reconstruction of this client's internal anatomy.</p>${state.me.role !== "student" ? '<button data-edit="notes" class="primary">+ Add coach feedback here</button>' : ""}</section>` +
     `${metricHistory}` +
     `${card("Coach feedback", history.notes.length ? linkedNotes(history.notes.slice(0, 3), c) + (history.notes.length > 3 ? `<a class="record-link" href="${href("client", { tab: "notes", region: region.id })}">Read all ${history.notes.length} notes for this region →</a>` : "") : `<p>${state.me.role === "student" ? "Your coach has not shared feedback for this body region." : "No coach feedback is linked to this body region. Add a specific observation with the button above."}</p>`)}` +
@@ -261,6 +262,8 @@ export async function scans(root) {
   }
   const m = await record("media", scan.media_id),
     dicom = m.mime === "application/dicom";
+  const demoReference = isEducationalScanReference(state.me.organization, scan, m);
+  const canMark = Boolean(scan.session_id || demoReference);
   const frameCount = m.detail.frames || 1;
   let frameIndex = scanFrameIndex(params().get("scan_frame"), frameCount);
   const detail = $("#scan-detail");
@@ -270,17 +273,18 @@ export async function scans(root) {
   detail.innerHTML =
     card(
       scan.name,
-      `${notice(scan.detail.provenance || m.detail.provenance || "Supplied scan. Coach annotations are manual observations.")}${dicom ? `<div class="grid three">${field("Window centre · pixel intensity", "center", m.detail.window_center || 0, "number", 'step="any"')}${field("Window width · intensity range", "width", m.detail.window_width || 0, "number", 'min="0" step="any"')}${field("Frame index · starts at 0", "frame", frameIndex, "number", `min="0" max="${frameCount - 1}" step="1"`)}</div><button id="window-apply">Apply window</button><p class="muted" id="scan-frame-status"></p><details><summary>What do these image controls mean?</summary><p>Window centre selects the middle of the displayed pixel intensity range. Window width selects how much of that range is mapped from black to white; 0 uses the full range in the selected frame. These values use this file’s intensity scale after its rescale metadata is applied. They are display settings, rather than body measurements.</p><p>This file contains ${frameCount} frame${frameCount === 1 ? "" : "s"}. Frame index 0 is the first image; ${frameCount - 1} is the last. A frame index identifies an image in the file; it does not measure an anatomical angle or elapsed time.</p></details>` : `<label for="scan-contrast">Image contrast · <output id="scan-contrast-value" for="scan-contrast">100%</output><input id="scan-contrast" type="range" min="50" max="180" value="100"></label><details><summary>What does image contrast mean?</summary><p>100% displays the original contrast. Lower values soften contrast and higher values increase it for viewing. The original file and saved annotation positions remain unchanged.</p></details>`}<div class="scan-image" id="scan-stage"><img id="scan-image" alt="${esc(scan.name)}"><svg id="scan-annotations" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-label="Manual scan annotations"></svg></div><p id="scan-hint">${state.me.role === "student" ? "View your coach’s saved markers." : "Click the image to place an anatomical annotation."}</p><div class="actions"><a class="button" href="${href("client", { tab: "anatomy", region: scan.region_id, id: scan.analysis_id })}">Explore linked anatomy</a>${scan.session_id ? `<a class="button" href="${href("client", { tab: "sessions", session: scan.session_id })}">Source visit</a>` : ""}${scan.analysis_id ? `<a class="button" href="${href("report", { id: scan.analysis_id })}">Source analysis</a>` : ""}${state.me.role === "student" ? "" : '<button data-edit="notes">+ Linked coach note</button>'}<a class="button" href="${mediaURL(m.id)}" download="${esc(m.filename)}">Download original</a></div>`,
+      `${notice(scan.detail.provenance || m.detail.provenance || "Supplied scan. Coach annotations are manual observations.")}${dicom ? `<div class="grid three">${field("Window centre · pixel intensity", "center", m.detail.window_center || 0, "number", 'step="any"')}${field("Window width · intensity range", "width", m.detail.window_width || 0, "number", 'min="0" step="any"')}${field("Frame index · starts at 0", "frame", frameIndex, "number", `min="0" max="${frameCount - 1}" step="1"`)}</div><button id="window-apply">Apply window</button><p class="muted" id="scan-frame-status"></p><details><summary>What do these image controls mean?</summary><p>Window centre selects the middle of the displayed pixel intensity range. Window width selects how much of that range is mapped from black to white; 0 uses the full range in the selected frame. These values use this file’s intensity scale after its rescale metadata is applied. They are display settings, rather than body measurements.</p><p>This file contains ${frameCount} frame${frameCount === 1 ? "" : "s"}. Frame index 0 is the first image; ${frameCount - 1} is the last. A frame index identifies an image in the file; it does not measure an anatomical angle or elapsed time.</p></details>` : `<label for="scan-contrast">Image contrast · <output id="scan-contrast-value" for="scan-contrast">100%</output><input id="scan-contrast" type="range" min="50" max="180" value="100"></label><details><summary>What does image contrast mean?</summary><p>100% displays the original contrast. Lower values soften contrast and higher values increase it for viewing. The original file and saved annotation positions remain unchanged.</p></details>`}<div class="scan-image" id="scan-stage"><img id="scan-image" alt="${esc(scan.name)}"><svg id="scan-annotations" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-label="Manual scan annotations"></svg></div><p id="scan-hint">${state.me.role === "student" ? "View your coach’s saved markers." : canMark ? "Click the image to place an anatomical annotation." : "Connect this scan to a recorded visit before placing a body marker."}</p><div class="actions"><a class="button" href="${href("client", { tab: "anatomy", region: scan.region_id, id: scan.analysis_id })}">Explore linked anatomy</a>${scan.session_id ? `<a class="button" href="${href("client", { tab: "sessions", session: scan.session_id })}">Source visit</a>` : state.me.role === "student" || demoReference ? "" : '<button type="button" id="scan-link-visit">Connect to recorded visit</button>'}${scan.analysis_id ? `<a class="button" href="${href("report", { id: scan.analysis_id })}">Source analysis</a>` : ""}${state.me.role === "student" ? "" : '<button data-edit="notes">+ Linked coach note</button>'}<a class="button" href="${mediaURL(m.id)}" download="${esc(m.filename)}">Download original</a></div>`,
     ) +
     card(
       "Saved annotations",
       "<p class=\"muted\">Marker numbers match the image and remain the same when you change frames. Positions are relative to the image, with 0–1 coordinates; they are not calibrated physical distances.</p>" + table(
-        ["Marker", "Region", "Coach annotation", "Frame index"],
+        ["Marker", "Region", "Coach annotation", "Frame index", "Visit"],
         scanAnnotationMarkers(scan.findings).map((f) => [
           `#${f.marker}`,
           `<a href="${href("client", { tab: "anatomy", region: f.region_id, id: scan.analysis_id })}">${esc(regionName(f.region_id))}</a>`,
           esc(f.text),
           dicom ? `<button type="button" data-scan-frame="${f.frame_index}">View frame ${f.frame_index}</button>` : "0 · Original image",
+          f.session_id ? `<a href="${href("client", { tab: "sessions", session: f.session_id })}">Recorded visit →</a>` : "Visit not recorded",
         ]),
       ),
     ) +
@@ -293,6 +297,53 @@ export async function scans(root) {
       ),
     );
   if (credit) detail.insertAdjacentHTML("beforeend", credit);
+  const linkToVisit = () => {
+    const choices = scanVisitLinkOptions(c, scan);
+    if (!choices.length) {
+      let recordedVisitId = "";
+      modal("Record a scan review now",
+        notice("No saved visit is available for this scan. This creates a review record at the current time. It does not reconstruct when the scan was taken or an earlier visit, and it records no completed exercise.") +
+        (scan.analysis_id ? `<p>Source assessment: <a href="${href("report", { id: scan.analysis_id })}">Open assessment →</a>. It will be linked to this new review record.</p>` : "") +
+        area("What did you review with this client?", "visit_context") +
+        '<label class="check"><input type="checkbox" name="confirm_current_visit" required> Record this review now, with no practice claimed</label>',
+        async (f) => {
+          const context = String(f.get("visit_context") || "").trim();
+          if (!context) throw Error("Describe this review before recording it.");
+          if (!f.get("confirm_current_visit")) throw Error("Confirm that this is a review recorded now.");
+          if (!recordedVisitId) {
+            try {
+              const saved = await api("complete-session", {
+                student_id: c.id,
+                analysis_id: scan.analysis_id || null,
+                completed: [],
+                notes: `Scan review: ${context}`,
+                require_new: true,
+              });
+              recordedVisitId = saved.id;
+            } catch (error) {
+              if (error.status === 409) {
+                throw Error("A visit was recorded for this assessment while this dialog was open. Close this dialog and reopen the scan to review that visit before linking it.");
+              }
+              throw error;
+            }
+          }
+          await api("save", { collection: "scans", item: { id: scan.id, session_id: recordedVisitId } });
+          go("client", { tab: "scans", scan: scan.id, region: scan.region_id, id: scan.analysis_id });
+        });
+      return;
+    }
+    modal("Connect this scan to a visit",
+      select("Recorded visit", "session_id", choices, "", "Choose a saved visit") +
+      notice("Choose the actual visit for this scan. A matching date alone does not establish a link."),
+      async (f) => {
+        const session_id = f.get("session_id");
+        if (!session_id) throw Error("Choose a recorded visit for this scan.");
+        await api("save", { collection: "scans", item: { id: scan.id, session_id } });
+        go("client", { tab: "scans", scan: scan.id, region: scan.region_id, id: scan.analysis_id });
+      });
+  };
+  if (detail.querySelector("#scan-link-visit"))
+    detail.querySelector("#scan-link-visit").onclick = linkToVisit;
   if (dicom) {
     detail.querySelector("[name=frame]").value = frameIndex;
     for (const name of ["center", "width"]) {
@@ -354,6 +405,10 @@ export async function scans(root) {
     };
   if (state.me.role !== "student")
     $("#scan-stage").onclick = (e) => {
+      if (!canMark) {
+        linkToVisit();
+        return;
+      }
       const rect = image.getBoundingClientRect();
       const x = (e.clientX - rect.left) / rect.width,
         y = (e.clientY - rect.top) / rect.height;

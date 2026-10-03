@@ -49,6 +49,9 @@ def program_detail(repo, actor, value, db):
         source = repo.get(actor, "analyses", result["source_analysis_id"], db)
         if result.get("student_id") and source["student_id"] != result["student_id"]:
             raise Refused("The source analysis belongs to another client.")
+        if result.get("source_student_id") and source["student_id"] != result["source_student_id"]:
+            raise Refused("The source analysis belongs to another client.")
+        result["source_student_id"] = source["student_id"]
     if "source_finding" in result:
         result["source_finding"] = _short(result["source_finding"], 300)
     if "start_date" in result and result["start_date"]:
@@ -357,7 +360,7 @@ def duplicate(repo, actor, item):
     detail.update(template=bool(item.get("as_template", False)), status="Draft", copied_from=source["id"])
     changing_client = bool(item.get("as_template")) or student_id != source["detail"].get("student_id")
     if changing_client:
-        for key in ("source_analysis_id", "source_finding", "coach_notes"):
+        for key in ("source_analysis_id", "source_student_id", "source_finding", "coach_notes"):
             detail.pop(key, None)
     if student_id:
         detail["student_id"] = student_id

@@ -263,6 +263,7 @@ def test_dicom_upload_window_annotation(state, tmp_path):
             "name": "Manual test scan",
             "scan_type": "DICOM",
             "captured_at": "2026-09-22",
+            "session_id": r.client(c, sid)["sessions"][0]["id"],
         },
     )
     r.annotate(

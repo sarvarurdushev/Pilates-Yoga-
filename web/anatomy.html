@@ -1,4 +1,5 @@
 <!DOCTYPE html><html lang="en"><head>
+<script>if(new URLSearchParams(location.search).get('embed')==='1')document.documentElement.classList.add('embedded-atlas');</script>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Neuro Wellness</title><style>
 /* The palette is a room, not a set of swatches.
@@ -1083,7 +1084,7 @@ body.sheet #view{cursor:move}
   #discBar{order:3;width:100%;margin-left:0;justify-content:flex-start;gap:5px}
   .disc{white-space:normal;font-size:10.5px;padding:3px 9px;line-height:1.35}
   /* it stays over the stage, but it may wrap rather than run off the side */
-  #viewbar{left:8px;top:8px;right:8px;flex-wrap:wrap;gap:4px}
+  #viewbar{left:8px;top:calc(var(--barh) + 10px);right:8px;flex-wrap:wrap;gap:4px}
   #viewbar button{padding:4px 8px}
   #tabs button{font-size:12px;padding:10px 4px}
   #panelBody{padding:14px 12px 24px}
@@ -1094,7 +1095,14 @@ body.sheet #view{cursor:move}
     the bottom half and the stage keeps the top. */
  #panel{right:0;left:0;bottom:0;top:auto;width:auto;height:52vh;border-radius:0;
   border-left:0;border-right:0;border-bottom:0}
- #stage{bottom:52vh}
+ /* A hidden detail panel must not reserve half of a small screen. */
+ #stage{bottom:0}
+ #app:has(#panel:not([hidden])) #stage{bottom:52vh}
+ /* The client workspace already shows the selected region and its context
+    beside this iframe. Keep the atlas's own detail panel available, but give
+    the model most of the embedded height instead of splitting it in half. */
+ html.embedded-atlas #panel{height:24vh}
+ html.embedded-atlas #app:has(#panel:not([hidden])) #stage{bottom:24vh}
  #layerbar{left:8px;bottom:8px;min-width:0}
  /* Stacked, the panel is a couple of hundred pixels tall and the controls strip is a fixed
     height, so the body was left with sixty of them and clipped its first heading in half.

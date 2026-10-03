@@ -1,16 +1,33 @@
 import { visitsForClient } from "./visits.js";
 
+// An assignment can carry the assessment that led to this client's plan even when
+// the reusable program itself has no client-specific source in its detail.
+export function programSourceId(program, client) {
+  if (!client) return null;
+  const detail = program?.detail || {};
+  // Older reusable programs can carry a source without source_student_id. The
+  // selected client's loaded assessments, not the absence of an owner field,
+  // establish whether that source belongs to this client's plan context.
+  const ownsDetailSource = (client.analyses || []).some((analysis) =>
+    analysis.id === detail.source_analysis_id && (!analysis.student_id || analysis.student_id === client.id));
+  if (detail.source_analysis_id && ownsDetailSource &&
+      (!detail.source_student_id || detail.source_student_id === client.id) &&
+      (!detail.student_id || detail.student_id === client.id))
+    return detail.source_analysis_id;
+  const assignments = (program?.assignments || []).filter((item) => item.student_id === client.id);
+  const assignment = assignments.find((item) => item.active !== 0) || assignments.at(-1);
+  return assignment?.analysis_id || null;
+}
+
 // These facts are display context, never an inferred assessment or a clinical conclusion.
 export function programFirstScreenFacts(program, client, source) {
-  const detail = program?.detail || {};
   const assignments = program?.assignments || [];
   const assigned = Boolean(client && (
     assignments.some((item) => item.student_id === client.id && item.active !== 0) ||
     (client.programs || []).some((item) => item.program_id === program?.id)
   ));
-  const validSource = Boolean(client && source && detail.source_analysis_id === source.id &&
-    source.student_id === client.id &&
-    (!detail.source_student_id || detail.source_student_id === client.id));
+  const validSource = Boolean(client && source && programSourceId(program, client) === source.id &&
+    source.student_id === client.id);
   const visit = validSource ? visitsForClient(client).find((item) =>
     item.analyses.some((analysis) => analysis.id === source.id)) : null;
   const views = validSource ? [...new Set((source.result?.views || []).map((item) => item.view).filter(Boolean))] : [];

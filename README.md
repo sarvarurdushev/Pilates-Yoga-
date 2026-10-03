@@ -2701,9 +2701,9 @@ it fine.
 ## Tests
 
 ```bash
-python -m pytest        # 1,917 tests, ~3m30s
-cd web && npm test      # 181 tests, ~30s
-cd web && npm run test:smoke   # the browser suite: the app, driven
+python -m pytest        # latest local run: 2,617 passed, 1 skipped (~10m)
+cd web && npm test      # latest local run: 484 passed
+cd web && npm run test:smoke   # browser checks for the standalone anatomy atlas
 ```
 
 No model weights are required for the Python suite — the pose backend is
@@ -2712,7 +2712,7 @@ a second it was at 58 tests: most of the time now goes on the anatomy, the
 accounts and the session layers, which do real work against a temporary SQLite
 store.
 
-`npm run test:smoke` drives the built application in a headless browser and
+`npm run test:smoke` drives the standalone anatomy atlas in a headless browser and
 checks the picture rather than the state — that nothing in the catalogue
 overlaps, that no vertex has a normal of zero, that a click lands on what is
 under it. It needs a browser; set `CHROMIUM` to one already on the machine if

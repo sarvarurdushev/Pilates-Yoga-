@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   visitFormOptions, initialVisitId, compatibleAssessments,
   compatibleScans, compatibleFindings, assignedProgramOptions,
+  scanVisitLinkOptions,
 } from '../src/platform/visit-form-links.js';
 
 const client = {
@@ -38,6 +39,17 @@ test('visit options identify saved visits including multi-capture and practice-o
   assert.deepEqual(ids(choices), ['s1', 's2', 's3']);
   assert.match(choices[0].name, /Front posture \+ Side posture/);
   assert.match(choices[2].name, /Practice only/);
+});
+
+test('scan visit choices use exact source assessment links and preserve ambiguous imported matches', () => {
+  assert.deepEqual(ids(scanVisitLinkOptions(client, { analysis_id: 'a1' })), ['s1']);
+  assert.deepEqual(ids(scanVisitLinkOptions(client, { analysis_id: null })), ['s1', 's2', 's3']);
+  assert.deepEqual(ids(scanVisitLinkOptions(client, { analysis_id: 'orphan' })), []);
+  const imported = { ...client, sessions: [
+    ...client.sessions,
+    { id: 's4', analysis_id: 'a1', performed_at: '2026-09-04T10:00:00Z' },
+  ] };
+  assert.deepEqual(ids(scanVisitLinkOptions(imported, { analysis_id: 'a1' })), ['s1', 's4']);
 });
 
 test('new note inherits valid route visit or infers its assessment/scan visit', () => {

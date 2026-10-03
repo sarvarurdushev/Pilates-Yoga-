@@ -1,6 +1,8 @@
 """Coach notes and scans may be attached to a selected visit without a capture."""
 
 from io import BytesIO
+import json
+import zipfile
 
 import pytest
 from PIL import Image
@@ -91,6 +93,10 @@ def test_analysis_conflicts_and_backup_round_trip(tmp_path):
         "scan_type": "Image", "captured_at": "2026-09-25", "session_id": visit,
     })
     note = repo.save(admin, "notes", {"student_id": first, "scan_id": scan["id"], "text": "Linked discussion", "session_id": visit})
+    marker = repo.annotate(admin, {
+        "scan_id": scan["id"], "x": 0.2, "y": 0.4, "text": "Visit-linked body marker",
+    })
+    assert marker["session_id"] == visit
     fresh = repo.actor(repo.create_org("Recovery", "visit-recovery@example.test", "visit-recovery-password", "Recovered studio"))
     with export_archive(repo, admin) as archive:
         restore_archive(repo, fresh, archive)
@@ -101,8 +107,32 @@ def test_analysis_conflicts_and_backup_round_trip(tmp_path):
     assert restored_scan["session_id"] == restored_note["session_id"]
     assert restored_scan["session_id"] in {s["id"] for s in restored["sessions"]}
     assert restored_scan["session_id"] != visit
+    assert restored_scan["findings"][0]["session_id"] == restored_scan["session_id"]
     with repo.db() as db:
         assert not db.execute("PRAGMA foreign_key_check").fetchall()
+
+    # An archive made before marker-specific links cannot prove whether the
+    # scan was linked before or after its marker. Keep that marker unlinked.
+    legacy_archive = tmp_path / "pre-marker-visits.zip"
+    with export_archive(repo, admin) as archive, zipfile.ZipFile(archive) as original, zipfile.ZipFile(legacy_archive, "w") as legacy:
+        for entry in original.infolist():
+            if entry.filename == "records/p_scan_finding_visits.jsonl":
+                continue
+            content = original.read(entry.filename)
+            if entry.filename == "manifest.json":
+                manifest = json.loads(content)
+                manifest["tables"].remove("p_scan_finding_visits")
+                content = json.dumps(manifest).encode()
+            legacy.writestr(entry, content)
+    legacy_owner = repo.actor(repo.create_org(
+        "Older restore", "visit-legacy@example.test", "legacy-visit-password", "Older studio",
+    ))
+    restore_archive(repo, legacy_owner, legacy_archive)
+    legacy_client = next(p for p in repo.people(legacy_owner) if p["name"] == "First client")
+    legacy_scan = next(s for s in repo.client(legacy_owner, legacy_client["id"])["scans"]
+                       if s["name"] == "Uploaded reference")
+    assert legacy_scan["session_id"] is not None
+    assert legacy_scan["findings"][0]["session_id"] is None
 
 
 def test_client_visit_scan_list_carries_saved_markers_and_authors(tmp_path):
@@ -121,6 +151,7 @@ def test_client_visit_scan_list_carries_saved_markers_and_authors(tmp_path):
     assert len(stored["findings"]) == 1
     finding = stored["findings"][0]
     assert finding["id"] == marker["id"] == source["id"]
+    assert marker["session_id"] == finding["session_id"] == source["session_id"] == visit
     assert finding["scan_id"] == scan["id"]
     assert finding["frame_index"] == source["frame_index"] == 0
     assert finding["created_at"] == source["created_at"]
@@ -128,6 +159,125 @@ def test_client_visit_scan_list_carries_saved_markers_and_authors(tmp_path):
     assert finding["author_name"] == "Owner"
     assert finding["text"] == "Saved visual observation"
     assert repo.client(admin, second)["scans"] == []
+
+
+def test_new_body_markers_require_exact_scan_visit_and_keep_it_on_edits(tmp_path):
+    repo, admin, first, _, visit, later, _, media = studio(tmp_path)
+    scan = repo.save(admin, "scans", {
+        "student_id": first, "media_id": media["id"], "name": "Unlinked image",
+        "scan_type": "Image", "captured_at": "2026-09-25",
+    })
+    with pytest.raises(Refused, match="Link this scan to a recorded visit"):
+        repo.annotate(admin, {
+            "scan_id": scan["id"], "x": 0.3, "y": 0.4,
+            "text": "Would be orphaned",
+        })
+    # An ordinary studio cannot bypass the visit requirement by labelling
+    # its own uploaded image as a demo reference.
+    repo.save(admin, "scans", {"id": scan["id"], "detail": {"demo": True}})
+    with pytest.raises(Refused, match="Link this scan to a recorded visit"):
+        repo.annotate(admin, {
+            "scan_id": scan["id"], "x": 0.3, "y": 0.4,
+            "text": "Still has no visit",
+        })
+    # A coach in the investor demo can also edit scan detail. The uploaded
+    # image must not become a seed reference just because demo=true was set.
+    with repo.db() as db:
+        db.execute("UPDATE p_organizations SET demo=1 WHERE id=?", (admin.org_id,))
+    demo_admin = repo.actor(repo.issue(admin.user_id, "admin"))
+    assert demo_admin.demo
+    with pytest.raises(Refused, match="Link this scan to a recorded visit"):
+        repo.annotate(demo_admin, {
+            "scan_id": scan["id"], "x": 0.3, "y": 0.4,
+            "text": "Uploaded demo-org image is not a seeded reference",
+        })
+    repo.save(admin, "scans", {"id": scan["id"], "detail": {}})
+    assert not repo.get(admin, "scans", scan["id"])["findings"]
+    scan = repo.save(admin, "scans", {"id": scan["id"], "session_id": visit})
+    marker = repo.annotate(admin, {
+        "scan_id": scan["id"], "x": 0.3, "y": 0.4,
+        "text": "Now linked to this exact visit",
+    })
+    assert marker["session_id"] == visit
+    for replacement in (later, None):
+        with pytest.raises(Refused, match="scan marker belongs to another visit"):
+            repo.save(admin, "scans", {"id": scan["id"], "session_id": replacement})
+    assert repo.get(admin, "scans", scan["id"])["findings"][0]["session_id"] == visit
+
+
+def test_legacy_markers_stay_unlinked_when_scan_link_order_is_unknown(tmp_path):
+    repo, admin, first, _, visit, _, _, media = studio(tmp_path)
+    linked = repo.save(admin, "scans", {
+        "student_id": first, "media_id": media["id"], "name": "Legacy visit scan",
+        "scan_type": "Image", "captured_at": "2026-09-25", "session_id": visit,
+    })
+    general = repo.save(admin, "scans", {
+        "student_id": first, "media_id": media["id"], "name": "Legacy general scan",
+        "scan_type": "Image", "captured_at": "2026-09-25",
+    })
+    with repo.db() as db:
+        for identifier, scan in (("old-linked", linked), ("old-general", general)):
+            db.execute(
+                "INSERT INTO p_scan_findings(id,scan_id,x,y,text,created_at) "
+                "VALUES (?,?,?,?,?,?)",
+                (identifier, scan["id"], 0.5, 0.5, "Older marker", "2026-09-25T00:00:00Z"),
+            )
+    # Reopening an existing studio must not guess which visit was active when
+    # the marker was saved, even if its scan currently has a visit link.
+    Repository(repo.path)
+    assert repo.get(admin, "scans", linked["id"])["findings"][0]["session_id"] is None
+    assert repo.get(admin, "scans", general["id"])["findings"][0]["session_id"] is None
+    with repo.db() as db:
+        assert not db.execute("PRAGMA foreign_key_check").fetchall()
+
+
+def test_restore_rejects_marker_pointing_to_another_valid_visit(tmp_path):
+    repo, admin, first, _, visit, later, _, media = studio(tmp_path)
+    scan = repo.save(admin, "scans", {
+        "student_id": first, "media_id": media["id"], "name": "Visit scan",
+        "scan_type": "Image", "captured_at": "2026-09-25", "session_id": visit,
+    })
+    repo.annotate(admin, {"scan_id": scan["id"], "x": 0.5, "y": 0.5, "text": "Visit marker"})
+    tampered = tmp_path / "marker-wrong-visit.zip"
+    with export_archive(repo, admin) as archive, zipfile.ZipFile(archive) as original, zipfile.ZipFile(tampered, "w") as changed:
+        for entry in original.infolist():
+            content = original.read(entry.filename)
+            if entry.filename == "records/p_scan_finding_visits.jsonl":
+                marker = json.loads(content)
+                marker["session_id"] = later  # Valid FK, but the wrong visit.
+                content = (json.dumps(marker) + "\n").encode()
+            changed.writestr(entry, content)
+    fresh = repo.actor(repo.create_org(
+        "Tampered restore", "tampered-marker@example.test", "tampered-visit-password", "Fresh studio",
+    ))
+    with pytest.raises(Refused, match="different visit or client"):
+        restore_archive(repo, fresh, tampered)
+    assert repo.people(fresh) == []
+
+
+def test_create_only_visit_conflict_keeps_existing_practice(tmp_path):
+    repo, admin, first, _, _, _, _, _ = studio(tmp_path)
+    with repo.db() as db:
+        db.execute(
+            "INSERT INTO p_analyses(id,org_id,student_id,kind,protocol,created_at,status) "
+            "VALUES (?,?,?,?,?,?,?)",
+            ("capture-for-visit", admin.org_id, first, "posture", "Standing", "2026-09-25", "complete"),
+        )
+    saved = repo.complete_session(admin, {
+        "student_id": first, "analysis_id": "capture-for-visit",
+        "completed": ["actual-practice"], "notes": "Original coaching note",
+    })
+    before = next(s for s in repo.client(admin, first)["sessions"] if s["id"] == saved["id"])
+    with pytest.raises(Refused, match="already has a recorded visit") as refused:
+        repo.complete_session(admin, {
+            "student_id": first, "analysis_id": "capture-for-visit",
+            "completed": [], "notes": "Review only", "require_new": True,
+        })
+    assert refused.value.status == 409
+    after = next(s for s in repo.client(admin, first)["sessions"] if s["id"] == saved["id"])
+    assert after["completed"] == before["completed"] == ["actual-practice"]
+    assert after["notes"] == before["notes"] == "Original coaching note"
+    assert after["exercise_events"] == before["exercise_events"]
 
 
 def test_note_sources_cannot_claim_different_recorded_visits(tmp_path):

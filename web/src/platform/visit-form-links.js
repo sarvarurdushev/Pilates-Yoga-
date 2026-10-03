@@ -32,6 +32,18 @@ export function visitFormOptions(client) {
   });
 }
 
+// A scan with a source assessment may be attached only to a visit that
+// actually contains that assessment. More than one such visit can exist in
+// imported data, so let the coach select the correct saved ID explicitly.
+export function scanVisitLinkOptions(client, scan) {
+  const matching = scan?.analysis_id
+    ? new Set((client?.sessions || []).filter((session) =>
+      visitAnalysisIds(session).has(scan.analysis_id)).map((session) => session.id))
+    : null;
+  return visitFormOptions(client).filter((visit) =>
+    !matching || matching.has(visit.id));
+}
+
 export function initialVisitId(client, item = {}, route = new URLSearchParams(),
   analysisId = "", scanId = "") {
   const sessions = client?.sessions || [];

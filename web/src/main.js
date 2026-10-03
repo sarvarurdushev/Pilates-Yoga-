@@ -2405,6 +2405,13 @@ function panelInset() {
   return Math.max(0, c.right - left + 10);
 }
 const LAB_H = 24, LAB_GAP = 7, LANE_PAD = 13, MAX_PER_SIDE = 8, LAB_MAX = 300, MIN_PX = 26;
+/* One broad visible layer is enough to bound the silhouette. Projecting every atlas entry
+ * here would put a 2,000-structure pass back into the per-frame label layout. */
+const SILHOUETTE_LAYERS = [
+  'skeleton', 'bones_full', 'muscles_deep', 'muscles_superficial', 'muscles_full',
+  'brain', 'organs', 'organs_full', 'nervous', 'heart_detail', 'arteries', 'veins',
+  'airways', 'connective', 'nerves_cranial', 'detail',
+];
 /** How many candidates get a real anchor. Comfortably more than the 2 x MAX_PER_SIDE placed. */
 const SHORTLIST = 28;
 /* Clear air between the subject's own silhouette and the nearest edge of a plate. A leader
@@ -2795,10 +2802,29 @@ function updateLabels() {
    *
    * The plates are aligned on their *inner* edge, so every rope starts at the same x and the
    * ragged edge is on the outside where nothing attaches to it. */
-  /* The spread of the *structures*, from their own projected surface points — see the
-   * `x0`/`x1` computed per candidate above for why the anchor alone is not enough. */
+  /* A pose can put an arm or leg far beyond every structure that currently has a label.
+   * Bounding the lanes by just the shortlisted names then lays the name plates across the
+   * painted limb. Include a broad visible anatomy layer, using the same centroids and radii
+   * already kept for label culling. The gutter absorbs the small error of a screen-space
+   * bounding sphere; no WebGL readback or full-atlas projection is needed on every frame. */
   let sx0 = Infinity, sx1 = -Infinity;
   for (const c of cand) { if (c.x0 < sx0) sx0 = c.x0; if (c.x1 > sx1) sx1 = c.x1; }
+  if (app.explode <= 0) {
+    const silhouetteLayer = SILHOUETTE_LAYERS.find(layer => app.layers[layer]?.on);
+    for (const [key, point] of Object.entries(app.centroids)) {
+      const id = +key, r = get(id);
+      if (!r || r.layer !== silhouetteLayer || (app.isolate?.size && !app.isolate.has(id))) continue;
+      _v.copy(point).project(camera);
+      if (_v.z < -1 || _v.z > 1) continue;
+      const distance = camera.position.distanceTo(point);
+      const radius = (app.radii[id] ?? 0) * projScale / Math.max(0.001, distance);
+      const x = (_v.x * 0.5 + 0.5) * wFull;
+      const y = (-_v.y * 0.5 + 0.5) * h;
+      if (x + radius < 0 || x - radius > wFull || y + radius < 0 || y - radius > h) continue;
+      sx0 = Math.min(sx0, x - radius);
+      sx1 = Math.max(sx1, x + radius);
+    }
+  }
   if (!cand.length) { sx0 = 0; sx1 = wFull; }
   const laneIn = {
     left:  Math.max(LANE_PAD + 40, Math.min(sx0 - LANE_GUTTER, w * 0.5)),
@@ -2845,7 +2871,10 @@ function updateLabels() {
                      || (restY[b.l.id] ?? 0) - (restY[a.l.id] ?? 0));
     const block = list.length * LAB_H + Math.max(0, list.length - 1) * LAB_GAP;
     let y = Math.max(8, (h - block) / 2);
-    for (const c of list) { c.y = y; y += LAB_H + LAB_GAP; place(c, side, laneIn[side], w); }
+    for (const c of list) {
+      c.y = y; y += LAB_H + LAB_GAP;
+      place(c, side, laneIn[side], w, sx0, sx1);
+    }
   }
 }
 
@@ -2865,7 +2894,7 @@ function hide(l) {
  *               so the ropes all start at one x and the ragged edge faces outward.
  * @param w      the lane's own width, for clamping a long plate back inside the stage
  */
-function place(c, side, laneIn, w) {
+function place(c, side, laneIn, w, subjectLeft, subjectRight) {
   const { l, r, sel, act, role: actRole } = c;
   attachEls(l);
   if (!l.el) return;
@@ -2902,6 +2931,15 @@ function place(c, side, laneIn, w) {
   const bw = l.w ?? 120;
   const x = side === 'left' ? Math.max(LANE_PAD, laneIn - bw)
                             : Math.min(w - LANE_PAD - bw, laneIn);
+  /* The console may leave too little air on one side for a long name. Clamping that
+   * plate into the lane would put it back over the model, defeating the silhouette
+   * bound. A missing plate is clearer than a false label drawn on another structure. */
+  if ((side === 'left' && x + bw > subjectLeft - 4)
+      || (side === 'right' && x < subjectRight + 4)) {
+    l.hidden = false;
+    hide(l);
+    return;
+  }
   l.el.style.left = x + 'px'; l.el.style.top = c.y + 'px';
   l.el.style.opacity = 1; l.el.style.pointerEvents = 'auto';
   l.el.classList.toggle('sel', sel);
@@ -3663,8 +3701,16 @@ export function setView(key, immediate = false) {
   }
   const v = VIEWS[key];
   if (!v) return;
-  const t = new THREE.Vector3(0, -0.05, 0);
-  flyToPose(new THREE.Vector3(...v).add(t), t, immediate);
+  const dir = new THREE.Vector3(...v).normalize();
+  const pts = bodyCentroidPoints();
+  if (pts.length >= 8 && key !== 'superior') {
+    const { target, distance } = frameFor(pts, dir, HOME_PAD);
+    flyToPose(target.clone().addScaledVector(dir, distance), target, immediate);
+  } else {
+    // The toolbar can be used before the body registry has loaded.
+    const t = new THREE.Vector3(0, -0.05, 0);
+    flyToPose(new THREE.Vector3(...v).add(t), t, immediate);
+  }
   nudgeIdle();
 }
 
@@ -3962,11 +4008,16 @@ export function resetView(immediate = false) {
  */
 const HOME_PAD = 0.03;         // body heights, how far the outermost centroid sits inside
 
-function deriveHome() {
-  if (!REG_READY) return;                           // called before the body's table arrived
+function bodyCentroidPoints() {
+  if (!REG_READY) return [];
   const pts = [];
   for (const [, r] of registry().byId)
     if (r.layer !== 'brain' && r.centroid) pts.push(new THREE.Vector3().fromArray(r.centroid));
+  return pts;
+}
+
+function deriveHome() {
+  const pts = bodyCentroidPoints();
   if (pts.length < 8) return;                       // trust the constant over a stub
   const dir = HOME.p.clone().sub(HOME.t).normalize();
   const { target, distance } = frameFor(pts, dir, HOME_PAD);

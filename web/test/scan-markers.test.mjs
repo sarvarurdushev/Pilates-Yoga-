@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scanAnnotationMarkers, scanFrameIndex } from '../src/platform/scan-markers.js';
+import { isEducationalScanReference, scanAnnotationMarkers, scanFrameIndex } from '../src/platform/scan-markers.js';
+
+test('only seeded public reference media gets the visit-free annotation affordance', () => {
+  const org = { demo: true };
+  const scan = { detail: { demo: true } };
+  const media = { detail: { sample: true, source_url: 'https://example.test/reference' } };
+  assert.equal(isEducationalScanReference(org, scan, media), true);
+  assert.equal(isEducationalScanReference(org, scan, { detail: { sample: false, source_url: media.detail.source_url } }), false);
+  assert.equal(isEducationalScanReference(org, scan, { detail: { sample: true } }), false);
+  assert.equal(isEducationalScanReference({ demo: false }, scan, media), false);
+});
 
 test('saved annotation keys match each frame without restarting numbering', () => {
   const findings = [

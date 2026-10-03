@@ -10,7 +10,9 @@ import json
 import shutil
 import tempfile
 import zipfile
-from .repository import Refused, uid, now, encode, backfill_session_exercise_events
+from .repository import (
+    Refused, uid, now, encode, backfill_session_exercise_events,
+)
 from .inspection import schema, scope, PUBLIC
 
 MAX_ARCHIVE = 256 * 1024 * 1024
@@ -22,6 +24,7 @@ OPTIONAL_RESTORE_TABLES = {
     "p_program_revision_visits", "p_resource_details",
     "p_training_session_program_versions", "p_session_analyses",
     "p_session_recorders", "p_session_exercise_events", "p_session_notes", "p_session_scans",
+    "p_scan_finding_visits",
 }
 
 
@@ -284,6 +287,19 @@ def restore_archive(repo, actor, archive):
                     )
                     count += 1
             backfill_session_exercise_events(db)
+            # Old archives have no marker-time visit evidence. A scan's current
+            # visit link alone cannot prove where an older marker belongs.
+            if db.execute(
+                "SELECT 1 FROM p_scan_finding_visits fv "
+                "JOIN p_scan_findings f ON f.id=fv.finding_id "
+                "JOIN p_scans s ON s.id=f.scan_id "
+                "LEFT JOIN p_session_scans ss ON ss.scan_id=s.id "
+                "LEFT JOIN p_training_sessions ts ON ts.id=fv.session_id "
+                "WHERE s.org_id=? AND (ss.session_id IS NOT fv.session_id "
+                "OR ts.student_id IS NOT s.student_id) LIMIT 1",
+                (actor.org_id,),
+            ).fetchone():
+                raise Refused("A scan marker in the backup belongs to a different visit or client.")
             if db.execute("PRAGMA foreign_key_check").fetchone():
                 raise Refused("The restored archive contains a broken relationship.")
             repo.audit(

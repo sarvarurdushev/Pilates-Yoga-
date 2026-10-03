@@ -5,6 +5,7 @@ import { scanAnnotationMarkers } from "./scan-markers.js";
 export function visitsForClient(client) {
   const analyses = Array.isArray(client.analyses) ? client.analyses : [];
   const sessions = Array.isArray(client.sessions) ? client.sessions : [];
+  const scans = Array.isArray(client.scans) ? client.scans : [];
   const byId = new Map(analyses.map((analysis) => [analysis.id, analysis]));
   const linked = new Set();
   const visits = sessions.map((session) => {
@@ -19,20 +20,35 @@ export function visitsForClient(client) {
       session,
       analyses: captures,
       analysis: captures[0] || null,
+      scans: session.id ? scans.filter((scan) => scan.session_id === session.id) : [],
       occurredAt: session.performed_at || captures[0]?.created_at,
       exerciseCount: Array.isArray(session.completed) ? session.completed.length : 0,
     };
   });
   for (const analysis of analyses) {
     if (!linked.has(analysis.id))
-      visits.push({ session: null, analyses: [analysis], analysis, occurredAt: analysis.created_at, exerciseCount: 0 });
+      visits.push({ session: null, analyses: [analysis], analysis, scans: [], occurredAt: analysis.created_at, exerciseCount: 0 });
   }
   return visits.sort((a, b) => String(b.occurredAt || "").localeCompare(String(a.occurredAt || "")));
 }
 
 export function visitPracticeLabel(visit) {
   if (visit.exerciseCount) return `${visit.exerciseCount} movement${visit.exerciseCount === 1 ? "" : "s"} logged`;
+  if (visitKind(visit).includes("review")) return "Scan review recorded · no exercises logged";
   return (visit.analyses?.length || visit.analysis) ? "No exercises logged for this assessment" : "No exercises logged";
+}
+
+export function visitKind(visit) {
+  const assessment = Boolean(visit.analyses?.length || visit.analysis);
+  const practice = Boolean(visit.exerciseCount);
+  const scanReview = Boolean(visit.session?.id) &&
+    /^Scan review:/i.test(String(visit.session?.notes || "").trim()) &&
+    (visit.scans || []).some((scan) => scan.session_id === visit.session?.id);
+  if (scanReview && !practice) return assessment ? "Assessment review" : "Scan review";
+  if (assessment && practice) return "Assessment & practice";
+  if (assessment) return "Assessment";
+  if (practice) return "Practice";
+  return "Visit record";
 }
 
 export function visitRecorderLabel(visit) {
@@ -93,6 +109,7 @@ export function visitConnections(client, visit, revisions = []) {
 
 export function visitTimeline(visit, connections) {
   const events = [];
+  const sessionId = visit.session?.id || "";
   const add = (type, id, at, record, rank, order = 0) => {
     if (at) events.push({ type, id, at, record, rank, order });
   };
@@ -121,6 +138,9 @@ export function visitTimeline(visit, connections) {
     add("scan", scan.id, scan.captured_at, scan, 3);
     for (const marker of scanAnnotationMarkers(Array.isArray(scan.findings) ? scan.findings : [])) {
       if (marker.scan_id !== scan.id) continue;
+      // A marker needs its own saved visit relation. An older marker on a
+      // merely related scan must not be assigned to this visit by proximity.
+      if (!sessionId || marker.session_id !== sessionId) continue;
       // A marker without its own saved time cannot borrow the scan date.
       add("scan_marker", marker.id, marker.created_at,
         { ...marker, scan_id: scan.id, scan_name: scan.name }, 4);

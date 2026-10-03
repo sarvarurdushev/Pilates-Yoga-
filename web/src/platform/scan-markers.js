@@ -1,4 +1,9 @@
 // Marker numbers are scan-wide so the image and saved text use the same key.
+export function isEducationalScanReference(organization, scan, media) {
+  return Boolean(organization?.demo && scan?.detail?.demo &&
+    media?.detail?.sample === true && media?.detail?.source_url);
+}
+
 export function scanAnnotationMarkers(findings = [], frameIndex = null) {
   const markers = findings.map((finding, index) => ({ ...finding, marker: index + 1 }));
   return frameIndex === null ? markers : markers.filter((finding) =>

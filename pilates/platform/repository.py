@@ -173,6 +173,9 @@ class Repository:
                 "SELECT id,analysis_id FROM p_training_sessions WHERE analysis_id IS NOT NULL"
             )
             backfill_session_exercise_events(db)
+            # Historical scan markers have no evidence of when their scan was
+            # linked to a visit. Leave them unlinked; new markers save their
+            # exact visit at annotation time.
         from .regions import seed_regions
 
         seed_regions(self)
@@ -631,7 +634,9 @@ class Repository:
             result["findings"] = [
                 dict(r)
                 for r in db.execute(
-                    "SELECT * FROM p_scan_findings WHERE scan_id=? ORDER BY created_at,rowid", (identifier,)
+                    "SELECT f.*,fv.session_id FROM p_scan_findings f "
+                    "LEFT JOIN p_scan_finding_visits fv ON fv.finding_id=f.id "
+                    "WHERE f.scan_id=? ORDER BY f.created_at,f.rowid", (identifier,)
                 )
             ]
         if collection == "locations":
@@ -933,8 +938,9 @@ class Repository:
             scan["findings"] = []
         with self.db() as db:
             for finding in db.execute(
-                "SELECT f.*,u.name AS author_name FROM p_scan_findings f "
+                "SELECT f.*,fv.session_id,u.name AS author_name FROM p_scan_findings f "
                 "JOIN p_scans s ON s.id=f.scan_id "
+                "LEFT JOIN p_scan_finding_visits fv ON fv.finding_id=f.id "
                 "LEFT JOIN p_users u ON u.id=f.author_id AND u.org_id=s.org_id "
                 "WHERE s.student_id=? AND s.org_id=? "
                 "ORDER BY f.scan_id,f.created_at,f.rowid",
@@ -1043,6 +1049,15 @@ class Repository:
             ):
                 raise Refused("The scan and assessment do not share a recorded visit.")
         if collection == "scans":
+            # A saved marker's exact visit must not change when its source
+            # scan is edited. An older, unlinked marker may remain general.
+            if db.execute(
+                "SELECT 1 FROM p_scan_findings f "
+                "JOIN p_scan_finding_visits fv ON fv.finding_id=f.id "
+                "WHERE f.scan_id=? AND fv.session_id IS NOT ? LIMIT 1",
+                (identifier, session_id),
+            ).fetchone():
+                raise Refused("A saved scan marker belongs to another visit.")
             # A note explicitly tied to this scan and visit cannot be stranded by
             # moving or clearing the scan's own visit link.
             conflicting = db.execute(
@@ -1808,6 +1823,8 @@ class Repository:
             if by_analysis and by_reservation and by_analysis["id"] != by_reservation["id"]:
                 raise Refused("This assessment is already linked to another visit. Open that visit or choose its reservation.")
             linked = by_analysis or by_reservation
+            if item.get("require_new") is True and linked:
+                raise Refused("This assessment or reservation already has a recorded visit. Open that visit instead.", 409)
             if linked and linked["program_id"] and item.get("program_id") and linked["program_id"] != item["program_id"]:
                 raise Refused("This visit is already linked to another program.")
             submitted_events = item.get("completed_events")
@@ -1912,6 +1929,21 @@ class Repository:
         with self.db() as db:
             scan = self.get(actor, "scans", item["scan_id"], db)
             media = self.get(actor, "media", scan["media_id"], db)
+            # A real client's newly saved body marker has a durable exact
+            # visit relation. Public educational demo markers may remain on
+            # an unlinked reference scan. Its mutable demo flag alone cannot
+            # grant this exception: uploaded media lacks seed provenance.
+            visit_id = scan["session_id"]
+            educational_reference = (
+                actor.demo
+                and scan["detail"].get("demo")
+                and media["detail"].get("sample") is True
+                and bool(media["detail"].get("source_url"))
+            )
+            if not visit_id and not educational_reference:
+                raise Refused("Link this scan to a recorded visit before adding a body marker.")
+            if visit_id:
+                self._check_visit_link(actor, "scans", scan["id"], scan, visit_id, db)
             if (
                 not 0
                 <= int(item.get("frame_index", 0))
@@ -1941,7 +1973,12 @@ class Repository:
                     now(),
                 ),
             )
-        return {"id": identifier}
+            if visit_id:
+                db.execute(
+                    "INSERT INTO p_scan_finding_visits(finding_id,session_id) VALUES (?,?)",
+                    (identifier, visit_id),
+                )
+        return {"id": identifier, "session_id": visit_id}
 
     def coordinates(self, actor, analysis_id, person_id=None):
         with self.db() as db:
@@ -2067,5 +2104,5 @@ class Repository:
             "counts": counts,
             "coach_students": relationships,
             "audit": audit,
-            "schema_version": 1,
+            "schema_version": 2,
         }
