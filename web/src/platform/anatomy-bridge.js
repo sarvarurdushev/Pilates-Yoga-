@@ -1,8 +1,10 @@
 import { relatedRegion } from "./core.js";
+import { feedbackMarkerRegions, feedbackMarkerPosition, feedbackMarkerLayout, feedbackSourceURL } from "./feedback-markers.js";
 
 export function fullscreenRegionURL(pathname, search, hash, regionId) {
   const next = new URLSearchParams(search);
   next.set("region", regionId);
+  next.set("layer", "region");
   return pathname + "?" + next + hash;
 }
 
@@ -17,6 +19,7 @@ export function contextForRegion(previous, client, region, structureId) {
     notes: client.notes
       .filter((note) => relatedRegion(note.region_id, region.id))
       .map((note) => note.text),
+    feedback: client.notes,
   };
 }
 
@@ -30,6 +33,116 @@ if (query.get("platform") === "1") {
     regionCatalog = null,
     clientRecord = null,
     currentContext = null;
+  const markerLayer = document.createElement("div");
+  markerLayer.id = "client-feedback-markers";
+  markerLayer.setAttribute("aria-label", "Coach feedback marked on the body");
+  document.querySelector("#stage")?.append(markerLayer);
+  const leaders = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  leaders.classList.add("client-feedback-leaders");
+  leaders.setAttribute("aria-hidden", "true");
+  let markedRegions = [];
+  const currentFeedback = (context) => context.feedback || [];
+  const markerSource = (context) => ({
+    id: context.client?.id,
+    notes: currentFeedback(context),
+  });
+  const placeMarkers = () => {
+    if (!ready || !atlas || !currentContext || !markerLayer.isConnected) return;
+    const stage = document.querySelector("#stage");
+    const bounds = stage?.getBoundingClientRect();
+    const camera = atlas.gfx?.camera;
+    if (!bounds?.width || !bounds?.height || !camera) return;
+    const focused = currentContext.layer === "region" || !currentContext.layer;
+    const positions = [];
+    markerLayer.querySelectorAll(".client-feedback-leader").forEach(line => { line.style.display = "none"; });
+    for (const marked of markedRegions) {
+      const button = markerLayer.querySelector(`[data-feedback-region="${marked.id}"]`);
+      if (!button) continue;
+      if (focused && marked.id !== currentContext.region?.id) {
+        button.hidden = true;
+        continue;
+      }
+      let projected = null;
+      const joints = atlas.app.explode === 0
+        ? marked.jointCoordinates.map(coord => atlas.jointCentre(coord)).filter(Boolean) : [];
+      const jointAnchor = joints.length && joints.length === marked.jointCoordinates.length
+        ? joints.reduce((sum, point) => sum.add(point), joints[0].clone().set(0, 0, 0)).divideScalar(joints.length) : null;
+      const anchors = marked.anchorIds.map(id => atlas.structureAnchorOf(id)).filter(Boolean);
+      const candidates = jointAnchor ? [jointAnchor] : marked.pairedAnchor
+        ? [anchors.length === 2 ? anchors[0].clone().add(anchors[1]).multiplyScalar(0.5) : null]
+        : anchors;
+      for (const point of candidates) {
+        if (!point) continue;
+        point.project(camera);
+        const position = feedbackMarkerPosition(point, bounds.width, bounds.height);
+        if (position) {
+          projected = position;
+          break;
+        }
+      }
+      button.hidden = true;
+      if (projected) positions.push({ id: marked.id, ...projected });
+    }
+    for (const position of feedbackMarkerLayout(positions, bounds.width, bounds.height)) {
+      const button = markerLayer.querySelector(`[data-feedback-region="${position.id}"]`);
+      button.hidden = false;
+      button.style.left = `${position.x.toFixed(1)}px`;
+      button.style.top = `${position.y.toFixed(1)}px`;
+      button.dataset.anchorX = position.anchorX.toFixed(1);
+      button.dataset.anchorY = position.anchorY.toFixed(1);
+      const leader = leaders.querySelector(`[data-feedback-leader="${position.id}"]`);
+      if (leader && Math.hypot(position.x - position.anchorX, position.y - position.anchorY) > 1) {
+        leader.setAttribute("x1", position.anchorX);
+        leader.setAttribute("y1", position.anchorY);
+        leader.setAttribute("x2", position.x);
+        leader.setAttribute("y2", position.y);
+        leader.style.display = "";
+      }
+    }
+  };
+  const markerTimer = window.setInterval(placeMarkers, 120);
+  window.addEventListener("pagehide", () => window.clearInterval(markerTimer), { once: true });
+  const markFeedback = async (context) => {
+    markedRegions = feedbackMarkerRegions(markerSource(context), regionCatalog);
+    await atlas.ensureStructureAnchors(markedRegions.flatMap(region => region.anchorIds));
+    leaders.replaceChildren();
+    markerLayer.replaceChildren(leaders);
+    for (const marked of markedRegions) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.feedbackRegion = marked.id;
+      button.dataset.noteId = marked.noteId || "";
+      button.className = "client-feedback-marker";
+      button.hidden = true;
+      const leader = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      leader.classList.add("client-feedback-leader");
+      leader.dataset.feedbackLeader = marked.id;
+      leader.style.display = "none";
+      leaders.append(leader);
+      button.textContent = String(marked.count);
+      button.title = `${marked.name}: ${marked.count} coach feedback note${marked.count === 1 ? "" : "s"}`;
+      button.setAttribute("aria-label", `Open ${marked.name}, ${marked.count} coach feedback note${marked.count === 1 ? "" : "s"}`);
+      button.onclick = async () => {
+        if (parent !== window) {
+          tell("motion-atlas-feedback-region", { region_id: marked.id, note_id: marked.noteId });
+          return;
+        }
+        const region = regionCatalog.find((entry) => entry.id === marked.id);
+        if (!region) return;
+        const client = await selectedClient();
+        const next = new URLSearchParams(location.search);
+        next.set("region", region.id);
+        next.set("layer", "region");
+        history.replaceState(null, "", location.pathname + "?" + next + location.hash);
+        query.set("region", region.id);
+        query.set("layer", "region");
+        syncReturnLinks(region.id);
+        apply(contextForRegion(currentContext, client, region, null));
+      };
+      markerLayer.append(button);
+    }
+    placeMarkers();
+  };
   const panel = document.createElement("aside");
   panel.id = "motion-context-panel";
   Object.assign(panel.style, {
@@ -53,7 +166,7 @@ if (query.get("platform") === "1") {
   const returnURL = (regionId) => "/#" + new URLSearchParams({
     page: "client", client: query.get("client"), tab: "anatomy",
     region: regionId,
-    ...(query.get("analysis") ? { id: query.get("analysis") } : {}),
+    ...(currentContext?.analysis_id ? { id: currentContext.analysis_id } : {}),
   });
   const syncReturnLinks = (regionId) => returnLinks.forEach((link) => {
     link.href = returnURL(regionId);
@@ -126,6 +239,7 @@ if (query.get("platform") === "1") {
   };
   async function apply(context) {
     currentContext = context;
+    syncReturnLinks(context.region.id);
     if (Array.isArray(context.regions)) regionCatalog = context.regions;
     pending = context;
     if (!ready || applying) return;
@@ -147,6 +261,14 @@ if (query.get("platform") === "1") {
           await atlas.setLayer(name, false);
         await atlas.setLayer("skeleton", true);
         await atlas.setLayer("muscles_superficial", true);
+      } else if (context.layer === "feedback") {
+        await atlas.setIsolate(null);
+        for (const name of [
+          "bones_full", "muscles_full", "connective", "nervous",
+        ]) await atlas.setLayer(name, false);
+        await atlas.setLayer("skeleton", true);
+        await atlas.setLayer("muscles_superficial", true);
+        atlas.fitView();
       } else if (context.layer && context.layer !== "region") {
         await atlas.setIsolate(null);
         for (const name of [
@@ -196,6 +318,42 @@ if (query.get("platform") === "1") {
           }
           panel.append(details);
         }
+        const sourced = (context.feedback || []).filter((note) =>
+          relatedRegion(note.region_id, r.id));
+        if (sourced.length) {
+          const sources = document.createElement("div");
+          sources.className = "client-feedback-sources";
+          for (const note of sourced) {
+            const sourceURL = feedbackSourceURL(context.client.id, note);
+            if (!sourceURL) {
+              const absent = document.createElement("p");
+              absent.textContent = "Source visit not recorded for this feedback.";
+              sources.append(absent);
+            }
+            const link = document.createElement("a");
+            link.href = sourceURL || "/#" + new URLSearchParams({
+              page: "client", client: context.client.id, tab: "notes", region: r.id,
+              ...(note.id ? { note: note.id } : {}),
+            });
+            link.target = "_top";
+            link.textContent = (sourceURL ? "Source visit for “" : "Open feedback “") + note.text.slice(0, 48) + (note.text.length > 48 ? "…" : "") + "” →";
+            sources.append(link);
+          }
+          panel.append(sources);
+        }
+        if (context.layer !== "feedback" && (context.feedback || []).some((note) => note.region_id)) {
+          const showAll = document.createElement("button");
+          showAll.type = "button";
+          showAll.textContent = "Show all feedback on body";
+          showAll.onclick = () => {
+            const next = new URLSearchParams(location.search);
+            next.set("layer", "feedback");
+            history.replaceState(null, "", location.pathname + "?" + next + location.hash);
+            query.set("layer", "feedback");
+            apply({ ...context, layer: "feedback", structure_id: null, exercise: null });
+          };
+          panel.append(showAll);
+        }
         const back = document.createElement("a");
         back.href = "/#" + new URLSearchParams({
           page: "client", client: context.client.id, tab: "anatomy", region: r.id,
@@ -206,6 +364,7 @@ if (query.get("platform") === "1") {
         back.target = "_top";
         panel.append(back);
       }
+      await markFeedback(context);
       tell("motion-atlas-context", {
         client_id: context.client.id,
         region_id: r.id,
@@ -255,16 +414,21 @@ if (query.get("platform") === "1") {
         };
         const me = await req("/platform/me");
         const c = await selectedClient();
+        const sourceId = c.analyses.some((analysis) => analysis.id === query.get("analysis"))
+          ? query.get("analysis") : null;
         const region =
           me.regions.find((r) => r.id === query.get("region")) || me.regions[0];
         await apply({
           client: { id: c.id, name: c.name },
           region,
-          analysis_id: query.get("analysis"),
+          analysis_id: sourceId,
           exercise: query.get("exercise"),
           notes: c.notes
             .filter((n) => relatedRegion(n.region_id, region.id))
             .map((n) => n.text),
+          feedback: c.notes,
+          regions: me.regions,
+          layer: query.get("layer") === "region" ? "region" : c.notes.length ? "feedback" : "region",
         });
       }
     } catch (e) {

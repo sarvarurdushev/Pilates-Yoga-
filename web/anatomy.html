@@ -111,6 +111,17 @@ button{font:inherit;cursor:pointer}
   radial-gradient(58% 46% at 50% 42%,rgba(96,150,210,.055) 0%,transparent 68%),
   radial-gradient(130% 105% at 50% 44%,transparent 42%,rgba(1,3,6,.82) 100%)}
 #labels{position:absolute;inset:0;pointer-events:none;z-index:4}
+#client-feedback-markers{position:absolute;inset:0;z-index:6;pointer-events:none}
+.client-feedback-leaders{position:absolute;inset:0;width:100%;height:100%;overflow:hidden;pointer-events:none}
+.client-feedback-leader{stroke:#98ddff;stroke-width:1.5;vector-effect:non-scaling-stroke}
+.client-feedback-marker{position:absolute;transform:translate(-50%,-50%);width:33px;height:33px;
+ border:2px solid #98ddff;border-radius:50%;background:#155eaee8;color:#fff;
+ box-shadow:0 0 0 5px #4eacff55,0 2px 14px #001b40;font-size:13px;font-weight:750;
+ pointer-events:auto;display:grid;place-items:center;line-height:1}
+.client-feedback-marker:hover,.client-feedback-marker:focus-visible{background:#2e78cf;outline:2px solid #fff;outline-offset:5px}
+.client-feedback-marker[hidden]{display:none}
+.client-feedback-sources{display:grid;gap:6px;margin-bottom:8px}
+.client-feedback-sources a{color:#7aceff;text-decoration:underline}
 
 /* ----------------------------------------------------------------- sections
  * The strip of sections along the bottom of the stage. It sits to the right of the layer

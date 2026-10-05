@@ -2701,8 +2701,8 @@ it fine.
 ## Tests
 
 ```bash
-python -m pytest        # latest local run: 2,617 passed, 1 skipped (~10m)
-cd web && npm test      # latest local run: 484 passed
+python -m pytest        # latest local run: 2,625 passed, 1 skipped (~10m)
+cd web && npm test      # latest local run: 505 passed
 cd web && npm run test:smoke   # browser checks for the standalone anatomy atlas
 ```
 

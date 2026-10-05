@@ -107,7 +107,7 @@ function banner(session) {
     <span>${esc(session.date)}</span><span class="sep">·</span>
     <span>${session.ranked().length} muscle groups</span>
     ${sessions > 1 ? `<span class="sep">·</span><span>${sessions} sessions on record</span>` : ''}
-    ${score != null ? `<span class="sep">·</span><span>${Math.round(score)}/100</span>` : ''}
+    ${score != null ? `<span class="sep">·</span><span title="Mean of this application's camera-derived coaching checks; not a clinical normal range">Camera coaching checks: ${Math.round(score)}/100 · ${session.score.checks ?? 'Unknown'} checks</span>` : ''}
     ${fake ? '<span class="sample">Sample</span>' : ''}
     <span class="warn">Blue structures are measured. Everything else is anatomy</span>`;
   document.body.appendChild(bar);

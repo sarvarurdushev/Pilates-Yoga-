@@ -592,6 +592,15 @@ def test_equipment_availability_and_paged_analysis_filter(state):
     assert not {x["id"] for x in first["items"]} & {x["id"] for x in second["items"]}
 
 
+def test_equipment_counts_refuse_impossible_reservable_stock(state):
+    repo, _coach, admin, _student = state
+    equipment = next(item for item in repo.list(admin, "equipment")["items"] if item["name"] == "Mat")
+    for available in (equipment["quantity"] + 1, -1, 1.5, True):
+        with pytest.raises(Refused, match="equipment units|Reservable units"):
+            repo.save(admin, "equipment", {"id": equipment["id"], "available": available})
+    assert repo.get(admin, "equipment", equipment["id"])["available"] == equipment["available"]
+
+
 def test_http_auth_csrf_media_ranges_and_backup(state):
     import threading
     import urllib.request

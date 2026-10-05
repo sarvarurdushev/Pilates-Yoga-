@@ -1166,6 +1166,16 @@ class Repository:
             merged = {**existing, **fields}
             if collection == "programs" and not str(merged.get("name") or "").strip():
                 raise Refused("Name the program.")
+            if collection == "equipment":
+                quantity = merged.get("quantity", 1)
+                available = merged.get("available", 1)
+                if any(
+                    not isinstance(value, int) or isinstance(value, bool) or value < 0
+                    for value in (quantity, available)
+                ):
+                    raise Refused("Enter non-negative whole numbers for equipment units.")
+                if available > quantity:
+                    raise Refused("Reservable units cannot exceed total equipment units.")
             self._linked(actor, merged, db, merged.get("student_id"))
             if collection == "notes" and merged.get("program_id"):
                 assigned = db.execute(

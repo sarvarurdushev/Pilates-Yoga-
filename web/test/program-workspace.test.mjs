@@ -2,7 +2,53 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { withSavedProgressEvidence } from "./progress-fixtures.mjs";
 import { comparableProgramMeasurements, latestProgramSessionCompletion, programSessionsForAssignment } from "../src/platform/library.js";
-import { clientCaptureOptions, currentPhaseSteps, programDurationEstimate, revisionVisitOptions, revisionVisitLink, revisionSourceOptions, revisionAuthorLabel, revisionStepsHTML } from "../src/platform/programs.js";
+import { clientCaptureOptions, currentPhaseSteps, programDurationEstimate, revisionVisitOptions, revisionVisitLink, revisionSourceOptions, revisionAuthorLabel, revisionStepsHTML, programEditorClientContext } from "../src/platform/programs.js";
+
+test("reusing a plan for another client clears the original client's evidence and capture", () => {
+  const original = {detail:{student_id:"a",source_student_id:"a",source_analysis_id:"analysis-a",source_finding:"shoulder-a",coach_notes:"Private A context"},
+    steps:[{exercise_id:"bridge",detail:{source:{kind:"analysis",id:"analysis-a"},why_assigned:"A's reason",media:[{kind:"client_capture",media_id:"capture-a"},{kind:"exercise_library",media_id:"demo"}]}}]};
+  const context = programEditorClientContext(original,{id:"b",analyses:[{id:"analysis-b",student_id:"b"}]});
+  assert.equal(context.sourceReport, "");
+  assert.equal(context.sourceFinding, "");
+  assert.equal(context.source.detail.source_analysis_id, null);
+  assert.equal(context.source.detail.coach_notes, undefined);
+  assert.equal(context.source.steps[0].detail.source, undefined);
+  assert.equal(context.source.steps[0].detail.why_assigned, undefined);
+  assert.deepEqual(context.source.steps[0].detail.media,[{kind:"exercise_library",media_id:"demo"}]);
+  assert.equal(original.detail.source_analysis_id,"analysis-a","preparing a reusable draft must not alter the original program");
+});
+
+test("the same client's saved assessment and step evidence remain available", () => {
+  const context = programEditorClientContext({detail:{student_id:"a",source_analysis_id:"analysis-a",source_finding:"shoulder-a"},
+    steps:[{detail:{source:{kind:"analysis",id:"analysis-a"},why_assigned:"A's reason"}}]},
+    {id:"a",analyses:[{id:"analysis-a",student_id:"a"}]});
+  assert.equal(context.sourceReport,"analysis-a");
+  assert.equal(context.sourceFinding,"shoulder-a");
+  assert.equal(context.source.steps[0].detail.source.id,"analysis-a");
+  assert.equal(context.source.steps[0].detail.why_assigned,"A's reason");
+});
+
+test("an explicit destination-client report is retained and a foreign URL report is refused", () => {
+  const source = {detail:{student_id:"a",source_analysis_id:"analysis-a",source_finding:"old finding"}};
+  const client = {id:"b",analyses:[{id:"analysis-b",student_id:"b"}]};
+  const own = programEditorClientContext(source,client,{report:"analysis-b",finding:"b finding"});
+  assert.equal(own.sourceReport,"analysis-b");
+  assert.equal(own.changeAnalysis,"analysis-b");
+  assert.equal(own.sourceFinding,"b finding");
+  const foreign = programEditorClientContext(source,client,{report:"analysis-a",finding:"foreign finding"});
+  assert.equal(foreign.sourceReport,"");
+  assert.equal(foreign.changeAnalysis,"");
+  assert.equal(foreign.sourceFinding,"");
+});
+
+test("a validated saved same-client source remains when the current response omits its older assessment", () => {
+  const context = programEditorClientContext({detail:{student_id:"a",source_analysis_id:"older",source_finding:"older finding"},
+    steps:[{detail:{source:{kind:"analysis",id:"older"}}}]},{id:"a",analyses:[]});
+  assert.equal(context.sourceReport,"older");
+  assert.equal(context.sourceFinding,"older finding");
+  assert.equal(context.source.steps[0].detail.source.id,"older");
+  assert.equal(programEditorClientContext(context.source,{id:"a",analyses:[]},{report:"foreign"}).sourceReport,"");
+});
 
 const analysis = (id, protocol, demo = false, kind = "movement") =>
   ({id, protocol, demo, kind});
@@ -87,6 +133,16 @@ test("version history links to the exact saved source visit rather than guessing
   assert.match(html, />Source visit<\/a>/);
   assert.equal(revisionVisitLink({session_id: null}, "student"), "");
   assert.equal(revisionVisitLink({session_id: "visit"}, null), "");
+});
+
+test("historical revision discloses an unrecorded source visit while manual planning remains valid", () => {
+  const analysis = revisionVisitLink({version:2,source_kind:"analysis",source_id:"assessment",created_at:"2026-06-01"}, "student");
+  assert.match(analysis, /Source visit not recorded/);
+  assert.doesNotMatch(analysis, /href=|2026-06-01/);
+  const manual = revisionVisitLink({version:2,source_kind:"manual",snapshot:{detail:{student_id:"student"}}}, "student");
+  assert.match(manual, /Manual coach decision · no visit linked/);
+  assert.doesNotMatch(manual, /not recorded|unavailable/);
+  assert.equal(revisionVisitLink({snapshot:{detail:{template:true,status:"Draft"}}}, "student"), "");
 });
 
 

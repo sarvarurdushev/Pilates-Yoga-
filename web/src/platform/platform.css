@@ -1238,11 +1238,12 @@ td {
   background: #172840;
 }
 .pd-edit-step-head { display: flex; align-items: center; gap: 12px; padding: 11px; }
-.pd-edit-step-head > div:nth-child(2) { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.pd-edit-step-head > div:nth-child(2) { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .pd-edit-step-head small { color: #96b8e6; }
 .pd-edit-step-head span { color: #a9bfdc; font-size: 12px; }
-.pd-edit-step-head strong { font-size: 14px; }
+.pd-edit-step-head strong { font-size: 14px; overflow-wrap: anywhere; }
 .pd-drag { cursor: grab; font-size: 20px !important; user-select: none; }
+.pd-drag:focus-visible { outline: 2px solid #8bbaff; outline-offset: 3px; border-radius: 3px; }
 .pd-card-actions { display: flex; gap: 5px; flex-wrap: wrap; justify-content: end; }
 .pd-card-actions button { padding: 6px 8px; font-size: 11px; }
 .pd-step-details { border-top: 1px solid #344c68; }
@@ -1326,6 +1327,8 @@ td {
   .pd-fields-two, .pd-fields-four, .pd-builder-toolbar, .pd-builder-toolbar > div, .pd-instruction-grid { grid-template-columns: 1fr; }
   .pd-builder-toolbar > div { grid-column: auto; }
   .pd-edit-step-head, .pd-practice-head { flex-wrap: wrap; }
+  .pd-edit-step-head > div:nth-child(2) { flex-basis: calc(100% - 36px); }
+  .pd-edit-step-head > .pd-card-actions { flex-basis: 100%; justify-content: start; }
   .pd-dose { white-space: normal; }
   .pd-dialog { padding: 15px; }
   .pd-dialog #edit-form > .page-head { top: -15px; }

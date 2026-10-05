@@ -36,13 +36,15 @@ import {
   mediaURL,
 } from "./core.js";
 import { edit } from "./forms.js";
+import { feedbackVisitDisclosure } from "./feedback-source.js";
 import { cameraLabels, comparisonText, metricCopy, explainedChart } from "./explain.js";
 import { metricRegion, analysisStatusLabel } from "./reports.js";
 import { progressMilestones } from "./progress-milestones.js";
 import { progressFirstScreenFacts } from "./first-screen-context.js";
-import { visitAtAGlance, visitMetricLabel } from "./visit-evidence.js";
+import { visitAtAGlance, visitMetricLabel, loggedMovementSummary } from "./visit-evidence.js";
 import { visitsForClient, visitKind, visitPracticeLabel, visitRecorderLabel, visitConnections, visitTimeline } from "./visits.js";
 import { comparableProgressSeries, preferredProgressMetric, selectedProgressSeries } from "./progress-selection.js";
+import { selectedClientRoute } from "./selected-client-route.js";
 // One client workspace is the entrance to all scoped records. Older tab URLs
 // still resolve below; these tabs group the information by the user's task.
 const workspaceTabs = [
@@ -340,17 +342,9 @@ async function render() {
   state.dispose.splice(0).forEach((fn) => fn());
   document.body.classList.remove("nav-open");
   const p = params();
-  let cid = p.get("client");
-  if (state.me.role === "student") cid = state.me.user.id;
-  if (
-    cid &&
-    state.me.role !== "admin" &&
-    !state.me.students.some((s) => s.id === cid)
-  ) {
-    cid = null;
-    p.delete("client");
-    history.replaceState(null, "", "#" + p);
-  }
+  const selected = selectedClientRoute(p, state.me);
+  const cid = selected.id;
+  if (selected.changed) history.replaceState(null, "", "#" + p);
   try {
     state.client = cid
       ? await api("client?id=" + encodeURIComponent(cid))
@@ -597,18 +591,18 @@ async function overview(root) {
   if (state.me.role === "student") {
     root.innerHTML =
       head("Your practice", c.goal || "Your sessions, coach feedback and assigned practice in one place.") +
-      `<div class="grid two">${card("Your latest session", latestSummary)}${card("What your coach said", notes.length ? notesHTML(notes) : notice("Your coach has not shared feedback yet. It will appear here after a session review."))}${card("Your assigned program", programCards(c.programs))}${card("Your progress", `<p>Compare measurements from similar visits and open the source session for each result.</p><a class="button" href="${workspaceHref("progress")}">See progress over time →</a>`)}</div>${card("Your body map", `<p>Explore the body regions connected to your sessions, coach feedback and assigned exercises.</p><a class="button" href="${workspaceHref("anatomy")}">Open body / 3D anatomy →</a>`)}`;
+      `<div class="grid two">${card("Your latest assessment", latestSummary)}${card("What your coach said", notes.length ? notesHTML(notes) : notice("Your coach has not shared feedback yet. It will appear here after a session review."))}${card("Your assigned program", programCards(c.programs))}${card("Your progress", `<p>Compare measurements from similar visits and open the source session for each result.</p><a class="button" href="${workspaceHref("progress")}">See progress over time →</a>`)}</div>${card("Your body map", `<p>Explore the body regions connected to your sessions, coach feedback and assigned exercises.</p><a class="button" href="${workspaceHref("anatomy")}">Open body / 3D anatomy →</a>`)}`;
     return;
   }
   if (state.me.role === "admin") {
     root.innerHTML =
       head(c.name + " · client overview", c.goal || "Client relationships, session records and program status.") +
-      `<div class="stats">${stat("Assessment records", c.analyses.length, "Movement and posture") }${stat("Visits", visitsForClient(c).length, "Assessments and practice", "schedule")}${stat("Assigned coaches", c.coach_ids.length, c.coach_ids.map(coachName).join(", ") || "Not assigned", "clients")}${stat("Next reservation", dt(c.next_reservation?.starts_at), locationName(c.next_reservation?.location_id), "schedule")}</div><div class="grid two">${card("Latest session", latestSummary)}${card("Current program assignment", programCards(c.programs))}${card("Locations and access", `<p>Assigned locations: ${esc(c.location_ids.map(locationName).join(", ") || "None")}</p><p>Assigned coaches: ${esc(c.coach_ids.map(coachName).join(", ") || "None")}</p><a class="button" href="${workspaceHref("schedule")}">Review reservations →</a>`)}${card("Review status", `<p>${latest ? esc(latest.detail?.reviewed_at ? "Latest assessment reviewed " + dt(latest.detail.reviewed_at) : "Latest assessment awaits coach review.") : "No assessment to review yet."}</p><a class="button" href="${workspaceHref("sessions")}">Inspect client sessions →</a>`)}</div>`;
+      `<div class="stats">${stat("Assessment records", c.analyses.length, "Movement and posture") }${stat("Visits", visitsForClient(c).length, "Assessments and practice", "schedule")}${stat("Assigned coaches", c.coach_ids.length, c.coach_ids.map(coachName).join(", ") || "Not assigned", "clients")}${stat("Next reservation", dt(c.next_reservation?.starts_at), locationName(c.next_reservation?.location_id), "schedule")}</div><div class="grid two">${card("Latest assessment", latestSummary)}${card("Current program assignment", programCards(c.programs))}${card("Locations and access", `<p>Assigned locations: ${esc(c.location_ids.map(locationName).join(", ") || "None")}</p><p>Assigned coaches: ${esc(c.coach_ids.map(coachName).join(", ") || "None")}</p><a class="button" href="${workspaceHref("schedule")}">Review reservations →</a>`)}${card("Review status", `<p>${latest ? esc(latest.detail?.reviewed_at ? "Latest assessment reviewed " + dt(latest.detail.reviewed_at) : "Latest assessment awaits coach review.") : "No assessment to review yet."}</p><a class="button" href="${workspaceHref("sessions")}">Inspect client sessions →</a>`)}</div>`;
     return;
   }
   root.innerHTML =
     head(c.name + " · coaching workspace", c.goal || "Review the latest session, coach feedback and current practice.") +
-    `<div class="stats">${stat("Assessment records", c.analyses.length, "Movement and posture")}${stat("Visits", visitsForClient(c).length, "Assessments and practice", "schedule")}${stat("Coach feedback", c.notes.length, "Linked to body regions", "notes")}${stat("Next reservation", dt(c.next_reservation?.starts_at), locationName(c.next_reservation?.location_id), "schedule")}</div><div class="grid two">${card("Latest session", latestSummary)}${card("Coaching focus", notes.length ? notesHTML(notes) : notice("No coach feedback has been saved yet. Open a session or body region to add feedback."))}${card("Current program", programCards(c.programs))}${card("Progress across visits", `<p>Review comparable measurements alongside their source sessions and coach notes.</p><a class="button" href="${workspaceHref("progress")}">Open progress →</a>`)}</div><div class="actions"><a class="button primary" href="${href("capture")}">New assessment</a><a class="button" href="${workspaceHref("anatomy")}">Explore body map</a></div>`;
+    `<div class="stats">${stat("Assessment records", c.analyses.length, "Movement and posture")}${stat("Visits", visitsForClient(c).length, "Assessments and practice", "schedule")}${stat("Coach feedback", c.notes.length, "Linked to body regions", "notes")}${stat("Next reservation", dt(c.next_reservation?.starts_at), locationName(c.next_reservation?.location_id), "schedule")}</div><div class="grid two">${card("Latest assessment", latestSummary)}${card("Coaching focus", notes.length ? notesHTML(notes) : notice("No coach feedback has been saved yet. Open a session or body region to add feedback."))}${card("Current program", programCards(c.programs))}${card("Progress across visits", `<p>Review comparable measurements alongside their source sessions and coach notes.</p><a class="button" href="${workspaceHref("progress")}">Open progress →</a>`)}</div><div class="actions"><a class="button primary" href="${href("capture")}">New assessment</a><a class="button" href="${workspaceHref("anatomy")}">Explore body map</a></div>`;
 }
 export function analysisTable(rows) {
   if (!rows.length)
@@ -828,7 +822,7 @@ async function sessionDetail(root, sessionId, assessmentId) {
         : `<a href="${workspaceHref("notes", { ...(practice?.id ? { session: practice.id } : {}) })}">Add feedback for this visit →</a>`;
   const happened = scanReviewOnly
     ? `${analyses.length ? `${esc(analyses.map((item) => item.protocol).join(", "))} assessment linked for review · ` : ""}Scan reviewed; no exercises logged`
-    : `${analyses.length ? `${esc(analyses.map((item) => item.protocol).join(", "))} captured` : "No assessment capture linked"}${completed.length ? ` · ${completed.length} movement${completed.length === 1 ? "" : "s"} logged` : ""}`;
+    : `${analyses.length ? `${esc(analyses.map((item) => item.protocol).join(", "))} captured` : "No assessment capture linked"}${completed.length ? ` · ${esc(loggedMovementSummary(completionRows, exercises))}` : ""}`;
   const atAGlance = `<section class="panel session-at-glance"><h2>At this visit</h2><dl class="session-facts"><div><dt>Who and when</dt><dd>${esc(c.name)} · ${esc(dt(when))}</dd></div><div><dt>What happened</dt><dd>${happened}</dd></div><div><dt>Camera view</dt><dd>${esc(cameraText)}</dd></div><div><dt>Saved measurement and meaning</dt><dd>${measured}</dd></div><div><dt>Change from comparable capture</dt><dd>${changed}</dd></div><div><dt>Coach thought</dt><dd>${coachThought}</dd></div><div><dt>Linked body regions</dt><dd>${regionText}</dd></div><div><dt>Next action</dt><dd>${nextStep}</dd></div></dl></section>`;
   const eventHTML = (event) => {
     const timestamp = event.type === "exercise"
@@ -1174,7 +1168,7 @@ export function notesHTML(notes) {
     const findingLabel = finding
       ? `<p><strong>Linked finding · ${esc(finding.source)}</strong> ${finding.analysis_id ? `<a href="${workspaceHref("sessions", { assessment: finding.analysis_id })}">${esc(finding.text)}</a>` : esc(finding.text)}</p>`
       : n.detail?.observation_id ? "<p>Linked finding is no longer available.</p>" : "";
-    return `<article class="note">${badge(source, demo ? "demo" : "")}<h3><a href="${href("client", { tab: "anatomy", region: n.region_id, id: n.analysis_id })}">${esc(regionName(n.region_id))}</a></h3><p>${esc(n.text)}</p>${findingLabel}<small>${esc(author)} · ${date(n.created_at)}${updated} · ${n.visibility === "student" ? "Shared with student" : "Coach only"}</small><div class="actions">${n.session_id ? `<a href="${workspaceHref("sessions", { session: n.session_id })}">Source visit</a>` : n.analysis_id ? `<a href="${workspaceHref("sessions", { assessment: n.analysis_id })}">Source session</a>` : ""}${n.analysis_id ? `<a href="${href("report", { id: n.analysis_id })}">Assessment report</a>` : ""}${n.scan_id ? `<a href="${workspaceHref("scans", { scan: n.scan_id })}">Linked scan</a>` : ""}${n.program_id ? `<a href="${href("program", { id: n.program_id })}">Program</a>` : ""}${n.exercise_id ? `<a href="${href("exercise", { id: n.exercise_id })}">Exercise</a>` : ""}${state.me.role !== "student" ? `<button data-edit="notes" data-id="${n.id}">Edit feedback</button>` : ""}</div></article>`;
+    return `<article class="note">${badge(source, demo ? "demo" : "")}<h3><a href="${href("client", { tab: "anatomy", region: n.region_id, id: n.analysis_id })}">${esc(regionName(n.region_id))}</a></h3><p>${esc(n.text)}</p>${findingLabel}${feedbackVisitDisclosure(n, {role: state.me.role, clientId: state.client?.id, inlineEdit: true})}<small>${esc(author)} · ${date(n.created_at)}${updated} · ${n.visibility === "student" ? "Shared with student" : "Coach only"}</small><div class="actions">${n.session_id ? `<a href="${workspaceHref("sessions", { session: n.session_id })}">Source visit</a>` : n.analysis_id ? `<a href="${workspaceHref("sessions", { assessment: n.analysis_id })}">Source session</a>` : ""}${n.analysis_id ? `<a href="${href("report", { id: n.analysis_id })}">Assessment report</a>` : ""}${n.scan_id ? `<a href="${workspaceHref("scans", { scan: n.scan_id })}">Linked scan</a>` : ""}${n.program_id ? `<a href="${href("program", { id: n.program_id })}">Program</a>` : ""}${n.exercise_id ? `<a href="${href("exercise", { id: n.exercise_id })}">Exercise</a>` : ""}${state.me.role !== "student" ? `<button data-edit="notes" data-id="${n.id}">Edit feedback</button>` : ""}</div></article>`;
   }).join("");
 }
 async function section(root, section) {
@@ -1277,21 +1271,21 @@ async function section(root, section) {
     root.innerHTML =
       head(
         "Locations",
-        "Manage rooms, capacity and connected people.",
+        "Manage rooms, simultaneous reservation capacity and assigned people.",
         '<button data-edit="locations">+ Location</button>',
       ) +
-      `<div class="grid two">${rows.map((l) => card(l.name, `<p>${esc(l.address)}</p><p>Capacity ${l.capacity} · ${state.me.students.filter((s) => s.location_ids.includes(l.id)).length} clients · ${state.me.coaches.filter((s) => s.location_ids.includes(l.id)).length} coaches</p><button data-edit="locations" data-id="${l.id}">Manage location</button>`)).join("")}</div>`;
+      `<div class="grid two">${rows.map((l) => card(l.name, `<p>${esc(l.address)}</p><p>Up to ${esc(l.capacity)} overlapping reservations · ${state.me.students.filter((s) => s.location_ids.includes(l.id)).length} assigned clients · ${state.me.coaches.filter((s) => s.location_ids.includes(l.id)).length} assigned coaches</p><button data-edit="locations" data-id="${l.id}">Manage location</button>`)).join("")}</div>`;
   else if (collection === "equipment")
     root.innerHTML =
       head(
         "Equipment",
-        "Availability at your assigned locations.",
+        "Base reservable units at your assigned locations. Availability for a particular time also subtracts overlapping bookings.",
         state.me.role === "admin"
           ? '<button data-edit="equipment">+ Equipment</button>'
           : "",
       ) +
       table(
-        ["Equipment", "Location", "Available", "Total", ""],
+        ["Equipment", "Location", "Reservable units", "Total units", ""],
         rows.map((e) => [
           esc(e.name),
           esc(locationName(e.location_id)),

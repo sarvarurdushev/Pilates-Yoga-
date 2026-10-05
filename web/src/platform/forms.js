@@ -98,7 +98,7 @@ export async function edit(kind, id, copy = false) {
       field("Name", "name", item.name, "text", "required") +
       field("Address", "address", item.address) +
       field(
-        "Capacity",
+        "Simultaneous reservation capacity",
         "capacity",
         item.capacity || 12,
         "number",
@@ -127,7 +127,7 @@ export async function edit(kind, id, copy = false) {
     const add = (r) => {
       const wrap = document.createElement("div");
       wrap.className = "room-row";
-      wrap.innerHTML = `<input aria-label="Room name" data-room-name value="${esc(r.name || "")}" required><input aria-label="Room capacity" data-room-capacity type="number" min="1" value="${r.capacity || 8}">`;
+      wrap.innerHTML = `<input aria-label="Room name" data-room-name value="${esc(r.name || "")}" required><input aria-label="Room simultaneous reservation capacity" data-room-capacity type="number" min="1" value="${r.capacity || 8}">`;
       d.querySelector("#room-rows").append(wrap);
     };
     rooms.forEach(add);
@@ -149,7 +149,7 @@ export async function edit(kind, id, copy = false) {
         'min="0" required',
       ) +
       field(
-        "Available for reservations",
+        "Reservable units before overlapping bookings",
         "available",
         item.available ?? 1,
         "number",

@@ -73,4 +73,3 @@ test("the rendered program chart labels first and latest comparable assessments"
   assert.match(html, /assessment=two/);
   assert.doesNotMatch(html, /99°/);
 });
-

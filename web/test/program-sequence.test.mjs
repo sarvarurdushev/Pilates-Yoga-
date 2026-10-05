@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import {
   exerciseStep,
   configureStep,
+  orderedStepsBySection,
   reorderStep,
+  moveStepBefore,
+  moveStepToSectionEnd,
   removeStep,
 } from "../src/platform/program-sequence.js";
 
@@ -54,4 +57,27 @@ test("a custom movement remains configurable, reorderable and removable in one s
 test("invalid custom movement cannot create an unaddressable card", () => {
   assert.throws(() => exerciseStep({ id: "custom" }, { uid: "" }), /card identity/);
   assert.throws(() => configureStep({ exercise_id: "custom" }, { sets: 2 }), /movement card/);
+});
+
+test("arrows and drops follow visible section order even when a legacy sequence is interleaved", () => {
+  const sections = ["Warm-up", "Practice", "Cooldown"];
+  const card = (uid, section) => exerciseStep({ id: `exercise-${uid}` }, { uid, section });
+  const legacy = [card("a", "Warm-up"), card("c", "Practice"), card("b", "Warm-up"), card("d", "Practice")];
+  const ids = (steps) => steps.map((step) => step._uid);
+  assert.deepEqual(ids(orderedStepsBySection(legacy, sections)), ["a", "b", "c", "d"]);
+
+  const arrow = reorderStep(legacy, "b", 1, sections);
+  assert.deepEqual(ids(arrow), ["a", "c", "b", "d"]);
+  assert.equal(arrow[2].detail.section, "Practice");
+  assert.equal(legacy[2].detail.section, "Warm-up", "moving must not mutate saved card evidence");
+
+  const dropped = moveStepBefore(arrow, "d", "c", sections);
+  assert.deepEqual(ids(dropped), ["a", "d", "c", "b"]);
+  assert.deepEqual(ids(moveStepBefore(dropped, "d", "d", sections)), ids(dropped),
+    "dropping a card on itself cannot send it to the wrong position");
+
+  const note = { _uid: "note", type: "note", section: "Warm-up", text: "Breathe naturally" };
+  const movedNote = moveStepToSectionEnd([note, ...dropped], "note", "Practice", sections);
+  assert.deepEqual(ids(movedNote), ["a", "d", "c", "b", "note"]);
+  assert.equal(movedNote.at(-1).section, "Practice");
 });

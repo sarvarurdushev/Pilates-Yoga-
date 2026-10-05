@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { acceptedFrameSummary, analysisStatusLabel, coordinateTraceChart, movementDerivativeCharts, movementTechnicalNumbers, reportPersonIndex, reportPersonUnverified, reviewedPersonSelection, selectPostureObservation } from "../src/platform/reports.js";
+import { acceptedFrameSummary, analysisStatusLabel, coordinateTraceChart, movementDerivativeCharts, movementTechnicalNumbers, reportPersonIndex, reportPersonUnverified, reviewedPersonSelection, selectPostureObservation, feedbackProvenanceLabel } from "../src/platform/reports.js";
+
+test("feedback provenance follows the saved note, independently of its assessment", () => {
+  assert.equal(feedbackProvenanceLabel({ detail: { source: "coach_entered" } }), "COACH-WRITTEN FEEDBACK");
+  assert.equal(feedbackProvenanceLabel({ detail: { source: "demo_coach_feedback" } }), "DEMO COACH FEEDBACK");
+  assert.equal(feedbackProvenanceLabel({ detail: { simulation: true } }), "DEMO COACH FEEDBACK");
+  assert.equal(feedbackProvenanceLabel({}), "COACH-WRITTEN FEEDBACK");
+});
 
 test("advanced movement derivatives label their absolute summaries and signed traces", () => {
   const html = movementDerivativeCharts({

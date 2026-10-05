@@ -32,19 +32,52 @@ export function configureStep(step, prescription) {
   };
 }
 
-export function reorderStep(steps, uid, offset) {
-  const from = steps.findIndex((step) => step._uid === uid);
-  const to = from + offset;
-  if (from < 0 || to < 0 || to >= steps.length) return steps;
-  const target = steps[to];
-  const section = target.section || target.detail?.section || target.phase || "Practice";
-  const moved = { ...steps[from], detail: { ...(steps[from].detail || {}) } };
+const sectionOf = (step) => step.section || step.detail?.section || step.phase || "Practice";
+
+/** Keep the stored order aligned with the order the sectioned editor displays. */
+export function orderedStepsBySection(steps, sections = []) {
+  const names = [...new Set([...sections, ...steps.map(sectionOf)])];
+  return names.flatMap((name) => steps.filter((step) => sectionOf(step) === name));
+}
+
+function inSection(step, section) {
+  const moved = { ...step, detail: { ...(step.detail || {}) } };
   if (moved.type === "note") moved.section = section;
   else moved.detail.section = section;
-  const reordered = [...steps];
+  return moved;
+}
+
+export function reorderStep(steps, uid, offset, sections = []) {
+  const ordered = orderedStepsBySection(steps, sections);
+  const from = ordered.findIndex((step) => step._uid === uid);
+  const to = from + offset;
+  if (from < 0 || to < 0 || to >= ordered.length) return ordered;
+  const target = ordered[to];
+  const moved = inSection(ordered[from], sectionOf(target));
+  const reordered = [...ordered];
   reordered[from] = target;
   reordered[to] = moved;
   return reordered;
+}
+
+export function moveStepBefore(steps, uid, targetUid, sections = []) {
+  const ordered = orderedStepsBySection(steps, sections);
+  const from = ordered.findIndex((step) => step._uid === uid);
+  const target = ordered.find((step) => step._uid === targetUid);
+  if (from < 0 || !target || uid === targetUid) return ordered;
+  const [source] = ordered.splice(from, 1);
+  ordered.splice(ordered.findIndex((step) => step._uid === targetUid), 0,
+    inSection(source, sectionOf(target)));
+  return ordered;
+}
+
+export function moveStepToSectionEnd(steps, uid, section, sections = []) {
+  const ordered = orderedStepsBySection(steps, sections);
+  const from = ordered.findIndex((step) => step._uid === uid);
+  if (from < 0 || !sections.includes(section)) return ordered;
+  const [source] = ordered.splice(from, 1);
+  ordered.push(inSection(source, section));
+  return orderedStepsBySection(ordered, sections);
 }
 
 export const removeStep = (steps, uid) => steps.filter((step) => step._uid !== uid);

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { visitAtAGlance, visitMetricLabel } from "../src/platform/visit-evidence.js";
+import { visitAtAGlance, visitMetricLabel, loggedMovementSummary } from "../src/platform/visit-evidence.js";
 import { withSavedProgressEvidence } from "./progress-fixtures.mjs";
 
 const client = () => withSavedProgressEvidence({
@@ -18,6 +18,13 @@ const client = () => withSavedProgressEvidence({
     { analysis_id: "other", metric: "front:shoulder_tilt", unit: "deg", value: 99,
       recorded_at: "2026-09-10T10:00:00Z" },
   ],
+});
+
+test("visit summary names historical logged movements without inventing missing names", () => {
+  assert.equal(loggedMovementSummary([{ name: "Earlier arm arcs" }, {}, {}, { name: "Bridge" }], [
+    { name: "Renamed arm arcs" }, { name: "Bird dog" }, null, { name: "Bridge" },
+  ]), "4 movements logged: Earlier arm arcs, Bird dog, Historical movement name unavailable, and 1 more");
+  assert.equal(loggedMovementSummary([{ name: "Bridge" }]), "1 movement logged: Bridge");
 });
 
 test("visit strip chooses saved, same-protocol source and explains the value", () => {

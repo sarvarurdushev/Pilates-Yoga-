@@ -134,6 +134,14 @@ test("source feedback resolves the exact note, not another visit in the same reg
   assert.deepEqual(visibleFeedback([], {noteId:"source"}), []);
 });
 
+test("missing referenced feedback is disclosed without borrowing another note", () => {
+  const html = revisionSourceLink({source_kind:"coach_observation",source_id:"missing-note"}, "client-a",
+    [{id:"other-note",region_id:"right_shoulder",text:"Unrelated feedback"}]);
+  assert.match(html, /Source feedback unavailable/);
+  assert.match(html, /saved record missing-/);
+  assert.doesNotMatch(html, /href=|other-note|Unrelated feedback/);
+});
+
 
 test("session duration counts rest only between timed sets and identifies untimed work", () => {
   assert.deepEqual(programDurationEstimate([

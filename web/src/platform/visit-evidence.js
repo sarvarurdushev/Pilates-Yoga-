@@ -1,6 +1,13 @@
 import { comparableProgressSeries, targetMetricRelevance } from "./progress-selection.js";
 import { metricCopy } from "./explain.js";
 
+export function loggedMovementSummary(rows, exercises = [], limit = 3) {
+  const names = rows.map((row, index) => row.name || exercises[index]?.name || "Historical movement name unavailable");
+  const visible = names.slice(0, limit).join(", ");
+  const remaining = Math.max(0, names.length - limit);
+  return `${names.length} movement${names.length === 1 ? "" : "s"} logged: ${visible}${remaining ? `, and ${remaining} more` : ""}`;
+}
+
 export function visitMetricLabel(metric = "") {
   const plain = String(metric).split(":").at(-1).replaceAll("_", " ").trim()
     .replace(/\brom\b/gi, "range of motion");

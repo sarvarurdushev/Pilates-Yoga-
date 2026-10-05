@@ -729,7 +729,7 @@ def simulation(client, visit, kind):
     # Gradual, bounded scenario progression with setbacks. Do not imply a
     # fabricated treatment effect from these explicitly simulated coordinates.
     trend = max(0.45, 1 - visit * 0.027 + 0.055 * math.sin(visit * 1.7))
-    base = np.array(
+    template = np.array(
         [
             [500, 110],
             [512, 100],
@@ -752,22 +752,34 @@ def simulation(client, visit, kind):
         dtype=float,
     )
     camera = "side_left" if scenario in (1, 2) else "front"
-    if camera == "side_left":
-        base[:, 0] = 500
-        base[[2, 4, 6, 8, 10, 12, 14, 16], 0] = 490
-        base[:5, 0] += 25
-        base[[7, 9], 0] += 12
-    if scenario == 0:
-        base[[6, 8, 10], 1] += 12 * trend
-    elif scenario == 2:
-        base[:5, 0] += 65 * trend
-        base[5:11, 0] += 20 * trend
-    elif scenario == 3:
-        base[[12, 14], 1] += 15 * trend
-    elif scenario == 4:
-        base[:11, 0] += 20 * trend
-    elif scenario == 5:
-        base[:13, 0] += 8 * trend
+
+    def standing_points(view):
+        """Project the parametric pose for this view before measuring it.
+
+        The featured second view is a separate simulation, never the primary
+        landmarks relabelled with another camera angle or inferred from the
+        illustrative client photograph.
+        """
+        points = template.copy()
+        if view == "side_left":
+            points[:, 0] = 500
+            points[[2, 4, 6, 8, 10, 12, 14, 16], 0] = 490
+            points[:5, 0] += 25
+            points[[7, 9], 0] += 12
+        if scenario == 0:
+            points[[6, 8, 10], 1] += 12 * trend
+        elif scenario == 2:
+            points[:5, 0] += 65 * trend
+            points[5:11, 0] += 20 * trend
+        elif scenario == 3:
+            points[[12, 14], 1] += 15 * trend
+        elif scenario == 4:
+            points[:11, 0] += 20 * trend
+        elif scenario == 5:
+            points[:13, 0] += 8 * trend
+        return points
+
+    base = standing_points(camera)
     scores = np.full(17, 0.97)
 
     def pose(points):
@@ -784,14 +796,16 @@ def simulation(client, visit, kind):
             "source": "demo simulation",
         }
 
-    def assess(points, mode):
+    def assess(points, mode, view):
         person = assess_person(
-            Detection(points, scores), 1000, 960, person_id="1", view=camera, mode=mode
+            Detection(points, scores), 1000, 960, person_id="1", view=view, mode=mode
         )
+        for metric in person["metrics"]:
+            metric["source"] = "Explicit parametric demo landmarks"
         person["pose3d"] = pose(points)
         return person
 
-    person = assess(base, "standing")
+    person = assess(base, "standing", camera)
     raw = {
         "width": 1000,
         "height": 960,
@@ -844,7 +858,7 @@ def simulation(client, visit, kind):
                 points[:13, 0] += sway
                 points[13] = points[11] + np.array([55, 145])
                 points[15] = points[13] + np.array([-35, 150])
-            frame = assess(points, "pose")
+            frame = assess(points, "pose", camera)
             byid = {m["id"]: m.get("value") for m in frame["metrics"]}
             for key in SIGNALS:
                 series[key].append(byid.get(key))
@@ -888,6 +902,20 @@ def simulation(client, visit, kind):
         )
         raw.update(duration=12, frames_sampled=len(frames))
     views = [{"view": camera, "report": raw}]
+    # The seven illustrated clients visit twenty times. Their midpoint
+    # standing assessment includes a second, separately measured camera view
+    # in that same saved visit; the other nineteen primary-view visits remain
+    # directly comparable with their own earlier primary-view captures.
+    # These are the featured scenario IDs (several clients share scenario 2).
+    if kind == "posture" and visit == 10 and scenario in (0, 2, 3, 4):
+        alternate = "front" if camera == "side_left" else "side_left"
+        alternate_person = assess(standing_points(alternate), "standing", alternate)
+        views.append({"view": alternate, "report": {
+            "width": 1000,
+            "height": 960,
+            "people": [alternate_person],
+            "source": "Explicit alternate-view demo coordinate simulation",
+        }})
     return {
         "kind": kind,
         "views": views,

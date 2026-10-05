@@ -173,3 +173,32 @@ test("a filtered exercise search offers a working clear-filters action", async (
     globalThis.fetch = priorFetch;
   }
 });
+
+test("historical feedback exposes its absent visit and the staff repair action without borrowing a date", async () => {
+  const { feedbackVisitDisclosure } = await import("../src/platform/feedback-source.js");
+  const notesHTML = (notes) => notes.map((n) => feedbackVisitDisclosure(n, {role:state.me.role, clientId:state.client.id, inlineEdit:true})).join("");
+  const { linkedNotes, markerVisitHTML } = await import("../src/platform/anatomy.js");
+  const note = {id:"old-note",region_id:"right_shoulder",author_id:"coach-1",
+    created_at:"2026-09-30T10:00:00Z",text:"Supported practice",visibility:"student",detail:{source:"coach_entered"}};
+  state.client = {...client, observations:[], sessions:[{id:"same-time-visit",performed_at:note.created_at}]};
+  state.me = {role:"coach",user:{id:"coach-1",name:"Casey"},coaches:[],regions:[]};
+  for (const html of [notesHTML([note]), linkedNotes([note],state.client)]) {
+    assert.match(html,/Source visit not recorded/);
+    assert.match(html,/connect.*(?:exact|known) visit/);
+    assert.doesNotMatch(html,/session=same-time-visit/);
+  }
+  state.me.role = "student";
+  for (const html of [notesHTML([note]), linkedNotes([note],state.client)]) {
+    assert.match(html,/Source visit not recorded/);
+    assert.doesNotMatch(html,/Edit feedback|connect (?:the exact|a known) visit/);
+  }
+  for (const linked of [{...note,session_id:"exact-visit"},{...note,analysis_id:"exact-assessment"}]) {
+    assert.equal(notesHTML([linked]), "");
+    const html = linkedNotes([linked],state.client);
+    assert.doesNotMatch(html,/Source visit not recorded/);
+    assert.match(html,linked.session_id ? /session=exact-visit/ : /assessment=exact-assessment/);
+  }
+  assert.match(markerVisitHTML({id:"old-marker",scan_id:"linked-scan",created_at:note.created_at}),/Visit not recorded · general annotation/);
+  assert.doesNotMatch(markerVisitHTML({scan_id:"linked-scan"}),/href/);
+  assert.match(markerVisitHTML({session_id:"marker-own-visit",scan_id:"linked-scan"}),/session=marker-own-visit/);
+});

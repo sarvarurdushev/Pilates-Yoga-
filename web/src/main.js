@@ -933,12 +933,15 @@ function loadLayer(name) {
    * male scan, so a different body cannot borrow it. Refusing here keeps the 404 out of the
    * console and the toggle honest. */
   if (!hasLayer(name)) return Promise.resolve();
-  if (L2.loaded || L2.loading) return Promise.resolve();
+  if (L2.loaded) return Promise.resolve();
+  // A second caller must wait for the same geometry index. Resolving while a
+  // layer was loading let client context report ready before its anchors existed.
+  if (L2.loading) return L2.promise;
   L2.loading = true;
   pending++;
   ui?.setBusy?.(true);
-  if (name === 'brain') return loadBrain(L2);
-  return new Promise(res => {
+  if (name === 'brain') return (L2.promise = loadBrain(L2));
+  return (L2.promise = new Promise(res => {
     new GLTFLoader().load(layerUrl(body, name), (gltf) => {
       const mat = makeStructureMaterial(palette, LOOK[name], dqUniform);
       materials.push(mat);
@@ -1007,7 +1010,7 @@ function loadLayer(name) {
       done();
       res();
     }, undefined, (e) => { console.error(`${name} failed to load`, e); L2.loading = false; done(); res(); });
-  });
+  }));
 }
 
 /* The brain is two files and its own material, and it arrives in brain-frame coordinates,
@@ -3229,6 +3232,22 @@ export const posedNow = () => !!boneDQ?.posed;
 
 /** Where a structure is drawn right now, so a test can ask whether it can be pointed at. */
 export const drawnPointOf = (id) => drawnPoint(+id, new THREE.Vector3());
+
+/** Load anchor geometry without changing which anatomy layers are visible. */
+export async function ensureStructureAnchors(ids) {
+  const parts = [...new Set(ids.flatMap(id => drawnIds(+id)))];
+  const required = [...new Set(parts.map(id => get(id)?.layer).filter(hasLayer))];
+  await Promise.all(required.map(loadLayer));
+  return ids.filter(id => !structureAnchorOf(id));
+}
+
+/** Aggregates point to the centre of their drawn parts, in the current pose. */
+export function structureAnchorOf(id) {
+  const points = drawnIds(+id).map(part => drawnPoint(part)).filter(point =>
+    point && Number.isFinite(point.x) && Number.isFinite(point.y) && Number.isFinite(point.z));
+  if (!points.length) return null;
+  return points.reduce((sum, point) => sum.add(point), new THREE.Vector3()).divideScalar(points.length);
+}
 
 /** Pick at a client coordinate. Exported so a test can ask what is under a point. */
 export const pickAt = (clientX, clientY) => pick({ clientX, clientY });

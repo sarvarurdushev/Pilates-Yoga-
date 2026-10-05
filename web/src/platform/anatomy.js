@@ -34,6 +34,7 @@ import {
   safeURL,
 } from "./core.js";
 import { metricRegion } from "./reports.js";
+import { feedbackVisitDisclosure } from "./feedback-source.js";
 import { cameraLabels, explainedChart, metricCopy } from "./explain.js";
 import { comparableProgressSeries } from "./progress-selection.js";
 import { scanLinkedNotes } from "./anatomy-bridge.js";
@@ -53,8 +54,13 @@ function choose(root) {
     head("Choose a client", "Select a client to explore their body regions, scan records and coach notes.") +
     anatomyClientChoice(state.me.students, state.me.role);
 }
-function linkedNotes(notes, client, emptyMessage) {
-  return notes.map((n) => `<article class="note"><p class="eyebrow">${esc(n.detail?.simulation || n.detail?.source === "demo_coach_feedback" || (client.detail?.demo && !n.detail?.source) ? "DEMO COACH FEEDBACK" : "COACH FEEDBACK")}</p><p>${esc(n.text)}</p><small>${esc(coachName(n.author_id))} · ${esc(dt(n.created_at))} · ${n.visibility === "student" ? "Shared with student" : "Coach only"}</small><div class="actions">${n.session_id ? `<a href="${href("client", { tab: "sessions", session: n.session_id })}">Source visit →</a>` : n.analysis_id ? `<a href="${href("client", { tab: "sessions", assessment: n.analysis_id })}">Source session →</a>` : ""}${n.program_id ? `<a href="${href("program", { id: n.program_id, client: client.id })}">Related program →</a>` : ""}${n.exercise_id ? `<a href="${href("exercise", { id: n.exercise_id, client: client.id })}">Related exercise →</a>` : ""}${n.detail?.updated_at ? `<small>Last edited ${esc(dt(n.detail.updated_at))}</small>` : ""}</div></article>`).join("") || `<p>${esc(emptyMessage || (client.detail?.demo ? "No simulated coach feedback is linked to this region." : "No coach feedback is linked to this region yet."))}</p>`;
+export function linkedNotes(notes, client, emptyMessage) {
+  return notes.map((n) => `<article class="note"><p class="eyebrow">${esc(n.detail?.simulation || n.detail?.source === "demo_coach_feedback" || (client.detail?.demo && !n.detail?.source) ? "DEMO COACH FEEDBACK" : "COACH FEEDBACK")}</p><p>${esc(n.text)}</p><small>${esc(coachName(n.author_id))} · ${esc(dt(n.created_at))} · ${n.visibility === "student" ? "Shared with student" : "Coach only"}</small>${feedbackVisitDisclosure(n, {role: state.me.role, clientId: client.id})}<div class="actions">${n.session_id ? `<a href="${href("client", { tab: "sessions", session: n.session_id })}">Source visit →</a>` : n.analysis_id ? `<a href="${href("client", { tab: "sessions", assessment: n.analysis_id })}">Source session →</a>` : ""}${n.program_id ? `<a href="${href("program", { id: n.program_id, client: client.id })}">Related program →</a>` : ""}${n.exercise_id ? `<a href="${href("exercise", { id: n.exercise_id, client: client.id })}">Related exercise →</a>` : ""}${n.detail?.updated_at ? `<small>Last edited ${esc(dt(n.detail.updated_at))}</small>` : ""}</div></article>`).join("") || `<p>${esc(emptyMessage || (client.detail?.demo ? "No simulated coach feedback is linked to this region." : "No coach feedback is linked to this region yet."))}</p>`;
+}
+export function markerVisitHTML(marker) {
+  return marker.session_id
+    ? `<a href="${href("client", { tab: "sessions", session: marker.session_id })}">Recorded visit →</a>`
+    : "Visit not recorded · general annotation";
 }
 export function regionHistory(client, region) {
   const observations = client.observations.filter((o) => relatedRegion(o.region_id, region.id));
@@ -66,6 +72,20 @@ export function regionHistory(client, region) {
     ...series.flatMap((group) => group.rows.map((row) => row.analysis_id))].filter(Boolean));
   const sessions = client.analyses.filter((a) => connected.has(a.id)).sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
   return { observations, notes, trend: series[0] || null, sessions };
+}
+export function initialAnatomyLayer(route, notes, analysisId, exercise) {
+  const requested = route.get("view");
+  const hasFeedback = notes.some((note) => note.region_id);
+  if (requested === "feedback" && hasFeedback) return "feedback";
+  if (requested === "region" || route.has("region") || analysisId || exercise || !hasFeedback)
+    return "region";
+  return "feedback";
+}
+export function anatomySourceContext(analysis, fullRecord) {
+  if (!analysis) return "All visits";
+  const views = [...new Set((fullRecord?.result?.views || []).map((view) => view.view).filter(Boolean))];
+  const viewText = views.length ? views.map((view) => cameraLabels[view] || view.replaceAll("_", " ")).join(", ") : "No camera view recorded";
+  return `${analysis.kind === "movement" ? "Movement analysis" : "Posture assessment"} · ${analysis.protocol || "Protocol not recorded"} · ${viewText} · ${dt(analysis.created_at)}`;
 }
 function bodyMapMarkers(client, selected, programs) {
   const noteIds = new Set(client.notes.map((note) => note.region_id).filter(Boolean));
@@ -85,17 +105,25 @@ export async function anatomy(root) {
     regions().find((r) => r.id === c.notes[0]?.region_id) ||
     regions().find((r) => r.id === c.observations[0]?.region_id) ||
     regions()[0];
-  const aid = params().get("id") || c.latest_analysis?.id;
+  const requestedAid = params().get("id");
+  const aid = c.analyses.some((analysis) => analysis.id === requestedAid) ? requestedAid : null;
   const ex = params().get("exercise");
+  const initialLayer = initialAnatomyLayer(params(), c.notes, aid, ex);
+  let selectedLayer = initialLayer;
   const query = new URLSearchParams({
     platform: "1",
     client: c.id,
     region: region.id,
     ...(aid ? { analysis: aid } : {}),
     ...(ex ? { exercise: ex } : {}),
+    layer: initialLayer,
   });
   const history = regionHistory(c, region);
-  const assigned = await Promise.allSettled(c.programs.map((assignment) => record("programs", assignment.program_id)));
+  const [assigned, sourceRecord] = await Promise.all([
+    Promise.allSettled(c.programs.map((assignment) => record("programs", assignment.program_id))),
+    aid ? record("analyses", aid).catch(() => null) : null,
+  ]);
+  if (!root.isConnected) return;
   const programs = assigned.filter((result) => result.status === "fulfilled").map((result) => result.value);
   const exercises = programs.flatMap((program) => (program.steps || [])
     .filter((step) => step.exercise_id && (
@@ -124,17 +152,17 @@ export async function anatomy(root) {
     sessionLink: `<a href="${href("client", { tab: "sessions", assessment: trend.latest.analysis_id })}">Latest source visit →</a>${trend.previous ? `<a href="${href("client", { tab: "sessions", assessment: trend.previous.analysis_id })}">Previous source visit →</a>` : ""}<a href="${href("client", { tab: "progress", metric: trend.metric, assessment: trend.latest.analysis_id })}">Full history →</a>`,
   }) : card("Measured region history", `<p>No supported measurement is linked to this body region yet. ${state.me.role === "student" ? "Your coach can add a suitable posture or movement capture." : "Capture a clear, suitable view to begin a measured history."}</p>${state.me.role === "student" ? "" : `<a class="button" href="${href("capture", { client: c.id })}">Start an assessment →</a>`}`);
   const sourceAnalysis = c.analyses.find((analysis) => analysis.id === aid);
-  const sourceText = sourceAnalysis ? `${sourceAnalysis.kind === "movement" ? "Movement analysis" : "Posture assessment"} · ${dt(sourceAnalysis.created_at)}` : "All visits";
+  const sourceText = anatomySourceContext(sourceAnalysis, sourceRecord);
   root.innerHTML =
     head("Client body map", c.name + " · " + region.name,
       `<a class="button" href="/anatomy.html?${query}" target="_blank" rel="noopener">Full-screen anatomy ↗</a>`) +
     `<p class="muted">Select a marked region to see why it matters, the sessions behind it, coach feedback, and assigned practice.</p>` +
-    `<div class="filter-row">${select("Body region", "body-region", regions().map((r) => [r.id, r.name + (c.notes.some((n) => n.region_id === r.id) ? " · coach feedback" : "")]), region.id, null)}${select("Anatomy view", "anatomy-layer", [["region", "Relevant region"], ["bones_full", "Skeleton"], ["muscles_full", "Muscles"], ["connective", "Connective structures"], ["nervous", "Nerves"], ["whole", "Whole body"]], "region", null)}<button id="anatomy-refocus">Focus region</button></div>` +
+    `<div class="filter-row">${select("Body region", "body-region", regions().map((r) => [r.id, r.name + (c.notes.some((n) => n.region_id === r.id) ? " · coach feedback" : "")]), region.id, null)}${select("Anatomy view", "anatomy-layer", [["feedback", "Coach feedback map"], ["region", "Relevant region"], ["bones_full", "Skeleton"], ["muscles_full", "Muscles"], ["connective", "Connective structures"], ["nervous", "Nerves"], ["whole", "Whole body"]], initialLayer, null)}<button id="anatomy-refocus">Focus region</button></div>` +
     `<div class="anatomy-workspace"><div class="anatomy-view-stage"><div id="anatomy-status" role="status" class="notice">Loading the existing anatomy viewer…</div><iframe class="anatomy-frame" id="atlas" title="${esc(c.name)} · ${esc(region.name)} anatomy" src="/anatomy.html?${query}&embed=1"></iframe>${bodyMapMarkers(c, region, programs)}</div><aside class="anatomy-context">` +
     `<section class="panel anatomy-region-summary"><p class="eyebrow">${esc(c.name)} · ${esc(region.side)} · ${esc(sourceText)}</p><h2>${esc(region.name)}</h2><p>${esc(region.explanation)}</p><div class="anatomy-counts"><span><strong>${history.observations.length}</strong> measured findings</span><span><strong>${history.notes.length}</strong> coach feedback</span><span><strong>${history.sessions.length}</strong> related assessments</span><span><strong>${exercises.length}</strong> assigned movements</span></div><p class="muted">The atlas is an educational reference, not a reconstruction of this client's internal anatomy.</p>${state.me.role !== "student" ? '<button data-edit="notes" class="primary">+ Add coach feedback here</button>' : ""}</section>` +
     `${metricHistory}` +
     `${card("Coach feedback", history.notes.length ? linkedNotes(history.notes.slice(0, 3), c) + (history.notes.length > 3 ? `<a class="record-link" href="${href("client", { tab: "notes", region: region.id })}">Read all ${history.notes.length} notes for this region →</a>` : "") : `<p>${state.me.role === "student" ? "Your coach has not shared feedback for this body region." : "No coach feedback is linked to this body region. Add a specific observation with the button above."}</p>`)}` +
-    `${card("Assigned practice", exercises.slice(0, 6).map((step) => `<a class="record-link" href="${href("program", { id: step.program.id, client: c.id })}">${esc(step.exercise_name)} <small>${esc(step.program.name)} · ${esc(step.detail?.purpose || "Coach-assigned exercise")}</small></a>`).join("") || `<p>No assigned movement targets this body region yet.</p><a class="button" href="${href("client", { client: c.id, tab: "programs", region: region.id })}">${state.me.role === "student" ? "See your assigned program" : "Review this client's program"} →</a>`)}` +
+    `${card("Assigned practice", exercises.slice(0, 6).map((step) => `<a class="record-link" href="${href("program", { id: step.program.id, client: c.id })}">${esc(step.exercise_name)} <small>${esc(step.program.name)} · ${esc(step.detail?.why_assigned || step.detail?.purpose || "Coach-assigned exercise")}</small></a>`).join("") || `<p>No assigned movement targets this body region yet.</p><a class="button" href="${href("client", { client: c.id, tab: "programs", region: region.id })}">${state.me.role === "student" ? "See your assigned program" : "Review this client's program"} →</a>`)}` +
     `<details class="panel anatomy-more"><summary>Measured findings and related sessions</summary>${history.observations.slice(0, 8).map((observation) => `<article class="anatomy-observation"><p class="eyebrow">${esc(observation.source || "SYSTEM MEASUREMENT")}</p><a href="${href("client", { tab: "sessions", assessment: observation.analysis_id })}">${esc(observation.text)}</a><small>${esc(dt(observation.created_at))}</small></article>`).join("") || "<p>No measured findings linked yet.</p>"}${history.sessions.slice(0, 6).map((analysis) => `<a class="record-link" href="${href("client", { tab: "sessions", assessment: analysis.id })}">${esc(analysis.protocol)} · ${esc(dt(analysis.created_at))} →</a>`).join("")}</details>` +
     `<details class="panel anatomy-more"><summary>Mapped structures and scans</summary><ul>${region.structures.map((structure) => `<li><button class="text-button" data-structure="${structure.id}">${esc(structure.name)}</button></li>`).join("")}</ul>${scans.map((scan) => `<a class="record-link" href="${href("client", { tab: "scans", scan: scan.id, region: region.id, id: scan.analysis_id })}">${esc(scan.name)} →</a>`).join("") || "<p>No scan linked to this region.</p>"}</details>` +
     `<div class="panel anatomy-next"><p class="eyebrow">NEXT STEP</p>${aid ? `<a class="record-link" href="${href("report", { id: aid })}">Return to source assessment →</a>` : ""}${state.me.role !== "student" ? `<a class="record-link" href="${href("client", { tab: "programs", region: region.id, report: aid || "" })}">Add this area to a program →</a>` : `<a class="record-link" href="${href("client", { tab: "programs" })}">See your assigned program →</a>`}</div></aside></div>`;
@@ -150,6 +178,8 @@ export async function anatomy(root) {
         notes: c.notes
           .filter((n) => relatedRegion(n.region_id, region.id))
           .map((n) => n.text),
+        feedback: c.notes,
+        layer: selectedLayer,
         exercise: ex,
         ...data,
       },
@@ -166,20 +196,38 @@ export async function anatomy(root) {
       $("#anatomy-status").textContent = e.data.message;
     if (e.data?.type === "motion-atlas-selection") {
       if (e.data.region_id && e.data.region_id !== region.id)
-        go("client", { tab: "anatomy", region: e.data.region_id, id: aid });
+        go("client", { tab: "anatomy", region: e.data.region_id, id: aid, view: "region" });
       else if (!e.data.region_id)
         $("#anatomy-status").textContent = "This atlas structure has no mapped coaching region. Choose a region from the list.";
+    }
+    if (e.data?.type === "motion-atlas-feedback-region") {
+      const note = c.notes.find((entry) => entry.id === e.data.note_id &&
+        relatedRegion(entry.region_id, e.data.region_id));
+      if (note && regions().some((entry) => entry.id === e.data.region_id))
+        go("client", { tab: "anatomy", region: e.data.region_id,
+          id: note.analysis_id || "", view: "region" });
     }
   };
   window.addEventListener("message", listener);
   state.dispose.push(() => window.removeEventListener("message", listener));
   $("#anatomy-refocus").onclick = () => send();
   root.querySelector("[name=body-region]").onchange = (e) =>
-    go("client", { tab: "anatomy", region: e.target.value, id: aid });
-  root.querySelector("[name=anatomy-layer]").onchange = (e) =>
-    send({ layer: e.target.value });
+    go("client", { tab: "anatomy", region: e.target.value, id: aid, view: "region" });
+  root.querySelector("[name=anatomy-layer]").onchange = (e) => {
+    const layer = e.target.value;
+    selectedLayer = layer;
+    send({ layer });
+    const next = params();
+    if (layer === "region" || layer === "feedback") next.set("view", layer);
+    else next.delete("view");
+    window.history.replaceState(null, "", location.pathname + "#" + next);
+  };
   root.querySelectorAll("[data-map-region]").forEach((button) =>
-    button.onclick = () => go("client", { tab: "anatomy", region: button.dataset.mapRegion, id: aid }));
+    button.onclick = () => {
+      const note = c.notes.find((entry) => relatedRegion(entry.region_id, button.dataset.mapRegion));
+      go("client", { tab: "anatomy", region: button.dataset.mapRegion,
+        id: note?.analysis_id || "", view: "region" });
+    });
   root
     .querySelectorAll("[data-structure]")
     .forEach(
@@ -264,6 +312,7 @@ export async function scans(root) {
     dicom = m.mime === "application/dicom";
   const demoReference = isEducationalScanReference(state.me.organization, scan, m);
   const canMark = Boolean(scan.session_id || demoReference);
+  const sourceVisit = c.sessions.find((visit) => visit.id === scan.session_id);
   const frameCount = m.detail.frames || 1;
   let frameIndex = scanFrameIndex(params().get("scan_frame"), frameCount);
   const detail = $("#scan-detail");
@@ -273,18 +322,18 @@ export async function scans(root) {
   detail.innerHTML =
     card(
       scan.name,
-      `${notice(scan.detail.provenance || m.detail.provenance || "Supplied scan. Coach annotations are manual observations.")}${dicom ? `<div class="grid three">${field("Window centre · pixel intensity", "center", m.detail.window_center || 0, "number", 'step="any"')}${field("Window width · intensity range", "width", m.detail.window_width || 0, "number", 'min="0" step="any"')}${field("Frame index · starts at 0", "frame", frameIndex, "number", `min="0" max="${frameCount - 1}" step="1"`)}</div><button id="window-apply">Apply window</button><p class="muted" id="scan-frame-status"></p><details><summary>What do these image controls mean?</summary><p>Window centre selects the middle of the displayed pixel intensity range. Window width selects how much of that range is mapped from black to white; 0 uses the full range in the selected frame. These values use this file’s intensity scale after its rescale metadata is applied. They are display settings, rather than body measurements.</p><p>This file contains ${frameCount} frame${frameCount === 1 ? "" : "s"}. Frame index 0 is the first image; ${frameCount - 1} is the last. A frame index identifies an image in the file; it does not measure an anatomical angle or elapsed time.</p></details>` : `<label for="scan-contrast">Image contrast · <output id="scan-contrast-value" for="scan-contrast">100%</output><input id="scan-contrast" type="range" min="50" max="180" value="100"></label><details><summary>What does image contrast mean?</summary><p>100% displays the original contrast. Lower values soften contrast and higher values increase it for viewing. The original file and saved annotation positions remain unchanged.</p></details>`}<div class="scan-image" id="scan-stage"><img id="scan-image" alt="${esc(scan.name)}"><svg id="scan-annotations" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-label="Manual scan annotations"></svg></div><p id="scan-hint">${state.me.role === "student" ? "View your coach’s saved markers." : canMark ? "Click the image to place an anatomical annotation." : "Connect this scan to a recorded visit before placing a body marker."}</p><div class="actions"><a class="button" href="${href("client", { tab: "anatomy", region: scan.region_id, id: scan.analysis_id })}">Explore linked anatomy</a>${scan.session_id ? `<a class="button" href="${href("client", { tab: "sessions", session: scan.session_id })}">Source visit</a>` : state.me.role === "student" || demoReference ? "" : '<button type="button" id="scan-link-visit">Connect to recorded visit</button>'}${scan.analysis_id ? `<a class="button" href="${href("report", { id: scan.analysis_id })}">Source analysis</a>` : ""}${state.me.role === "student" ? "" : '<button data-edit="notes">+ Linked coach note</button>'}<a class="button" href="${mediaURL(m.id)}" download="${esc(m.filename)}">Download original</a></div>`,
+      `<p class="muted">${demoReference ? "Reference record date" : "Capture date"}: ${esc(scan.captured_at ? date(scan.captured_at) : "Date not recorded")}</p>${notice(scan.detail.provenance || m.detail.provenance || "Supplied scan. Coach annotations are manual observations.")}${dicom ? `<div class="grid three">${field("Window centre · pixel intensity", "center", m.detail.window_center || 0, "number", 'step="any"')}${field("Window width · intensity range", "width", m.detail.window_width || 0, "number", 'min="0" step="any"')}${field("Frame index · starts at 0", "frame", frameIndex, "number", `min="0" max="${frameCount - 1}" step="1"`)}</div><button id="window-apply">Apply window</button><p class="muted" id="scan-frame-status"></p><details><summary>What do these image controls mean?</summary><p>Window centre selects the middle of the displayed pixel intensity range. Window width selects how much of that range is mapped from black to white; 0 uses the full range in the selected frame. These values use this file’s intensity scale after its rescale metadata is applied. They are display settings, rather than body measurements.</p><p>This file contains ${frameCount} frame${frameCount === 1 ? "" : "s"}. Frame index 0 is the first image; ${frameCount - 1} is the last. A frame index identifies an image in the file; it does not measure an anatomical angle or elapsed time.</p></details>` : `<label for="scan-contrast">Image contrast · <output id="scan-contrast-value" for="scan-contrast">100%</output><input id="scan-contrast" type="range" min="50" max="180" value="100"></label><details><summary>What does image contrast mean?</summary><p>100% displays the original contrast. Lower values soften contrast and higher values increase it for viewing. The original file and saved annotation positions remain unchanged.</p></details>`}<div class="scan-image" id="scan-stage"><img id="scan-image" alt="${esc(scan.name)}"><svg id="scan-annotations" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-label="Manual scan annotations"></svg></div><p id="scan-hint">${state.me.role === "student" ? "View your coach’s saved markers." : canMark ? "Click the image to place an anatomical annotation." : "Connect this scan to a recorded visit before placing a body marker."}</p><div class="actions"><a class="button" href="${href("client", { tab: "anatomy", region: scan.region_id, id: scan.analysis_id })}">Explore linked anatomy</a>${scan.session_id ? `<a class="button" href="${href("client", { tab: "sessions", session: scan.session_id })}">Source visit${sourceVisit?.performed_at ? ` · ${esc(date(sourceVisit.performed_at))}` : ""}</a>` : state.me.role === "student" || demoReference ? "" : '<button type="button" id="scan-link-visit">Connect to recorded visit</button>'}${scan.analysis_id ? `<a class="button" href="${href("report", { id: scan.analysis_id })}">Source analysis</a>` : ""}${state.me.role === "student" ? "" : '<button data-edit="notes">+ Linked coach note</button>'}<a class="button" href="${mediaURL(m.id)}" download="${esc(m.filename)}">Download original</a></div>`,
     ) +
     card(
       "Saved annotations",
-      "<p class=\"muted\">Marker numbers match the image and remain the same when you change frames. Positions are relative to the image, with 0–1 coordinates; they are not calibrated physical distances.</p>" + table(
+      "<p class=\"muted\">Marker numbers match the image and remain the same when you change frames. Positions are relative to the image, with 0–1 coordinates; they are not calibrated physical distances. An older marker without its own saved visit link remains a general annotation, even when the scan is now linked to a visit.</p>" + table(
         ["Marker", "Region", "Coach annotation", "Frame index", "Visit"],
         scanAnnotationMarkers(scan.findings).map((f) => [
           `#${f.marker}`,
           `<a href="${href("client", { tab: "anatomy", region: f.region_id, id: scan.analysis_id })}">${esc(regionName(f.region_id))}</a>`,
           esc(f.text),
           dicom ? `<button type="button" data-scan-frame="${f.frame_index}">View frame ${f.frame_index}</button>` : "0 · Original image",
-          f.session_id ? `<a href="${href("client", { tab: "sessions", session: f.session_id })}">Recorded visit →</a>` : "Visit not recorded",
+          markerVisitHTML(f),
         ]),
       ),
     ) +

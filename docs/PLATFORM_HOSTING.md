@@ -10,6 +10,13 @@ provision a disk or make storage durable. Render removes these when an instance
 is replaced or restarted. Generated demonstration histories can be recreated;
 real captures and custom programs require durable storage.
 
+For the current demonstration deployment, the owner confirmed that there are no
+real hosted records to preserve and chose to keep this same free service despite
+the loss of hosted SQLite data and uploads on later restarts or redeploys. This
+authorizes a disposable deployment to the Render-connected branch without an
+archive or paid disk. It does not make the hosted service suitable for storing
+real client records; the durable path below remains the preparation for that use.
+
 ## Prepared change for the existing service (requires billing authorization)
 
 A practical configuration for the tested inference workload is one CPU / 2 GB
