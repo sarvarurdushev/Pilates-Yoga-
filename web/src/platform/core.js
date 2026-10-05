@@ -144,13 +144,13 @@ export function toast(message) {
   el.classList.add("show");
   setTimeout(() => el.classList.remove("show"), 4500);
 }
-export async function api(path, body) {
+export async function api(path, body, { timeoutMs } = {}) {
   let r;
   try {
     r = await fetch("/platform/" + path, {
       credentials: "same-origin",
       signal: AbortSignal.timeout(
-        path.startsWith("auth/demo") ? 180000 : 60000,
+        timeoutMs ?? (path.startsWith("auth/demo") ? 180000 : 60000),
       ),
       headers: body
         ? { "Content-Type": "application/json", "X-Platform-Request": "1" }
@@ -159,17 +159,21 @@ export async function api(path, body) {
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
   } catch {
-    throw Error(
+    const e = Error(
       "The server is unavailable. Keep your selected files and retry when it is ready.",
     );
+    e.status = 0;
+    throw e;
   }
   let data;
   try {
     data = await r.json();
   } catch {
-    throw Error(
+    const e = Error(
       `The server returned an incomplete response (${r.status}). Your selected files are still on this device. Retry shortly.`,
     );
+    e.status = r.status;
+    throw e;
   }
   if (!r.ok) {
     const e = Error(data.error || "This action could not finish.");
