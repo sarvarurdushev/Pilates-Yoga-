@@ -1,8 +1,8 @@
 # Motion Yoga verification report — 5 October 2026
 
-The client workspace and Coach program designer are implemented and verified locally, and their first release passed actual hosted pipeline checks. The [current numbered acceptance ledger](CURRENT_SPEC_ACCEPTANCE.md) records **62 requirements DONE + VERIFIED locally**; #44 remains pending the final follow-up release verification and delivery of this report. This report summarizes the resulting behavior and actual evidence rather than repeating the checklist.
+The client workspace and Coach program designer are implemented, integrated and verified, including actual hosted pipeline and role-navigation checks. The [original #1–#44 checklist](PLATFORM_COMPLETION.md) and [current #1–#63 acceptance ledger](CURRENT_SPEC_ACCEPTANCE.md) record **DONE + VERIFIED** for every numbered requirement, with evidence and the accepted free-service limitation. This report supplies the requested #44 completion report and summarizes actual behavior and evidence rather than repeating the checklists.
 
-**Release status: first release deployed and verified; demo-login follow-up pending deployment.** Application PR #1 was merged at `22a6107a514c549b3805c64f6cb998011005d576`. [The existing Motion Yoga Render site](https://pilates-yoga-j1kz.onrender.com/) served that exact commit before and after a passing live receipt for photo/video inference, role/source relationships, original media, DICOM annotations, shared feedback and saved programs. The first fresh demo login returned a transient gateway 502 while its history was still being prepared; reconnecting to the same workspace succeeded. A bounded automatic reconnect now passes local tests, but its new served commit and fresh hosted browser/API checks still need verification before the project is declared complete.
+**Release status: deployed and verified.** Application [PR #1](https://github.com/sarvarurdushev/Pilates-Yoga-/pull/1) was merged at `22a6107a514c549b3805c64f6cb998011005d576`; [PR #2](https://github.com/sarvarurdushev/Pilates-Yoga-/pull/2) deployed the demo-login follow-up at **`9b39bf4b71e8373c84e7f7826e2fc83f6cdec93c`**. [The existing Motion Yoga Render site](https://pilates-yoga-j1kz.onrender.com/) served the follow-up commit before and after passing live API and browser receipts. Actual hosted checks covered photo/video inference, role/source relationships, original media, DICOM annotations, shared feedback, saved programs and three-role navigation. The first release's fresh demo login returned a transient gateway 502 while its history was still being prepared; reconnecting to the same workspace succeeded. The follow-up adds bounded automatic reconnect, and a new fresh hosted login succeeded through the normal welcome action.
 
 ## Files and areas changed
 
@@ -107,21 +107,22 @@ The detailed receipts are in [integrated QA](PLATFORM_INTEGRATED_QA_2026_09_30.m
 | `npm run test` in `web` | **513 passed, zero failed**, 31.02 s; `/tmp/motion-web-final-demo-reconnect-1005.log` |
 | `npm run build` in `web` | **Passed**, 3.51 s, after the demo-login follow-up; `/tmp/motion-build-demo-reconnect-1005.log` |
 | Demo-login browser recovery | **Passed**, identical key/role, one organization and zero page errors; `/tmp/motion-demo-auth-ui-1005.log` |
+| Hosted API and browser | **Passed** on exact deployed commit `9b39bf4b71e8373c84e7f7826e2fc83f6cdec93c`; [pipeline](verification/2026-10-05/hosted-pipeline.json), [browser](verification/2026-10-05/hosted-browser.json) |
 | Diff whitespace check | **Passed** |
 
 The existing large-bundle build warning remains. The skipped test remains a skip; it is not counted as verified. The software-rendered anatomy smoke measures correctness and layout, not production GPU performance.
 
 ## Hosted receipt and demo-login recovery
 
-`/tmp/motion-render-capabilities-1005.json` and `/tmp/motion-hosted-acceptance-retry-1005.json` identify the served Render commit as **`22a6107a514c549b3805c64f6cb998011005d576`**. The latter completed with `verified:true`; its fixture measurements were saved under a separate **Hosted workflow validation client**, not attributed to Sarah Kim's fictional history.
+The archived [capability receipt](verification/2026-10-05/capabilities.json) and [pipeline receipt](verification/2026-10-05/hosted-pipeline.json) identify the served Render commit as **`9b39bf4b71e8373c84e7f7826e2fc83f6cdec93c`**. The pipeline completed with `verified:true`; its fixture measurements were saved under a separate **Hosted workflow validation client**, not attributed to Sarah Kim's fictional history. Both deployment and workflow checks were repeated after the reconnect fix; they were not assumed from the first release's passing receipt.
 
 | Hosted check | Verified result |
 |---|---|
 | Capabilities and deployment | Photo/video/3D capabilities true, RTMO-s, platform Render, exact commit checked before and after the run. |
-| Photograph | Actual pipeline processed generated `sarah.png` in **27.68 s**; selected Person 1 from two suitable detections, saved **40 coordinate rows and 14 supported progress rows**, and returned estimated depth. |
-| Movement video | Actual pipeline processed `tree-demo.mp4` in **47.58 s**; **16/16 accepted sampled frames, nine body signals, 640 coordinate rows and 18 supported progress rows**. Person 1 was suitable and Person 2 unsuitable. It correctly reported zero complete cycles for this balance fixture. |
+| Photograph | Actual pipeline processed generated `sarah.png` in **33.20 s**; selected Person 1 from two suitable detections, saved **40 coordinate rows and 14 supported progress rows**, and returned estimated depth. |
+| Movement video | Actual pipeline processed `tree-demo.mp4` in **51.96 s**; **16/16 accepted sampled frames, nine body signals, 640 coordinate rows and 18 supported progress rows**. Person 1 was suitable and Person 2 unsuitable. It correctly reported zero complete cycles for this balance fixture. |
 | Video depth | **Five independently estimated depth frames** were retained. The aggregate video depth status remained unavailable; this is sparse frame-level depth, not a complete 3D clip. |
-| Health and original media | All **20 health probes returned HTTP 200** during inference; maximum response time **2.739 s**. Both original photo/video byte hashes matched after reload. |
+| Health and original media | All **23 health probes returned HTTP 200** during inference; maximum response time **1.160 s**. Both original photo/video byte hashes matched after reload. |
 | Roles | Admin saw 34 seeded clients; Coach saw eight assigned clients and was denied a foreign client. Student saw their own program/client and was denied foreign/system/edit actions; Coach-private planning fields were absent. |
 | DICOM and feedback | An artificial multiframe DICOM rendered selected frame 1 with windowing. A manual annotation and shared feedback retained the exact saved frame, visit, analysis and body region. |
 | Program relationships | A program-only custom exercise, ordered exercise/shared/private notes, immutable version 1, exact source visit and assigned Student projection saved and reloaded. |
@@ -130,7 +131,13 @@ The first hosted attempt received a non-JSON 502 from `/platform/auth/demo` afte
 
 The follow-up `authenticateDemo` retains the same key/role/user identity, retries only network status 0 or gateway 502/503/504, waits two seconds between at most three sequential attempts, and forwards the remaining shared **180 s** deadline to the request. Other errors are not retried. Five focused tests passed. A browser test forwarded a real initial seed, injected the gateway 502, displayed the preparation/reconnect status and opened the same eight-client Coach organization automatically with zero page errors. No backend changed after the 2,625-pass Python run. The 513-test web suite and production build passed after this fix.
 
-**Final follow-up receipt remains pending:** new served commit, fresh hosted welcome/login/browser navigation and repeated API workflow verification. The above receipt proves the first release; it does not yet prove the follow-up is deployed.
+The first release's earlier receipt (`/tmp/motion-hosted-acceptance-retry-1005.json`) passed photo/video in 27.68/47.58 s with the same supported coordinate/progress/frame counts, five sparse depth frames and 20 successful health probes. The final receipt above supersedes its deployment and timing results.
+
+The final [hosted browser receipt](verification/2026-10-05/hosted-browser.json) passed with zero page errors and the exact follow-up commit checked before and after. Its retained [fresh welcome/Coach/Admin receipt](verification/2026-10-05/hosted-browser-first.json) opened the Coach dashboard through the normal welcome button in **40.072 s** after one HTTP 200 authentication response. No transient retry was needed on that fresh hosted run; the actual retry behavior was exercised separately by the local injected-gateway browser test. Coach had eight assigned clients, Sarah's 20 visits, an exact session/report and preserved return context. Admin had 34 seeded clients and four locations before the separate API verifier added its validation client.
+
+The same-workspace Student follow-up explicitly selected the original Sarah fixture after the API validation client altered the default demo selection. It verified Sarah's own 20 visits, foreign-client HTTP 403, initially collapsed advanced measurements/hidden coordinates, absent Coach review controls, assigned program/rationale and the matching right-shoulder body/iframe client context. The initial harness failures were assertion issues: case-sensitive `Sarah Kim` against an uppercase body heading, then unchanged fresh total/default Student assumptions after the API added its separate validation client. Corrected assertions retained the original fresh baseline rather than reseeding or hiding fixture changes. The completed receipt records that scope. Hosted body context was checked; the full native atlas rendering/geometry smoke remains the separately recorded local verification, not a repeated hosted GPU claim.
+
+The final checklist/report and browser-harness receipt edits change no application runtime files. Their completion commit uses Render’s documented [skip-auto-deploy mechanism](https://render.com/docs/deploys#skipping-an-auto-deploy), preserving the verified running application at `9b39bf4b71e8373c84e7f7826e2fc83f6cdec93c`.
 
 ## Known limitations
 
@@ -138,4 +145,4 @@ The follow-up `authenticateDemo` retains the same key/role/user identity, retrie
 - Synthetic subjects, generated imagery/scans and the synthetic camera exercise software paths. Camera-derived landmarks and independently estimated depth are not clinically calibrated anatomy, diagnosis or automatic exercise recognition. Reference scans and atlas/library values are not personal findings.
 - Unknown historical visits, formulas, units or subjective endpoints stay explicitly unavailable or technical. They are not inferred from a date, copied image or convenient modern definition.
 
-The report and numbered ledgers can be finalized after the follow-up deployment and its hosted receipts are verified.
+No numbered implementation or verification gate remains open. The storage and measurement limits above are explicit properties of the approved demonstration release.

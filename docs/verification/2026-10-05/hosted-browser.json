@@ -1,0 +1,90 @@
+{
+  "base": "https://pilates-yoga-j1kz.onrender.com",
+  "expectedCommit": "9b39bf4b71e8373c84e7f7826e2fc83f6cdec93c",
+  "keyFingerprint": "60b16abf52705694",
+  "startedAt": "2026-10-05T12:35:57.400Z",
+  "authAttempts": [
+    {
+      "role": "coach",
+      "keyFingerprint": "60b16abf52705694",
+      "userFingerprint": null,
+      "startedAfterMs": 4395,
+      "status": 200,
+      "durationMs": 38813
+    },
+    {
+      "role": "admin",
+      "keyFingerprint": "60b16abf52705694",
+      "userFingerprint": null,
+      "startedAfterMs": 52539,
+      "status": 200,
+      "durationMs": 848
+    },
+    {
+      "role": "student",
+      "keyFingerprint": "60b16abf52705694",
+      "userFingerprint": null,
+      "startedAfterMs": 54601,
+      "status": 200,
+      "durationMs": 268
+    }
+  ],
+  "pageErrors": [],
+  "liveCommit": "9b39bf4b71e8373c84e7f7826e2fc83f6cdec93c",
+  "welcome": {
+    "elapsedMs": 40072,
+    "attempts": 1,
+    "transientRecovery": false,
+    "normalUIClick": true
+  },
+  "coach": {
+    "assignedClients": 8,
+    "clientFingerprint": "d41062fe4ed6b7cf",
+    "visits": 20,
+    "assessmentFingerprint": "5e640962b263e53b",
+    "selectedClientPreserved": true,
+    "actualSessionReportAndReturn": true
+  },
+  "admin": {
+    "clients": 34,
+    "locations": 4,
+    "organizationFingerprint": "d6eadf1d088280da"
+  },
+  "elapsedMs": 68547,
+  "finishedAt": "2026-10-05T12:52:16.449Z",
+  "retainedFreshReceipt": "/tmp/motion-hosted-browser-first-1005.json",
+  "verificationScope": "Retained fresh normal welcome, Coach and Admin receipt; same-workspace Student follow-up explicitly selecting original Sarah fixture after separate API validation client altered the default demo student. Original first browser used normal Student UI role selection.",
+  "followupStartedAt": "2026-10-05T12:51:57.795Z",
+  "student": {
+    "ownClientFingerprint": "d41062fe4ed6b7cf",
+    "assessmentFingerprint": "5e640962b263e53b",
+    "ownVisits": 20,
+    "foreignClientStatus": 403,
+    "advancedInitiallyCollapsed": true,
+    "coordinatesInitiallyHidden": true,
+    "coachReviewUnavailable": true,
+    "assignedProgramAndWhyVisible": true,
+    "bodyRegion": "right_shoulder",
+    "bodyContextAndIframeClientVerified": true,
+    "rendererRepeated": false,
+    "rendererNote": "Hosted selected-client/body shell verified; full native atlas rendering was verified separately locally."
+  },
+  "liveCommitAfter": "9b39bf4b71e8373c84e7f7826e2fc83f6cdec93c",
+  "result": "PASS",
+  "followup": {
+    "reused": true,
+    "fresh": false,
+    "explicitStudentFixtureSelection": true,
+    "authAttempts": [
+      {
+        "role": "student",
+        "keyFingerprint": "60b16abf52705694",
+        "userFingerprint": "d41062fe4ed6b7cf",
+        "status": 200,
+        "explicitFixtureSelection": true
+      }
+    ],
+    "elapsedMs": 18654,
+    "pageErrors": []
+  }
+}

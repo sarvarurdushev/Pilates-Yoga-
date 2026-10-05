@@ -1,0 +1,140 @@
+{
+  "base": "https://pilates-yoga-j1kz.onrender.com",
+  "expected_commit": "9b39bf4b71e8373c84e7f7826e2fc83f6cdec93c",
+  "started_at": 1791203974.2611005,
+  "jobs": [
+    {
+      "kind": "posture",
+      "fixture": "sarah.png",
+      "job_id": "550a453ad9a4496984c3f76699c1a890",
+      "fixture_sha256": "3994ee8814cb7aa3fc8e9788283fed81f35759f241d09213645ba21e1c4fdfc0",
+      "input_provenance": "generated",
+      "media_id": "4b6f9b53502a4a9a97a6d316413c932b",
+      "health": [
+        0.323,
+        0.45,
+        0.333,
+        0.89,
+        0.265,
+        0.337,
+        0.301,
+        0.233,
+        0.198
+      ],
+      "original_bytes_verified": true,
+      "state": "done",
+      "seconds": 33.2,
+      "error": "",
+      "analysis_id": "2323353d58da41cdbe4c3e52f0315fd0",
+      "session_id": "a0d234419aaa47fb8a3cad2219c8da05",
+      "selection": {
+        "front": "1"
+      },
+      "coordinate_rows": 40,
+      "measured_progress_rows": 14,
+      "frames": 0,
+      "accepted_frames": 0,
+      "available_signals": 0,
+      "detected_cycles": 0,
+      "people": [
+        {
+          "person_id": "1",
+          "suitable": true
+        },
+        {
+          "person_id": "2",
+          "suitable": true
+        }
+      ],
+      "depth_status": "estimated",
+      "estimated_depth_frames": 0
+    },
+    {
+      "kind": "movement",
+      "fixture": "tree-demo.mp4",
+      "job_id": "f1cc1dcd666d4055b35a5e5e65179db9",
+      "fixture_sha256": "2b9f3fa173b0fba011e02bac175ddc4bd34f27652f8c6061c92a907f7be2a6ad",
+      "input_provenance": "movement_video_fixture",
+      "media_id": "911ae979699c49f7903bbb83fa15c56f",
+      "health": [
+        1.16,
+        0.195,
+        0.236,
+        0.276,
+        0.169,
+        0.305,
+        0.198,
+        0.276,
+        0.559,
+        0.374,
+        0.334,
+        0.556,
+        0.306,
+        0.357
+      ],
+      "original_bytes_verified": true,
+      "state": "done",
+      "seconds": 51.96,
+      "error": "",
+      "analysis_id": "6a4f06687a74418cb750735d1deec4c7",
+      "session_id": "9cab6f609f2b45c8aca9c2699635087f",
+      "selection": {
+        "front": "1"
+      },
+      "coordinate_rows": 640,
+      "measured_progress_rows": 18,
+      "frames": 16,
+      "accepted_frames": 16,
+      "available_signals": 9,
+      "detected_cycles": 0,
+      "people": [
+        {
+          "person_id": "1",
+          "suitable": true
+        },
+        {
+          "person_id": "2",
+          "suitable": false
+        }
+      ],
+      "depth_status": "unavailable",
+      "estimated_depth_frames": 5
+    }
+  ],
+  "capabilities": {
+    "photo": true,
+    "video": true,
+    "three_d": true,
+    "login_required": false,
+    "model": "RTMO-s",
+    "version": "2.0-evidence",
+    "deployment": {
+      "platform": "render",
+      "commit": "9b39bf4b71e8373c84e7f7826e2fc83f6cdec93c"
+    }
+  },
+  "validation_client_id": "635dfdefe43e470395e2096499eac9f6",
+  "roles": {
+    "organization_fingerprint": "d6eadf1d088280da",
+    "admin_clients": 34,
+    "coach_clients": 8,
+    "student_fingerprint": "aca067c303befc6a",
+    "schema_version": 2,
+    "coach_foreign_client_refused": true,
+    "student_own_program_and_foreign_client_refusal": true
+  },
+  "record_source": "actual_capture",
+  "linked_records": {
+    "scan_id": "f0b292f85d2f44b2aa4b0b35891612c3",
+    "annotation_id": "24a04d5b921e4ff29c2b3c1146b89e16",
+    "frame": 1,
+    "note_id": "35fcd8430f824515894daa7e2301c28e",
+    "exercise_id": "959f3ab8ded94965a860b31b3780caf5",
+    "program_id": "207394ab858a4877b0fa955c5e639ec4",
+    "program_version": 1,
+    "session_id": "9cab6f609f2b45c8aca9c2699635087f",
+    "calibration_fixture_sha256": "51fd32adb2d41683bfb08fbe75af6acf9306aabeb3988bd0d73b2237483f36c4"
+  },
+  "verified": true,
+  "finished_at": 1791204080.426851
+}

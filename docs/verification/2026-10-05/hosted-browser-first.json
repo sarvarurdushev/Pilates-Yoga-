@@ -1,0 +1,57 @@
+{
+  "base": "https://pilates-yoga-j1kz.onrender.com",
+  "expectedCommit": "9b39bf4b71e8373c84e7f7826e2fc83f6cdec93c",
+  "keyFingerprint": "60b16abf52705694",
+  "startedAt": "2026-10-05T12:35:57.400Z",
+  "authAttempts": [
+    {
+      "role": "coach",
+      "keyFingerprint": "60b16abf52705694",
+      "userFingerprint": null,
+      "startedAfterMs": 4395,
+      "status": 200,
+      "durationMs": 38813
+    },
+    {
+      "role": "admin",
+      "keyFingerprint": "60b16abf52705694",
+      "userFingerprint": null,
+      "startedAfterMs": 52539,
+      "status": 200,
+      "durationMs": 848
+    },
+    {
+      "role": "student",
+      "keyFingerprint": "60b16abf52705694",
+      "userFingerprint": null,
+      "startedAfterMs": 54601,
+      "status": 200,
+      "durationMs": 268
+    }
+  ],
+  "pageErrors": [],
+  "liveCommit": "9b39bf4b71e8373c84e7f7826e2fc83f6cdec93c",
+  "welcome": {
+    "elapsedMs": 40072,
+    "attempts": 1,
+    "transientRecovery": false,
+    "normalUIClick": true
+  },
+  "coach": {
+    "assignedClients": 8,
+    "clientFingerprint": "d41062fe4ed6b7cf",
+    "visits": 20,
+    "assessmentFingerprint": "5e640962b263e53b",
+    "selectedClientPreserved": true,
+    "actualSessionReportAndReturn": true
+  },
+  "admin": {
+    "clients": 34,
+    "locations": 4,
+    "organizationFingerprint": "d6eadf1d088280da"
+  },
+  "result": "FAIL",
+  "error": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Sarah Kim/. Input:\n\n'SARAH KIM \u00b7 RIGHT \u00b7 ALL VISITS\\n' +\n  '\\n' +\n  'Right Shoulder / scapular region\\n' +\n  '\\n' +\n  'Relevant structures for explaining the observed right shoulder movement. Highlighting does not establish muscle weakness or disease.\\n' +\n  '\\n' +\n  '20\\n' +\n  'measured findings\\n' +\n  '20\\n' +\n  'coach feedback\\n' +\n  '20\\n' +\n  'related assessments\\n' +\n  '5\\n' +\n  'assigned movements\\n' +\n  '\\n' +\n  \"The atlas is an educational reference, not a reconstruction of this client's internal anatomy.\"\n\n    at file:///home/sarvar/Documents/Codex/2026-09-15/files-mentioned-by-the-user-body/work/Pilates-Yoga/web/test/hosted-platform.browser.mjs:127:66",
+  "elapsedMs": 68547,
+  "finishedAt": "2026-10-05T12:37:05.946Z"
+}
