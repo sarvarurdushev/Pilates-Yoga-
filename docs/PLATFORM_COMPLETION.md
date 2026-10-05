@@ -1,6 +1,6 @@
 # Requirements 1–44: implementation and evidence
 
-A requirement is complete only when its data, authorization, workflow and relevant verification pass. UI existence alone is not evidence. This is the earlier specification; the later #1–63 work and current release status are tracked in CURRENT_SPEC_ACCEPTANCE.md. Local verification has now closed the prior WebGL gaps; the newest Render release is pending at this pre-merge checkpoint.
+A requirement is complete only when its data, authorization, workflow and relevant verification pass. UI existence alone is not evidence. This is the earlier specification; the later #1–63 work and current release status are tracked in CURRENT_SPEC_ACCEPTANCE.md. Local verification has now closed the prior WebGL gaps; the main implementation is hosted-verified at `22a6107a514c549b3805c64f6cb998011005d576`; a small demo sign-in recovery follow-up remains pending.
 
 | # | Requirement | Status | Evidence |
 |---|---|---|---|
@@ -9,14 +9,14 @@ A requirement is complete only when its data, authorization, workflow and releva
 | 3 | ADMIN | DONE + VERIFIED locally | Admin organization view, location assignment UI; role conversion/deletion and inspector tests. |
 | 4 | LOCATIONS | DONE + VERIFIED locally | Four seeded locations; room/capacity/equipment relationships; new location + coach/client assignment UI. |
 | 5 | DATABASE ARCHITECTURE | DONE + VERIFIED locally; disposable hosting accepted | Relational schema, foreign keys, reopen, immutable history and full archive/restore pass. The user explicitly confirmed no real hosted records need preservation and chose the same free service despite reset risk. Free-host durability is not promised or a paid-storage gate; local database/backup functionality is real. |
-| 6 | CLIENT PROFILE = CENTRAL HUB | DONE + VERIFIED locally | Sarah header and 11 scoped tabs; client-history test includes >200 older notes. |
+| 6 | CLIENT PROFILE = CENTRAL HUB | DONE + VERIFIED locally | Sarah header and eight scoped tabs; client-history test includes >200 older notes. |
 | 7 | COACH DASHBOARD | DONE + VERIFIED locally | Assigned-client dashboard, upcoming/today sessions and follow-up conditions; server scope tested. |
 | 8 | PROGRAM BUILDER | DONE + VERIFIED locally | Program sequence CRUD/reorder/duplicate/assign, exercise prescriptions and equipment relations; saved program UI. |
 | 9 | COACH CONTENT EDITING | DONE + VERIFIED locally | Edited instructions, uploaded image, saved optional resource and verified persistent content. |
 | 10 | EXERCISE DATABASE | DONE + VERIFIED locally | 199 distinct catalog entries, category/search/pagination tests, editable owned content. |
 | 11 | EQUIPMENT | DONE + VERIFIED locally | Location inventory and exercise/program requirements; unavailable equipment rejects reservations. |
 | 12 | DEMO CLIENTS | DONE + VERIFIED locally | 34 linked fictional profiles, six distinct scenarios, assigned coaches and locations. |
-| 13 | HISTORICAL DATA | DONE + VERIFIED locally | Seven featured clients now have20 completed visits across about six months; remaining profiles have linked histories. New geometry/camera/phase/setback/source tests and all-seven saved-history integrity audit pass; illustrations and simulations remain distinct. |
+| 13 | HISTORICAL DATA | DONE + VERIFIED locally | Seven featured clients now have 20 completed visits across 133 days (about 4.4 months); remaining profiles have linked histories. New geometry/camera/phase/setback/source tests and all-seven saved-history integrity audit pass; illustrations and simulations remain distinct. |
 | 14 | BEFORE/AFTER IMAGES | DONE + VERIFIED locally | Seven individually generated before/after pairs inspected; scenario and identity associations verified. |
 | 15 | POSTURE ANALYSIS | DONE + VERIFIED locally | Actual skeleton overlay, anatomical joint IDs and labelled midpoint proxies; posture regression suite. |
 | 16 | ESTIMATED BODY COORDINATES | DONE + VERIFIED locally | Real frame XYZ/confidence/time table, landmark selection, trajectories and rejected-frame unavailable state. |

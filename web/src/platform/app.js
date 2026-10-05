@@ -37,6 +37,7 @@ import {
 } from "./core.js";
 import { edit } from "./forms.js";
 import { feedbackVisitDisclosure } from "./feedback-source.js";
+import { authenticateDemo } from "./demo-auth.js";
 import { cameraLabels, comparisonText, metricCopy, explainedChart } from "./explain.js";
 import { metricRegion, analysisStatusLabel } from "./reports.js";
 import { progressMilestones } from "./progress-milestones.js";
@@ -216,7 +217,12 @@ async function demo(role, user_id) {
       "Preparing your connected demonstration. First opening can take about a minute…";
   document.querySelectorAll("[data-demo]").forEach((b) => (b.disabled = true));
   try {
-    state.me = await api("auth/demo", { key, role, user_id });
+    state.me = await authenticateDemo({ key, role, user_id }, {
+      request: api,
+      onRetry: () => {
+        if (status) status.textContent = "Your demonstration is still being prepared. Reconnecting to the same workspace…";
+      },
+    });
     state.client = null;
     history.replaceState(null, "", "#page=dashboard");
     await render();
