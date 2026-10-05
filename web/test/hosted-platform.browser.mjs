@@ -6,7 +6,7 @@
  */
 import assert from 'node:assert/strict';
 import {createHash,randomBytes} from 'node:crypto';
-import {chmod,writeFile} from 'node:fs/promises';
+import {chmod,readFile,writeFile} from 'node:fs/promises';
 import {chromium} from 'playwright';
 
 const approved='https://pilates-yoga-j1kz.onrender.com';
@@ -14,12 +14,14 @@ const base=(process.env.MOTION_BASE_URL||approved).replace(/\/$/,'');
 assert.equal(base,approved,'This browser receipt is restricted to the explicitly approved Render service.');
 const expected=process.env.MOTION_EXPECTED_SHA;
 assert.match(expected||'',/^[a-f0-9]{40}$/,'MOTION_EXPECTED_SHA must identify the complete live commit.');
-const key=randomBytes(16).toString('hex');
+const reused=Boolean(process.env.MOTION_DEMO_KEY_FILE);
+const key=reused?(await readFile(process.env.MOTION_DEMO_KEY_FILE,'utf8')).trim():randomBytes(16).toString('hex');
+assert.match(key,/^[a-f0-9]{32}$/,'The private demo key file must contain one valid key.');
 const privateKeyFile='/tmp/motion-hosted-browser-private-key-1005';
 const fingerprint=value=>createHash('sha256').update(String(value)).digest('hex').slice(0,16);
 const redact=value=>String(value).replaceAll(key,'[demo-key-redacted]');
 const started=Date.now();
-const report={base,expectedCommit:expected,keyFingerprint:fingerprint(key),startedAt:new Date().toISOString(),authAttempts:[],pageErrors:[]};
+const report={base,expectedCommit:expected,keyFingerprint:fingerprint(key),freshWorkspace:!reused,startedAt:new Date().toISOString(),authAttempts:[],pageErrors:[]};
 const browser=await chromium.launch({...(process.env.CHROMIUM?{executablePath:process.env.CHROMIUM}:{}),
   args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-gpu-sandbox']});
 const page=await browser.newPage({viewport:{width:1440,height:1000}});
@@ -53,8 +55,17 @@ const checkDeployment=async()=>{
   const capabilities=await response.json();assert.equal(capabilities.deployment?.commit,expected,'The requested deployment is not live.');
   return capabilities.deployment.commit;
 };
-const role=async(name,heading)=>{
-  await page.locator('#demo-role').selectOption(name);
+const role=async(name,heading,userId)=>{
+  if(userId){
+    // Other acceptance jobs may add clients before this same-key follow-up.
+    // Select the original seeded fixture explicitly instead of assuming default order.
+    const opening=Date.now();
+    const response=await page.request.post(base+'/platform/auth/demo',{data:{key,role:name,user_id:userId},headers:{'X-Platform-Request':'1',Origin:base},timeout:180000});
+    report.authAttempts.push({role:name,keyFingerprint:fingerprint(key),userFingerprint:fingerprint(userId),
+      status:response.status(),durationMs:Date.now()-opening,explicitFixtureSelection:true});
+    assert.equal(response.status(),200,'Explicit fixture role authentication failed.');
+    await page.reload({waitUntil:'domcontentloaded',timeout:60000});
+  }else await page.locator('#demo-role').selectOption(name);
   await page.getByRole('heading',{name:heading,exact:true}).waitFor({timeout:195000});
   const profile=await info('me');assert.equal(profile.role,name);return profile;
 };
@@ -85,8 +96,8 @@ try{
   const initialAttempts=report.authAttempts.filter(attempt=>attempt.role==='coach');
   assert.ok(initialAttempts.length>=1&&initialAttempts.length<=3);assert.equal(initialAttempts.at(-1).status,200);
   assert.ok(initialAttempts.every(attempt=>attempt.keyFingerprint===fingerprint(key)&&attempt.userFingerprint===null));
-  report.welcome={elapsedMs:Date.now()-opening,attempts:initialAttempts.length,transientRecovery:initialAttempts.some(attempt=>attempt.status>=500||attempt.failure),normalUIClick:true};
-  console.log('Fresh welcome/demo reached Coach dashboard:',report.welcome);
+  report.welcome={elapsedMs:Date.now()-opening,attempts:initialAttempts.length,transientRecovery:initialAttempts.some(attempt=>attempt.status>=500||attempt.failure),normalUIClick:true,fresh:!reused,reused};
+  console.log('Welcome/demo reached Coach dashboard:',report.welcome);
   const sarah=coach.students.find(client=>client.name==='Sarah Kim');assert.ok(sarah);
   const organization=coach.organization.id;
   await page.locator('#sidebar').getByRole('link',{name:'My clients',exact:true}).click();
@@ -99,11 +110,12 @@ try{
   report.coach={assignedClients:coach.students.length,clientFingerprint:fingerprint(sarah.id),visits:client.sessions.length,
     assessmentFingerprint:fingerprint(assessment),selectedClientPreserved:true,actualSessionReportAndReturn:true};
   const admin=await role('admin','Organization overview');assert.equal(admin.organization.id,organization);
-  assert.equal(admin.students.length,34);assert.equal(admin.locations.length,4);
-  assert.equal(await page.locator('.stats .stat').filter({has:page.locator('span',{hasText:'Client profiles'})}).locator('strong').innerText(),'34');
+  const seededClients=admin.students.filter(client=>client.id.startsWith(organization+'-student')).length;
+  assert.equal(seededClients,34);if(!reused)assert.equal(admin.students.length,34);assert.equal(admin.locations.length,4);
+  assert.equal(await page.locator('.stats .stat').filter({has:page.locator('span',{hasText:'Client profiles'})}).locator('strong').innerText(),String(admin.students.length));
   assert.equal(await page.locator('.stats .stat').filter({has:page.locator('span',{hasText:'Locations'})}).locator('strong').innerText(),'4');
-  report.admin={clients:admin.students.length,locations:admin.locations.length,organizationFingerprint:fingerprint(organization)};
-  const student=await role('student','Your practice, today');assert.equal(student.organization.id,organization);
+  report.admin={clients:admin.students.length,seededClients,locations:admin.locations.length,organizationFingerprint:fingerprint(organization)};
+  const student=await role('student','Your practice, today',reused?sarah.id:undefined);assert.equal(student.organization.id,organization);
   assert.deepEqual(student.students.map(client=>client.id),[sarah.id]);assert.equal(student.user.id,sarah.id);
   const foreign=admin.students.find(client=>client.id!==sarah.id);assert.ok(foreign);
   assert.equal((await request('client?id='+encodeURIComponent(foreign.id))).status,403);
@@ -124,7 +136,7 @@ try{
   await bodyLink.click();await page.getByRole('heading',{name:'Client body map',exact:true}).waitFor();await assertClient(sarah.id);
   const region=bodyParams.get('region');assert.equal(await page.locator('[name=body-region]').inputValue(),region);
   const frameParams=new URLSearchParams(new URL(await page.locator('#atlas').getAttribute('src'),base).search);assert.equal(frameParams.get('client'),sarah.id);assert.equal(frameParams.get('region'),region);
-  await page.locator('.anatomy-region-summary').waitFor();assert.match(await page.locator('.anatomy-region-summary').innerText(),/Sarah Kim/);
+  await page.locator('.anatomy-region-summary').waitFor();assert.match(await page.locator('.anatomy-region-summary').innerText(),/Sarah Kim/i);
   report.student={ownClientFingerprint:fingerprint(sarah.id),assessmentFingerprint:fingerprint(ownAssessment),foreignClientStatus:403,
     advancedInitiallyCollapsed:true,coordinatesInitiallyHidden:true,coachReviewUnavailable:true,
     assignedProgramAndWhyVisible:true,bodyRegion:region,bodyContextAndIframeClientVerified:true,

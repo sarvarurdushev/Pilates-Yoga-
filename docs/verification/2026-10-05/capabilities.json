@@ -1,0 +1,12 @@
+{
+  "photo": true,
+  "video": true,
+  "three_d": true,
+  "login_required": false,
+  "model": "RTMO-s",
+  "version": "2.0-evidence",
+  "deployment": {
+    "platform": "render",
+    "commit": "9b39bf4b71e8373c84e7f7826e2fc83f6cdec93c"
+  }
+}
