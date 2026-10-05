@@ -97,7 +97,7 @@ function tiles(session) {
   const moved = runs.filter((h) =>
     h.verdict !== 'steady' && h.verdict !== 'too few sessions').length;
   const cells = [
-    [score?.value != null ? Math.round(score.value) : '—', 'Score out of 100'],
+    [score?.value != null ? Math.round(score.value) : '—', 'Camera coaching checks /100'],
     [session.ranked().length, 'Muscle groups measured'],
     [(session.bundle.quantities ?? []).length, 'Measurements this class'],
     [sessions, 'Classes on record'],
@@ -137,10 +137,11 @@ function score(session) {
     ? `<p class="note">${gone.length} class${gone.length === 1 ? '' : 'es'} produced
        no score and are not on the line: ${esc(gone.map((g) => g.date).join(', '))}.
        ${esc(gone[0].withheld_reason || '')}</p>` : '';
-  return section('Score, class by class', `out of 100`,
+  return section('Camera coaching checks, class by class', `out of 100`,
     `<div class="grid"><div class="plot">
-      <h5>Score</h5><p class="sub">${verdictChip(series)}</p>
+      <h5>Camera coaching checks</h5><p class="sub">${verdictChip(series)}</p>
       ${spark(series, { id: 'lab-score' })}</div></div>${missing}`,
+    `This is the mean of the app's recorded checks, each on a 0–100 scale. Components are weighted by their check counts. The selected session has ${esc(session.score?.checks ?? 'an unknown number of')} checks and ${Number.isFinite(session.score?.coverage) ? Math.round(session.score.coverage * 100) + '%' : 'unrecorded'} coverage of the app's measurable quantities. ${session.score?.components?.length ? 'Components: ' + session.score.components.map((c) => `${esc(c.name)} (${esc(c.checks)} checks)`).join(', ') + '. ' : ''}Higher values mean closer agreement with these coaching rules, not a clinical normal range. ` +
     'A score is derived from the checks a class allowed, never stored, so a '
   + 'change to how one is computed applies to every class ever recorded. Where '
   + 'too few checks could be made the number is withheld rather than made from '
@@ -179,6 +180,22 @@ const GROUPS = [
 
 const pretty = (name) => name.replace(/_/g, ' ').replace(/ peak moment$/, ' effort');
 
+export function historicalQuantityCopy(name, series = {}, quantity = {}) {
+  const unit = series.unit || quantity.unit || '';
+  let definition = '';
+  if (name === 'control') definition = 'Smoothed direction reversals divided by twice the detected repetition count; a dimensionless ratio. It is unavailable when no repetitions are detected.';
+  else if (name === 'tempo ratio') definition = 'Mean return duration divided by outward duration over detected repetitions; a dimensionless ratio, not a strength or effort measure.';
+  else if (name === 'repetitions') definition = 'Detected complete outward-and-return cycles in the selected movement signal; a count.';
+  else if (name === 'range consistency' && unit === 'deg') definition = 'Standard deviation of detected repetition excursions, in degrees. It describes variation in this projected angle, not whole-body consistency.';
+  else if (name.endsWith(' symmetry') && unit === 'deg') definition = 'Absolute difference between corresponding left and right projected angles, in degrees; this is a camera-plane gap.';
+  else if (unit === 'deg') definition = 'Saved projected angle in degrees from the visible video landmarks. Compare the same named angle and camera setup; it is not a calibrated internal joint measurement.';
+  else if (unit === 'Nm' || unit === 'N·m') definition = 'Estimated net joint moment in newton-metres from the saved mechanical model; it is not a force measured from an individual muscle.';
+  else if (unit) definition = `Archived ${quantity.plain || pretty(name)} in ${unit}. Its calculation is not defined in this saved record; inspect the source before interpreting change.`;
+  else definition = 'The unit and calculation are not defined in this historical record. Do not compare it to a modern measurement with a known formula or interpret its direction as benefit.';
+  return { definition, technical: !unit && !['control', 'tempo ratio', 'repetitions'].includes(name),
+    source: quantity.source || 'Source mechanism not recorded' };
+}
+
 function plots(session) {
   const history = session.bundle.history ?? {};
   const names = Object.keys(history);
@@ -190,15 +207,20 @@ function plots(session) {
     if (!mine.length) continue;
     for (const n of mine) taken.add(n);
     out.push(section(title, `${mine.length} measured`,
-      `<div class="grid">${mine.map((name) => `<div class="plot">
+      `<div class="grid">${mine.map((name) => {
+        const copy = historicalQuantityCopy(name, history[name], (session.bundle.quantities || []).find((q) => q.name === name));
+        const plot = `<div class="plot">
         <h5>${esc(pretty(name))}</h5>
         <p class="sub">${verdictChip(history[name])}</p>
+        <p class="note">${esc(copy.definition)} <small>Saved source: ${esc(copy.source)}.</small></p>
         ${spark(history[name], { id: `lab-${name.replace(/\W+/g, '')}` })}
-      </div>`).join('')}</div>`,
+      </div>`;
+        return copy.technical ? `<details><summary>Historical technical quantity: ${esc(pretty(name))}</summary>${plot}</details>` : plot;
+      }).join('')}</div>`,
       title === 'Effort'
         ? 'The band on each chart is that measurement’s own session-to-session '
         + 'wobble. A line that stays inside it has not changed, however much it '
-        + 'looks like it has.' : ''));
+        + 'looks like it has.' : 'Dates identify saved sessions. The band shows the stored noise floor derived from session variation; the change verdict uses that same floor. Open the saved source before interpreting a change.'));
   }
   return out.join('');
 }

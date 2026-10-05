@@ -1,6 +1,7 @@
 """Render defaults compatible with the existing pip-build / pilates-web service."""
 
 import hashlib
+import http.client
 import os
 from pathlib import Path
 import urllib.request
@@ -20,7 +21,7 @@ def metadata():
 
 
 def prepare_render():
-    """Cache pinned 3D weights on first analysis, without loading either model.
+    """Cache pinned 3D weights before serving requests, without loading a model.
 
     An explicit model configuration is respected. A failed download leaves 2D
     available and the capability endpoint reports 3D as unavailable.
@@ -48,5 +49,5 @@ def prepare_render():
             temp.replace(target)
         os.environ["PILATES_3D_MODEL"] = str(target)
         print("Render: verified 3D model ready", flush=True)
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, http.client.HTTPException) as exc:
         print(f"Render: optional 3D model unavailable ({exc}); 2D remains available", flush=True)

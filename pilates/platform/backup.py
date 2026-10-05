@@ -10,11 +10,22 @@ import json
 import shutil
 import tempfile
 import zipfile
-from .repository import Refused, uid, now, encode
+from .repository import (
+    Refused, uid, now, encode, backfill_session_exercise_events,
+)
 from .inspection import schema, scope, PUBLIC
 
 MAX_ARCHIVE = 256 * 1024 * 1024
 MAX_EXPANDED = 1024 * 1024 * 1024
+# Tables added since the first organization archive format. Old archives may
+# omit these; all other current private tables are required on restore.
+OPTIONAL_RESTORE_TABLES = {
+    "p_program_step_details", "p_program_step_notes", "p_program_revisions",
+    "p_program_revision_visits", "p_resource_details",
+    "p_training_session_program_versions", "p_session_analyses",
+    "p_session_recorders", "p_session_exercise_events", "p_session_notes", "p_session_scans",
+    "p_scan_finding_visits",
+}
 
 
 def admin_only(actor):
@@ -108,7 +119,9 @@ def restore_archive(repo, actor, archive):
             meta = schema(db)
             tables = manifest.get("tables", [])
             expected = set(meta) - PUBLIC
-            if set(tables) != expected or len(tables) != len(expected):
+            optional_new = OPTIONAL_RESTORE_TABLES
+            missing = expected - set(tables)
+            if (set(tables) - expected) or (missing - optional_new) or len(tables) != len(set(tables)):
                 raise Refused(
                     "The backup schema does not match this application version."
                 )
@@ -231,7 +244,11 @@ def restore_archive(repo, actor, archive):
                                 row[key] = mapping[(parent, value)]
                         elif len(keys) == 1 and key == keys[0]:
                             row[key] = mapping[(table, value)]
-                        elif key in {"detail", "result", "summary", "completed"}:
+                        elif table == "p_program_revisions" and key == "source_id" and value:
+                            row[key] = text_ids.get(value, value)
+                        elif table == "p_session_exercise_events" and key == "completed_key" and value:
+                            row[key] = text_ids.get(value, value)
+                        elif key in {"detail", "result", "summary", "completed", "snapshot"}:
                             row[key] = encode(remap_json(json.loads(value)))
                     if table == "p_users":
                         row["password_hash"] = ""
@@ -269,6 +286,20 @@ def restore_archive(repo, actor, archive):
                         list(row.values()),
                     )
                     count += 1
+            backfill_session_exercise_events(db)
+            # Old archives have no marker-time visit evidence. A scan's current
+            # visit link alone cannot prove where an older marker belongs.
+            if db.execute(
+                "SELECT 1 FROM p_scan_finding_visits fv "
+                "JOIN p_scan_findings f ON f.id=fv.finding_id "
+                "JOIN p_scans s ON s.id=f.scan_id "
+                "LEFT JOIN p_session_scans ss ON ss.scan_id=s.id "
+                "LEFT JOIN p_training_sessions ts ON ts.id=fv.session_id "
+                "WHERE s.org_id=? AND (ss.session_id IS NOT fv.session_id "
+                "OR ts.student_id IS NOT s.student_id) LIMIT 1",
+                (actor.org_id,),
+            ).fetchone():
+                raise Refused("A scan marker in the backup belongs to a different visit or client.")
             if db.execute("PRAGMA foreign_key_check").fetchone():
                 raise Refused("The restored archive contains a broken relationship.")
             repo.audit(

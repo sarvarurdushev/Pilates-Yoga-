@@ -29,11 +29,17 @@ def test_demo_relations_and_tenants(state):
         "Incheon",
     }
     assert r.list(a, "exercises")["total"] == 199
-    assert r.list(a, "analyses")["total"] == 204
+    # Seven featured illustrated clients have five months of linked history.
+    assert r.list(a, "analyses")["total"] == 302
     for p in r.people(a):
         client = r.client(a, p["id"])
-        assert len(client["analyses"]) == 6 and len(client["sessions"]) == 6
-        assert len(client["scans"]) == 1 and len(client["notes"]) == 6
+        featured = bool(p["detail"].get("asset"))
+        expected = 20 if featured else 6
+        assert len(client["analyses"]) == expected and len(client["sessions"]) == expected
+        assert len(client["scans"]) == 1 and len(client["notes"]) == expected
+        if featured:
+            dates = sorted(datetime.fromisoformat(a["created_at"]) for a in client["analyses"])
+            assert (dates[-1] - dates[0]).days >= 120
         scan = client["scans"][0]
         assert scan["region_id"] == client["programs"][0]["region_id"]
         scan_media = r.get(a, "media", scan["media_id"])
@@ -154,8 +160,10 @@ def test_content_and_links(state):
         )
     with pytest.raises(Refused):
         r.delete(c, "exercises", ex["id"])
-    r.delete(c, "programs", program["id"])
-    r.delete(c, "exercises", ex["id"])
+    with pytest.raises(Refused, match="Archive an assigned"):
+        r.delete(c, "programs", program["id"])
+    with pytest.raises(Refused):
+        r.delete(c, "exercises", ex["id"])
 
 
 def test_coordinates_and_derivatives():
@@ -255,6 +263,7 @@ def test_dicom_upload_window_annotation(state, tmp_path):
             "name": "Manual test scan",
             "scan_type": "DICOM",
             "captured_at": "2026-09-22",
+            "session_id": r.client(c, sid)["sessions"][0]["id"],
         },
     )
     r.annotate(
@@ -503,6 +512,11 @@ def test_backup_round_trip_and_role_boundaries(state):
         "p_coaches",
         "p_locations",
         "p_programs",
+        "p_program_revisions",
+        "p_program_step_details",
+        "p_program_step_notes",
+        "p_training_session_program_versions",
+        "p_resource_details",
         "p_exercises",
         "p_media",
         "p_scans",
@@ -521,6 +535,10 @@ def test_backup_round_trip_and_role_boundaries(state):
     assert analysis["student_id"] == analysis["result"]["student_id"] == sarah["id"]
     assert analysis["id"] == analysis["result"]["id"]
     with r.db() as db:
+        import json
+        restored_revision = db.execute("SELECT program_id,snapshot FROM p_program_revisions WHERE program_id IN (SELECT id FROM p_programs WHERE org_id=?) ORDER BY version DESC LIMIT 1", (fresh.org_id,)).fetchone()
+        assert restored_revision
+        assert json.loads(restored_revision["snapshot"])["id"] == restored_revision["program_id"]
         assert not db.execute("PRAGMA foreign_key_check").fetchall()
         assert not db.execute(
             "SELECT 1 FROM p_users WHERE org_id=? AND id<>? AND password_hash<>''",
@@ -572,6 +590,15 @@ def test_equipment_availability_and_paged_analysis_filter(state):
     assert len(first["items"]) == len(second["items"]) == 50
     assert all(x["kind"] == "movement" for x in first["items"] + second["items"])
     assert not {x["id"] for x in first["items"]} & {x["id"] for x in second["items"]}
+
+
+def test_equipment_counts_refuse_impossible_reservable_stock(state):
+    repo, _coach, admin, _student = state
+    equipment = next(item for item in repo.list(admin, "equipment")["items"] if item["name"] == "Mat")
+    for available in (equipment["quantity"] + 1, -1, 1.5, True):
+        with pytest.raises(Refused, match="equipment units|Reservable units"):
+            repo.save(admin, "equipment", {"id": equipment["id"], "available": available})
+    assert repo.get(admin, "equipment", equipment["id"])["available"] == equipment["available"]
 
 
 def test_http_auth_csrf_media_ranges_and_backup(state):
@@ -679,9 +706,9 @@ def test_precomputed_demo_matches_current_geometry():
 
     for scenario in range(6):
         client = next(i for i in range(34) if scenario_for(i) == scenario)
-        for visit in range(6):
+        for visit in range(20):
             stored = cache.compressed(scenario, visit)
-            assert stored, "Rebuild and package all 36 demo scenarios"
+            assert stored, "Rebuild and package all 120 demo scenarios"
             data = json.loads(gzip.decompress(stored))
             # JSON persistence converts tuple series to arrays in both paths.
             assert data == json.loads(json.dumps(cache.calculate(client, visit)))

@@ -28,6 +28,11 @@ import {
   dt,
   exerciseIllustration,
 } from "./core.js";
+import {
+  initialVisitId, visitFormOptions, compatibleAssessments,
+  compatibleScans, compatibleFindings, sessionForAnalysis, assignedProgramOptions,
+} from "./visit-form-links.js";
+import { markCompletion, completedEventPayload } from "./completed-events.js";
 const asObject = (f) => Object.fromEntries(f);
 const checks = (title, name, rows, selected = []) =>
   `<fieldset><legend>${esc(title)}</legend>${rows.map((r) => `<label class="check"><input type="checkbox" name="${name}" value="${esc(r.id)}" ${selected.includes(r.id) ? "checked" : ""}>${esc(r.name)}</label>`).join("")}</fieldset>`;
@@ -37,7 +42,10 @@ function removeButton(kind, id) {
     : "";
 }
 export async function edit(kind, id, copy = false) {
-  if (kind === "programs") return programEditor(id, copy);
+  if (kind === "programs") {
+    const { programEditor } = await import("./programs.js");
+    return programEditor(id, copy);
+  }
   if (kind === "exercises") return exerciseEditor(id, copy);
   const me = state.me;
   let item = {};
@@ -90,7 +98,7 @@ export async function edit(kind, id, copy = false) {
       field("Name", "name", item.name, "text", "required") +
       field("Address", "address", item.address) +
       field(
-        "Capacity",
+        "Simultaneous reservation capacity",
         "capacity",
         item.capacity || 12,
         "number",
@@ -119,7 +127,7 @@ export async function edit(kind, id, copy = false) {
     const add = (r) => {
       const wrap = document.createElement("div");
       wrap.className = "room-row";
-      wrap.innerHTML = `<input aria-label="Room name" data-room-name value="${esc(r.name || "")}" required><input aria-label="Room capacity" data-room-capacity type="number" min="1" value="${r.capacity || 8}">`;
+      wrap.innerHTML = `<input aria-label="Room name" data-room-name value="${esc(r.name || "")}" required><input aria-label="Room simultaneous reservation capacity" data-room-capacity type="number" min="1" value="${r.capacity || 8}">`;
       d.querySelector("#room-rows").append(wrap);
     };
     rooms.forEach(add);
@@ -141,7 +149,7 @@ export async function edit(kind, id, copy = false) {
         'min="0" required',
       ) +
       field(
-        "Available for reservations",
+        "Reservable units before overlapping bookings",
         "available",
         item.available ?? 1,
         "number",
@@ -236,33 +244,50 @@ export async function edit(kind, id, copy = false) {
     return;
   } else if (kind === "notes") {
     if (!state.client)
-      throw Error("Select a client before adding a coaching note.");
+      throw Error("Select a client before adding coach feedback.");
     const c = state.client;
-    const programs = (await list("programs")).items;
+    const programs = assignedProgramOptions(c);
+    const exercises = (await list("exercises")).items;
+    if (item.exercise_id && !exercises.some((exercise) => exercise.id === item.exercise_id))
+      exercises.push(await record("exercises", item.exercise_id));
+    const route = params();
+    const observationId = item.detail?.observation_id || route.get("observation") || "";
+    const observations = c.observations || [];
+    const selectedFinding = observations.find((o) => o.id === observationId);
+    const assessmentId = item.analysis_id || route.get("report") ||
+      route.get("assessment") || route.get("id") || selectedFinding?.analysis_id || "";
+    const scanId = item.scan_id || route.get("scan") || selectedFinding?.scan_id || "";
+    const visitId = initialVisitId(c, item, route, assessmentId, scanId);
+    const visibleScans = compatibleScans(c, visitId, assessmentId);
+    const visibleScanId = visibleScans.some((scan) => scan.id === scanId) ? scanId : "";
+    const visibleAssessments = compatibleAssessments(c, visitId, visibleScanId);
+    const visibleAssessmentId = visibleAssessments.some((a) => a.id === assessmentId)
+      ? assessmentId : "";
+    const observationName = (o) =>
+      [dt(o.created_at), o.kind || "Finding", o.text || regionName(o.region_id)].join(" · ").slice(0, 180);
     html =
+      select("Body region", "region_id", regions(), item.region_id || route.get("region")) +
+      select("Recorded visit", "session_id", visitFormOptions(c), visitId,
+        c.sessions?.length ? "No linked visit · general feedback" : "No visit recorded yet") +
       select(
-        "Anatomical region",
-        "region_id",
-        regions(),
-        item.region_id || params().get("region"),
-      ) +
-      select(
-        "Analysis session",
+        "Related movement or posture assessment",
         "analysis_id",
-        c.analyses.map((a) => ({
+        visibleAssessments.map((a) => ({
           id: a.id,
-          name: dt(a.created_at) + " · " + a.kind,
+          name: dt(a.created_at) + " · " + (a.protocol || a.kind),
         })),
-        item.analysis_id || params().get("id"),
-        "General client note",
+        visibleAssessmentId,
+        "General coach feedback",
       ) +
       select(
-        "Related scan",
-        "scan_id",
-        c.scans,
-        item.scan_id || params().get("scan"),
-        "No scan",
+        "Linked finding / observation",
+        "observation_id",
+        compatibleFindings(c, visitId, visibleAssessmentId)
+          .map((o) => ({ id: o.id, name: observationName(o) })),
+        observationId,
+        "No specific finding",
       ) +
+      select("Related scan", "scan_id", visibleScans, visibleScanId, "No scan") +
       select(
         "Related program",
         "program_id",
@@ -270,7 +295,8 @@ export async function edit(kind, id, copy = false) {
         item.program_id || c.programs[0]?.program_id,
         "No program",
       ) +
-      area("Coach note", "text", item.text) +
+      select("Related exercise", "exercise_id", exercises, item.exercise_id, "No exercise") +
+      area("Coach feedback", "text", item.text) +
       select(
         "Visibility",
         "visibility",
@@ -285,10 +311,83 @@ export async function edit(kind, id, copy = false) {
     save = async (f) =>
       api("save", {
         collection: kind,
-        item: { ...asObject(f), id, student_id: c.id },
+        item: {
+          ...asObject(f),
+          id,
+          student_id: c.id,
+          detail: { ...(item.detail || {}), observation_id: f.get("observation_id") || null },
+        },
       });
   } else throw Error("Choose a supported record type.");
-  const d = modal(id ? "Edit " + kind : "New " + kind, html, save);
+  const title = kind === "notes"
+    ? (id ? "Edit coach feedback" : "New coach feedback")
+    : (id ? "Edit " + kind : "New " + kind);
+  const d = modal(title, html, save);
+  if (kind === "notes") {
+    const c = state.client;
+    const visit = d.querySelector('[name="session_id"]');
+    const analysis = d.querySelector('[name="analysis_id"]');
+    const finding = d.querySelector('[name="observation_id"]');
+    const region = d.querySelector('[name="region_id"]');
+    const scan = d.querySelector('[name="scan_id"]');
+    const observationName = (o) =>
+      [dt(o.created_at), o.kind || "Finding", o.text || regionName(o.region_id)].join(" · ").slice(0, 180);
+    const updateScans = () => {
+      const rows = compatibleScans(c, visit.value, analysis.value);
+      const current = scan.value;
+      scan.innerHTML = options(rows, current, "No scan");
+      if (!rows.some((entry) => entry.id === current)) scan.value = "";
+    };
+    const updateAssessments = () => {
+      const rows = compatibleAssessments(c, visit.value, scan.value);
+      const current = analysis.value;
+      analysis.innerHTML = options(rows.map((a) => ({
+        id: a.id, name: dt(a.created_at) + " · " + (a.protocol || a.kind),
+      })), current, "General coach feedback");
+      if (!rows.some((entry) => entry.id === current)) analysis.value = "";
+    };
+    const updateFindings = () => {
+      const rows = compatibleFindings(c, visit.value, analysis.value);
+      const current = finding.value;
+      finding.innerHTML = options(rows.map((o) => ({
+        id: o.id, name: observationName(o),
+      })), current, "No specific finding");
+      if (!rows.some((entry) => entry.id === current)) finding.value = "";
+    };
+    visit.onchange = () => {
+      updateScans();
+      updateAssessments();
+      updateScans();
+      updateFindings();
+    };
+    analysis.onchange = () => {
+      updateScans();
+      updateFindings();
+    };
+    scan.onchange = () => {
+      const selected = c.scans.find((entry) => entry.id === scan.value);
+      if (selected?.session_id && !visit.value) visit.value = selected.session_id;
+      if (selected?.analysis_id && !analysis.value) analysis.value = selected.analysis_id;
+      updateAssessments();
+      updateScans();
+      updateFindings();
+    };
+    finding.onchange = () => {
+      const selected = (c.observations || []).find((o) => o.id === finding.value);
+      if (!selected) return;
+      if (selected.analysis_id) {
+        analysis.value = selected.analysis_id;
+        if (!visit.value) visit.value = sessionForAnalysis(c, selected.analysis_id)?.id || "";
+      }
+      if (selected.region_id) region.value = selected.region_id;
+      if (selected.scan_id) scan.value = selected.scan_id;
+      updateAssessments();
+      updateScans();
+      updateFindings();
+    };
+    updateScans();
+    updateFindings();
+  }
   wireRemove(d, kind, id);
 }
 function localDate(value) {
@@ -495,186 +594,11 @@ async function exerciseEditor(id, copy) {
   );
   wireRemove(d, "exercises", id);
 }
-async function programEditor(id, copy) {
-  const source = id ? await record("programs", id) : {};
-  if (copy) id = null;
-  const first = await list("exercises", { limit: 50 });
-  const ex = first.items;
-  for (const step of source.steps || []) {
-    if (!ex.some((e) => e.id === step.exercise_id))
-      ex.push(await record("exercises", step.exercise_id));
-  }
-  const detail = source.detail || {};
-  let steps = structuredClone(source.steps || []);
-  const html =
-    field(
-      "Program name",
-      "name",
-      (copy ? "Copy of " : "") + (source.name || ""),
-      "text",
-      "required",
-    ) +
-    area("Description", "description", detail.description) +
-    area("Goal", "goal", source.goal) +
-    `<div class="grid two">${select(
-      "Difficulty",
-      "difficulty",
-      ["Foundation", "Intermediate", "Advanced"].map((x) => [x, x]),
-      detail.difficulty || "Foundation",
-      null,
-    )}${field("Frequency", "frequency", detail.frequency || "Twice weekly")}${select("Target region", "region_id", regions(), source.region_id || params().get("region"))}${select("Location", "location_id", state.me.locations, source.location_id || state.client?.location_ids?.[0], "Any assigned location")}</div>` +
-    field("Movement focus", "movement_focus", detail.movement_focus) +
-    `<h3>Exercise sequence</h3><p class="muted">Add movements, then drag steps or use the arrow controls.</p><div class="filter-row">${field("Find an exercise", "exercise_search")}${select("Exercise to add", "exercise_id", ex, "", "Choose an exercise")}<button type="button" id="step-add">+ Add movement</button></div><div id="program-steps"></div>` +
-    removeButton("programs", id);
-  const d = modal(
-    copy ? "Duplicate program" : id ? "Edit program" : "New program",
-    html,
-    async (f) => {
-      readSteps();
-      const values = asObject(f);
-      const saved = await api("save", {
-        collection: "programs",
-        item: {
-          id,
-          name: values.name,
-          goal: values.goal,
-          region_id: values.region_id,
-          location_id: values.location_id,
-          detail: {
-            ...detail,
-            source_analysis_id:
-              detail.source_analysis_id ||
-              (state.client?.analyses.some((a) => a.id === params().get("id"))
-                ? params().get("id")
-                : null),
-            source_student_id:
-              detail.source_student_id || state.client?.id || null,
-            description: values.description,
-            difficulty: values.difficulty,
-            frequency: values.frequency,
-            movement_focus: values.movement_focus,
-            duration: Math.round(
-              steps.reduce((n, s) => n + s.sets * (s.seconds + s.rest), 0) / 60,
-            ),
-          },
-          steps,
-        },
-      });
-      go("program", { id: saved.id });
-    },
-  );
-  function readSteps() {
-    d.querySelectorAll(".program-step").forEach((el, i) => {
-      for (const key of ["sets", "reps", "seconds", "rest"])
-        steps[i][key] = Number(el.querySelector(`[name=${key}]`).value);
-      steps[i].notes = el.querySelector("[name=notes]").value;
-      steps[i].phase = el.querySelector("[name=phase]").value;
-    });
-  }
-  let dragged = null;
-  function draw() {
-    d.querySelector("#program-steps").innerHTML = steps
-      .map(
-        (s, i) =>
-          `<div class="program-step" draggable="true" data-index="${i}"><div class="page-head"><h3>${i + 1}. ${esc(ex.find((e) => e.id === s.exercise_id)?.name || "Exercise")}</h3><div><button type="button" data-move="${i},-1" aria-label="Move step ${i + 1} up">↑</button><button type="button" data-move="${i},1" aria-label="Move step ${i + 1} down">↓</button><button type="button" data-duplicate="${i}">Duplicate</button><button type="button" data-step-delete="${i}">Remove</button></div></div><div class="grid five">${select(
-            "Phase",
-            "phase",
-            ["Warm-up", "Practice", "Cooldown"].map((v) => [v, v]),
-            s.phase || "Practice",
-            null,
-          )}${field("Sets", "sets", s.sets || 1, "number", 'min="1"')}${field("Reps", "reps", s.reps ?? 8, "number", 'min="0"')}${field("Duration (s)", "seconds", s.seconds ?? 60, "number", 'min="0"')}${field("Rest (s)", "rest", s.rest ?? 20, "number", 'min="0"')}</div>${area("Step coaching note", "notes", s.notes)}</div>`,
-      )
-      .join("");
-    d.querySelectorAll("[data-move]").forEach(
-      (b) =>
-        (b.onclick = () => {
-          readSteps();
-          const [i, delta] = b.dataset.move.split(",").map(Number),
-            j = i + delta;
-          if (j >= 0 && j < steps.length)
-            [steps[i], steps[j]] = [steps[j], steps[i]];
-          draw();
-        }),
-    );
-    d.querySelectorAll("[data-duplicate]").forEach(
-      (b) =>
-        (b.onclick = () => {
-          readSteps();
-          steps.splice(
-            +b.dataset.duplicate + 1,
-            0,
-            structuredClone(steps[+b.dataset.duplicate]),
-          );
-          draw();
-        }),
-    );
-    d.querySelectorAll("[data-step-delete]").forEach(
-      (b) =>
-        (b.onclick = () => {
-          readSteps();
-          steps.splice(+b.dataset.stepDelete, 1);
-          draw();
-        }),
-    );
-    d.querySelectorAll(".program-step").forEach((el) => {
-      el.ondragstart = () => {
-        readSteps();
-        dragged = +el.dataset.index;
-      };
-      el.ondragover = (e) => e.preventDefault();
-      el.ondrop = (e) => {
-        e.preventDefault();
-        if (dragged !== null) {
-          const step = steps.splice(dragged, 1)[0];
-          steps.splice(+el.dataset.index, 0, step);
-          draw();
-        }
-      };
-    });
-  }
-  d.querySelector("#step-add").onclick = () => {
-    readSteps();
-    const eid = d.querySelector("[name=exercise_id]").value;
-    if (eid) {
-      steps.push({
-        exercise_id: eid,
-        sets: 1,
-        reps: 8,
-        seconds: 60,
-        rest: 20,
-        phase: steps.length ? "Practice" : "Warm-up",
-      });
-      draw();
-    }
-  };
-  let searchVersion = 0,
-    searchTimer;
-  d.querySelector("[name=exercise_search]").placeholder =
-    "Search all exercises; refine to show up to 50 matches";
-  d.querySelector("[name=exercise_search]").oninput = (e) => {
-    const q = e.target.value,
-      version = ++searchVersion;
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(async () => {
-      try {
-        const result = await list("exercises", { q, limit: 50 });
-        if (version !== searchVersion || !d.isConnected) return;
-        for (const item of result.items)
-          if (!ex.some((x) => x.id === item.id)) ex.push(item);
-        d.querySelector("[name=exercise_id]").innerHTML = options(
-          result.items,
-          "",
-          `${result.total} matches · choose a movement`,
-        );
-      } catch (error) {
-        toast(error.message);
-      }
-    }, 200);
-  };
-  draw();
-  wireRemove(d, "programs", id);
-}
 export async function detailPage(root, kind, id) {
+  if (kind === "program") {
+    const { programDetail } = await import("./programs.js");
+    return programDetail(root, id);
+  }
   const collection = kind === "program" ? "programs" : "exercises";
   const item = await record(collection, id);
   const d = item.detail || {};
@@ -738,7 +662,7 @@ export async function detailPage(root, kind, id) {
       );
     if (state.me.role === "student")
       root.innerHTML +=
-        '<button id="complete-session" class="primary">Save completed practice</button>';
+        '<p class="muted">Checking a movement records when you marked it complete in the app.</p><button id="complete-session" class="primary">Save completed practice</button>';
   }
   if ($("#edit-content"))
     $("#edit-content").onclick = () => edit(collection, id);
@@ -764,15 +688,16 @@ export async function detailPage(root, kind, id) {
                     ?.latest_analysis?.id || null,
           }),
       );
-  if ($("#complete-session"))
+  if ($("#complete-session")) {
+    root.querySelectorAll(".completed-step").forEach((input) => {
+      input.onchange = () => markCompletion(input);
+    });
     $("#complete-session").onclick = async () => {
       try {
         await api("complete-session", {
           student_id: state.me.user.id,
           program_id: id,
-          completed: [...root.querySelectorAll(".completed-step:checked")].map(
-            (e) => e.value,
-          ),
+          ...completedEventPayload(root.querySelectorAll(".completed-step")),
         });
         toast("Practice saved to your history");
         go("client", { tab: "sessions" });
@@ -780,4 +705,5 @@ export async function detailPage(root, kind, id) {
         toast(e.message);
       }
     };
+  }
 }

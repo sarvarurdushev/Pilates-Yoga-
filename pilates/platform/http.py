@@ -119,6 +119,14 @@ def dispatch(h, method, route):
                 )
             elif action == "record":
                 result = repo.get(actor, query.get("collection"), query.get("id"))
+            elif action == "program/versions":
+                from .designer import versions
+
+                result = versions(repo, actor, query.get("id"))
+            elif action == "program/templates":
+                from .designer import templates
+
+                result = templates(repo, actor)
             elif action == "people":
                 result = repo.people(actor, query.get("role", "student"))
             elif action == "client":
@@ -218,6 +226,12 @@ def dispatch(h, method, route):
                     result = repo.delete(actor, body.get("collection"), body.get("id"))
                 elif action == "assign":
                     result = repo.assign_program(actor, body)
+                elif action == "program/retire":
+                    result = repo.retire_program(actor, body)
+                elif action == "program/duplicate":
+                    from .designer import duplicate
+
+                    result = duplicate(repo, actor, body)
                 elif action == "complete-session":
                     result = repo.complete_session(actor, body)
                 elif action == "review":

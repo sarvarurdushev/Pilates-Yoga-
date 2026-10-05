@@ -3,7 +3,7 @@
 from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 import json
@@ -120,6 +120,9 @@ WRITABLE = {
     ),
 }
 
+# Separate link tables preserve the positional layout of existing note and scan rows.
+VISIT_LINKS = {"notes": ("p_session_notes", "note_id"), "scans": ("p_session_scans", "scan_id")}
+
 
 def password_hash(password):
     if not isinstance(password, str) or not 10 <= len(password) <= 1024:
@@ -144,6 +147,18 @@ def password_ok(password, stored):
         return False
 
 
+def backfill_session_exercise_events(db):
+    """Link legacy completed keys to their session without inventing timestamps."""
+    for session in db.execute(
+        "SELECT id,completed FROM p_training_sessions ts WHERE NOT EXISTS "
+        "(SELECT 1 FROM p_session_exercise_events e WHERE e.session_id=ts.id)"
+    ):
+        for sequence, key in enumerate(json.loads(session["completed"] or "[]"), 1):
+            if isinstance(key, str):
+                db.execute("INSERT INTO p_session_exercise_events VALUES (?,?,?,?,?,?)",
+                           (uid(), session["id"], sequence, key, None, None))
+
+
 class Repository:
     def __init__(self, path, media_root=None):
         self.path = str(path)
@@ -153,9 +168,20 @@ class Repository:
         with self.db() as db:
             db.executescript(Path(__file__).with_name("schema.sql").read_text())
             db.execute("INSERT OR IGNORE INTO p_schema VALUES (1,?)", (now(),))
+            db.execute(
+                "INSERT OR IGNORE INTO p_session_analyses(session_id,analysis_id) "
+                "SELECT id,analysis_id FROM p_training_sessions WHERE analysis_id IS NOT NULL"
+            )
+            backfill_session_exercise_events(db)
+            # Historical scan markers have no evidence of when their scan was
+            # linked to a visit. Leave them unlinked; new markers save their
+            # exact visit at annotation time.
         from .regions import seed_regions
 
         seed_regions(self)
+        from .designer import backfill_revisions
+
+        backfill_revisions(self)
 
     @contextmanager
     def db(self):
@@ -285,6 +311,9 @@ class Repository:
         from .seed import seed_organization
 
         seed_organization(self, org)
+        from .designer import backfill_revisions
+
+        backfill_revisions(self, org)
         with self.db() as db:
             if user_id:
                 row = db.execute(
@@ -372,10 +401,11 @@ class Repository:
         if collection == "media":
             if actor.role == "admin":
                 return "org_id=?", [actor.org_id]
-            return (
-                f"org_id=? AND (student_id IN ({marks}) OR owner_id=? OR exercise_id IN (SELECT id FROM p_exercises WHERE org_id=? AND visibility='organization') OR exercise_id IN (SELECT pe.exercise_id FROM p_program_exercises pe JOIN p_program_assignments pa ON pa.program_id=pe.program_id WHERE pa.student_id IN ({marks})))",
-                [actor.org_id, *students, actor.user_id, actor.org_id, *students],
-            )
+            where = f"org_id=? AND (student_id IN ({marks}) OR owner_id=? OR exercise_id IN (SELECT id FROM p_exercises WHERE org_id=? AND visibility='organization') OR exercise_id IN (SELECT pe.exercise_id FROM p_program_exercises pe JOIN p_program_assignments pa ON pa.program_id=pe.program_id WHERE pa.student_id IN ({marks})))"
+            if actor.role == "student":
+                where += " AND id NOT IN (SELECT json_extract(m.value,'$.media_id') FROM p_program_step_details sd, json_each(sd.detail,'$.media') m WHERE json_extract(m.value,'$.visibility')='coach')"
+                where += " AND id NOT IN (SELECT json_extract(m.value,'$.media_id') FROM p_program_revisions r, json_each(r.snapshot,'$.steps') s, json_each(s.value,'$.detail.media') m WHERE json_extract(m.value,'$.visibility')='coach')"
+            return where, [actor.org_id, *students, actor.user_id, actor.org_id, *students]
         if collection in ("locations", "equipment") and actor.role != "admin":
             locations = self.location_ids(actor, db)
             field = "id" if collection == "locations" else "location_id"
@@ -390,8 +420,9 @@ class Repository:
                 [actor.org_id, actor.user_id, *students],
             )
         if collection == "programs" and actor.role != "admin":
+            template = " OR (json_extract(detail,'$.template')=1 AND json_extract(detail,'$.template_visibility')='organization')" if actor.role == "coach" else ""
             return (
-                f"org_id=? AND (owner_id=? OR id IN (SELECT program_id FROM p_program_assignments WHERE student_id IN ({marks})))",
+                f"org_id=? AND (owner_id=? OR id IN (SELECT program_id FROM p_program_assignments WHERE student_id IN ({marks})){template})",
                 [actor.org_id, actor.user_id, *students],
             )
         return "org_id=?", [actor.org_id]
@@ -423,6 +454,8 @@ class Repository:
             if kind and collection == "analyses":
                 where += " AND kind=?"
                 args.append(kind)
+            if collection == "exercises":
+                where += " AND COALESCE(json_extract(detail,'$.program_only'),0)!=1"
             if category and collection == "exercises":
                 where += " AND (category=? OR EXISTS (SELECT 1 FROM json_each(detail,'$.tags') WHERE value=?))"
                 args.extend([category, category])
@@ -467,6 +500,9 @@ class Repository:
                 if collection != "analyses"
                 else "id,org_id,student_id,coach_id,location_id,kind,protocol,created_at,status,demo,detail"
             )
+            if collection in VISIT_LINKS:
+                link_table, key = VISIT_LINKS[collection]
+                fields += f", (SELECT session_id FROM {link_table} WHERE {key}={TABLES[collection]}.id) AS session_id"
             rows = [
                 unpack(r)
                 for r in db.execute(
@@ -477,6 +513,41 @@ class Repository:
             if collection == "media":
                 for row in rows:
                     row.pop("path", None)
+                capture_rows = [row for row in rows if row["kind"] == "capture"]
+                if capture_rows:
+                    by_id = {row["id"]: row for row in capture_rows}
+                    ids = list(by_id)
+                    marks = ",".join("?" for _ in ids)
+                    sources = {identifier: [] for identifier in ids}
+                    # The media upload predates analysis, so view and protocol
+                    # live on the saved image/video analysis links. Read only
+                    # those links for media already visible to this actor.
+                    for linked in db.execute(
+                        "SELECT source.media_id,source.view,a.protocol "
+                        "FROM ("
+                        f"SELECT media_id,view,analysis_id FROM p_image_analyses WHERE media_id IN ({marks}) "
+                        "UNION ALL "
+                        f"SELECT media_id,view,analysis_id FROM p_video_analyses WHERE media_id IN ({marks})"
+                        ") source JOIN p_analyses a ON a.id=source.analysis_id "
+                        "JOIN p_media m ON m.id=source.media_id "
+                        "WHERE a.org_id=? AND a.student_id=m.student_id",
+                        [*ids, *ids, actor.org_id],
+                    ):
+                        sources[linked["media_id"]].append(linked)
+                    for identifier, linked in sources.items():
+                        if not linked:
+                            continue
+                        views = {source["view"] for source in linked}
+                        protocols = {source["protocol"] for source in linked}
+                        # A capture can be reused. Do not describe it using
+                        # one arbitrary analysis if the linked records disagree.
+                        if len(views) == 1:
+                            by_id[identifier]["capture_view"] = next(iter(views))
+                        if len(protocols) == 1 and next(iter(protocols)):
+                            by_id[identifier]["capture_protocol"] = next(iter(protocols))
+            if collection == "programs" and actor.role == "student":
+                for row in rows:
+                    row["detail"].pop("coach_notes", None)
             if collection == "exercises":
                 for row in rows:
                     first = db.execute(
@@ -493,21 +564,34 @@ class Repository:
             with self.db() as conn:
                 return self.get(actor, collection, identifier, conn)
         where, args = self._scope(actor, collection, db)
+        fields = "*"
+        if collection in VISIT_LINKS:
+            link_table, key = VISIT_LINKS[collection]
+            fields += f", (SELECT session_id FROM {link_table} WHERE {key}={TABLES[collection]}.id) AS session_id"
         row = db.execute(
-            f"SELECT * FROM {TABLES[collection]} WHERE ({where}) AND id=?",
+            f"SELECT {fields} FROM {TABLES[collection]} WHERE ({where}) AND id=?",
             args + [identifier],
         ).fetchone()
         if not row:
             raise Refused("This record is not available in your workspace.", 404)
         result = unpack(row)
         if collection == "programs":
-            result["steps"] = [
-                unpack(r)
-                for r in db.execute(
-                    "SELECT * FROM p_program_exercises WHERE program_id=? ORDER BY position",
-                    (identifier,),
-                )
-            ]
+            from .designer import student_program
+
+            result["steps"] = []
+            for r in db.execute(
+                "SELECT pe.*,sd.detail AS step_detail,e.name AS exercise_name,e.category AS exercise_category,e.region_id AS exercise_region_id FROM p_program_exercises pe LEFT JOIN p_program_step_details sd ON sd.step_id=pe.id JOIN p_exercises e ON e.id=pe.exercise_id WHERE pe.program_id=? ORDER BY pe.position",
+                (identifier,),
+            ):
+                step = dict(r)
+                step["detail"] = json.loads(step.pop("step_detail") or "{}")
+                result["steps"].append(step)
+            result["steps"].extend(
+                {**dict(r), "type": "note"}
+                for r in db.execute("SELECT * FROM p_program_step_notes WHERE program_id=?", (identifier,))
+            )
+            result["steps"].sort(key=lambda row: row["position"])
+            result["version"] = db.execute("SELECT COALESCE(MAX(version),0) FROM p_program_revisions WHERE program_id=?", (identifier,)).fetchone()[0]
             students = self.student_ids(actor, db)
             result["assignments"] = [
                 unpack(r)
@@ -517,20 +601,28 @@ class Repository:
                 )
                 if r["student_id"] in students
             ]
+            if actor.role == "student":
+                result = student_program(result)
         if collection == "exercises":
-            result["resources"] = [
-                dict(r)
-                for r in db.execute(
-                    "SELECT * FROM p_resources WHERE exercise_id=?", (identifier,)
-                )
-            ]
-            result["media"] = [
-                {k: v for k, v in unpack(r).items() if k != "path"}
-                for r in db.execute(
-                    "SELECT m.* FROM p_media m JOIN p_exercise_media e ON e.media_id=m.id WHERE e.exercise_id=?",
-                    (identifier,),
-                )
-            ]
+            result["resources"] = []
+            for r in db.execute(
+                "SELECT pr.*,rd.detail AS resource_detail FROM p_resources pr LEFT JOIN p_resource_details rd ON rd.resource_id=pr.id WHERE pr.exercise_id=?", (identifier,)
+            ):
+                resource = dict(r)
+                resource["detail"] = json.loads(resource.pop("resource_detail") or "{}")
+                if actor.role != "student" or resource["detail"].get("visibility", "student") == "student":
+                    result["resources"].append(resource)
+            result["media"] = []
+            for r in db.execute(
+                "SELECT m.* FROM p_media m JOIN p_exercise_media e ON e.media_id=m.id WHERE e.exercise_id=?",
+                (identifier,),
+            ):
+                if actor.role == "student":
+                    try:
+                        self.get(actor, "media", r["id"], db)
+                    except Refused:
+                        continue
+                result["media"].append({k: v for k, v in unpack(r).items() if k != "path"})
             result["equipment"] = [
                 dict(r)
                 for r in db.execute(
@@ -542,7 +634,9 @@ class Repository:
             result["findings"] = [
                 dict(r)
                 for r in db.execute(
-                    "SELECT * FROM p_scan_findings WHERE scan_id=?", (identifier,)
+                    "SELECT f.*,fv.session_id FROM p_scan_findings f "
+                    "LEFT JOIN p_scan_finding_visits fv ON fv.finding_id=f.id "
+                    "WHERE f.scan_id=? ORDER BY f.created_at,f.rowid", (identifier,)
                 )
             ]
         if collection == "locations":
@@ -627,10 +721,24 @@ class Repository:
                         "SELECT count(*) FROM p_training_sessions WHERE student_id=?",
                         (identifier,),
                     ).fetchone()[0]
-                    u["last_session_steps"] = db.execute(
-                        "SELECT count(*) FROM p_program_exercises WHERE program_id=?",
-                        ((u["latest_session"] or {}).get("program_id"),),
-                    ).fetchone()[0]
+                    u["last_session_steps"] = None
+                    last_session = u["latest_session"]
+                    if last_session and last_session.get("program_id"):
+                        revision = db.execute(
+                            "SELECT r.snapshot FROM p_training_session_program_versions sv "
+                            "JOIN p_program_revisions r ON r.program_id=sv.program_id AND r.version=sv.version "
+                            "WHERE sv.session_id=?",
+                            (last_session["id"],),
+                        ).fetchone()
+                        if revision:
+                            snapshot = json.loads(revision[0])
+                            phase = (snapshot.get("detail") or {}).get("phase")
+                            u["last_session_steps"] = sum(
+                                bool(step.get("exercise_id")) and
+                                (not (step.get("detail") or {}).get("program_phase") or
+                                 (step.get("detail") or {}).get("program_phase") == phase)
+                                for step in snapshot.get("steps", [])
+                            )
                     u["coach_ids"] = [
                         r[0]
                         for r in db.execute(
@@ -712,10 +820,67 @@ class Repository:
             client["sessions"] = [
                 unpack(r)
                 for r in db.execute(
-                    "SELECT * FROM p_training_sessions WHERE student_id=? ORDER BY performed_at DESC",
+                    "SELECT ts.*,pv.version AS program_version FROM p_training_sessions ts LEFT JOIN p_training_session_program_versions pv ON pv.session_id=ts.id WHERE ts.student_id=? ORDER BY ts.performed_at DESC",
                     (identifier,),
                 )
             ]
+            for session in client["sessions"]:
+                session["analysis_ids"] = list(dict.fromkeys(
+                    [session["analysis_id"]] if session["analysis_id"] else []
+                ))
+            by_session = {session["id"]: session for session in client["sessions"]}
+            for session in client["sessions"]:
+                session["exercise_events"] = []
+            for event in db.execute(
+                "SELECT e.* FROM p_session_exercise_events e "
+                "JOIN p_training_sessions ts ON ts.id=e.session_id "
+                "WHERE ts.student_id=? ORDER BY ts.performed_at,e.sequence",
+                (identifier,),
+            ):
+                session = by_session.get(event["session_id"])
+                if session:
+                    session["exercise_events"].append(dict(event))
+            for recorder in db.execute(
+                "SELECT sr.* FROM p_session_recorders sr "
+                "JOIN p_training_sessions ts ON ts.id=sr.session_id WHERE ts.student_id=?",
+                (identifier,),
+            ):
+                session = by_session.get(recorder["session_id"])
+                if session:
+                    session["recorded_by"] = dict(recorder)
+            for link in db.execute(
+                "SELECT sa.session_id,sa.analysis_id FROM p_session_analyses sa "
+                "JOIN p_training_sessions ts ON ts.id=sa.session_id WHERE ts.student_id=?",
+                (identifier,),
+            ):
+                session = by_session.get(link["session_id"])
+                if session and link["analysis_id"] not in session["analysis_ids"]:
+                    session["analysis_ids"].append(link["analysis_id"])
+            client["program_history"] = [
+                dict(r)
+                for r in db.execute(
+                    "SELECT a.*,p.name,p.region_id FROM p_program_assignments a "
+                    "JOIN p_programs p ON p.id=a.program_id WHERE a.student_id=? "
+                    "ORDER BY a.starts_on DESC,a.rowid DESC",
+                    (identifier,),
+                )
+            ]
+            client["visit_program_ids"] = []
+            for linked in db.execute(
+                "SELECT DISTINCT r.program_id FROM p_program_revision_visits rv "
+                "JOIN p_program_revisions r ON r.id=rv.revision_id "
+                "JOIN p_training_sessions ts ON ts.id=rv.session_id "
+                "JOIN p_programs p ON p.id=r.program_id "
+                "WHERE ts.student_id=? AND p.org_id=? ORDER BY r.program_id",
+                (identifier, actor.org_id),
+            ):
+                try:
+                    self.get(actor, "programs", linked["program_id"], db)
+                except Refused as error:
+                    if error.status not in (403, 404):
+                        raise
+                    continue
+                client["visit_program_ids"].append(linked["program_id"])
             client["progress"] = [
                 dict(r)
                 for r in db.execute(
@@ -723,6 +888,26 @@ class Repository:
                     (identifier,),
                 )
             ]
+            # Reconcile the compact progress index with archived source evidence.
+            # Older rows remain stored; unsupported/ambiguous values cannot become
+            # comparable merely because they have a number in this index.
+            from .progress_evidence import progress_evidence, selected_progress_measurements
+
+            progress_sources = {}
+            for source in db.execute(
+                "SELECT DISTINCT a.id,a.student_id,a.kind,a.protocol,a.status,a.demo,"
+                "a.created_at,a.result,a.detail FROM p_analyses a "
+                "JOIN p_progress_records pr ON pr.analysis_id=a.id "
+                "WHERE pr.student_id=? AND a.student_id=? AND a.org_id=?",
+                (identifier, identifier, actor.org_id),
+            ):
+                source = unpack(source)
+                progress_sources[source["id"]] = (
+                    source, selected_progress_measurements(source["result"], source["detail"])
+                )
+            for record in client["progress"]:
+                source, measurements = progress_sources.get(record["analysis_id"], (None, {}))
+                record["evidence"] = progress_evidence(record, source, measurements)
             client["observations"] = [
                 dict(r)
                 for r in db.execute(
@@ -745,6 +930,25 @@ class Repository:
                 client[collection].extend(page["items"])
                 if not page["items"] or len(client[collection]) >= page["total"]:
                     break
+        # The client hub needs saved markers for the exact visit timeline. Keep
+        # the scan-wide order used by get("scans") so marker numbers agree with
+        # the image and annotation table. Author names come from saved authors.
+        scans_by_id = {scan["id"]: scan for scan in client["scans"]}
+        for scan in scans_by_id.values():
+            scan["findings"] = []
+        with self.db() as db:
+            for finding in db.execute(
+                "SELECT f.*,fv.session_id,u.name AS author_name FROM p_scan_findings f "
+                "JOIN p_scans s ON s.id=f.scan_id "
+                "LEFT JOIN p_scan_finding_visits fv ON fv.finding_id=f.id "
+                "LEFT JOIN p_users u ON u.id=f.author_id AND u.org_id=s.org_id "
+                "WHERE s.student_id=? AND s.org_id=? "
+                "ORDER BY f.scan_id,f.created_at,f.rowid",
+                (identifier, actor.org_id),
+            ):
+                scan = scans_by_id.get(finding["scan_id"])
+                if scan is not None:
+                    scan["findings"].append(dict(finding))
         return client
 
     def _linked(self, actor, data, db, student=None):
@@ -789,6 +993,101 @@ class Repository:
             if not row or row[0] != data.get("location_id"):
                 raise Refused("The room must belong to the selected location.")
 
+    @staticmethod
+    def _analysis_in_visit(db, session_id, analysis_id):
+        return bool(db.execute(
+            "SELECT 1 FROM p_training_sessions WHERE id=? AND analysis_id=? "
+            "UNION SELECT 1 FROM p_session_analyses WHERE session_id=? AND analysis_id=?",
+            (session_id, analysis_id, session_id, analysis_id),
+        ).fetchone())
+
+    @staticmethod
+    def _analysis_visit_ids(db, analysis_id):
+        if not analysis_id:
+            return set()
+        return {row[0] for row in db.execute(
+            "SELECT id FROM p_training_sessions WHERE analysis_id=? "
+            "UNION SELECT session_id FROM p_session_analyses WHERE analysis_id=?",
+            (analysis_id, analysis_id),
+        )}
+
+    def _sources_share_visit(self, db, analysis_id, scan, scan_session_id):
+        """Different saved sources must not claim contradictory visits."""
+        assessment_visits = self._analysis_visit_ids(db, analysis_id)
+        scan_visits = ({scan_session_id} if scan_session_id else
+                       self._analysis_visit_ids(db, scan.get("analysis_id")))
+        if assessment_visits and scan_visits:
+            return bool(assessment_visits & scan_visits)
+        # Two different assessments cannot be called the same source before
+        # either is assigned to a visit; a source without a visit stays unknown.
+        return not scan.get("analysis_id") or scan["analysis_id"] == analysis_id
+
+    def _check_visit_link(self, actor, collection, identifier, record, session_id, db):
+        if session_id:
+            session = db.execute(
+                "SELECT ts.id FROM p_training_sessions ts "
+                "JOIN p_users u ON u.id=ts.student_id "
+                "WHERE ts.id=? AND ts.student_id=? AND u.org_id=?",
+                (session_id, record.get("student_id"), actor.org_id),
+            ).fetchone()
+            if not session:
+                raise Refused("Choose a visit belonging to this client.")
+            if record.get("analysis_id") and not self._analysis_in_visit(
+                db, session_id, record["analysis_id"]
+            ):
+                raise Refused("The assessment belongs to a different visit.")
+        if collection == "notes" and record.get("scan_id"):
+            scan = self.get(actor, "scans", record["scan_id"], db)
+            if session_id and scan["session_id"] and scan["session_id"] != session_id:
+                raise Refused("The scan belongs to a different visit.")
+            if session_id and scan["analysis_id"] and not self._analysis_in_visit(
+                db, session_id, scan["analysis_id"]
+            ):
+                raise Refused("The scan assessment belongs to a different visit.")
+            if record.get("analysis_id") and not self._sources_share_visit(
+                db, record["analysis_id"], scan, scan["session_id"]
+            ):
+                raise Refused("The scan and assessment do not share a recorded visit.")
+        if collection == "scans":
+            # A saved marker's exact visit must not change when its source
+            # scan is edited. An older, unlinked marker may remain general.
+            if db.execute(
+                "SELECT 1 FROM p_scan_findings f "
+                "JOIN p_scan_finding_visits fv ON fv.finding_id=f.id "
+                "WHERE f.scan_id=? AND fv.session_id IS NOT ? LIMIT 1",
+                (identifier, session_id),
+            ).fetchone():
+                raise Refused("A saved scan marker belongs to another visit.")
+            # A note explicitly tied to this scan and visit cannot be stranded by
+            # moving or clearing the scan's own visit link.
+            conflicting = db.execute(
+                "SELECT 1 FROM p_notes n JOIN p_session_notes sn ON sn.note_id=n.id "
+                "WHERE n.scan_id=? AND sn.session_id IS NOT ? LIMIT 1",
+                (identifier, session_id),
+            ).fetchone()
+            if conflicting:
+                raise Refused("Move linked coach notes before changing this scan's visit.")
+            # A note without an explicit visit can still name both this scan
+            # and an assessment. Moving the scan must preserve that relation.
+            for note in db.execute(
+                "SELECT analysis_id FROM p_notes WHERE scan_id=? AND analysis_id IS NOT NULL",
+                (identifier,),
+            ):
+                if not self._sources_share_visit(db, note["analysis_id"], record, session_id):
+                    raise Refused("A linked coach note assessment would belong to a different visit.")
+
+    @staticmethod
+    def _save_visit_link(collection, identifier, session_id, db):
+        link_table, key = VISIT_LINKS[collection]
+        if session_id:
+            db.execute(
+                f"INSERT INTO {link_table}({key},session_id) VALUES (?,?) "
+                f"ON CONFLICT({key}) DO UPDATE SET session_id=excluded.session_id",
+                (identifier, session_id),
+            )
+        else:
+            db.execute(f"DELETE FROM {link_table} WHERE {key}=?", (identifier,))
+
     def save(self, actor, collection, item):
         if collection not in WRITABLE:
             raise Refused("This record is created by its workflow.", 403)
@@ -812,11 +1111,81 @@ class Repository:
             ):
                 raise Refused("Duplicate this shared content before editing it.", 403)
             fields = {k: item[k] for k in WRITABLE[collection] if k in item}
+            session_id = None
+            if collection in VISIT_LINKS:
+                session_id = item.get("session_id", existing.get("session_id"))
+                if session_id is not None and (
+                    not isinstance(session_id, str) or len(session_id) > 100
+                ):
+                    raise Refused("Choose a valid visit.")
+                session_id = session_id or None
+            if collection == "notes":
+                detail = fields.get("detail", existing.get("detail", {}))
+                if not isinstance(detail, dict):
+                    raise Refused("Enter valid coach feedback details.")
+                detail = {**existing.get("detail", {}), **detail}
+                observation_id = detail.get("observation_id")
+                if observation_id:
+                    observation = db.execute(
+                        "SELECT student_id,analysis_id,region_id FROM p_observations WHERE id=?",
+                        (observation_id,),
+                    ).fetchone()
+                    if not observation or observation["student_id"] != fields.get("student_id", existing.get("student_id")):
+                        raise Refused("Choose a finding belonging to this client.")
+                    if fields.get("analysis_id", existing.get("analysis_id")) not in (None, "", observation["analysis_id"]):
+                        raise Refused("The selected finding belongs to a different assessment.")
+                    if not fields.get("analysis_id"):
+                        fields["analysis_id"] = observation["analysis_id"]
+                    if not fields.get("region_id"):
+                        fields["region_id"] = observation["region_id"]
+                detail["source"] = "coach_entered"
+                if existing:
+                    detail["updated_at"] = now()
+                fields["detail"] = detail
+            if collection == "programs" and not existing and "detail" not in fields:
+                fields["detail"] = {"status": "Draft"}
+            if collection == "programs" and "detail" in fields:
+                from .designer import program_detail
+
+                fields["detail"] = program_detail(self, actor, fields["detail"], db)
+            if collection == "exercises" and "detail" in fields:
+                detail = fields["detail"]
+                if not isinstance(detail, dict):
+                    raise Refused("Enter exercise details.")
+                if "target_region_ids" in detail:
+                    from .designer import _region_ids
+
+                    detail["target_region_ids"] = _region_ids(db, detail["target_region_ids"])
+                if "program_only" in detail:
+                    detail["program_only"] = bool(detail["program_only"])
+                    if detail["program_only"] and fields.get("visibility", existing.get("visibility", "private")) != "private":
+                        raise Refused("Program-only exercises must stay private.")
             for k in list(fields):
                 if k.endswith("_id") and fields[k] == "":
                     fields[k] = None
             merged = {**existing, **fields}
+            if collection == "programs" and not str(merged.get("name") or "").strip():
+                raise Refused("Name the program.")
+            if collection == "equipment":
+                quantity = merged.get("quantity", 1)
+                available = merged.get("available", 1)
+                if any(
+                    not isinstance(value, int) or isinstance(value, bool) or value < 0
+                    for value in (quantity, available)
+                ):
+                    raise Refused("Enter non-negative whole numbers for equipment units.")
+                if available > quantity:
+                    raise Refused("Reservable units cannot exceed total equipment units.")
             self._linked(actor, merged, db, merged.get("student_id"))
+            if collection == "notes" and merged.get("program_id"):
+                assigned = db.execute(
+                    "SELECT 1 FROM p_program_assignments WHERE program_id=? AND student_id=?",
+                    (merged["program_id"], merged.get("student_id")),
+                ).fetchone()
+                if not assigned:
+                    raise Refused("Assign the program to this client before linking feedback.")
+            if collection in VISIT_LINKS:
+                self._check_visit_link(actor, collection, identifier, merged, session_id, db)
             for f in ("name", "text"):
                 if f in fields and not str(fields[f]).strip():
                     raise Refused(f"Enter {f}.")
@@ -859,8 +1228,14 @@ class Repository:
                     + ")",
                     list(fields.values()),
                 )
+            if collection in VISIT_LINKS:
+                self._save_visit_link(collection, identifier, session_id, db)
             if collection == "programs" and "steps" in item:
                 self._steps(actor, identifier, item["steps"], db)
+            if collection == "programs":
+                from .designer import record_revision
+
+                record_revision(self, actor, identifier, item, db)
             if collection == "exercises":
                 self._exercise_links(actor, identifier, item, db)
             if collection == "locations" and "rooms" in item:
@@ -882,19 +1257,36 @@ class Repository:
     def _steps(self, actor, program, steps, db):
         if not isinstance(steps, list) or len(steps) > 200:
             raise Refused("A program supports up to 200 sequence steps.")
+        program_row = db.execute("SELECT detail,location_id FROM p_programs WHERE id=?", (program,)).fetchone()
+        program_detail = unpack(program_row)["detail"]
+        assigned = [r[0] for r in db.execute("SELECT DISTINCT student_id FROM p_program_assignments WHERE program_id=?", (program,))]
+        student_id = program_detail.get("student_id") or (assigned[0] if len(assigned) == 1 else None)
         db.execute("DELETE FROM p_program_exercises WHERE program_id=?", (program,))
+        db.execute("DELETE FROM p_program_step_notes WHERE program_id=?", (program,))
         for position, step in enumerate(steps):
+            if not isinstance(step, dict):
+                raise Refused("Enter a valid program step.")
+            if step.get("type") == "note":
+                text = str(step.get("text") or "").strip()
+                if not text or len(text) > 3000 or step.get("visibility", "student") not in ("student", "coach"):
+                    raise Refused("Enter a note and choose who can see it.")
+                db.execute("INSERT INTO p_program_step_notes VALUES (?,?,?,?,?,?,?)", (uid(), program, position, str(step.get("phase", "Practice"))[:80], str(step.get("section", ""))[:80], text, step.get("visibility", "student")))
+                continue
             self.get(actor, "exercises", step["exercise_id"], db)
+            from .designer import step_detail
+
+            extra = step_detail(self, actor, step["exercise_id"], step.get("detail"), db, student_id, program_location_id=program_row["location_id"])
             values = [
                 int(step.get(k, d))
                 for k, d in [("sets", 1), ("reps", 8), ("seconds", 60), ("rest", 20)]
             ]
             if any(v < 0 or v > 7200 for v in values) or values[0] < 1:
                 raise Refused("Enter valid sets, repetitions and durations.")
+            step_id = uid()
             db.execute(
                 "INSERT INTO p_program_exercises VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (
-                    uid(),
+                    step_id,
                     program,
                     step["exercise_id"],
                     position,
@@ -903,6 +1295,8 @@ class Repository:
                     str(step.get("notes", ""))[:3000],
                 ),
             )
+            if extra:
+                db.execute("INSERT INTO p_program_step_details VALUES (?,?)", (step_id, encode(extra)))
 
     def _exercise_links(self, actor, exercise, item, db):
         if "resources" in item:
@@ -910,17 +1304,28 @@ class Repository:
                 raise Refused("Use at most 30 resources per exercise.")
             db.execute("DELETE FROM p_resources WHERE exercise_id=?", (exercise,))
             for r in item["resources"]:
-                if not re.match(r"^https?://[^\s]+$", str(r.get("url", ""))):
+                if not isinstance(r, dict) or not re.match(r"^https?://[^\s]+$", str(r.get("url", ""))):
                     raise Refused("Resources need an http or https URL.")
+                from .designer import REFERENCE_TYPES
+
+                detail = dict(r.get("detail") or {})
+                for key in ("type", "description", "visibility"):
+                    if key in r:
+                        detail[key] = r[key]
+                if detail.get("type", "other") not in REFERENCE_TYPES or detail.get("visibility", "student") not in ("student", "coach"):
+                    raise Refused("Choose a valid reference type and audience.")
+                detail["description"] = str(detail.get("description") or "")[:1000]
+                resource_id = uid()
                 db.execute(
                     "INSERT INTO p_resources VALUES (?,?,?,?)",
                     (
-                        uid(),
+                        resource_id,
                         exercise,
                         str(r.get("title") or "Resource")[:150],
                         r["url"],
                     ),
                 )
+                db.execute("INSERT INTO p_resource_details VALUES (?,?)", (resource_id, encode(detail)))
         if "equipment" in item:
             db.execute(
                 "DELETE FROM p_exercise_equipment WHERE exercise_id=?", (exercise,)
@@ -1012,11 +1417,24 @@ class Repository:
             r["name"]: r["quantity"]
             for r in db.execute(
                 """
-            SELECT lower(e.name) AS name, MAX(ee.quantity) AS quantity
-            FROM p_program_exercises pe JOIN p_exercise_equipment ee ON ee.exercise_id=pe.exercise_id
-            JOIN p_equipment e ON e.id=ee.equipment_id WHERE pe.program_id=? GROUP BY lower(e.name)
+            SELECT name, MAX(quantity) AS quantity FROM (
+                SELECT lower(e.name) AS name, ee.quantity AS quantity
+                FROM p_program_exercises pe
+                LEFT JOIN p_program_step_details sd ON sd.step_id=pe.id
+                JOIN p_exercise_equipment ee ON ee.exercise_id=pe.exercise_id
+                JOIN p_equipment e ON e.id=ee.equipment_id
+                WHERE pe.program_id=? AND json_type(sd.detail,'$.equipment') IS NULL
+                UNION ALL
+                SELECT lower(e.name) AS name,
+                       CAST(json_extract(j.value,'$.quantity') AS INTEGER) AS quantity
+                FROM p_program_exercises pe
+                JOIN p_program_step_details sd ON sd.step_id=pe.id
+                JOIN json_each(sd.detail,'$.equipment') j
+                JOIN p_equipment e ON e.id=json_extract(j.value,'$.equipment_id')
+                WHERE pe.program_id=?
+            ) GROUP BY name
             """,
-                (program_id,),
+                (program_id, program_id),
             )
         }
 
@@ -1235,15 +1653,23 @@ class Repository:
                         "UPDATE p_reservations SET status='cancelled' WHERE location_id=? AND status='reserved'",
                         (identifier,),
                     )
-                if (
-                    collection == "equipment"
-                    and db.execute(
+                if collection == "equipment" and (
+                    db.execute(
                         "SELECT 1 FROM p_exercise_equipment WHERE equipment_id=?",
+                        (identifier,),
+                    ).fetchone()
+                    or db.execute(
+                        "SELECT 1 FROM p_program_step_details sd, json_each(sd.detail,'$.equipment') j "
+                        "WHERE json_extract(j.value,'$.equipment_id')=? LIMIT 1",
+                        (identifier,),
+                    ).fetchone()
+                    or db.execute(
+                        "SELECT 1 FROM p_program_revisions WHERE instr(snapshot,?)>0 LIMIT 1",
                         (identifier,),
                     ).fetchone()
                 ):
                     raise Refused(
-                        "Update exercises that require this equipment before deleting it. Set availability to zero to mark it out of service.",
+                        "Update exercises that require this equipment before deleting it. Current or historical programs may also reference it; set availability to zero to mark it out of service.",
                         409,
                     )
                 if (
@@ -1257,6 +1683,16 @@ class Repository:
                         "Remove this exercise from its programs before deleting it.",
                         409,
                     )
+                if collection == "programs" and (
+                    db.execute("SELECT 1 FROM p_program_assignments WHERE program_id=?", (identifier,)).fetchone()
+                    or db.execute("SELECT 1 FROM p_training_sessions WHERE program_id=?", (identifier,)).fetchone()
+                    or db.execute("SELECT 1 FROM p_program_revisions WHERE program_id=? AND version>1", (identifier,)).fetchone()
+                ):
+                    raise Refused("Archive an assigned or edited program to preserve its history.", 409)
+                if collection == "media" and db.execute("SELECT 1 FROM p_program_revisions WHERE instr(snapshot,?)>0 LIMIT 1", (identifier,)).fetchone():
+                    raise Refused("This media belongs to a historical program version. Archive the plan instead.", 409)
+                if collection == "exercises" and db.execute("SELECT 1 FROM p_program_revisions WHERE instr(snapshot,?)>0 LIMIT 1", (identifier,)).fetchone():
+                    raise Refused("This exercise belongs to a historical program version.", 409)
                 paths = (
                     [
                         r[0]
@@ -1283,7 +1719,19 @@ class Repository:
             raise Refused("Your coach assigns programs.", 403)
         with self.db() as db:
             self.assert_student(actor, item["student_id"], True, db)
-            self.get(actor, "programs", item["program_id"], db)
+            program = self.get(actor, "programs", item["program_id"], db)
+            if program["detail"].get("student_id") and program["detail"]["student_id"] != item["student_id"]:
+                raise Refused("This client-specific plan belongs to another client.", 403)
+            from .designer import _source
+
+            for step in program["steps"]:
+                source = step.get("detail", {}).get("source")
+                if source:
+                    _source(self, actor, source, db, item["student_id"])
+                for medium in step.get("detail", {}).get("media", []):
+                    linked = self.get(actor, "media", medium.get("media_id"), db)
+                    if linked["kind"] == "capture" and linked.get("student_id") != item["student_id"]:
+                        raise Refused("A client capture belongs to another client.")
             self._linked(actor, item, db, item["student_id"])
             if item.get("replace", True):
                 db.execute(
@@ -1306,11 +1754,44 @@ class Repository:
             self.audit(db, actor, "assign:program", identifier)
         return {"id": identifier}
 
+    def retire_program(self, actor, item):
+        """End one client's assignment while keeping the program and its history."""
+        if actor.role == "student":
+            raise Refused("Your coach completes programs.", 403)
+        student_id = item.get("student_id")
+        program_id = item.get("program_id")
+        reason = str(item.get("reason") or "Program completed by coach").strip()[:2000]
+        with self.db() as db:
+            self.assert_student(actor, student_id, True, db)
+            self.get(actor, "programs", program_id, db)
+            assignment = db.execute(
+                "SELECT id,notes FROM p_program_assignments WHERE student_id=? AND program_id=? "
+                "AND active=1 ORDER BY rowid DESC LIMIT 1",
+                (student_id, program_id),
+            ).fetchone()
+            if not assignment:
+                raise Refused("This client has no active assignment for the program.")
+            history_note = (str(assignment["notes"] or "").strip() +
+                            "\nCompleted: " + reason).strip()[:3000]
+            db.execute(
+                "UPDATE p_program_assignments SET active=0,notes=? WHERE id=?",
+                (history_note, assignment["id"]),
+            )
+            self.audit(db, actor, "retire:program", assignment[0])
+        return {"id": assignment[0], "active": False, "reason": reason}
+
     def complete_session(self, actor, item):
         with self.db() as db:
             self.assert_student(actor, item["student_id"], True, db)
+            completed = item.get("completed", [])
+            if not isinstance(completed, list) or len(completed) > 200 or any(
+                not isinstance(value, str) or not value for value in completed
+            ):
+                raise Refused("Choose valid completed movements.")
             if item.get("program_id"):
                 program = self.get(actor, "programs", item["program_id"], db)
+                if program.get("detail", {}).get("status") == "Completed":
+                    raise Refused("This program is completed. Ask the coach for a new active plan.")
                 if not db.execute(
                     "SELECT 1 FROM p_program_assignments WHERE student_id=? AND program_id=? AND active=1",
                     (item["student_id"], item["program_id"]),
@@ -1318,34 +1799,139 @@ class Repository:
                     raise Refused(
                         "Assign this program to the client before recording a session."
                     )
-                allowed = {s["exercise_id"] for s in program["steps"]}
-                if any(x not in allowed for x in item.get("completed", [])):
-                    raise Refused("Completed exercises must belong to the program.")
+                allowed = {
+                    value for step in program["steps"] if step.get("exercise_id")
+                    for value in (step["exercise_id"], step["id"])
+                }
+                if any(x not in allowed for x in completed):
+                    raise Refused("Completed movements must belong to the program.")
 
-            if item.get("reservation_id"):
-                r = self.get(actor, "reservations", item["reservation_id"], db)
-                if r["student_id"] != item["student_id"]:
+            reservation_id = item.get("reservation_id") or None
+            analysis_id = item.get("analysis_id") or None
+            if reservation_id:
+                reservation = self.get(actor, "reservations", reservation_id, db)
+                if reservation["student_id"] != item["student_id"]:
                     raise Refused("The reservation belongs to another client.")
-            identifier = uid()
+            if analysis_id:
+                analysis = self.get(actor, "analyses", analysis_id, db)
+                if analysis["student_id"] != item["student_id"]:
+                    raise Refused("The assessment belongs to another client.")
+                if reservation_id and analysis["location_id"] and analysis["location_id"] != reservation["location_id"]:
+                    raise Refused("The assessment and reservation have different locations.")
+                recorded_reservation = analysis.get("detail", {}).get("reservation_id")
+                if reservation_id and recorded_reservation and recorded_reservation != reservation_id:
+                    raise Refused("The assessment belongs to another reservation.")
+            by_analysis = db.execute(
+                "SELECT ts.* FROM p_training_sessions ts LEFT JOIN p_session_analyses sa ON sa.session_id=ts.id "
+                "WHERE ts.student_id=? AND (ts.analysis_id=? OR sa.analysis_id=?) LIMIT 1",
+                (item["student_id"], analysis_id, analysis_id),
+            ).fetchone() if analysis_id else None
+            by_reservation = db.execute(
+                "SELECT * FROM p_training_sessions WHERE student_id=? AND reservation_id=? ORDER BY performed_at DESC LIMIT 1",
+                (item["student_id"], reservation_id),
+            ).fetchone() if reservation_id else None
+            if by_analysis and by_reservation and by_analysis["id"] != by_reservation["id"]:
+                raise Refused("This assessment is already linked to another visit. Open that visit or choose its reservation.")
+            linked = by_analysis or by_reservation
+            if item.get("require_new") is True and linked:
+                raise Refused("This assessment or reservation already has a recorded visit. Open that visit instead.", 409)
+            if linked and linked["program_id"] and item.get("program_id") and linked["program_id"] != item["program_id"]:
+                raise Refused("This visit is already linked to another program.")
+            submitted_events = item.get("completed_events")
+            if submitted_events is not None and (
+                not isinstance(submitted_events, list) or len(submitted_events) != len(completed)
+            ):
+                raise Refused("Movement event order must match completed movements.")
+            event_times = []
+            for index, key in enumerate(completed):
+                entry = submitted_events[index] if submitted_events is not None else None
+                if entry is not None and (not isinstance(entry, dict) or entry.get("key") != key):
+                    raise Refused("Movement event order must match completed movements.")
+                value = entry.get("completed_at") if entry is not None else None
+                if value in (None, ""):
+                    event_times.append(None)
+                    continue
+                if not isinstance(value, str):
+                    raise Refused("Choose a valid movement completion time.")
+                try:
+                    marked = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                except ValueError as exc:
+                    raise Refused("Choose a valid movement completion time.") from exc
+                if marked.tzinfo is None or marked > datetime.now(timezone.utc) + timedelta(minutes=5):
+                    raise Refused("Choose a valid movement completion time.")
+                event_times.append(marked.astimezone(timezone.utc).isoformat())
+            if linked:
+                identifier = linked["id"]
+                db.execute(
+                    "UPDATE p_training_sessions SET reservation_id=?,program_id=?,analysis_id=?,completed=?,notes=? WHERE id=?",
+                    (
+                        reservation_id or linked["reservation_id"],
+                        item.get("program_id") or linked["program_id"],
+                        linked["analysis_id"] or analysis_id,
+                        encode(completed),
+                        str(item.get("notes") or linked["notes"] or "")[:3000],
+                        identifier,
+                    ),
+                )
+            else:
+                identifier = uid()
+                db.execute(
+                    "INSERT INTO p_training_sessions VALUES (?,?,?,?,?,?,?,?)",
+                    (
+                        identifier, item["student_id"], reservation_id,
+                        item.get("program_id") or None, analysis_id,
+                        now(), encode(completed), str(item.get("notes", ""))[:3000],
+                    ),
+                )
+            previous_events = db.execute(
+                "SELECT * FROM p_session_exercise_events WHERE session_id=? ORDER BY sequence",
+                (identifier,),
+            ).fetchall()
+            existing_by_key = {}
+            for event in previous_events:
+                existing_by_key.setdefault(event["completed_key"], []).append(event)
+            db.execute("DELETE FROM p_session_exercise_events WHERE session_id=?", (identifier,))
+            logged_at = now()
+            for sequence, (key, completed_at) in enumerate(zip(completed, event_times), 1):
+                pool = existing_by_key.get(key, [])
+                old = pool.pop(0) if pool else None
+                db.execute(
+                    "INSERT INTO p_session_exercise_events VALUES (?,?,?,?,?,?)",
+                    (old["id"] if old else uid(), identifier, sequence, key,
+                     (old["logged_at"] or logged_at) if old else logged_at,
+                     completed_at or (old["completed_at"] if old else None)),
+                )
+            recorder = db.execute(
+                "SELECT name FROM p_users WHERE id=? AND org_id=?",
+                (actor.user_id, actor.org_id),
+            ).fetchone()
             db.execute(
-                "INSERT INTO p_training_sessions VALUES (?,?,?,?,?,?,?,?)",
-                (
-                    identifier,
-                    item["student_id"],
-                    item.get("reservation_id") or None,
-                    item.get("program_id") or None,
-                    None,
-                    now(),
-                    encode(item.get("completed", [])),
-                    str(item.get("notes", ""))[:3000],
-                ),
+                "INSERT INTO p_session_recorders(session_id,user_id,name,role,recorded_at) "
+                "VALUES (?,?,?,?,?) ON CONFLICT(session_id) DO UPDATE SET "
+                "user_id=excluded.user_id,name=excluded.name,role=excluded.role,"
+                "recorded_at=excluded.recorded_at",
+                (identifier, actor.user_id, recorder["name"] if recorder else "Studio user", actor.role, now()),
             )
-            if item.get("reservation_id"):
+            if analysis_id:
+                db.execute(
+                    "INSERT OR IGNORE INTO p_session_analyses(session_id,analysis_id) VALUES (?,?)",
+                    (identifier, analysis_id),
+                )
+            if item.get("program_id"):
+                version = db.execute("SELECT MAX(version) FROM p_program_revisions WHERE program_id=?", (item["program_id"],)).fetchone()[0]
+                if version:
+                    db.execute(
+                        "INSERT INTO p_training_session_program_versions VALUES (?,?,?) "
+                        "ON CONFLICT(session_id) DO UPDATE SET program_id=excluded.program_id,version=excluded.version",
+                        (identifier, item["program_id"], version),
+                    )
+            if reservation_id:
                 db.execute(
                     "UPDATE p_reservations SET status='attended' WHERE id=?",
-                    (item["reservation_id"],),
+                    (reservation_id,),
                 )
-        return {"id": identifier}
+            self.audit(db, actor, "complete:session", identifier)
+        return {"id": identifier, "analysis_id": analysis_id or (linked["analysis_id"] if linked else None)}
 
     def annotate(self, actor, item):
         if actor.role == "student":
@@ -1353,6 +1939,21 @@ class Repository:
         with self.db() as db:
             scan = self.get(actor, "scans", item["scan_id"], db)
             media = self.get(actor, "media", scan["media_id"], db)
+            # A real client's newly saved body marker has a durable exact
+            # visit relation. Public educational demo markers may remain on
+            # an unlinked reference scan. Its mutable demo flag alone cannot
+            # grant this exception: uploaded media lacks seed provenance.
+            visit_id = scan["session_id"]
+            educational_reference = (
+                actor.demo
+                and scan["detail"].get("demo")
+                and media["detail"].get("sample") is True
+                and bool(media["detail"].get("source_url"))
+            )
+            if not visit_id and not educational_reference:
+                raise Refused("Link this scan to a recorded visit before adding a body marker.")
+            if visit_id:
+                self._check_visit_link(actor, "scans", scan["id"], scan, visit_id, db)
             if (
                 not 0
                 <= int(item.get("frame_index", 0))
@@ -1382,7 +1983,12 @@ class Repository:
                     now(),
                 ),
             )
-        return {"id": identifier}
+            if visit_id:
+                db.execute(
+                    "INSERT INTO p_scan_finding_visits(finding_id,session_id) VALUES (?,?)",
+                    (identifier, visit_id),
+                )
+        return {"id": identifier, "session_id": visit_id}
 
     def coordinates(self, actor, analysis_id, person_id=None):
         with self.db() as db:
@@ -1508,5 +2114,5 @@ class Repository:
             "counts": counts,
             "coach_students": relationships,
             "audit": audit,
-            "schema_version": 1,
+            "schema_version": 2,
         }

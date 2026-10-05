@@ -339,7 +339,7 @@ export function scoreLines(history, opts = {}) {
       ? `<p class="ss-sl-ends">${[
           line.high ? `<b>${scale}</b> ${esc(line.high)}` : '',
           line.low ? `<b>0</b> ${esc(line.low)}` : ''].filter(Boolean).join(' · ')}</p>`
-      : '';
+      : `<p class="ss-sl-ends">Coach-defined subjective scale /${esc(scale)}; endpoints not recorded. A change alone does not identify improvement.</p>`;
     return `<div class="ss-sl" style="--n:${n % 5}">
       <p class="ss-sl-head"><b>${esc(line.label)}</b>
         <span>${line.latest}/${scale}</span>

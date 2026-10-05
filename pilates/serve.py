@@ -1025,7 +1025,13 @@ def serve(bundle: dict | None, root: Path = WEB, port: int = 8000,
     """
     import os
 
-    # Bind promptly; platform jobs prepare weights lazily.
+    # Prepare the small, pinned optional 3D asset before Render advertises its
+    # capabilities. Inference models themselves still load only for a job.
+    # A failed fetch keeps the server and its 2D analysis available.
+    if analyse:
+        from .deployment import prepare_render
+
+        prepare_render()
     if port == 8000 and os.environ.get("PORT"):
         port = int(os.environ["PORT"])
     handler = partial(Handler, directory=str(root))

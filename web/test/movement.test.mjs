@@ -600,7 +600,20 @@ test('the chart says what its outer ring is', () => {
 test('the chart reads in Korean', () => {
   const html = radarHtml(screened(), 'ko');
   assert.match(html, /관절 가동 범위 비교/);
-  assert.match(html, /바깥 원은 공개된 기준 범위입니다/);
+  assert.match(html, /바깥 원은 각 검사의 공개된 참고값입니다/);
+});
+
+test('radar explains the smaller side without inferring stiffness', () => {
+  const en = radarHtml(screened(), 'en');
+  const ko = radarHtml(screened(), 'ko');
+  assert.match(en, /both sides were measured.*smaller camera-estimated peak/);
+  assert.match(en, /single screened value/);
+  assert.match(en, /Camera setup, instructions, comfort or guarding/);
+  assert.doesNotMatch(en, /stiff shoulder/);
+  assert.match(ko, /양쪽을 측정했다면.*작은 쪽/);
+  assert.match(ko, /한쪽 값만 있으면 그 값을 표시합니다/);
+  assert.match(ko, /촬영 조건, 동작 방법/);
+  assert.doesNotMatch(ko, /뻣뻣하면/);
 });
 
 test('no spoke can reach past the outer ring', () => {

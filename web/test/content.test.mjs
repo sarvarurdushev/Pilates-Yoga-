@@ -7,6 +7,7 @@ import { MOVEMENT_PATHWAY } from '../src/content/pathways.js';
 import { MUSCLE_INFO } from '../src/content/muscles.js';
 import { UI, DISCLAIMERS } from '../src/content/strings.js';
 import { HELP } from '../src/content/help.js';
+import { SLICE_COUNT } from '../src/sections.js';
 import { REGION_INFO } from '../src/regionData.js';
 import { buildRegistry, vertebra, LAYER_ORDER, searchText } from '../src/structures.js';
 import { KO_NAME } from '../src/content/koreanNames.js';
@@ -262,7 +263,30 @@ test('the section strip says in both languages that it is not imaging', () => {
   assert.match(HELP.sections.tech.en, /not imaging data/i);
   assert.match(UI.sectionsNote.en, /not an MRI/i);
   assert.match(UI.sectionsNote.ko, /MRI/);
-  assert.match(HELP.sections.tech.ko, /영상 데이터가 아닙니다/);
+  assert.match(HELP.sections.tech.ko, /영상 데이터나 MRI가 아닙니다/);
+});
+
+test('section guidance tracks the rendered count and explains model coordinates', () => {
+  // The atlas renders SLICE_COUNT model intersections. The strip, enlarged
+  // help, and missed-section message must agree, or a reader may mistake a
+  // missing thumbnail for a missing structure in a personal scan.
+  assert.equal(SLICE_COUNT, 9);
+  for (const text of [HELP.sections.plain.en, HELP.labSectionsBig.plain.en,
+                      UI.labSectMissed.en]) {
+    assert.match(text, /nine/i);
+    assert.doesNotMatch(text, /five cuts/i);
+  }
+  for (const text of [HELP.sections.plain.ko, HELP.labSectionsBig.plain.ko,
+                      UI.labSectMissed.ko]) {
+    assert.match(text, /아홉/);
+    assert.doesNotMatch(text, /다섯/);
+  }
+  for (const lang of LANGS) {
+    assert.match(HELP.sections.plain[lang], /fsaverage/);
+    assert.match(HELP.labSectionsBig.plain[lang], /fsaverage/);
+    assert.match(HELP.sections.plain[lang], /MRI/);
+    assert.match(HELP.labSectionsBig.plain[lang], /MRI/);
+  }
 });
 
 test('all four disclaimers are present in both languages', () => {

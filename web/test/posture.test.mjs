@@ -131,6 +131,27 @@ test('a mark carries the short name, not the finding’s sentence', () => {
     .find((m) => m.metric === 'shoulder_tilt').name, '어깨 수평');
 });
 
+test('a clear posture report uses coaching bands rather than clinical norms', () => {
+  const payload = whole({
+    findings: [], regions: REGIONS,
+    unremarkable_detail: [{ name: 'pelvis level', name_ko: '골반 수평' }],
+  });
+  for (const lang of ['en', 'ko']) {
+    const html = _internals.reportHtml({ report: payload, photos: new Map(),
+      taken: '2026-09-14', who: '' }, lang, () => ({}));
+    if (lang === 'en') {
+      assert.match(html, /No reported measurement crossed this check’s working coaching bands/);
+      assert.match(html, /Within the working coaching band/);
+      assert.match(html, /not a clinical normal range/);
+      assert.doesNotMatch(html, /Inside its usual range|Every measurement sits inside its usual range/);
+    } else {
+      assert.match(html, /코칭 참고 범위 안/);
+      assert.match(html, /임상적 정상 범위가 아닙니다/);
+      assert.doesNotMatch(html, /측정한 모든 항목이 정상 범위 안에 있습니다/);
+    }
+  }
+});
+
 test('a measurement inside its range carries no direction label', () => {
   /* "left higher" next to a difference of one degree reads as a finding. */
   const marks = marksFor(report(), 'front', 'en');
@@ -716,7 +737,7 @@ test('a region is coloured by what was measured in it, not by a default', () => 
 test('the map reads in Korean', () => {
   const html = bodyMapHtml({ regions: REGIONS }, 'ko');
   assert.match(html, /머리·목/);
-  assert.match(html, /정상/);
+  assert.match(html, /확인 우선순위 낮음/);
   assert.ok(!/Head and neck/.test(html));
 });
 
@@ -1059,12 +1080,12 @@ test('an empty body falls back to a frame rather than to NaN', () => {
   for (const n of box.split(' ').map(Number)) assert.ok(Number.isFinite(n));
 });
 
-test('how far the furthest joint moved is measured and shown', () => {
+test('the largest normalized landmark shift is measured and shown', () => {
   /* Two visits that barely differ draw as one shape, because the earlier
    * outline is underneath the later one. A number turns "only one body here"
    * into a finding. */
   const html = outlinesHtml({ outlines: { front: pair(60) } }, 'en');
-  assert.match(html, /furthest a joint moved/);
+  assert.match(html, /largest landmark shift/);
   assert.match(html, /\d+\.\d%/);
 });
 
@@ -1090,10 +1111,18 @@ test('no comparison draws nothing', () => {
   assert.equal(outlinesHtml({ outlines: {} }, 'en'), '');
 });
 
+test('aligned photographs do not claim a visible difference proves bodily change', () => {
+  const html = outlinesHtml({ outlines: { front: pair(60) } }, 'en');
+  assert.match(html, /shoulder-to-ankle height/);
+  assert.match(html, /pose, perspective, clothing and landmark detection/);
+  assert.doesNotMatch(html, /what differs is the body/);
+});
+
 test('the drawing explains itself in Korean', () => {
   const html = outlinesHtml({ outlines: { front: pair(60) } }, 'ko');
   assert.match(html, /이전과 현재 겹쳐 보기/);
-  assert.match(html, /카메라 거리가 아니라/);
+  assert.match(html, /카메라 거리의 영향을 줄이지만/);
+  assert.match(html, /원근, 옷차림, 지점 검출/);
 });
 
 /* ------------------------------------------- both ends of a line, by name */

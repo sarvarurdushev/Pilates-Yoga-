@@ -4,8 +4,8 @@
  * This is the step before anybody gets on a reformer. A student stands against
  * a wall, four photographs are taken — front, left side, right side, back —
  * and this screen says what the standing alignment measures, what is outside
- * its usual range, and where a first session could start. Afterwards they move
- * on to a class, and the recording half of the application takes over.
+ * this check's working coaching bands, and where a first session could start.
+ * Afterwards they move on to a class, and the recording half takes over.
  *
  * **The photographs stay in the browser.** They are sent once, measured, and
  * dropped: the server keeps no copy and returns none. What comes back is
@@ -73,7 +73,7 @@ const T = {
   myself:     { en: 'Mine', ko: '내 것' },
   taken:      { en: 'Date the photographs were taken', ko: '촬영 날짜' },
   findings:   { en: 'What the photographs measured', ko: '사진에서 측정한 내용' },
-  clear:      { en: 'Every measurement sits inside its usual range.', ko: '측정한 모든 항목이 정상 범위 안에 있습니다.' },
+  clear:      { en: 'No reported measurement crossed this check’s working coaching bands.', ko: '이 검사의 코칭 참고 범위를 벗어난 측정값은 없습니다.' },
   plan:       { en: 'Where a first session could start', ko: '첫 세션 시작 지점' },
   doseNote:   { en: 'A place to start, not a prescription. The frequency follows how far out the finding was; adjust it in the room.',
                 ko: '시작점이며 처방이 아닙니다. 빈도는 측정된 편차에 따라 정한 것이므로 현장에서 조정하세요.' },
@@ -82,7 +82,7 @@ const T = {
   notTaken:   { en: 'Photographs not supplied', ko: '촬영되지 않은 사진' },
   worth:      { en: 'Worth checking', ko: '확인이 필요한 사항' },
   retake:     { en: 'Retake these photographs', ko: '다시 촬영이 필요한 사진' },
-  inRange:    { en: 'Inside its usual range', ko: '정상 범위 안' },
+  inRange:    { en: 'Within the working coaching band', ko: '코칭 참고 범위 안' },
   usually:    { en: 'Usually seen with', ko: '함께 나타나는 경우' },
   showOn:     { en: 'Show on the body', ko: '인체 모형에서 보기' },
   outOf:      { en: 'out of 100', ko: '100점 만점' },
@@ -95,14 +95,14 @@ const T = {
                 ko: '먼저 로그인하세요. 분석 결과는 특정 회원에게 속합니다.' },
   disputed:   { en: 'the two photographs disagreed', ko: '두 사진이 어긋났습니다' },
   whereItIs:  { en: 'Where it is', ko: '부위별 상태' },
-  even:       { en: 'Even', ko: '정상' },
+  even:       { en: 'Lower review priority', ko: '확인 우선순위 낮음' },
   watchRegion:{ en: 'Watch', ko: '주의' },
   offRegion:  { en: 'Off', ko: '불균형' },
   notMeasuredRegion: { en: 'Not measured', ko: '측정 안 됨' },
   actsHere:   { en: 'Muscles that act here', ko: '이 부위에 작용하는 근육' },
   thenNow:    { en: 'Then and now, drawn together', ko: '이전과 현재 겹쳐 보기' },
-  thenNowNote:{ en: 'Both outlines are scaled to the same body height and lined up at the feet, so what differs is the body and not how far away the camera was.',
-                ko: '두 윤곽선은 같은 신장으로 맞추고 발 위치를 기준으로 정렬했습니다. 따라서 차이는 카메라 거리가 아니라 신체의 변화입니다.' },
+  thenNowNote:{ en: 'Both outlines are scaled by shoulder-to-ankle height and aligned at the feet. This reduces apparent size differences from camera distance; pose, perspective, clothing and landmark detection can also change the drawing.',
+                ko: '두 윤곽선은 어깨에서 발목까지의 길이로 크기를 맞추고 발을 기준으로 정렬했습니다. 카메라 거리의 영향을 줄이지만 자세, 원근, 옷차림, 지점 검출도 그림의 차이를 만들 수 있습니다.' },
   before:     { en: 'Before', ko: '이전' },
   left:       { en: 'left', ko: '좌측' },
   right:      { en: 'right', ko: '우측' },
@@ -112,13 +112,13 @@ const T = {
   higherEnd:  { en: 'higher', ko: '높음' },
   lowerEnd:   { en: 'lower', ko: '낮음' },
   levelWith:  { en: 'level', ko: '수평' },
-  ofHeight:   { en: 'furthest a joint moved', ko: '가장 많이 이동한 관절' },
+  ofHeight:   { en: 'of normalized outline height · largest landmark shift', ko: '정규화 윤곽 높이 대비 최대 지점 차이' },
   after:      { en: 'After', ko: '현재' },
   everyMeasure:{ en: 'Every measurement', ko: '전체 측정값' },
-  everyMeasureNote: { en: 'The shaded part of each track is the range that counts as unremarkable. The marker is where this body landed.',
-                      ko: '각 막대의 음영 구간이 정상으로 보는 범위이며, 표시된 점이 이번 측정값입니다.' },
+  everyMeasureNote: { en: 'The shaded part is this check’s working coaching band for review, not a clinical normal range. The marker shows this photograph’s measurement.',
+                      ko: '음영은 이 검사의 코칭 참고 범위이며 임상적 정상 범위가 아닙니다. 점은 이번 사진에서 측정한 값입니다.' },
   toRange:    { en: 'to', ko: '~' },
-  noRange:    { en: 'no usual range', ko: '정상 범위 없음' },
+  noRange:    { en: 'no coaching band set', ko: '코칭 참고 범위 미설정' },
   onThePhotos:{ en: 'What was measured, on the photographs', ko: '사진에서 측정한 항목' },
   noPhoto:    { en: 'Photograph not kept', ko: '사진 미보관' },
   onFile:     { en: 'Already on file', ko: '기록된 분석' },
@@ -152,7 +152,7 @@ const T = {
     marked:     { en: 'Marked', ko: '뚜렷함' },
     notable:    { en: 'Notable', ko: '주의' },
     watch:      { en: 'Watch', ko: '관찰' },
-    within_band: { en: 'In range', ko: '정상' },
+    within_band: { en: 'Within review band', ko: '코칭 참고 범위 이내' },
   },
 };
 
@@ -1089,7 +1089,7 @@ function muscleName(name, lang) {
  * page. The work had all been done and none of it was shown, which reads as a
  * product that measured nothing rather than one that found nothing.
  *
- * Each row is the name, the number, and a track with the normal range shaded
+ * Each row is the name, the number, and a track with the working band shaded
  * on it and a marker where this body landed. The track is drawn a full range
  * wide either side of the band, so a value outside it is visibly outside
  * rather than pinned to an edge, and a reader can see at a glance whether
@@ -1141,7 +1141,7 @@ export function measurementsHtml(report, lang) {
 }
 
 /**
- * Where one value sits against its normal range.
+ * Where one value sits against its working coaching band.
  *
  * The band is drawn as the shaded middle third and the track runs a full
  * range either side of it, so a value outside the band is drawn outside the
@@ -1179,8 +1179,8 @@ export function trackHtml(value, band, ink) {
  * camera, so the same body is a different number of pixels tall in each. Drawn
  * raw, the nearer visit is simply bigger and every joint has "moved". So each
  * outline is divided by its own shoulder-to-ankle span and translated to put
- * the ankles at a common point: what is left on the screen is the shape of the
- * body, with the camera taken out of it.
+ * the ankles at a common point. This reduces size differences from camera
+ * distance; viewpoint, pose, clothing and landmark error can remain.
  *
  * The feet are the anchor rather than the head or the centre, because the feet
  * are where a standing body actually meets the world. Aligning on the head
@@ -1849,7 +1849,7 @@ function reportHtml(state, lang, identity) {
     .filter((w) => !/^no .* photograph:/.test(w) && !doubts.includes(w));
   const held = (lang === 'ko' ? report.findings_note_ko
                               : report.findings_note) ?? '';
-  /* Not listed while the photographs are in doubt: "inside its usual range" is
+  /* Not listed while the photographs are in doubt: "within the coaching band" is
    * a finding, and a finding about a body that may not have been the one
    * measured is the same mistake as a score. */
   const inRange = held ? '' : (report.unremarkable_detail ?? [])

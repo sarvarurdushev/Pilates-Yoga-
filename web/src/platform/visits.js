@@ -1,0 +1,170 @@
+import { scanAnnotationMarkers } from "./scan-markers.js";
+
+// A capture can create a visit record before any exercises are logged. Link by
+// analysis ID only: sharing a reservation does not make two captures the same visit.
+export function visitsForClient(client) {
+  const analyses = Array.isArray(client.analyses) ? client.analyses : [];
+  const sessions = Array.isArray(client.sessions) ? client.sessions : [];
+  const scans = Array.isArray(client.scans) ? client.scans : [];
+  const byId = new Map(analyses.map((analysis) => [analysis.id, analysis]));
+  const linked = new Set();
+  const visits = sessions.map((session) => {
+    const ids = [...new Set([
+      ...(Array.isArray(session.analysis_ids) ? session.analysis_ids : []),
+      session.analysis_id,
+    ].filter(Boolean))];
+    const captures = ids.map((id) => byId.get(id)).filter(Boolean)
+      .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+    captures.forEach((capture) => linked.add(capture.id));
+    return {
+      session,
+      analyses: captures,
+      analysis: captures[0] || null,
+      scans: session.id ? scans.filter((scan) => scan.session_id === session.id) : [],
+      occurredAt: session.performed_at || captures[0]?.created_at,
+      exerciseCount: Array.isArray(session.completed) ? session.completed.length : 0,
+    };
+  });
+  for (const analysis of analyses) {
+    if (!linked.has(analysis.id))
+      visits.push({ session: null, analyses: [analysis], analysis, scans: [], occurredAt: analysis.created_at, exerciseCount: 0 });
+  }
+  return visits.sort((a, b) => String(b.occurredAt || "").localeCompare(String(a.occurredAt || "")));
+}
+
+export function visitPracticeLabel(visit) {
+  if (visit.exerciseCount) return `${visit.exerciseCount} movement${visit.exerciseCount === 1 ? "" : "s"} logged`;
+  if (visitKind(visit).includes("review")) return "Scan review recorded · no exercises logged";
+  return (visit.analyses?.length || visit.analysis) ? "No exercises logged for this assessment" : "No exercises logged";
+}
+
+export function visitKind(visit) {
+  const assessment = Boolean(visit.analyses?.length || visit.analysis);
+  const practice = Boolean(visit.exerciseCount);
+  const scanReview = Boolean(visit.session?.id) &&
+    /^Scan review:/i.test(String(visit.session?.notes || "").trim()) &&
+    (visit.scans || []).some((scan) => scan.session_id === visit.session?.id);
+  if (scanReview && !practice) return assessment ? "Assessment review" : "Scan review";
+  if (assessment && practice) return "Assessment & practice";
+  if (assessment) return "Assessment";
+  if (practice) return "Practice";
+  return "Visit record";
+}
+
+export function visitRecorderLabel(visit) {
+  const sources = [
+    visit.session?.recorded_by ? { detail: { recorded_by: visit.session.recorded_by } } : null,
+    ...(visit.analyses || (visit.analysis ? [visit.analysis] : [])),
+  ];
+  const labels = [...new Set(sources.filter(Boolean).map(recordedByLabel)
+    .filter((label) => label !== "Not recorded"))];
+  return labels.join(", ") || "Not recorded";
+}
+
+export function recordedByLabel(analysis) {
+  const recorder = analysis?.detail?.recorded_by;
+  if (!recorder || typeof recorder !== "object" || !recorder.name) return "Not recorded";
+  const role = typeof recorder.role === "string" && recorder.role
+    ? recorder.role[0].toUpperCase() + recorder.role.slice(1)
+    : "";
+  return role ? `${recorder.name} · ${role}` : recorder.name;
+}
+
+// A visit is linked by stored IDs, never by proximity in time or a matching
+// reservation alone. Scan notes can join through their exact scan ID only when
+// they do not claim a different assessment.
+export function visitConnections(client, visit, revisions = []) {
+  const analysisIds = new Set((visit.analyses || (visit.analysis ? [visit.analysis] : []))
+    .map((analysis) => analysis.id));
+  const sessionId = visit.session?.id || "";
+  // A deliberate session link is authoritative. Legacy records still join by
+  // exact analysis or scan ID; dates and shared reservations never join them.
+  const scans = (client.scans || []).filter((scan) => scan.session_id
+    ? scan.session_id === sessionId : analysisIds.has(scan.analysis_id));
+  const scanIds = new Set(scans.map((scan) => scan.id));
+  const connected = (item) => item.session_id
+    ? Boolean(sessionId && item.session_id === sessionId)
+    : Boolean(analysisIds.has(item.analysis_id) ||
+      (!item.analysis_id && item.scan_id && scanIds.has(item.scan_id)));
+  const notes = (client.notes || []).filter(connected);
+  const noteIds = new Set(notes.map((note) => note.id));
+  // An unmoving joint in an unrelated exercise can yield a valid 0° ROM
+  // measurement. Keep it in the source report, but do not call it a visit
+  // finding or a targeted body region.
+  const observations = (client.observations || []).filter((item) =>
+    connected(item) && !(item.kind === "movement" && /\bROM:\s*0(?:\.0+)?\s*deg\b/i.test(item.text || "")));
+  const assignments = (client.program_history || []).filter((assignment) =>
+    analysisIds.has(assignment.analysis_id));
+  const programChanges = revisions.filter((revision) => revision.session_id
+    ? Boolean(sessionId && revision.session_id === sessionId)
+    : (analysisIds.has(revision.source_id) && revision.source_kind === "analysis") ||
+      (noteIds.has(revision.source_id) && ["coach_observation", "client_feedback"].includes(revision.source_kind)));
+  const regions = [...new Set([
+    ...notes.map((note) => note.region_id),
+    ...observations.map((observation) => observation.region_id),
+    ...scans.filter((scan) => !scan.detail?.demo).map((scan) => scan.region_id),
+  ].filter(Boolean))];
+  return { scans, notes, observations, assignments, programChanges, regions };
+}
+
+export function visitTimeline(visit, connections) {
+  const events = [];
+  const sessionId = visit.session?.id || "";
+  const add = (type, id, at, record, rank, order = 0) => {
+    if (at) events.push({ type, id, at, record, rank, order });
+  };
+  if (visit.session?.completed?.length || visit.session?.notes) {
+    add("practice", visit.session.id, visit.session.performed_at, visit.session, 0);
+    // New records preserve the time the client marked a movement, or just the
+    // server log time. Legacy arrays have neither; show only session context.
+    const saved = Array.isArray(visit.session.exercise_events) && visit.session.exercise_events.length
+      ? visit.session.exercise_events
+      : (visit.session.completed || []).map((key, index) => ({
+          id: `${visit.session.id}:exercise:${index + 1}`,
+          session_id: visit.session.id, completed_key: key, sequence: index + 1,
+        }));
+    saved.forEach((event, index) => {
+      const time_source = event.completed_at ? "marked" : event.logged_at ? "logged" : "session";
+      add("exercise", event.id, event.completed_at || event.logged_at || visit.session.performed_at,
+        { ...event, time_source }, 1, index);
+    });
+  }
+  for (const analysis of visit.analyses || (visit.analysis ? [visit.analysis] : []))
+    add("capture", analysis.id, analysis.created_at, analysis, 2);
+  for (const scan of connections.scans) {
+    // Public educational demo images are reference material, not evidence of
+    // this client's imaging acquisition or marker history.
+    if (scan.detail?.demo) continue;
+    add("scan", scan.id, scan.captured_at, scan, 3);
+    for (const marker of scanAnnotationMarkers(Array.isArray(scan.findings) ? scan.findings : [])) {
+      if (marker.scan_id !== scan.id) continue;
+      // A marker needs its own saved visit relation. An older marker on a
+      // merely related scan must not be assigned to this visit by proximity.
+      if (!sessionId || marker.session_id !== sessionId) continue;
+      // A marker without its own saved time cannot borrow the scan date.
+      add("scan_marker", marker.id, marker.created_at,
+        { ...marker, scan_id: scan.id, scan_name: scan.name }, 4);
+    }
+  }
+  const findingGroups = new Map();
+  for (const observation of connections.observations) {
+    const key = `${observation.analysis_id || observation.scan_id || observation.id}:${String(observation.created_at || "").slice(0, 10)}`;
+    if (!findingGroups.has(key)) findingGroups.set(key, []);
+    findingGroups.get(key).push(observation);
+  }
+  for (const [key, findings] of findingGroups)
+    add("findings", key, findings.map((finding) => finding.created_at).sort()[0], findings, 4);
+  for (const note of connections.notes)
+    add("note", note.id, note.created_at, note, 5);
+  for (const analysis of visit.analyses || (visit.analysis ? [visit.analysis] : [])) {
+    if (analysis.detail?.reviewed_at)
+      add("review", analysis.id, analysis.detail.reviewed_at, analysis, 6);
+  }
+  for (const assignment of connections.assignments)
+    add("assignment", assignment.id, assignment.starts_on, assignment, 7);
+  for (const revision of connections.programChanges)
+    add("program", revision.id, revision.created_at, revision, 8);
+  return events.sort((a, b) =>
+    String(a.at).localeCompare(String(b.at)) || a.rank - b.rank || a.order - b.order ||
+    String(a.id).localeCompare(String(b.id)));
+}

@@ -127,3 +127,10 @@ through its restart/idle cycle. A sign-in UI correction now routes expired
 sessions back to the welcome screen instead of leaving a client-record error.
 Requirement #5 remains open until a durable backend is provisioned and tested
 across a redeploy. The WebGL anatomy visual checks remain open independently.
+
+The sign-in correction shipped as `d863e038e790ad251720aad93a999d316344a844`
+in successful deployment `6632657333`; `/evidence/capabilities` returned that
+exact SHA. In the deployed browser, a second tab signed out the shared session
+while the first still showed Sarah's client UI. Opening Sarah from that stale
+first tab returned directly to the welcome/sign-in screen, with no client-record
+error. This verifies the changed 401 path rather than just initial page loading.

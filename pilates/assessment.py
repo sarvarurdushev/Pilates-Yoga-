@@ -475,10 +475,12 @@ def analyse_series(times, values):
     ranges = []
     reps = []
     all_values = []
+    smoothed_by_time = {}
     durations = []
     for seg in segments:
         ts = [p[0] for p in seg]
         v = mv.smooth([p[1] for p in seg], 3)
+        smoothed_by_time.update(zip(ts, v))
         all_values += v
         r = mv.find_repetitions(ts, v, min_range=25)
         for rep in r:
@@ -521,6 +523,10 @@ def analyse_series(times, values):
         "series": [
             [round(t, 3), None if v is None else round(v, 1)]
             for t, v in zip(times, values)
+        ],
+        "smoothed_series": [
+            [round(t, 3), round(smoothed_by_time[t], 1) if t in smoothed_by_time else None]
+            for t in times
         ],
         "reason": "Projected 2D ROM. Isolated angle jumps are excluded, with gaps retained. Repetitions are complete angle cycles (minimum 25° excursion), not exercise recognition. No clinical reference is applied.",
     }
@@ -717,7 +723,14 @@ def video(
     people = []
     for key, tr in tracks.items():
         visible_fraction = tr["valid"] / max(1, len(tr["times"]))
-        enough = stable and tr["valid"] >= 12 and visible_fraction >= 0.6
+        # Sampling is 3 fps on small deployments and 6 fps elsewhere. A fixed
+        # 12-frame gate refused otherwise clear short clips only on deployment.
+        # Require at least two seconds of samples (and six frames), while
+        # keeping the temporal signal's own continuous-evidence checks.
+        minimum_valid = max(6, min(12, math.ceil(2 * sample_fps)))
+        observed_span = tr["times"][-1] - tr["times"][0] if len(tr["times"]) > 1 else 0
+        enough = (stable and tr["valid"] >= minimum_valid
+                  and visible_fraction >= 0.6 and observed_span >= 0.8)
         signals = (
             {k: analyse_series(tr["times"], v) for k, v in tr["signals"].items()}
             if enough
