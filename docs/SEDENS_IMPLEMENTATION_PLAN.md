@@ -1,6 +1,6 @@
 # SEDENS AI Private Room — implementation plan (V1)
 
-Status: **plan for review**. Written after [the repository audit](SEDENS_REPO_AUDIT.md). No product code has been written yet.
+Status: **Phase 0 approved; Phase 1 implemented** (see §19). Written after [the repository audit](SEDENS_REPO_AUDIT.md). Phase 2 has not started and waits for approval.
 Branch: `claude/sedens-ai-private-room-v1` (from `23dc14d`). Never merged into, force-pushed over, or deployed from the original branch.
 
 Labels used throughout: **REAL** (works with real data), **DEMO** (fictional data/content, labelled on screen), **SIMULATED** (a stand-in for a future integration, e.g. CRM, payment, room device), **EXPERIMENTAL** (implemented but not validated), **FUTURE** (designed, not built).
@@ -41,15 +41,19 @@ Audit facts: users belong to one org; `p_roles` is CHECK-constrained to admin/co
 | Coach | `p_coaches` (unchanged) + optional `s_creator_profiles` row (`creator_type='coach'`) |
 | Professor / expert creator | A user who is `admin` of their own org with `s_org_profiles.kind='creator_studio'` + `s_creator_profiles` (`professor`/`expert`). Not a member of any gym. |
 | Facility admin | `admin` of an org with `kind='facility'` (orgs without a profile row are treated as facilities, so every existing org keeps working) |
-| SEDENS admin / reviewer | user in the org with `kind='sedens'` + `s_platform_roles(role ∈ sedens_admin, reviewer)` |
+| SEDENS admin / reviewer | user in the org with `kind='sedens'` + `s_capabilities(capability ∈ sedens_admin, sedens_reviewer)` |
 
-Multi-facility creators: `s_creator_affiliations(creator, org, optional location, status requested/approved/revoked)`. An affiliation is approved by that facility's admin and grants **content distribution only** (the creator can make a course free for that facility). It grants **no access to that facility's member records**. Coaching customers in a second facility still requires a membership in that org; a cross-org identity link (`s_identities`) is designed as FUTURE because `create_org` currently enforces one org per email and changing sign-in is out of scope for V1.
+As built in Phase 1, the grant table is `s_capabilities` (capabilities `creator`, `sedens_reviewer`, `sedens_admin`) and the affiliation table is `s_creator_facility_affiliations`; see [the security model](SEDENS_SECURITY_MODEL.md).
+
+Multi-facility creators: `s_creator_facility_affiliations(creator, org, optional location, scope='content_distribution', status requested/approved/declined/revoked)`. An affiliation is approved by that facility's admin and grants **content distribution only** (the creator can make a course free for that facility). It grants **no access to that facility's member records**. Coaching customers in a second facility still requires a membership in that org; a cross-org identity link (`s_identities`) is designed as FUTURE because `create_org` currently enforces one org per email and changing sign-in is out of scope for V1.
 
 Course visibility is resolved by one function (`courses.visible_to(actor, room_context)`) that combines: course status `published`, access mode, `s_course_facilities`, `s_facility_course_settings.enabled`, and entitlements. Draft/submitted/needs-revision courses are visible only to the creator and reviewers.
 
 ## 4. Database migrations (exact)
 
-A new runner `pilates/sedens/migrations.py` applies numbered SQL files from `pilates/sedens/migrations/` inside one transaction each and records them in `s_schema(version, name, applied_at)`. It is called from the SEDENS repository constructor, after the platform `Repository` has created `p_*`. Every file is `CREATE TABLE IF NOT EXISTS`/`CREATE INDEX IF NOT EXISTS` only. Backup/restore (`platform/backup.py`) gains the new org-scoped tables.
+A new runner `pilates/sedens/migrations.py` applies numbered SQL files from `pilates/sedens/migrations/` inside one transaction each and records them in `s_schema(version, name, checksum, applied_at)`; an applied file whose text changes is refused. It is called from the `Sedens` constructor, after the platform `Repository` has created `p_*`. Every file is `CREATE TABLE IF NOT EXISTS`/`CREATE INDEX IF NOT EXISTS` only. Backup/restore (`platform/backup.py`) gaining the new org-scoped tables is still open (§19 limitations).
+
+**Numbering as built.** Phase 1 shipped the foundation as five files, `0001_tenancy_capabilities` … `0005_consent_analytics` (listed in §19). The room-journey, marketplace and governance tables below are therefore renumbered from `0006` when their phases start; their content is unchanged by this note. The table sketches that follow are the original proposal; where Phase 1 built a table, §19 and the SQL files are authoritative.
 
 ### 0001_foundation.sql — tenancy, rooms, consent, analytics
 
@@ -265,9 +269,40 @@ Open SEDENS → Enter AI Private Room → demo member identified → readiness �
 
 Coach: Creator Studio → new course → title → session → exercise → upload demo video + PDF/image with attestation → bind anatomy → choose free for my facility / selected facilities / paid → price → save draft → submit for review → preview in a simulated room. Professor: same, no gym membership, several facilities, education or training type. Facility admin: rooms, members, course list by product line, enable/disable/include/feature, Demo CRM page, utilization placeholder computed only from recorded events.
 
-## 18. Decisions requested from the owner
+## 18. Owner decisions (recorded 7 October 2026)
 
-1. Approve `/` → SEDENS home with the existing platform moved to `/workspace.html` (old links redirected), or keep `/` on the existing platform and add SEDENS at `/sedens.html`.
-2. Approve the professor-as-own-`creator_studio`-org model (§3).
-3. Hosting of this branch: leave undeployed (default), add a second free Render service, or point the existing free service at this branch later.
-4. Whether `Dr. Hong Jong Gi`'s review covers the platform catalog; until confirmed, SEDENS Standard items are `unreviewed`.
+1. `/` is the SEDENS home; the existing connected platform moves to `/workspace.html`; legacy `#page=` links keep working through redirect; the old workspace is not deleted or materially rewritten.
+2. The existing Render service stays untouched and this branch is not deployed. When the room journey is mature enough for external testing, a **second** free Render service will be created; the existing service will not be switched.
+3. Creators: no duplicate creator accounts. A facility coach keeps their account and may gain an `s_creator_profiles` row. An independent professor/expert who belongs to no gym may use a dedicated creator organization. Creator–facility affiliations let one creator distribute content to several organizations without any access to those organizations' customer records; content access and customer-data access are separate permissions, and selling a course to Gym B never grants access to Gym B's members.
+4. Content review: Dr. Hong Jong Gi's review applies only to content that can be explicitly proven to have been reviewed by him. The whole catalog is not claimed as professor-reviewed. Until evidence exists, SEDENS Standard entries carry an internal status (`unreviewed`, `sedens_reviewed`, `expert_reviewed`) with reviewer identity, date, evidence/version and scope of review.
+5. Customer feedback: the existing 0–100 posture score is removed from all customer-facing SEDENS experiences (it may remain in an engineering/debug view where existing tests depend on it); no replacement overall posture score; feedback is observation-based and confidence-gated.
+
+## 19. Phase 1 status (foundation, room access, rebrand)
+
+Implemented on `claude/sedens-ai-private-room-v1` and stopped here; Phase 2 waits for approval.
+
+**Migrations** (`pilates/sedens/migrations/`, additive, FKs cascade or null):
+
+| File | Tables |
+|---|---|
+| `0001_tenancy_capabilities.sql` | `s_org_profiles` (facility / creator_studio / sedens), `s_capabilities` |
+| `0002_creators.sql` | `s_creator_profiles`, `s_creator_facility_affiliations` (scope `content_distribution` only) |
+| `0003_rooms.sql` | `s_room_devices`, `s_room_device_pairings`, `s_room_sessions`, `s_room_access_codes` |
+| `0004_crm.sql` | `s_crm_settings`, `s_crm_member_links` |
+| `0005_consent_analytics.sql` | `s_consents`, `s_events` |
+
+The runner's own ledger is `s_schema`. No `p_*` table was altered or rebuilt.
+
+**Modules:** `pilates/sedens/` — `modes`, `migrations`, `core`, `util`, `capabilities`, `creators`, `onboarding`, `crm`, `demo`, `rooms`, `consent`, `analytics`, `library`, `http`. `pilates/serve.py` gained only the `/sedens/` dispatch (before `/platform/`) and the mode resolution at start-up.
+
+**Pages:** `/` (SEDENS home: hero, sign-in and demo, facility console `#/facility`, creator profile `#/creator`, consents `#/account`), `/room.html` (room screen: pairing, demonstration room, customer entry, room session scaffold), `/workspace.html` (unchanged connected platform). `/anatomy.html` is untouched. Legacy links are redirected by an inline script in `index.html`.
+
+**Endpoints:** listed in [the security model](SEDENS_SECURITY_MODEL.md) and the Phase 1 report.
+
+**Room entry:** customers never sign in on the shared room screen. They enter with a single-use, 5-minute room code requested on their own signed-in phone, or with a CRM credential (simulated in the demo). This replaced an earlier draft that let a customer sign in on the screen itself, after the Phase 1 adversarial review showed that it left a 7-day sign-in on a shared screen.
+
+**Exercise review status:** the room library reads the existing catalog read-only and marks every item `{"status": "unreviewed", "reviewer": null, "reviewed_at": null, "evidence": null, "scope": null}`. No SEDENS content claims expert or professor review.
+
+**Posture score:** no SEDENS page shows a posture score; the legacy workspace's engineering "Image alignment index" is unchanged (it is not part of any SEDENS customer view). Observation-based customer feedback is Phase 3/5 work.
+
+**Known limitations:** see [SEDENS_SECURITY_MODEL.md §8](SEDENS_SECURITY_MODEL.md) and [SEDENS_DEPLOYMENT_MODES.md](SEDENS_DEPLOYMENT_MODES.md). In short: SEDENS tables are not yet in organization backups; rate limits are in-memory; QR is typed or keyboard-wedge input; readiness, scan and workout steps are placeholders on the room screen; no cross-organization identity for coaches who coach members in two facilities.

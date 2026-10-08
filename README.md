@@ -1,3 +1,9 @@
+# SEDENS AI Private Room (branch `claude/sedens-ai-private-room-v1`)
+
+On this branch `/` is the SEDENS home and `/room.html` the room screen; the existing connected platform is unchanged at `/workspace.html` (old `#page=` links redirect there) and the anatomy atlas at `/anatomy.html`. Start with the [repository audit](docs/SEDENS_REPO_AUDIT.md), the [implementation plan](docs/SEDENS_IMPLEMENTATION_PLAN.md), the [security model](docs/SEDENS_SECURITY_MODEL.md), the [CRM adapter contract](docs/SEDENS_CRM_ADAPTER.md) and the [deployment modes](docs/SEDENS_DEPLOYMENT_MODES.md). Everything below this section describes the pre-SEDENS application and remains accurate for `/workspace.html`, the CLI and the analysis pipeline.
+
+---
+
 # Current assessment MVP
 
 The default app now opens without signing in. Upload photographs or movement videos, inspect refusal/landmarks, rotate a learned 3D skeleton when available, and compare saved measurements. RTMO and the existing class pipeline remain.
