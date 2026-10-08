@@ -65,3 +65,38 @@ def test_unknown_mode_refuses_to_start():
 def test_local_room_can_switch_demonstrations_off():
     assert modes.resolve({"SEDENS_DEMO": "0"}).demo_enabled is False
     assert modes.resolve({"SEDENS_MODE": "demo_free", "SEDENS_DEMO": "0"}).demo_enabled is True
+
+
+def test_server_refuses_cloud_production(monkeypatch, tmp_path):
+    from pilates.serve import serve
+
+    monkeypatch.setenv("SEDENS_MODE", "cloud_production")
+    with pytest.raises(modes.ModeError):
+        serve(None, port=0, db=str(tmp_path / "a.db"))
+
+
+def test_server_reports_its_mode(monkeypatch, tmp_path):
+    monkeypatch.setenv("SEDENS_MODE", "demo_free")
+    server, base = running_server(tmp_path / "a.db")
+    try:
+        status, config = Client(base).call("GET", "/sedens/config")
+        assert status == 200
+        assert config["mode"]["name"] == "demo_free"
+        assert config["mode"]["storage"]["persistent"] is False
+        assert config["mode"]["features"]["paid_services"] is False
+        assert "does not diagnose" in config["general_fitness_notice"]
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_demo_routes_disabled_when_demonstrations_are_off(monkeypatch, tmp_path):
+    monkeypatch.setenv("SEDENS_MODE", "local_room")
+    monkeypatch.setenv("SEDENS_DEMO", "0")
+    server, base = running_server(tmp_path / "a.db")
+    try:
+        status, body = Client(base).call("POST", "/sedens/demo/room-device", {"key": "a" * 32})
+        assert status == 404 and body["code"] == "demo_disabled"
+    finally:
+        server.shutdown()
+        server.server_close()

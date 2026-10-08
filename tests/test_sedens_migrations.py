@@ -169,6 +169,71 @@ def test_existing_analyses_notes_media_and_reservations_still_open(migrated):
     assert repo.coordinates(admin, analysis["id"]) is not None
 
 
+def test_platform_deletions_still_cascade_through_sedens_rows(migrated):
+    """Deleting a client or a location must not be blocked by SEDENS rows."""
+    from pilates.sedens import consent, crm, demo, rooms
+
+    sedens, _ = migrated
+    repo = sedens.repo
+    demo.ensure(sedens, ORG)
+    admin = repo.actor(repo.demo_login(KEY, "admin"))
+    device_token, _ = rooms.ensure_demo_device(sedens, ORG, demo.room_id(ORG))
+    entered = rooms.enter(sedens, device_token, method="qr", credential="SEDENS-QR-1001")
+    student_id = entered["context"].student_id
+    with sedens.db() as db:
+        consent.record(db, org_id=ORG, user_id=student_id, kind="scan_capture", granted=True,
+                       text_version=consent.TEXTS["scan_capture"]["version"], channel="room")
+    # The platform's own delete path, unchanged.
+    repo.delete(admin, "users", student_id)
+    with repo.db() as db:
+        assert not db.execute("SELECT 1 FROM s_room_sessions WHERE student_id=?", (student_id,)).fetchone()
+        assert not db.execute("SELECT 1 FROM s_consents WHERE user_id=?", (student_id,)).fetchone()
+        assert not db.execute("SELECT 1 FROM s_crm_member_links WHERE student_id=?", (student_id,)).fetchone()
+        assert not db.execute("PRAGMA foreign_key_check").fetchall()
+    repo.delete(admin, "locations", f"{ORG}-location0")
+    with repo.db() as db:
+        assert not db.execute("SELECT 1 FROM s_room_devices WHERE location_id=?", (f"{ORG}-location0",)).fetchone()
+        assert not db.execute("PRAGMA foreign_key_check").fetchall()
+
+
+def test_deleting_an_organization_removes_its_sedens_rows(tmp_path):
+    """Whole-org deletion (used by the demo seed rollback) cascades through SEDENS.
+
+    A fully seeded demo org cannot be deleted even before SEDENS, because of the
+    platform's own ON DELETE RESTRICT program links; that is pre-existing
+    behaviour and unchanged. This org has SEDENS rows of every kind instead.
+    """
+    from pilates.sedens import capabilities, consent, creators, crm, rooms
+    from sedens_support import facility, pair
+
+    sedens = make_sedens(tmp_path / "org.db")
+    fac = facility(sedens, "Z")
+    other = facility(sedens, "Y")
+    device = pair(sedens, fac)
+    with sedens.db() as db:
+        sedens.set_org_profile(db, fac["org_id"], "facility", "Z Gym")
+        capabilities.grant(sedens, db, fac["admin"], fac["coach_id"], "creator")
+        coach = sedens.repo.actor(fac["coach_token"])
+        creators.save_profile(sedens, db, coach, {"display_name": "Coach Z"})
+        creators.request_affiliation(sedens, db, coach, other["org_id"])
+        consent.record(db, org_id=fac["org_id"], user_id=fac["customer_id"], kind="product_analytics",
+                       granted=True, text_version=consent.TEXTS["product_analytics"]["version"], channel="account")
+        crm.link_member(sedens, db, fac["org_id"], "none", "M-1", fac["customer_id"])
+    rooms.enter(sedens, device, method="access_code",
+                credential=rooms.issue_access_code(sedens, sedens.repo.actor(fac["customer_token"]))["code"])
+    with sedens.db() as db:
+        db.execute("DELETE FROM p_organizations WHERE id=?", (fac["org_id"],))
+        for table, column in (("s_org_profiles", "org_id"), ("s_room_devices", "org_id"), ("s_room_sessions", "org_id"),
+                              ("s_room_access_codes", "org_id"),
+                              ("s_events", "org_id"), ("s_consents", "org_id"), ("s_crm_member_links", "org_id")):
+            assert not db.execute(f"SELECT 1 FROM {table} WHERE {column}=?", (fac["org_id"],)).fetchone(), table
+        assert not db.execute("SELECT 1 FROM s_creator_profiles").fetchone()
+        assert not db.execute("SELECT 1 FROM s_creator_facility_affiliations").fetchone()
+        assert not db.execute("PRAGMA foreign_key_check").fetchall()
+        # The other facility is untouched.
+        assert db.execute("SELECT 1 FROM p_organizations WHERE id=?", (other["org_id"],)).fetchone()
+
+
 def test_backup_export_and_inspector_are_unchanged_by_sedens_tables(migrated):
     """Phase 1 limitation, made explicit: SEDENS rows are not in org archives."""
     from pilates.platform.backup import export_archive

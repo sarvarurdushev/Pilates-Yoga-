@@ -374,6 +374,10 @@ class Handler(SimpleHTTPRequestHandler):
     # -- routes -----------------------------------------------------------
     def do_GET(self):  # noqa: N802 - the base class names it
         route = urlparse(self.path)
+        if route.path.startswith("/sedens/"):
+            from .sedens.http import dispatch as sedens_dispatch
+            sedens_dispatch(self, self.command, route)
+            return
         if route.path.startswith("/platform/"):
             from .platform.http import dispatch
             dispatch(self, self.command, route)
@@ -718,6 +722,10 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):  # noqa: N802
         route = urlparse(self.path)
+        if route.path.startswith("/sedens/"):
+            from .sedens.http import dispatch as sedens_dispatch
+            sedens_dispatch(self, self.command, route)
+            return
         if route.path.startswith("/platform/"):
             from .platform.http import dispatch
             dispatch(self, self.command, route)
@@ -1025,6 +1033,11 @@ def serve(bundle: dict | None, root: Path = WEB, port: int = 8000,
     """
     import os
 
+    # SEDENS deployment mode first: an unknown or unimplemented mode
+    # (cloud_production) refuses to start before anything is served.
+    from .sedens import modes as sedens_modes
+
+    sedens_mode = sedens_modes.resolve(db_path=db, analysis_enabled=analyse)
     # Prepare the small, pinned optional 3D asset before Render advertises its
     # capabilities. Inference models themselves still load only for a job.
     # A failed fetch keeps the server and its 2D analysis available.
@@ -1050,6 +1063,10 @@ def serve(bundle: dict | None, root: Path = WEB, port: int = 8000,
     from .platform.jobs import Jobs as PlatformJobs
     Handler.platform_repository = PlatformRepository(db) if db else None
     Handler.platform_jobs = PlatformJobs(Handler.platform_repository) if db and analyse else None
+    from .sedens.core import Sedens
+    Handler.sedens = Sedens(Handler.platform_repository, sedens_mode) if db else None
+    print(f"SEDENS mode: {sedens_mode.name} ({sedens_mode.label}); "
+          f"persistent storage: {sedens_mode.storage()['persistent']}", flush=True)
     if db and Handler.require_auth:
         claim_owner(db)
     server = ThreadingHTTPServer((host, port), handler)
