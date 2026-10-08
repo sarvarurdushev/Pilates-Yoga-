@@ -1,0 +1,67 @@
+"""SEDENS deployment modes: explicit, conservative about storage, no paid services."""
+
+import pytest
+
+from pilates.sedens import modes
+from sedens_support import Client, running_server
+
+
+def test_default_is_local_room_off_render():
+    mode = modes.resolve({}, db_path="/home/studio/sedens.db")
+    assert mode.name == "local_room"
+    assert mode.describe()["storage"]["persistent"] is True
+
+
+def test_render_defaults_to_demo_free():
+    mode = modes.resolve({"RENDER": "true"}, db_path="/tmp/studio.db")
+    assert mode.name == "demo_free"
+
+
+def test_explicit_mode_wins_over_render():
+    assert modes.resolve({"RENDER": "true", "SEDENS_MODE": "local_room"}).name == "local_room"
+
+
+@pytest.mark.parametrize("path", ["/var/data/studio.db", "/home/x/studio.db", ""])
+def test_demo_free_never_claims_persistent_storage(path):
+    mode = modes.resolve({"SEDENS_MODE": "demo_free"}, db_path=path)
+    storage = mode.describe()["storage"]
+    assert storage["persistent"] is False
+    assert "erased" in storage["reason"]
+
+
+def test_demo_free_uses_no_paid_services_and_allows_precomputed_demo_analysis():
+    features = modes.resolve({"SEDENS_MODE": "demo_free"}, db_path="/tmp/x.db", analysis_enabled=True).describe()["features"]
+    assert features["paid_services"] is False
+    assert features["precomputed_demo_analysis"] is True
+    assert features["real_analysis"] == "limited"
+
+
+def test_local_room_uses_the_real_pipeline_and_local_camera_when_enabled():
+    features = modes.resolve({"SEDENS_MODE": "local_room"}, db_path="/srv/a.db", analysis_enabled=True).describe()["features"]
+    assert features["real_analysis"] == "available"
+    assert features["local_camera"] is True
+    assert features["paid_services"] is False
+
+
+def test_local_room_on_render_without_disk_is_not_persistent():
+    mode = modes.resolve({"SEDENS_MODE": "local_room", "RENDER": "true"}, db_path="/tmp/studio.db")
+    assert mode.describe()["storage"]["persistent"] is False
+
+
+def test_local_room_temporary_directory_is_not_persistent():
+    assert modes.resolve({}, db_path="/tmp/studio.db").describe()["storage"]["persistent"] is False
+
+
+def test_cloud_production_refuses_to_start():
+    with pytest.raises(modes.ModeError, match="not implemented"):
+        modes.resolve({"SEDENS_MODE": "cloud_production"})
+
+
+def test_unknown_mode_refuses_to_start():
+    with pytest.raises(modes.ModeError, match="not a known mode"):
+        modes.resolve({"SEDENS_MODE": "production"})
+
+
+def test_local_room_can_switch_demonstrations_off():
+    assert modes.resolve({"SEDENS_DEMO": "0"}).demo_enabled is False
+    assert modes.resolve({"SEDENS_MODE": "demo_free", "SEDENS_DEMO": "0"}).demo_enabled is True

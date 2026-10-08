@@ -35,3 +35,4 @@ markers = ["mvp: login-free assessment workflow"]
 
 [tool.setuptools.package-data]
 "pilates.platform" = ["schema.sql", "catalog.json", "demo_scenarios/*.json.gz"]
+"pilates.sedens" = ["migrations/*.sql"]
