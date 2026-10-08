@@ -33,7 +33,13 @@ for (const legacy of ["/index.html#page=dashboard", "/#home", "/index.html?reset
   await page.waitForURL(/\/workspace\.html/);
   assert.ok(page.url().endsWith(legacy.replace(/^\/(index\.html)?/, "")), page.url());
 }
-console.log("PASS home renders; legacy #page=, #home and ?reset= links open /workspace.html unchanged");
+// Campaign links stay on the SEDENS home; a legacy hash opened while the home is showing still opens the workspace.
+await page.goto(base + "/?utm_source=newsletter&fbclid=abc");
+await page.getByRole("link", { name: "Enter AI Private Room" }).waitFor();
+assert.ok(!page.url().includes("/workspace.html"), page.url());
+await page.evaluate(() => { location.hash = "#page=dashboard"; });
+await page.waitForURL(/\/workspace\.html\?utm_source=newsletter&fbclid=abc#page=dashboard$/);
+console.log("PASS home renders; legacy #page=, #home and ?reset= links open /workspace.html unchanged; utm/fbclid links stay home; a pasted #page= opens the workspace");
 
 // 2. Demonstration room on a simulated screen
 const key = randomBytes(16).toString("hex");
@@ -64,6 +70,7 @@ await phone.page.getByRole("button", { name: "Customer" }).click();
 await phone.page.getByRole("button", { name: "Get a room code" }).click();
 const roomCode = (await phone.page.locator("#room-code .sd-code").textContent()).trim();
 assert.match(roomCode, /^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+assert.match(await phone.page.locator("#room-code").textContent(), /For Sarah at SEDENS Demo Fitness Center/);
 await shot(phone.page, "04b-phone-room-code");
 await room.page.fill("[name=credential]", roomCode);
 await room.page.getByRole("button", { name: "Enter", exact: true }).click();
@@ -76,6 +83,21 @@ await room.page.fill("[name=credential]", roomCode);
 await room.page.getByRole("button", { name: "Enter", exact: true }).click();
 await room.page.getByText("This room code is not valid. Ask for a new code on your phone.").waitFor();
 console.log("PASS room code from the customer's phone: entered once, single use, no sign-in left on the screen");
+
+// An account signed in on the shared screen (here the customer's own) hides entry until it is signed out.
+const signIn = (await phone.ctx.cookies()).filter((c) => c.name === "motion_session");
+await room.ctx.addCookies(signIn);
+await room.page.reload();
+await room.page.getByText("An account is signed in on this shared screen. Sign it out before anyone enters.").waitFor();
+assert.equal(await room.page.locator("[name=credential]").count(), 0);
+const blocked = await room.page.evaluate(async (code) => (await fetch("/sedens/room/enter", { method: "POST",
+  headers: { "Content-Type": "application/json", "X-Sedens-Request": "1" },
+  body: JSON.stringify({ method: "qr", credential: code }) })).json(), "SEDENS-QR-1001");
+assert.equal(blocked.code, "account_signed_in");
+await room.page.getByRole("button", { name: "Sign out this screen" }).click();
+await room.page.locator("#enter-code [name=credential]").waitFor();
+assert.ok(!(await room.ctx.cookies()).some((c) => c.name === "motion_session" && c.value));
+console.log("PASS a sign-in on the room screen blocks entry (server and page) until it is signed out");
 
 // 3. Real pairing protocol: the screen shows a code, the facility admin confirms it.
 const screen = await context({ width: 1920, height: 1080 });

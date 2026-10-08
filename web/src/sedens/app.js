@@ -1,18 +1,25 @@
-// SEDENS home. Routes live in the hash as "#/name"; any other hash or any query
-// string is a legacy coaching-workspace link and was already redirected by the
-// inline script in index.html before this module loaded.
-import { sedens, platform, demoKey, ApiError } from "./api.js";
+// SEDENS home. Routes live in the hash as "#/name"; any other hash or any
+// non-tracking query parameter is a legacy coaching-workspace link and was
+// already redirected by the inline script in index.html before this module loaded.
+import { sedens, platform, withDemo, ApiError } from "./api.js";
 import { t, lang } from "./i18n.js";
 import { $, esc, header, bindHeader, footer, formData, time } from "./ui.js";
 
-const state = { me: null, config: null };
+// seq: each render() takes a number; a view whose number is no longer current
+// stops writing, so a slow response never overwrites the page the user moved to.
+const state = { me: null, config: null, seq: 0 };
+const stale = (seq) => seq !== state.seq;
 const root = () => $("#sedens");
 
 async function loadMe() {
   try {
     state.me = await sedens("me");
   } catch (error) {
-    if (!(error instanceof ApiError) || error.status !== 401) throw error;
+    // demo_disabled: a workspace demonstration sign-in on a server whose SEDENS
+    // demonstrations are off. SEDENS treats it as signed out, so the home still
+    // offers sign-in instead of a dead-end error page.
+    const signedOut = error instanceof ApiError && (error.status === 401 || error.code === "demo_disabled");
+    if (!signedOut) throw error;
     state.me = null;
   }
 }
@@ -55,7 +62,7 @@ function homeView() {
   $("#get-code")?.addEventListener("click", async () => {
     try {
       const issued = await sedens("access-code", {});
-      $("#room-code").innerHTML = `<p class="sd-code">${esc(issued.code)}</p><p class="sd-muted">${esc(t("home.code_value", { code: issued.code }))} · ${esc(t("home.code_expires"))}</p>`;
+      $("#room-code").innerHTML = `<p class="sd-code">${esc(issued.code)}</p><p>${esc(t("home.code_for", { name: issued.customer.first_name, facility: issued.facility.name }))}</p><p class="sd-muted">${esc(t("home.code_value", { code: issued.code }))} · ${esc(t("home.code_expires"))}</p>`;
     } catch (error) {
       $("#room-code").innerHTML = `<p class="sd-notice error">${esc(error.message)}</p>`;
     }
@@ -77,7 +84,7 @@ function homeView() {
       $("#demo-status").textContent = t("auth.demo_preparing");
       document.querySelectorAll("[data-demo]").forEach((b) => (b.disabled = true));
       try {
-        const result = await sedens("demo/enter", { key: demoKey(), role: button.dataset.demo });
+        const result = await withDemo("demo/enter", { role: button.dataset.demo });
         state.me = result.me;
         location.hash = button.dataset.demo === "admin" ? "#/facility" : button.dataset.demo === "coach" ? "#/creator" : "#/";
         render();
@@ -115,6 +122,7 @@ async function facilityView() {
     page(`${backLink()}<h1>${esc(t("facility.title"))}</h1>${notice(t("facility.need_admin"))}`);
     return;
   }
+  const seq = state.seq;
   page(`${backLink()}<h1>${esc(t("facility.title"))}</h1><p class="sd-muted">${esc(state.me.organization.display_name)}</p><div id="facility-body">${notice(t("common.loading"))}</div>`);
   const [roomsData, crm, people, affiliations] = await Promise.all([
     sedens("facility/rooms"),
@@ -122,6 +130,7 @@ async function facilityView() {
     sedens("facility/people"),
     sedens("facility/affiliations"),
   ]);
+  if (stale(seq)) return;
   const rooms = roomsData.locations.flatMap((loc) => loc.rooms.map((room) => ({ ...room, location: loc.name })));
   const deviceRow = (d) =>
     `<li><span>${esc(d.name)} ${d.simulated ? `<span class="sd-badge warn">${esc(t("common.simulated"))}</span>` : ""}</span><span class="sd-muted">${esc(d.status === "revoked" ? t("facility.device_revoked") : d.paired ? t("facility.device_active") : t("facility.device_waiting"))}${d.last_seen_at ? " · " + esc(t("facility.last_seen", { time: time(d.last_seen_at) })) : ""}</span>${d.status === "active" ? `<button class="sd-ghost" data-revoke="${esc(d.id)}">${esc(t("facility.revoke"))}</button>` : ""}</li>`;
@@ -140,7 +149,7 @@ async function facilityView() {
         .map((a) => `<li><span>${esc(a.creator.display_name)} <span class="sd-muted">${esc(a.creator.creator_type)} · ${esc(t("creator.state_" + a.creator.verification_state))}</span></span><span class="sd-muted">${esc(a.status)}</span>${a.status === "requested" ? `<span><button data-decide="${esc(a.id)}" data-decision="approve">${esc(t("facility.approve"))}</button> <button class="sd-ghost" data-decide="${esc(a.id)}" data-decision="decline">${esc(t("facility.decline"))}</button></span>` : ""}</li>`)
         .join("")
     : `<li class="sd-muted">${esc(t("facility.no_affiliations"))}</li>`;
-  $("#facility-body").innerHTML = `<section class="sd-panel"><h2>${esc(t("facility.rooms"))}</h2><p class="sd-muted">${esc(t("facility.rooms_hint"))}</p>${roomList}${rooms.length ? `<form id="pair" class="sd-inline"><label class="sd-field"><span>${esc(t("facility.pair_code"))}</span><input name="code" required autocomplete="off" placeholder="ABCD-EFGH"></label><label class="sd-field"><span>${esc(t("facility.pair_room"))}</span><select name="room_id">${rooms.map((r) => `<option value="${esc(r.id)}">${esc(r.name)} · ${esc(r.location)}</option>`).join("")}</select></label><label class="sd-field"><span>${esc(t("facility.pair_name"))}</span><input name="name" maxlength="80"></label><button class="sd-primary">${esc(t("facility.pair"))}</button><p class="sd-error" role="alert"></p></form>` : ""}</section><section class="sd-panel"><h2>${esc(t("facility.crm"))}</h2><p>${esc(provider)}</p>${crm.simulated ? `<span class="sd-badge warn">${esc(t("common.simulated"))}</span>` : ""}<form id="crm" class="sd-inline"><label class="sd-check"><input type="checkbox" name="require_booking" ${crm.require_booking ? "checked" : ""}> ${esc(t("facility.require_booking"))}</label><label class="sd-field"><span>${esc(t("facility.grace"))}</span><input type="number" min="0" max="120" name="booking_grace_minutes" value="${esc(crm.booking_grace_minutes)}"></label><button>${esc(t("common.save"))}</button></form></section><section class="sd-panel"><h2>${esc(t("facility.creators"))}</h2><p class="sd-muted">${esc(t("facility.creators_hint"))}</p><ul class="sd-list">${creatorsList}</ul></section><section class="sd-panel"><h2>${esc(t("facility.affiliations"))}</h2><p class="sd-muted">${esc(t("facility.affiliations_hint"))}</p><p>${esc(t("facility.code", { code: state.me.organization.id }))}</p><ul class="sd-list">${affList}</ul></section>`;
+  $("#facility-body").innerHTML = `<section class="sd-panel"><h2>${esc(t("facility.rooms"))}</h2><p class="sd-muted">${esc(t("facility.rooms_hint"))}</p>${roomList}${rooms.length ? `<form id="pair" class="sd-inline"><label class="sd-field"><span>${esc(t("facility.pair_code"))}</span><input name="code" required autocomplete="off" placeholder="ABCD-EFGH"></label><label class="sd-field"><span>${esc(t("facility.pair_room"))}</span><select name="room_id">${rooms.map((r) => `<option value="${esc(r.id)}">${esc(r.name)} · ${esc(r.location)}</option>`).join("")}</select></label><label class="sd-field"><span>${esc(t("facility.pair_name"))}</span><input name="name" maxlength="80"></label><button class="sd-primary">${esc(t("facility.pair"))}</button><p class="sd-error" role="alert"></p></form>` : ""}</section><section class="sd-panel"><h2>${esc(t("facility.crm"))}</h2><p>${esc(provider)}</p>${crm.simulated ? `<span class="sd-badge warn">${esc(t("common.simulated"))}</span>` : ""}${crm.booking_rules ? `<form id="crm" class="sd-inline"><label class="sd-check"><input type="checkbox" name="require_booking" ${crm.require_booking ? "checked" : ""}> ${esc(t("facility.require_booking"))}</label><label class="sd-field"><span>${esc(t("facility.grace"))}</span><input type="number" min="0" max="120" name="booking_grace_minutes" value="${esc(crm.booking_grace_minutes)}"></label><button>${esc(t("common.save"))}</button></form>` : `<p class="sd-muted">${esc(t("facility.no_booking_rules"))}</p>`}</section><section class="sd-panel"><h2>${esc(t("facility.creators"))}</h2><p class="sd-muted">${esc(t("facility.creators_hint"))}</p><ul class="sd-list">${creatorsList}</ul></section><section class="sd-panel"><h2>${esc(t("facility.affiliations"))}</h2><p class="sd-muted">${esc(t("facility.affiliations_hint"))}</p><p>${esc(state.me.organization.demo ? t("facility.code_demo") : t("facility.code", { code: state.me.organization.id }))}</p><ul class="sd-list">${affList}</ul></section>`;
   const pair = $("#pair");
   if (pair)
     pair.onsubmit = async (event) => {
@@ -152,15 +161,17 @@ async function facilityView() {
         pair.querySelector(".sd-error").textContent = error.message;
       }
     };
-  $("#crm").onsubmit = async (event) => {
-    event.preventDefault();
-    const form = event.target;
-    await sedens("facility/crm", {
-      require_booking: form.require_booking.checked,
-      booking_grace_minutes: Number(form.booking_grace_minutes.value),
-    });
-    render();
-  };
+  const crmForm = $("#crm");
+  if (crmForm)
+    crmForm.onsubmit = async (event) => {
+      event.preventDefault();
+      const form = event.target;
+      await sedens("facility/crm", {
+        require_booking: form.require_booking.checked,
+        booking_grace_minutes: Number(form.booking_grace_minutes.value),
+      });
+      render();
+    };
   document.querySelectorAll("[data-revoke]").forEach((b) => (b.onclick = async () => { await sedens("facility/devices/revoke", { device_id: b.dataset.revoke }); render(); }));
   document.querySelectorAll("[data-grant]").forEach((b) => (b.onclick = async () => { await sedens("facility/capabilities", { user_id: b.dataset.grant, capability: "creator", grant: b.dataset.on === "1" }); render(); }));
   document.querySelectorAll("[data-decide]").forEach((b) => (b.onclick = async () => { await sedens("facility/affiliations/decide", { id: b.dataset.decide, decision: b.dataset.decision }); render(); }));
@@ -171,13 +182,16 @@ async function creatorView() {
     page(`${backLink()}<h1>${esc(t("creator.title"))}</h1>${notice(t("creator.need_capability"))}`);
     return;
   }
+  const seq = state.seq;
   const data = await sedens("creator/profile");
+  if (stale(seq)) return;
   if (!data.capabilities.includes("creator")) {
     page(`${backLink()}<h1>${esc(t("creator.title"))}</h1>${notice(t("creator.need_capability"))}`);
     return;
   }
   const p = data.profile || { display_name: state.me.user.name, bio: "", institution: "", creator_type: "", verification_state: "unverified" };
   const affiliations = (await sedens("creator/affiliations")).items;
+  if (stale(seq)) return;
   page(`${backLink()}<h1>${esc(t("creator.title"))}</h1><section class="sd-panel"><h2>${esc(t("creator.profile"))}</h2><p>${esc(t("creator.verification", { state: t("creator.state_" + p.verification_state) }))}</p><form id="profile"><label class="sd-field"><span>${esc(t("creator.display_name"))}</span><input name="display_name" required maxlength="80" value="${esc(p.display_name)}"></label><label class="sd-field"><span>${esc(t("creator.institution"))}</span><input name="institution" maxlength="160" value="${esc(p.institution)}"></label><label class="sd-field"><span>${esc(t("creator.bio"))}</span><textarea name="bio" maxlength="2000" rows="4">${esc(p.bio)}</textarea></label><p class="sd-muted">${esc(t("creator.type"))}: ${esc(p.creator_type || "—")}</p><p class="sd-error" role="alert"></p><button class="sd-primary">${esc(t("common.save"))}</button> ${data.profile && ["unverified", "rejected"].includes(p.verification_state) ? `<button type="button" id="verify">${esc(t("creator.verify_request"))}</button>` : ""}</form></section><section class="sd-panel"><h2>${esc(t("creator.affiliations"))}</h2><p class="sd-muted">${esc(t("creator.affiliation_hint"))}</p><ul class="sd-list">${data.distribution_targets.some((d) => d.basis === "home_facility") ? `<li>${esc(state.me.organization.display_name)} <span class="sd-muted">home</span></li>` : ""}${affiliations.map((a) => `<li>${esc(a.facility_name)} <span class="sd-muted">${esc(a.status)}</span></li>`).join("")}</ul>${data.profile ? `<form id="affiliate" class="sd-inline"><label class="sd-field"><span>${esc(t("creator.facility_code"))}</span><input name="org_id" required></label><button>${esc(t("creator.request"))}</button><p class="sd-error" role="alert"></p></form>` : ""}</section>${notice(t("creator.courses_soon"))}`);
   $("#profile").onsubmit = async (event) => {
     event.preventDefault();
@@ -204,7 +218,9 @@ async function creatorView() {
 
 async function accountView() {
   if (!state.me) return homeView();
+  const seq = state.seq;
   const data = await sedens("consents");
+  if (stale(seq)) return;
   const rows = Object.entries(data.texts)
     .map(([kind, text]) => {
       const current = data.current[kind];
@@ -220,15 +236,19 @@ async function accountView() {
 }
 
 async function render() {
+  const seq = ++state.seq;
   try {
-    // A sign-in made elsewhere (another tab, the coaching workspace) is picked up on navigation.
-    if (!state.me) await loadMe();
+    // A sign-in or sign-out made elsewhere (another tab, the coaching workspace)
+    // is picked up on every navigation.
+    await loadMe();
+    if (stale(seq)) return;
     const name = route();
     if (name === "facility") await facilityView();
     else if (name === "creator") await creatorView();
     else if (name === "account") await accountView();
     else homeView();
   } catch (error) {
+    if (stale(seq)) return;
     if (error instanceof ApiError && error.status === 401) {
       state.me = null;
       homeView();
@@ -238,15 +258,22 @@ async function render() {
   }
 }
 
+// A legacy workspace link pasted while the SEDENS home is open is a same-page
+// hash change; it opens the workspace exactly as on first load.
+function onHashChange() {
+  const target = window.sedensLegacyWorkspaceTarget?.(location.search, location.hash);
+  if (target) location.replace(target);
+  else render();
+}
+
 async function start() {
   try {
     state.config = await sedens("config");
   } catch {
     state.config = null;
   }
-  await loadMe().catch(() => {});
   await render();
-  window.addEventListener("hashchange", render);
+  window.addEventListener("hashchange", onHashChange);
 }
 
 start();

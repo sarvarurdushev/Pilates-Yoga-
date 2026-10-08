@@ -8,14 +8,28 @@
     <script id="sedens-legacy-redirect">
       // Legacy coaching-workspace links keep working. The server never sees a
       // hash, so this runs before anything renders: a "#page=…", "#home" or any
-      // other non-SEDENS hash, and any query string (?reset=, ?verify=,
-      // ?session=), opens the unchanged workspace at /workspace.html with the
-      // same query and hash. SEDENS routes are "#/…" with no query string.
+      // other non-SEDENS hash, and any query parameter (?reset=, ?verify=,
+      // ?session=, …), opens the unchanged workspace at /workspace.html with the
+      // same query and hash. SEDENS routes are "#/…". Campaign and click-tracking
+      // parameters (utm_*, fbclid, gclid, …) alone keep the SEDENS home.
       (function (root) {
+        var TRACKING = /^(utm_[a-z0-9_]*|fbclid|gclid|gbraid|wbraid|dclid|msclkid|yclid|igshid|mc_cid|mc_eid|_ga|_gl)$/i;
+        function legacyQuery(search) {
+          var parts = (search || "").replace(/^\?/, "").split("&");
+          for (var i = 0; i < parts.length; i++) {
+            var key = parts[i].split("=")[0].replace(/\+/g, " ");
+            try {
+              key = decodeURIComponent(key);
+            } catch (error) {
+              return true;
+            }
+            if (key && !TRACKING.test(key)) return true;
+          }
+          return false;
+        }
         function legacyWorkspaceTarget(search, hash) {
           var legacyHash = hash && hash !== "#" && hash.indexOf("#/") !== 0;
-          var legacySearch = search && search !== "?";
-          return legacyHash || legacySearch ? "/workspace.html" + (search || "") + (hash || "") : null;
+          return legacyHash || legacyQuery(search) ? "/workspace.html" + (search || "") + (hash || "") : null;
         }
         root.sedensLegacyWorkspaceTarget = legacyWorkspaceTarget;
         var target = root.location && legacyWorkspaceTarget(root.location.search, root.location.hash);

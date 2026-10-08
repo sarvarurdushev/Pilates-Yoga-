@@ -51,3 +51,14 @@ export function demoKey(fresh = false) {
   }
   return key;
 }
+
+// A demonstration whose workspace data was edited away (for example its only
+// location deleted) answers "demo_changed"; a fresh demonstration is opened once.
+export async function withDemo(path, body = {}) {
+  try {
+    return await sedens(path, { ...body, key: demoKey() });
+  } catch (error) {
+    if (!(error instanceof ApiError && error.code === "demo_changed")) throw error;
+    return sedens(path, { ...body, key: demoKey(true) });
+  }
+}

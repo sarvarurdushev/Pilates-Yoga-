@@ -1,11 +1,15 @@
 // The room screen (kiosk). It shows only what the server authorizes: every
 // room-only request is checked on the server against the paired device, the
 // room session and the customer. This page never decides access itself.
-import { sedens, platform, demoKey, ApiError } from "./api.js";
+import { sedens, platform, withDemo, ApiError } from "./api.js";
 import { t, lang, setLang } from "./i18n.js";
 import { $, esc, wordmark, time, formData } from "./ui.js";
 
-const state = { config: null, device: null, session: null, poll: null, credentials: null };
+// view: re-draws the current screen in place (used by the language button while
+// a pairing code is shown, so the code and its polling survive).
+const state = { config: null, device: null, session: null, poll: null, credentials: null, activity: null, view: null, pairing: 0 };
+const ENDED_CODES = ["room_session_expired", "room_session_ended", "room_session_idle"];
+const ACTIVITY_EVENTS = ["pointerdown", "keydown", "touchstart"];
 const root = () => $("#room");
 
 function frame(body, { help = true } = {}) {
@@ -14,13 +18,60 @@ function frame(body, { help = true } = {}) {
   root().innerHTML = `<header class="sd-header sd-room-header"><span class="sd-brand">${wordmark()}</span><div class="sd-header-right">${state.device?.facility?.demo ? `<span class="sd-badge warn">${esc(t("common.demo"))}</span>` : ""}${simulated ? `<span class="sd-badge warn">${esc(t("common.simulated"))}</span>` : ""}<button class="sd-ghost" data-lang>${esc(t("lang.toggle"))}</button></div></header><main class="sd-room-main">${body}</main>${help ? `<footer class="sd-footer"><p>${esc(t("room.help"))}</p><p class="sd-muted">${esc(t("notice.fitness"))}</p>${simulated ? `<p class="sd-muted">${esc(t("room.simulated_access"))}</p>` : ""}</footer>` : ""}`;
   root().querySelector("[data-lang]").onclick = () => {
     setLang(lang() === "ko" ? "en" : "ko");
-    render();
+    (state.view || render)();
   };
 }
 
 function stopPolling() {
   clearInterval(state.poll);
   state.poll = null;
+  state.view = null;
+  state.pairing += 1; // any pairing poll still in flight is now stale
+  if (state.activity) ACTIVITY_EVENTS.forEach((name) => document.removeEventListener(name, state.activity));
+  state.activity = null;
+}
+
+// The server closes a room session after idle_minutes without a room request.
+// Touching the screen tells it someone is still here; with no touch at all, the
+// screen ends the session itself so the next person starts from the entry view.
+function watchActivity(idleMinutes) {
+  const idleMs = Math.max(1, idleMinutes || 15) * 60000;
+  let lastTouch = Date.now();
+  let lastPing = Date.now();
+  state.activity = () => {
+    lastTouch = Date.now();
+    if (Date.now() - lastPing < 60000) return;
+    lastPing = Date.now();
+    sedens("room/session").catch((error) => {
+      if (error instanceof ApiError && error.status < 500) render();
+    });
+  };
+  ACTIVITY_EVENTS.forEach((name) => document.addEventListener(name, state.activity, { passive: true }));
+  const expiresAt = Date.parse(state.session?.expires_at || "") || Infinity;
+  state.poll = setInterval(async () => {
+    // Past the session's own end the server has closed it: show the real state.
+    if (Date.now() >= expiresAt) return render();
+    if (Date.now() - lastTouch < idleMs - 30000) return;
+    stopPolling();
+    await endSession(t("room.idle_ended"));
+  }, 15000);
+}
+
+// "Session ended" is shown only once the server has ended it (or it was already
+// gone). On any other failure the screen re-reads the real state from the server.
+async function endSession(message) {
+  stopPolling();
+  try {
+    await sedens("room/end", {});
+  } catch (error) {
+    if (!(error instanceof ApiError && error.status === 401)) {
+      await render();
+      root().querySelector(".sd-room-card")?.insertAdjacentHTML("afterbegin", `<p class="sd-notice error" role="alert">${esc(t("room.end_failed"))}</p>`);
+      return;
+    }
+  }
+  state.session = null;
+  await entryView(message);
 }
 
 function unpairedView(message = "") {
@@ -29,7 +80,7 @@ function unpairedView(message = "") {
   $("#pair").onclick = startPairing;
   $("#demo-room")?.addEventListener("click", async () => {
     try {
-      const result = await sedens("demo/room-device", { key: demoKey() });
+      const result = await withDemo("demo/room-device");
       state.credentials = result.credentials;
       await render();
     } catch (error) {
@@ -40,25 +91,35 @@ function unpairedView(message = "") {
 
 async function startPairing() {
   stopPolling();
+  const run = state.pairing;
   try {
     const started = await sedens("room/pairing/start", {});
-    frame(`<section class="sd-room-card"><p class="sd-eyebrow">${esc(t("room.pairing_code"))}</p><p class="sd-code" aria-live="polite">${esc(started.code)}</p><p class="sd-lead">${esc(t("room.pairing_instructions"))}</p></section>`);
-    state.poll = setInterval(async () => {
+    if (run !== state.pairing) return;
+    const view = () =>
+      frame(`<section class="sd-room-card"><p class="sd-eyebrow">${esc(t("room.pairing_code"))}</p><p class="sd-code" aria-live="polite">${esc(started.code)}</p><p class="sd-lead">${esc(t("room.pairing_instructions"))}</p></section>`);
+    view();
+    state.view = view;
+    // One poll at a time; a reply that arrives after pairing stopped is ignored.
+    const poll = async () => {
+      let status = null;
       try {
-        const status = await sedens("room/pairing/status");
-        if (status.state === "paired") {
-          stopPolling();
-          await render();
-        } else if (status.state !== "pending") {
-          stopPolling();
-          unpairedView(t("room.pairing_expired"));
-        }
+        status = await sedens("room/pairing/status");
       } catch {
         // Keep showing the code; the next poll retries.
       }
-    }, 3000);
+      if (run !== state.pairing) return;
+      if (status?.state === "pending" || status === null) {
+        setTimeout(poll, 3000);
+      } else if (status.state === "paired" || status.state === "claimed") {
+        await render();
+      } else {
+        stopPolling();
+        unpairedView(t("room.pairing_expired"));
+      }
+    };
+    setTimeout(poll, 3000);
   } catch (error) {
-    unpairedView(error.message);
+    if (run === state.pairing) unpairedView(error.message);
   }
 }
 
@@ -88,12 +149,16 @@ async function entryView(message = "", decision = null) {
   const account = d.screen_account
     ? `<p class="sd-notice error" role="alert">${esc(t("room.screen_account"))}</p><button id="sign-out-screen">${esc(t("room.sign_out_screen"))}</button>`
     : "";
-  frame(`<section class="sd-room-card"><p class="sd-eyebrow">${esc(t("room.facility_line", { facility: d.facility.name, location: d.location.name }))}</p><h1>${esc(t("room.welcome", { room: d.room.name }))}</h1><h2>${esc(t("room.entry_title"))}</h2>${account}${message ? `<p class="sd-notice" role="alert">${esc(message)}</p>` : ""}${decision?.booking?.exists ? `<p class="sd-muted">${esc(time(decision.booking.starts_at))}–${esc(time(decision.booking.ends_at))}</p>` : ""}${codeForm}${memberForm}</section>${demoCards()}`);
+  // The server refuses entry while any account is signed in here, so the forms
+  // are replaced by the sign-out button until the screen is clear.
+  frame(`<section class="sd-room-card"><p class="sd-eyebrow">${esc(t("room.facility_line", { facility: d.facility.name, location: d.location.name }))}</p><h1>${esc(t("room.welcome", { room: d.room.name }))}</h1><h2>${esc(t("room.entry_title"))}</h2>${account}${message ? `<p class="sd-notice" role="alert">${esc(message)}</p>` : ""}${decision?.booking?.exists ? `<p class="sd-muted">${esc(time(decision.booking.starts_at))}–${esc(time(decision.booking.ends_at))}</p>` : ""}${d.screen_account ? "" : codeForm + memberForm}</section>${d.screen_account ? "" : demoCards()}`);
+  // autofocus applies once per document; keyboard-wedge QR scanners type into the focused field.
+  $("#enter-code [name=credential]")?.focus();
   const submit = async (body) => {
     try {
       const result = await sedens("room/enter", body);
       state.session = result.session;
-      sessionView();
+      await sessionView();
     } catch (error) {
       if (error instanceof ApiError && error.code === "device_not_paired") return render();
       entryView(error.message, error.body?.decision);
@@ -127,11 +192,9 @@ async function sessionView() {
   sedens("room/event", { name: "room_screen_viewed", props: { screen: "session_home" } }).catch(() => {});
   const step = (text) => `<li><span>${esc(text)}</span><span class="sd-badge">${esc(t("room.coming"))}</span></li>`;
   frame(`<section class="sd-room-card"><p class="sd-eyebrow">${esc(t("room.facility_line", { facility: s.facility.name, location: s.location.name }))} · ${esc(s.room.name)}</p><h1>${esc(t("room.session_title", { name: s.customer.first_name }))}</h1><p class="sd-lead">${esc(t("room.session_body", { time: time(s.expires_at) }))}</p><h2>${esc(t("room.next_steps"))}</h2><ol class="sd-steps">${step(t("room.step_readiness"))}${step(t("room.step_scan"))}${step(t("room.step_session"))}</ol>${library ? `<p class="sd-muted">${esc(t("room.library_count", { count: library.items.length }))}</p>` : ""}<button class="sd-large" id="end">${esc(t("room.end"))}</button></section>`);
-  $("#end").onclick = async () => {
-    await sedens("room/end", {}).catch(() => {});
-    state.session = null;
-    await entryView(t("room.ended"));
-  };
+  $("#end").onclick = () => endSession(t("room.ended"));
+  stopPolling();
+  watchActivity(s.idle_minutes);
 }
 
 async function render() {
@@ -145,7 +208,7 @@ async function render() {
     } catch (error) {
       if (!(error instanceof ApiError) || error.status >= 500) throw error;
       state.session = null;
-      return entryView(["room_session_expired", "room_session_ended", "customer_signed_out"].includes(error.code) ? error.message : "");
+      return entryView(ENDED_CODES.includes(error.code) ? error.message : "");
     }
   } catch (error) {
     frame(`<section class="sd-room-card"><p class="sd-notice error">${esc(error.message || t("common.error"))}</p><button id="retry">${esc(t("common.back"))}</button></section>`);
