@@ -2,12 +2,14 @@
 
 import pytest
 
-from pilates.sedens import consent, onboarding
-from sedens_support import PASSWORD, Client, facility, make_sedens, running_server
+from pilates.sedens import consent
+from pilates.sedens import http as sedens_http
+from sedens_support import PASSWORD, Client, facility, make_sedens, running_server, sedens_staff
 
 
 @pytest.fixture
 def world(tmp_path):
+    sedens_http._LIMITS.clear()  # rate limits are per process; each test starts fresh
     sedens = make_sedens(tmp_path / "s.db")
     a = facility(sedens, "A")
     b = facility(sedens, "B")
@@ -103,20 +105,40 @@ def test_professor_registers_a_creator_studio(world):
 
 def test_reviewer_verifies_over_http(world):
     sedens, a, _, base = world
-    onboarding.bootstrap_sedens_org(sedens, name="Root", email="root@sedens.test", password=PASSWORD)
-    root_token = sedens.repo.login("root@sedens.test", PASSWORD)
+    _, _, reviewer_token = sedens_staff(sedens)
     signed_in(base, a["admin_token"]).call("POST", "/sedens/facility/capabilities", {"user_id": a["coach_id"], "capability": "creator"})
     coach = signed_in(base, a["coach_token"])
     coach.call("POST", "/sedens/creator/profile", {"display_name": "Coach A"})
     coach.call("POST", "/sedens/creator/verification/request")
-    reviewer = signed_in(base, root_token)
+    reviewer = signed_in(base, reviewer_token)
     status, queue = reviewer.call("GET", "/sedens/review/creators")
     assert status == 200 and queue["items"][0]["verification_state"] == "pending"
     status, body = signed_in(base, a["admin_token"]).call("GET", "/sedens/review/creators")
     assert status == 403
+    pending = queue["items"][0]
+    status, body = reviewer.call("POST", "/sedens/review/creators/decide",
+                                 {"creator_id": pending["id"], "decision": "verified"})
+    assert status == 409 and body["code"] == "profile_changed"
     status, decided = reviewer.call("POST", "/sedens/review/creators/decide",
-                                    {"creator_id": queue["items"][0]["id"], "decision": "verified"})
+                                    {"creator_id": pending["id"], "decision": "verified", "version": pending["version"]})
     assert status == 200 and decided["verification_state"] == "verified"
+
+
+def test_a_reviewer_cannot_take_over_sedens_accounts(world):
+    """Reviewers are coach accounts: the platform refuses them staff management,
+    and the SEDENS staff list is for SEDENS admins."""
+    sedens, _, _, base = world
+    root, reviewer_actor, reviewer_token = sedens_staff(sedens)
+    reviewer = signed_in(base, reviewer_token)
+    status, body = reviewer.call("GET", "/sedens/facility/people")
+    assert status == 403
+    status, _ = reviewer.call("POST", "/platform/people/save", {
+        "id": root.user_id, "name": "Root", "email": "root@sedens.test", "password": "attacker-pass-9", "roles": ["admin"]},
+        headers={"X-Platform-Request": "1"})
+    assert status == 403
+    assert sedens.repo.login("root@sedens.test", PASSWORD)
+    status, people = signed_in(base, sedens.repo.login("root@sedens.test", PASSWORD)).call("GET", "/sedens/facility/people")
+    assert status == 200 and reviewer_actor.user_id in {p["id"] for p in people["items"]}
 
 
 def test_facility_rooms_and_crm_are_admin_only(world):

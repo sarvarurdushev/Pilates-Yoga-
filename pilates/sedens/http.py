@@ -30,7 +30,7 @@ from .util import Denied
 
 _LIMITS = defaultdict(deque)
 _LIMIT_LOCK = threading.Lock()
-RATE = {"pairing": 10, "enter": 20, "demo": 10, "register": 5, "confirm": 20, "code": 10}
+RATE = {"pairing": 10, "enter": 20, "demo": 10, "register": 5, "confirm": 20, "code": 10, "affiliation": 10}
 
 
 def _client(h):
@@ -333,6 +333,7 @@ def _creator_affiliations(r):
 
 
 def _creator_affiliation_request(r):
+    _limit(r.h, "affiliation")
     actor = r.actor()
     with r.sedens.db() as db:
         return creators.request_affiliation(r.sedens, db, actor, r.body.get("org_id"), r.body.get("location_id"),
@@ -340,6 +341,7 @@ def _creator_affiliation_request(r):
 
 
 def _affiliation_revoke(r):
+    _limit(r.h, "affiliation")
     actor = r.actor()
     with r.sedens.db() as db:
         return creators.revoke_affiliation(r.sedens, db, actor, r.body.get("id"))
@@ -393,6 +395,11 @@ def _facility_people(r):
     if actor.role != "admin":
         raise Denied("Only a facility administrator can manage creator permissions.", 403, "admin_required")
     with r.sedens.db() as db:
+        # Facilities and creator studios manage their own creators. Inside the SEDENS
+        # organization the staff list and its permissions are for SEDENS admins only.
+        kind = r.sedens.org(db, actor.org_id)["kind"]
+        if kind not in capabilities.CREATOR_GRANTING_KINDS:
+            capabilities.require(r.sedens, db, actor, "sedens_admin")
         people = []
         for row in db.execute(
             "SELECT DISTINCT u.id,u.name FROM p_users u JOIN p_roles r ON r.user_id=u.id "
@@ -431,9 +438,9 @@ def _review_creators(r):
 
 def _review_decide(r):
     actor = r.actor()
-    with r.sedens.db() as db:
+    with r.sedens.batch(), r.sedens.db() as db:
         return creators.decide_verification(r.sedens, db, actor, r.body.get("creator_id"), r.body.get("decision"),
-                                            r.body.get("note", ""))
+                                            r.body.get("note", ""), r.body.get("version"))
 
 
 ROUTES = {

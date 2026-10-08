@@ -67,10 +67,31 @@ class Sedens:
 
     @staticmethod
     def audit(db, org_id, actor_id, action, subject, detail=None):
-        """Write the platform's own audit log, so SEDENS actions sit beside it."""
+        """Write the platform's own audit log, so SEDENS actions sit beside it.
+
+        ``p_audit.actor_id`` always names a user of ``org_id`` (or nobody): an
+        organization backup carries only its own users, and restore refuses a
+        reference to anyone else. When someone from another organization acts
+        (a SEDENS reviewer or admin), this organization's row names no user and
+        the action is recorded with its actor in the actor's own organization."""
+        actor_org = None
+        if actor_id is not None:
+            row = db.execute("SELECT org_id FROM p_users WHERE id=?", (actor_id,)).fetchone()
+            actor_org = row[0] if row else None
+        detail = dict(detail or {})
+        stamp = now()
+        if actor_id is not None and actor_org != org_id:
+            db.execute(
+                "INSERT INTO p_audit(org_id,actor_id,action,subject_id,created_at,detail) VALUES (?,?,?,?,?,?)",
+                (org_id, None, "sedens:" + action, str(subject), stamp,
+                 encode({**detail, "external_actor": True})),
+            )
+            if actor_org is None:
+                return
+            org_id, detail = actor_org, {**detail, "org_id": org_id}
         db.execute(
             "INSERT INTO p_audit(org_id,actor_id,action,subject_id,created_at,detail) VALUES (?,?,?,?,?,?)",
-            (org_id, actor_id, "sedens:" + action, str(subject), now(), encode(detail or {})),
+            (org_id, actor_id, "sedens:" + action, str(subject), stamp, encode(detail)),
         )
 
     @staticmethod

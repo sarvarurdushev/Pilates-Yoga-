@@ -6,10 +6,10 @@ An affiliation distributes content; it never opens a facility's customer data.
 
 import pytest
 
-from pilates.platform.repository import Actor, Refused
+from pilates.platform.repository import Refused
 from pilates.sedens import capabilities, creators, onboarding
 from pilates.sedens.util import Denied
-from sedens_support import PASSWORD, add_user, facility, make_sedens
+from sedens_support import PASSWORD, add_user, facility, make_sedens, sedens_staff
 
 
 @pytest.fixture
@@ -81,13 +81,26 @@ def test_sedens_org_bootstrap_and_admin_grants(world):
     sedens, a, _ = world
     created = onboarding.bootstrap_sedens_org(sedens, name="Root", email="root@sedens.test", password=PASSWORD)
     root = sedens.repo.actor(sedens.repo.login("root@sedens.test", PASSWORD))
+    reviewer_id = add_user(sedens.repo, root.org_id, "Reviewer", ["coach"])
+    other_admin = add_user(sedens.repo, root.org_id, "Other admin", ["admin"])
+    plain_admin = sedens.repo.actor(sedens.repo.issue(other_admin, "admin"))
     with sedens.db() as db:
         assert sedens.org(db, created["org_id"])["kind"] == "sedens"
-        assert capabilities.effective(sedens, db, root) == {"sedens_admin", "sedens_reviewer"}
-        reviewer_id = add_user(sedens.repo, root.org_id, "Reviewer", ["admin"])
+        assert capabilities.effective(sedens, db, root) == {"sedens_admin"}
         capabilities.grant(sedens, db, root, reviewer_id, "sedens_reviewer")
+        # A reviewer is a coach account: an administrator account cannot hold it.
+        with pytest.raises(Denied) as exc:
+            capabilities.grant(sedens, db, root, other_admin, "sedens_reviewer")
+        assert exc.value.code == "role_not_eligible"
         # A SEDENS admin may grant creator anywhere in the same environment.
         assert "creator" in capabilities.grant(sedens, db, root, a["coach_id"], "creator")
+        # Inside the SEDENS organization, creator grants and revocations both need a SEDENS admin.
+        capabilities.grant(sedens, db, root, reviewer_id, "creator")
+        for change in (capabilities.grant, capabilities.revoke):
+            with pytest.raises(Denied) as exc:
+                change(sedens, db, plain_admin, reviewer_id, "creator")
+            assert exc.value.code == "not_permitted"
+        assert "creator" in capabilities.held(sedens, db, reviewer_id)
         with pytest.raises(Denied, match="SEDENS organization"):
             capabilities.grant(sedens, db, root, a["admin"].user_id, "sedens_reviewer")
 
@@ -173,8 +186,7 @@ def test_creator_cannot_verify_themselves(world):
 
 def test_sedens_reviewer_verifies(world):
     sedens, a, _ = world
-    onboarding.bootstrap_sedens_org(sedens, name="Root", email="root2@sedens.test", password=PASSWORD)
-    root = sedens.repo.actor(sedens.repo.login("root2@sedens.test", PASSWORD))
+    _, root, _ = sedens_staff(sedens, "root2@sedens.test")
     with sedens.db() as db:
         capabilities.grant(sedens, db, a["admin"], a["coach_id"], "creator")
         coach = coach_actor(sedens, a)
@@ -184,7 +196,8 @@ def test_sedens_reviewer_verifies(world):
             creators.decide_verification(sedens, db, root, profile["id"], "verified")
         assert exc.value.code == "not_pending"
         creators.request_verification(sedens, db, coach)
-        decided = creators.decide_verification(sedens, db, root, profile["id"], "verified", "Checked certificate")
+        decided = creators.decide_verification(sedens, db, root, profile["id"], "verified", "Checked certificate",
+                                               version=profile["version"])
         assert decided["verification_state"] == "verified" and decided["self_declared"] is False
         # Re-saving identical details keeps the verification...
         same = creators.save_profile(sedens, db, coach, {"display_name": "C"})
@@ -198,12 +211,32 @@ def test_sedens_reviewer_verifies(world):
         assert tuple(row) == (None, None)
 
 
+def test_a_verification_names_the_content_the_reviewer_saw(world):
+    """A creator who edits (and asks again) while a reviewer is looking does not get the edit verified."""
+    sedens, a, _ = world
+    _, reviewer, _ = sedens_staff(sedens, "root4@sedens.test")
+    with sedens.db() as db:
+        capabilities.grant(sedens, db, a["admin"], a["coach_id"], "creator")
+        coach = coach_actor(sedens, a)
+        creators.save_profile(sedens, db, coach, {"display_name": "Coach A", "bio": "Mat Pilates instructor"})
+        seen = creators.request_verification(sedens, db, coach)
+        creators.save_profile(sedens, db, coach, {"display_name": "Dr. Coach A, MD", "bio": "Treats back pain"})
+        again = creators.request_verification(sedens, db, coach)
+        assert again["verification_state"] == "pending" and again["version"] != seen["version"]
+        for version in (seen["version"], None):
+            with pytest.raises(Denied) as exc:
+                creators.decide_verification(sedens, db, reviewer, seen["id"], "verified", version=version)
+            assert exc.value.code == "profile_changed"
+        assert creators.own_profile(sedens, db, coach)["verification_state"] == "pending"
+        # Rejecting needs no version: it never vouches for content.
+        assert creators.decide_verification(sedens, db, reviewer, seen["id"], "rejected")["verification_state"] == "rejected"
+
+
 def test_a_reviewer_cannot_verify_their_own_profile(world):
     sedens, a, _ = world
-    onboarding.bootstrap_sedens_org(sedens, name="Root", email="root3@sedens.test", password=PASSWORD)
-    root = sedens.repo.actor(sedens.repo.login("root3@sedens.test", PASSWORD))
+    admin, root, _ = sedens_staff(sedens, "root3@sedens.test")
     with sedens.db() as db:
-        capabilities.grant(sedens, db, root, root.user_id, "creator")
+        capabilities.grant(sedens, db, admin, root.user_id, "creator")
         profile = creators.save_profile(sedens, db, root, {"display_name": "Root"})
         creators.request_verification(sedens, db, root)
         with pytest.raises(Denied) as exc:
@@ -308,13 +341,72 @@ def test_only_the_target_facility_admin_decides(world):
                     if t["org_id"] == b["org_id"]]
 
 
+def test_a_facility_decline_stands(world):
+    """A declined or facility-revoked creator cannot reopen the request at once."""
+    sedens, a, b = world
+    with sedens.db() as db:
+        capabilities.grant(sedens, db, a["admin"], a["coach_id"], "creator")
+        coach = coach_actor(sedens, a)
+        creators.save_profile(sedens, db, coach, {"display_name": "Coach A"})
+        req = creators.request_affiliation(sedens, db, coach, b["org_id"])
+        creators.decide_affiliation(sedens, db, b["admin"], req["id"], "decline")
+        with pytest.raises(Denied) as exc:
+            creators.request_affiliation(sedens, db, coach, b["org_id"])
+        assert exc.value.code == "recently_declined"
+        # After the cooling-off period the creator may ask again.
+        db.execute("UPDATE s_creator_facility_affiliations SET decided_at='2020-01-01T00:00:00+00:00' WHERE id=?", (req["id"],))
+        again = creators.request_affiliation(sedens, db, coach, b["org_id"])
+        assert again["status"] == "requested"
+        # A creator who withdraws their own request may ask again straight away.
+        creators.revoke_affiliation(sedens, db, coach, again["id"])
+        assert creators.request_affiliation(sedens, db, coach, b["org_id"])["status"] == "requested"
+        # A facility that ends an approved affiliation is also a "no".
+        creators.decide_affiliation(sedens, db, b["admin"], again["id"], "approve")
+        creators.revoke_affiliation(sedens, db, b["admin"], again["id"])
+        with pytest.raises(Denied) as exc:
+            creators.request_affiliation(sedens, db, coach, b["org_id"])
+        assert exc.value.code == "recently_declined"
+
+
+def test_a_creator_never_writes_into_another_facility_audit_log(world):
+    sedens, a, b = world
+    with sedens.db() as db:
+        capabilities.grant(sedens, db, a["admin"], a["coach_id"], "creator")
+        coach = coach_actor(sedens, a)
+        creators.save_profile(sedens, db, coach, {"display_name": "Coach A"})
+        before = db.execute("SELECT count(*) FROM p_audit WHERE org_id=?", (b["org_id"],)).fetchone()[0]
+        for _ in range(3):
+            req = creators.request_affiliation(sedens, db, coach, b["org_id"])
+            creators.revoke_affiliation(sedens, db, coach, req["id"])
+        assert db.execute("SELECT count(*) FROM p_audit WHERE org_id=?", (b["org_id"],)).fetchone()[0] == before
+        own = db.execute("SELECT count(*) FROM p_audit WHERE org_id=? AND action LIKE 'sedens:affiliation:%'",
+                         (a["org_id"],)).fetchone()[0]
+        assert own == 6
+
+
+def test_affiliation_changes_are_rate_limited():
+    from types import SimpleNamespace
+
+    from pilates.sedens import http as sedens_http
+
+    h = SimpleNamespace(headers={}, client_address=("203.0.113.9", 1), sedens=None)
+    try:
+        for _ in range(sedens_http.RATE["affiliation"]):
+            sedens_http._limit(h, "affiliation")
+        with pytest.raises(Denied) as exc:
+            sedens_http._limit(h, "affiliation")
+        assert exc.value.code == "rate_limited"
+    finally:
+        sedens_http._LIMITS.pop(("affiliation", "203.0.113.9"), None)
+
+
 def test_facility_admin_sees_public_creator_details_only(affiliated):
     sedens, a, b, coach, _ = affiliated
     with sedens.db() as db:
         items = creators.facility_affiliations(sedens, db, b["admin"])
     creator = items[0]["creator"]
     assert set(creator) == {"id", "display_name", "creator_type", "bio", "institution", "qualifications",
-                            "specialties", "slug", "verification_state", "self_declared"}
+                            "specialties", "slug", "verification_state", "self_declared", "version"}
 
 
 def test_revocation_by_either_side(affiliated):
@@ -337,6 +429,22 @@ def test_demo_and_real_never_affiliate(world, tmp_path):
         with pytest.raises(Denied) as exc:
             creators.request_affiliation(sedens, db, coach, "demo-" + "e" * 32)
         assert exc.value.code == "environment_mismatch"
+
+
+def test_demonstrations_never_affiliate_with_each_other(world):
+    """A demonstration org id carries its key; one visitor's demo never meets another's."""
+    sedens, _, _ = world
+    sedens.repo.demo_login("1" * 32, "admin")
+    other = "demo-" + "2" * 32
+    sedens.repo.demo_login("2" * 32, "admin")
+    admin = sedens.repo.actor(sedens.repo.demo_login("1" * 32, "admin"))
+    coach = sedens.repo.actor(sedens.repo.demo_login("1" * 32, "coach"))
+    with sedens.db() as db:
+        capabilities.grant(sedens, db, admin, coach.user_id, "creator")
+        creators.save_profile(sedens, db, coach, {"display_name": "Demo coach"})
+        with pytest.raises(Denied) as exc:
+            creators.request_affiliation(sedens, db, coach, other)
+        assert exc.value.code == "demo_affiliation"
 
 
 def test_affiliation_requests_target_facilities_only(world):

@@ -34,13 +34,16 @@ def register_creator_studio(sedens, *, name, email, password, studio_name="", di
 
 
 def bootstrap_sedens_org(sedens, *, name, email, password, organization="SEDENS International") -> dict:
-    """Command-line only: the SEDENS organization and its first platform admin."""
+    """Command-line only: the SEDENS organization and its first platform admin.
+
+    Reviewers are added afterwards as ``coach`` accounts of this organization and
+    given ``sedens_reviewer`` by a SEDENS admin: a reviewer needs no
+    administrator role, and an administrator can manage every account here."""
     with sedens.batch():
         session_token = sedens.repo.create_org(name, email, password, organization)
         actor = sedens.repo.actor(session_token)
         with sedens.db() as db:
             sedens.set_org_profile(db, actor.org_id, "sedens", organization, "en")
-            for capability in ("sedens_admin", "sedens_reviewer"):
-                capabilities.grant(sedens, db, None, actor.user_id, capability, cli=True)
+            capabilities.grant(sedens, db, None, actor.user_id, "sedens_admin", cli=True)
             sedens.repo.logout(session_token)
     return {"org_id": actor.org_id, "user_id": actor.user_id}

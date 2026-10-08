@@ -16,9 +16,10 @@ facility B.
 from __future__ import annotations
 
 import re
+from datetime import timedelta
 
 from . import capabilities
-from .util import Denied, decode, encode, now, text, uid
+from .util import Denied, decode, digest, encode, now, parse, text, uid, utcnow
 
 TYPES_BY_ORG_KIND = {
     "facility": ("coach", "professor", "expert"),
@@ -27,6 +28,8 @@ TYPES_BY_ORG_KIND = {
 }
 DEFAULT_TYPE = {"facility": "coach", "creator_studio": "professor", "sedens": "sedens_editorial"}
 VERIFICATION_DECISIONS = ("verified", "rejected", "suspended", "unverified")
+# A facility's "no" stands this long before the same creator may ask again.
+DECLINE_COOLDOWN_DAYS = 30
 # Editing any of these after review means the review no longer describes the profile.
 REVIEWED_FIELDS = ("display_name", "creator_type", "bio", "institution", "qualifications", "specialties")
 
@@ -64,7 +67,14 @@ def public(row) -> dict | None:
         "verification_state": row["verification_state"],
         # Self-declared fields are labelled as such until a reviewer verifies.
         "self_declared": row["verification_state"] != "verified",
+        # A reviewer verifies this exact content: the decision must repeat it.
+        "version": content_version(row),
     }
+
+
+def content_version(row) -> str:
+    """Fingerprint of the reviewed fields, so a verification names what was reviewed."""
+    return digest(encode([row[field] for field in REVIEWED_FIELDS]))[:16]
 
 
 def profile_row(db, user_id):
@@ -137,7 +147,9 @@ def request_verification(sedens, db, actor):
     return public(profile_row(db, actor.user_id))
 
 
-def decide_verification(sedens, db, actor, creator_id, decision, note=""):
+def decide_verification(sedens, db, actor, creator_id, decision, note="", version=None):
+    """Run inside ``sedens.batch()`` so the profile cannot change between the
+    check and the decision."""
     capabilities.require(sedens, db, actor, "sedens_reviewer")
     if decision not in VERIFICATION_DECISIONS:
         raise Denied("Choose verified, rejected, suspended or unverified.", 400, "invalid")
@@ -153,11 +165,17 @@ def decide_verification(sedens, db, actor, creator_id, decision, note=""):
         raise Denied("Another SEDENS reviewer must review your own creator profile.", 403, "self_review")
     if decision == "verified" and row["verification_state"] != "pending":
         raise Denied("Only a profile waiting for review can be verified.", 409, "not_pending")
+    if decision == "verified" and version != content_version(row):
+        raise Denied("This profile changed after you opened it. Review it again.", 409, "profile_changed")
     stamp = now()
-    db.execute(
-        "UPDATE s_creator_profiles SET verification_state=?, verified_by=?, verified_at=?, verification_note=?, updated_at=? WHERE id=?",
-        (decision, actor.user_id, stamp, text(note, 1000, "Note"), stamp, creator_id),
-    )
+    changed = db.execute(
+        "UPDATE s_creator_profiles SET verification_state=?, verified_by=?, verified_at=?, verification_note=?, updated_at=? "
+        "WHERE id=? AND verification_state=? AND updated_at=?",
+        (decision, actor.user_id, stamp, text(note, 1000, "Note"), stamp, creator_id,
+         row["verification_state"], row["updated_at"]),
+    ).rowcount
+    if not changed:
+        raise Denied("This profile changed after you opened it. Review it again.", 409, "profile_changed")
     sedens.audit(db, row["org_id"], actor.user_id, "creator:verification", creator_id, {"decision": decision})
     return public(db.execute("SELECT * FROM s_creator_profiles WHERE id=?", (creator_id,)).fetchone())
 
@@ -197,6 +215,10 @@ def request_affiliation(sedens, db, actor, org_id, location_id=None, note=""):
         raise Denied("Your own facility does not need an affiliation.", 400, "own_facility")
     if target["demo"] != actor.demo:
         raise Denied("Choose a facility in the same environment.", 403, "environment_mismatch")
+    if target["demo"]:
+        # A demonstration organization's id carries its demonstration key, so one
+        # visitor's demonstration never deals with another's.
+        raise Denied("Demonstration facilities do not take affiliation requests.", 403, "demo_affiliation")
     if location_id and not db.execute(
         "SELECT 1 FROM p_locations WHERE id=? AND org_id=?", (location_id, org_id)
     ).fetchone():
@@ -208,6 +230,8 @@ def request_affiliation(sedens, db, actor, org_id, location_id=None, note=""):
     stamp = now()
     if existing and existing["status"] in ("requested", "approved"):
         return _affiliation(existing)
+    if existing and _facility_said_no(existing) and parse(existing["decided_at"]) > utcnow() - timedelta(days=DECLINE_COOLDOWN_DAYS):
+        raise Denied("This facility declined your request recently. You can ask again later.", 409, "recently_declined")
     if existing:
         db.execute(
             "UPDATE s_creator_facility_affiliations SET status='requested', requested_by=?, requested_at=?, decided_by=NULL, decided_at=NULL, note=? WHERE id=?",
@@ -220,9 +244,17 @@ def request_affiliation(sedens, db, actor, org_id, location_id=None, note=""):
             "INSERT INTO s_creator_facility_affiliations(id,creator_id,org_id,location_id,status,requested_by,requested_at,note) VALUES (?,?,?,?,?,?,?,?)",
             (identifier, profile["id"], org_id, location_id or None, "requested", actor.user_id, stamp, text(note, 500, "Note")),
         )
+    # The facility sees requests in its affiliation list. An actor writes only to
+    # their own organization's audit log, never into another facility's.
     sedens.audit(db, actor.org_id, actor.user_id, "affiliation:request", identifier, {"org_id": org_id})
-    sedens.audit(db, org_id, actor.user_id, "affiliation:request", identifier, {"creator_id": profile["id"]})
     return _affiliation(db.execute("SELECT * FROM s_creator_facility_affiliations WHERE id=?", (identifier,)).fetchone())
+
+
+def _facility_said_no(row) -> bool:
+    """Declined, or withdrawn by the facility rather than by the creator."""
+    if row["decided_at"] is None:
+        return False
+    return row["status"] == "declined" or (row["status"] == "revoked" and row["decided_by"] != row["requested_by"])
 
 
 def decide_affiliation(sedens, db, actor, affiliation_id, decision):
@@ -257,7 +289,7 @@ def revoke_affiliation(sedens, db, actor, affiliation_id):
             "UPDATE s_creator_facility_affiliations SET status='revoked', decided_by=?, decided_at=? WHERE id=?",
             (actor.user_id, now(), affiliation_id),
         )
-        sedens.audit(db, row["org_id"], actor.user_id, "affiliation:revoke", affiliation_id)
+        sedens.audit(db, actor.org_id, actor.user_id, "affiliation:revoke", affiliation_id, {"org_id": row["org_id"]})
     return _affiliation(db.execute("SELECT * FROM s_creator_facility_affiliations WHERE id=?", (affiliation_id,)).fetchone())
 
 

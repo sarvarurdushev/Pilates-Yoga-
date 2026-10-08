@@ -264,3 +264,41 @@ def test_existing_pages_and_anatomy_are_still_served(migrated, monkeypatch):
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_backups_still_restore_after_cross_organization_sedens_actions(tmp_path):
+    """A SEDENS reviewer, a SEDENS admin and a creator from another facility act on
+    facilities A and B. Each facility's own backup must still restore: no audit row
+    of theirs may name a user from another organization."""
+    from pilates.platform.backup import export_archive, restore_archive
+    from pilates.sedens import capabilities, creators
+    from sedens_support import facility, sedens_staff
+
+    sedens = make_sedens(tmp_path / "s.db")
+    a, b = facility(sedens, "A"), facility(sedens, "B")
+    root, reviewer, _ = sedens_staff(sedens)
+    coach_a = sedens.repo.actor(a["coach_token"])
+    with sedens.db() as db:
+        capabilities.grant(sedens, db, a["admin"], a["coach_id"], "creator")
+        capabilities.grant(sedens, db, root, b["coach_id"], "creator")  # SEDENS admin into B
+        profile = creators.save_profile(sedens, db, coach_a, {"display_name": "Coach A"})
+        creators.request_verification(sedens, db, coach_a)
+        creators.decide_verification(sedens, db, reviewer, profile["id"], "verified",
+                                     version=profile["version"])  # SEDENS reviewer into A
+        request = creators.request_affiliation(sedens, db, coach_a, b["org_id"])  # A's creator to B
+        creators.decide_affiliation(sedens, db, b["admin"], request["id"], "approve")
+        creators.revoke_affiliation(sedens, db, coach_a, request["id"])
+        foreign = db.execute(
+            "SELECT count(*) FROM p_audit x JOIN p_users u ON u.id=x.actor_id WHERE u.org_id<>x.org_id"
+        ).fetchone()[0]
+        assert foreign == 0
+        # The outside action is still recorded, without naming the person, in the facility...
+        assert db.execute("SELECT 1 FROM p_audit WHERE org_id=? AND action='sedens:creator:verification' "
+                          "AND actor_id IS NULL", (a["org_id"],)).fetchone()
+        # ...and with the person in the actor's own organization.
+        assert db.execute("SELECT 1 FROM p_audit WHERE org_id=? AND action='sedens:creator:verification' "
+                          "AND actor_id=?", (root.org_id, reviewer.user_id)).fetchone()
+    for label, fac in (("A", a), ("B", b)):
+        fresh = sedens.repo.actor(sedens.repo.create_org("Owner", f"restore-{label}@example.test", PASSWORD, "Restored"))
+        with export_archive(sedens.repo, fac["admin"]) as archive:
+            assert restore_archive(sedens.repo, fresh, archive)["restored_records"] > 0

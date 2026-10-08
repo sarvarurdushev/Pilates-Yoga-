@@ -42,6 +42,20 @@ def add_user(repo, org_id, name, roles, location_id=None, coach_id=None):
     return user_id
 
 
+def sedens_staff(sedens, email="root@sedens.test"):
+    """The SEDENS organization: its admin and a reviewer coach account, as Actors,
+    and the reviewer's session token."""
+    from pilates.sedens import capabilities, onboarding
+
+    onboarding.bootstrap_sedens_org(sedens, name="Root", email=email, password=PASSWORD)
+    root = sedens.repo.actor(sedens.repo.login(email, PASSWORD))
+    reviewer_id = add_user(sedens.repo, root.org_id, "Reviewer", ["coach"])
+    with sedens.db() as db:
+        capabilities.grant(sedens, db, root, reviewer_id, "sedens_reviewer")
+    token = sedens.repo.issue(reviewer_id, "coach")
+    return root, sedens.repo.actor(token), token
+
+
 def facility(sedens, label="A", rooms=("AI Private Room 01",)):
     """A real facility with one location, rooms, an admin, a coach and two customers."""
     repo = sedens.repo

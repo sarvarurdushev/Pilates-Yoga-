@@ -9,9 +9,15 @@ never widens customer-data access:
                      administrator, by a SEDENS platform admin, or on signing up
                      a dedicated creator organization.
 ``sedens_reviewer``  review creators and content. Only users of the SEDENS
-                     organization (``kind='sedens'``) can hold it.
-``sedens_admin``     SEDENS platform administration. Same restriction; granted
-                     by the command line or by another SEDENS admin.
+                     organization (``kind='sedens'``) can hold it, on a
+                     ``coach`` account: a reviewer needs no administrator role,
+                     and must not have one, because any administrator of an
+                     organization can manage every account in it through the
+                     coaching workspace.
+``sedens_admin``     SEDENS platform administration. Same organization; granted
+                     by the command line or by another SEDENS admin. Every
+                     ``admin`` account of the SEDENS organization is therefore
+                     trusted like a SEDENS admin.
 
 A capability is effective only while the grant is unrevoked, the user is
 active, the user's organization kind allows it and the *current session role*
@@ -28,14 +34,21 @@ SEDENS_ONLY = ("sedens_reviewer", "sedens_admin")
 # Session roles under which a capability may be exercised.
 ACTING_ROLES = {
     "creator": ("coach", "admin"),
-    "sedens_reviewer": ("admin",),
+    "sedens_reviewer": ("coach",),
     "sedens_admin": ("admin",),
 }
 # Roles the target account must hold to receive a grant at all.
 HOLDER_ROLES = {
     "creator": ("coach", "admin"),
-    "sedens_reviewer": ("admin",),
+    "sedens_reviewer": ("coach",),
     "sedens_admin": ("admin",),
+}
+# Organizations whose own administrator may grant and revoke ``creator``.
+CREATOR_GRANTING_KINDS = ("facility", "creator_studio")
+ROLE_MESSAGES = {
+    "creator": "This permission needs a coach or administrator account.",
+    "sedens_reviewer": "The SEDENS reviewer permission needs a coach account of the SEDENS organization.",
+    "sedens_admin": "The SEDENS admin permission needs an administrator account of the SEDENS organization.",
 }
 
 
@@ -74,12 +87,22 @@ def require(sedens, db, actor, capability):
         raise Denied(
             {
                 "creator": "Creator tools need a creator permission on a coach or administrator account.",
-                "sedens_reviewer": "This action needs a SEDENS reviewer permission.",
+                "sedens_reviewer": "This action needs a SEDENS reviewer permission, used from a coach sign-in.",
                 "sedens_admin": "This action needs a SEDENS platform administrator permission.",
             }[capability],
             403,
             "capability_required",
         )
+
+
+def _same_org_admin(granter, granter_org, target) -> bool:
+    """A facility or creator studio administrator acting on their own account holders.
+    The SEDENS organization's creator grants go through a SEDENS admin."""
+    return (
+        granter.role == "admin"
+        and granter.org_id == target["org_id"]
+        and granter_org["kind"] in CREATOR_GRANTING_KINDS
+    )
 
 
 def grant(sedens, db, granter, user_id, capability, *, cli=False):
@@ -91,13 +114,7 @@ def grant(sedens, db, granter, user_id, capability, *, cli=False):
         raise Denied("Choose an active account.", 404, "unknown_user")
     target_org = sedens.org(db, target["org_id"])
     if not set(HOLDER_ROLES[capability]) & set(target["roles"]):
-        raise Denied(
-            "This permission needs a coach or administrator account."
-            if capability == "creator"
-            else "SEDENS permissions need an administrator account of the SEDENS organization.",
-            400,
-            "role_not_eligible",
-        )
+        raise Denied(ROLE_MESSAGES[capability], 400, "role_not_eligible")
     if capability in SEDENS_ONLY and target_org["kind"] != "sedens":
         raise Denied(
             "SEDENS reviewer and admin permissions are only for the SEDENS organization.",
@@ -113,12 +130,7 @@ def grant(sedens, db, granter, user_id, capability, *, cli=False):
             raise Denied("Choose an account in the same environment.", 403, "environment_mismatch")
         is_platform_admin = has(sedens, db, granter, "sedens_admin")
         if capability == "creator":
-            same_org_admin = (
-                granter.role == "admin"
-                and granter.org_id == target["org_id"]
-                and granter_org["kind"] in ("facility", "creator_studio")
-            )
-            if not (same_org_admin or is_platform_admin):
+            if not (_same_org_admin(granter, granter_org, target) or is_platform_admin):
                 raise Denied(
                     "Only this organization's administrator or a SEDENS admin can grant creator tools.",
                     403,
@@ -152,7 +164,7 @@ def revoke(sedens, db, granter, user_id, capability, *, cli=False):
         if granter_org["demo"] != target_org["demo"]:
             raise Denied("Choose an account in the same environment.", 403, "environment_mismatch")
         is_platform_admin = has(sedens, db, granter, "sedens_admin")
-        same_org_admin = granter.role == "admin" and granter.org_id == target["org_id"]
+        same_org_admin = _same_org_admin(granter, granter_org, target)
         allowed = is_platform_admin or (capability == "creator" and same_org_admin)
         if not allowed:
             raise Denied("You cannot change this permission.", 403, "not_permitted")
