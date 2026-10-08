@@ -34,11 +34,12 @@ RATE = {"pairing": 10, "enter": 20, "demo": 10, "register": 5, "confirm": 20, "c
 
 
 def _client(h):
-    """The visitor's address. Behind Render's proxy the socket peer is the proxy,
-    so the right-most X-Forwarded-For hop (appended by that proxy) is used."""
+    """The visitor's address. Behind a hosting proxy (Render, Hugging Face) the
+    socket peer is the proxy, so the right-most X-Forwarded-For hop (appended by
+    that proxy) is used."""
     sedens = getattr(h, "sedens", None)
     forwarded = h.headers.get("X-Forwarded-For", "")
-    if sedens is not None and sedens.mode.render and forwarded.strip():
+    if sedens is not None and sedens.mode.hosted and forwarded.strip():
         return forwarded.split(",")[-1].strip()
     return h.client_address[0]
 
@@ -192,6 +193,11 @@ def _enter(r):
 
 def _access_code(r):
     _limit(r.h, "code")
+    with r.sedens.db() as db:
+        on_room_screen = rooms.device_for_token(r.sedens, db, r.device_token) is not None
+    if on_room_screen:
+        # The code proves the customer holds their own signed-in device.
+        raise Denied("Ask for your room code on your own phone, not on the room screen.", 403, "room_screen")
     return rooms.issue_access_code(r.sedens, r.actor())
 
 
@@ -515,7 +521,7 @@ def dispatch(h, method, route):
         if getattr(exc, "decision", None):
             payload["decision"] = exc.decision
         cookies = list(request.set_cookies)
-        if exc.code in ("room_session_expired", "room_session_ended", "customer_signed_out"):
+        if exc.code in ("room_session_expired", "room_session_ended", "room_session_idle"):
             cookies.append(_cookie(h, rooms.ROOM_COOKIE, "", "/sedens/", 0))
         _respond(h, payload, exc.status, cookies)
     except Refused as exc:

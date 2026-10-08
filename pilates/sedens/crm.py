@@ -117,6 +117,8 @@ class CRMProvider:
     simulated = False
     methods: tuple[str, ...] = ()
     demo_only = False
+    # True only when this provider can see bookings, so booking rules apply.
+    checks_bookings = False
 
     def verify_entry(self, sedens, db, request: EntryRequest, config: dict) -> EntryDecision:
         raise NotImplementedError
@@ -145,7 +147,10 @@ def _assigned(db, student_id, location_id) -> bool:
 
 
 class NoCRMProvider(CRMProvider):
-    """The facility's own SEDENS records are the only source of membership."""
+    """The facility's own SEDENS records are the only source of membership.
+
+    It sees no bookings, so booking rules cannot be switched on for it: a
+    facility without a CRM lets its assigned customers enter at any time."""
 
     name = "none"
     methods = ("access_code",)
@@ -182,6 +187,7 @@ class DemoCRMProvider(CRMProvider):
     """
 
     name = "demo"
+    checks_bookings = True
     simulated = True
     demo_only = True
     methods = ("access_code", "qr", "reservation", "member_id")
@@ -290,7 +296,9 @@ def public_settings(db, org_id) -> dict:
         "enabled": value["enabled"],
         "simulated": PROVIDERS[value["provider"]].simulated,
         "methods": list(PROVIDERS[value["provider"]].methods),
-        "require_booking": bool(config.get("require_booking", value["provider"] != "none")),
+        # Booking rules exist only where the provider can see bookings.
+        "booking_rules": PROVIDERS[value["provider"]].checks_bookings,
+        "require_booking": PROVIDERS[value["provider"]].checks_bookings and bool(config.get("require_booking", True)),
         "booking_grace_minutes": int(config.get("booking_grace_minutes", 15)),
         "updated_at": value["updated_at"],
     }
@@ -344,6 +352,12 @@ def update_policy(sedens, db, actor, *, enabled=None, require_booking=None, book
         raise Denied("Only a facility administrator can change CRM settings.", 403, "admin_required")
     current = settings(db, actor.org_id)
     config = dict(current["config"])
+    if (require_booking is not None or booking_grace_minutes is not None) and not PROVIDERS[current["provider"]].checks_bookings:
+        raise Denied(
+            "Booking rules need a connected booking system. Without one, customers assigned to a location may enter its rooms at any time.",
+            400,
+            "booking_rules_need_crm",
+        )
     if require_booking is not None:
         config["require_booking"] = bool(require_booking)
     if booking_grace_minutes is not None:

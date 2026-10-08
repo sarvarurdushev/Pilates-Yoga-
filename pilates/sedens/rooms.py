@@ -52,6 +52,16 @@ def session_minutes(env=None) -> int:
     return max(15, min(240, value))
 
 
+def idle_minutes(env=None) -> int:
+    """A room session with no room request for this long is closed."""
+    env = os.environ if env is None else env
+    try:
+        value = int(env.get("SEDENS_ROOM_IDLE_MINUTES", "15"))
+    except ValueError:
+        value = 15
+    return max(5, min(60, value))
+
+
 @dataclass(frozen=True)
 class Device:
     id: str
@@ -397,7 +407,7 @@ def _platform_actor(sedens, platform_token):
 ENTRY_MESSAGES = {
     "customer_required": ("Room access codes are for customers. Staff accounts cannot start a room session.", 403),
     "staff_signed_in": ("A staff account is signed in on this screen. Sign it out before a customer enters.", 403),
-    "different_customer_signed_in": ("Another person is signed in on this screen. Sign them out first.", 403),
+    "account_signed_in": ("An account is signed in on this screen. Sign it out first, then enter with a room code from your own phone.", 403),
     "access_code_invalid": ("This room code is not valid. Ask for a new code on your phone.", 403),
     "wrong_facility": ("This code belongs to a different facility.", 403),
     "wrong_location": ("This entry is for a different location.", 403),
@@ -424,7 +434,8 @@ def issue_access_code(sedens, actor) -> dict:
             raise Denied("Room access codes belong to a facility membership.", 400, "not_a_facility")
         if org["demo"] and not sedens.mode.demo_enabled:
             raise Denied("Demonstrations are switched off on this server.", 404, "demo_disabled")
-        if _customer(db, actor.user_id, actor.org_id) is None:
+        customer = _customer(db, actor.user_id, actor.org_id)
+        if customer is None:
             raise Denied("This SEDENS profile is not active at this facility.", 403, "customer_not_active")
         stamp = now()
         db.execute(
@@ -445,7 +456,10 @@ def issue_access_code(sedens, actor) -> dict:
                 (uid(), actor.org_id, actor.user_id, digest(code), stamp, expires),
             )
             sedens.audit(db, actor.org_id, actor.user_id, "room:access-code", actor.user_id)
-            return {"code": code[:4] + "-" + code[4:], "expires_at": expires, "single_use": True}
+            # Named so the phone shows whose code it is, even if the sign-in changed in another tab.
+            return {"code": code[:4] + "-" + code[4:], "expires_at": expires, "single_use": True,
+                    "customer": {"first_name": customer["name"].split(" ")[0]},
+                    "facility": {"name": org["display_name"]}}
     raise Denied("Could not create a room code. Retry.", 503, "access_code_unavailable")
 
 
@@ -462,9 +476,9 @@ def _access_code(db, credential):
 def enter(sedens, device_token, *, method, credential="", pin="", platform_token="") -> dict:
     """Identify a customer on a paired screen and open a room session.
 
-    ``platform_token`` is only inspected to refuse entry while a staff member or
-    a different person is signed in on the shared screen; it never identifies
-    the customer.
+    ``platform_token`` is only inspected to refuse entry while any account is
+    signed in on the shared screen (a sign-in there would outlive the room
+    session); it never identifies the customer.
     """
     denied = None
     result = None
@@ -479,8 +493,8 @@ def enter(sedens, device_token, *, method, credential="", pin="", platform_token
             credential=text(credential, 200, "Code"), pin=text(pin, 20, "PIN"),
         )
         reason, decision, student_id, code_row = None, None, None, None
-        if actor is not None and actor.role != "student":
-            reason = "staff_signed_in"
+        if actor is not None:
+            reason = "staff_signed_in" if actor.role != "student" else "account_signed_in"
         elif method == "access_code":
             code_row = _access_code(db, request.credential)
             if code_row is None:
@@ -508,8 +522,6 @@ def enter(sedens, device_token, *, method, credential="", pin="", platform_token
                 reason = "member_not_linked"
             elif _customer(db, student_id, device.org_id) is None:
                 reason = "customer_not_active"
-            elif actor is not None and actor.user_id != student_id:
-                reason = "different_customer_signed_in"
         if reason is not None:
             analytics.record(
                 db, "room_entry_denied", org_id=device.org_id, room_id=device.room_id, device_id=device.id,
@@ -539,14 +551,14 @@ def enter(sedens, device_token, *, method, credential="", pin="", platform_token
             room_token, session_id = token(), uid()
             db.execute(
                 "INSERT INTO s_room_sessions(id,org_id,location_id,room_id,device_id,student_id,token_hash,entry_method,"
-                "crm_provider,crm_reference,reservation_id,state,simulated,started_at,expires_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,'active',?,?,?)",
+                "crm_provider,crm_reference,reservation_id,state,simulated,started_at,expires_at,last_activity_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,'active',?,?,?,?)",
                 (
                     session_id, device.org_id, device.location_id, device.room_id, device.id, student_id,
                     digest(room_token), method,
                     decision.provider, booking.reference if booking and booking.exists else "",
                     booking.reservation_id if booking and booking.exists else None,
-                    int(device.simulated or decision.simulated), iso(started), iso(expires),
+                    int(device.simulated or decision.simulated), iso(started), iso(expires), iso(started),
                 ),
             )
             common = dict(org_id=device.org_id, user_id=student_id, room_id=device.room_id, device_id=device.id,
@@ -594,6 +606,10 @@ def authorize(sedens, device_token, room_token, platform_token="") -> RoomContex
                 or row["org_id"] != device.org_id
             ):
                 failure = Denied("This room session belongs to a different room screen.", 403, "room_scope_mismatch")
+            elif parse(row["last_activity_at"] or row["started_at"]) <= utcnow() - timedelta(minutes=idle_minutes()):
+                # Left without pressing End: the next person must not continue it.
+                _end_where(db, "id=?", (row["id"],), "expired", "idle", row["org_id"], device.demo)
+                failure = Denied("This room session closed after a period without activity.", 401, "room_session_idle")
             elif _customer(db, row["student_id"], row["org_id"]) is None:
                 failure = Denied("This SEDENS profile is no longer active here.", 403, "customer_not_active")
             elif row["crm_provider"] == "none" and not db.execute(
@@ -604,13 +620,20 @@ def authorize(sedens, device_token, room_token, platform_token="") -> RoomContex
                 _end_where(db, "id=?", (row["id"],), "revoked", "location_unassigned", row["org_id"], device.demo)
                 failure = Denied("This membership no longer includes this location.", 403, "not_assigned_to_location")
             else:
-                actor = _platform_actor(sedens, platform_token)
-                if actor is not None and actor.user_id != row["student_id"]:
-                    failure = Denied("Another account is signed in on this screen.", 403, "different_account_signed_in")
+                # No account may be signed in on the shared screen, not even the
+                # customer's own: that sign-in would outlive the room session.
+                if _platform_actor(sedens, platform_token) is not None:
+                    failure = Denied("An account is signed in on this screen. Sign it out first.", 403,
+                                     "account_signed_in")
                 else:
                     db.execute(
                         "UPDATE s_room_devices SET last_seen_at=? WHERE id=? AND (last_seen_at IS NULL OR last_seen_at<?)",
                         (stamp, device.id, iso(utcnow() - timedelta(seconds=60))),
+                    )
+                    db.execute(
+                        "UPDATE s_room_sessions SET last_activity_at=? WHERE id=? "
+                        "AND (last_activity_at IS NULL OR last_activity_at<?)",
+                        (stamp, row["id"], iso(utcnow() - timedelta(seconds=15))),
                     )
                     context = RoomContext(
                         row["id"], row["org_id"], row["location_id"], row["room_id"], row["device_id"],
@@ -643,4 +666,5 @@ def describe(sedens, context: RoomContext) -> dict:
             "entry_method": context.entry_method,
             "simulated": context.simulated,
             "expires_at": context.expires_at,
+            "idle_minutes": idle_minutes(),
         }

@@ -17,6 +17,19 @@ def test_render_defaults_to_demo_free():
     assert mode.name == "demo_free"
 
 
+def test_a_free_hugging_face_space_is_a_hosted_demonstration():
+    """The repository's Space Dockerfile sets neither RENDER nor SEDENS_MODE."""
+    for env in ({"SPACE_ID": "someone/sedens"}, {"SYSTEM": "spaces"}):
+        mode = modes.resolve(env, db_path="/home/user/data/studio.db")
+        assert mode.name == "demo_free" and mode.hosted and mode.host == "huggingface"
+        assert mode.describe()["storage"]["persistent"] is False
+        assert mode.describe()["features"]["local_camera"] is False
+    # A Space with paid persistent storage mounted at /data, run as a room deliberately.
+    paid = modes.resolve({"SPACE_ID": "x/y", "SEDENS_MODE": "local_room"}, db_path="/data/studio.db")
+    assert paid.describe()["storage"]["persistent"] is True
+    assert not modes.resolve({}, db_path="/srv/a.db").hosted
+
+
 def test_explicit_mode_wins_over_render():
     assert modes.resolve({"RENDER": "true", "SEDENS_MODE": "local_room"}).name == "local_room"
 

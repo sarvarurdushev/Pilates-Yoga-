@@ -205,19 +205,21 @@ def test_demonstration_accounts_are_refused_when_demonstrations_are_off(tmp_path
         server.server_close()
 
 
-def test_rate_limits_use_the_visitor_address_behind_the_render_proxy():
+def test_rate_limits_use_the_visitor_address_behind_a_hosting_proxy():
     from types import SimpleNamespace
 
-    from pilates.sedens import http as sedens_http, modes
+    from pilates.sedens import modes
 
-    def handler(render, forwarded):
-        mode = modes.Mode("demo_free", "/tmp/x.db", False, True, render)
+    def handler(host, forwarded):
+        mode = modes.Mode("demo_free", "/tmp/x.db", False, True, host)
         return SimpleNamespace(sedens=SimpleNamespace(mode=mode), client_address=("10.0.0.1", 1),
                                headers={"X-Forwarded-For": forwarded})
 
-    assert sedens_http._client(handler(True, "203.0.113.9, 198.51.100.7")) == "198.51.100.7"
-    assert sedens_http._client(handler(False, "203.0.113.9")) == "10.0.0.1"
-    assert sedens_http._client(handler(True, "")) == "10.0.0.1"
+    for host in ("render", "huggingface"):
+        assert sedens_http._client(handler(host, "203.0.113.9, 198.51.100.7")) == "198.51.100.7"
+        assert sedens_http._client(handler(host, "")) == "10.0.0.1"
+    # Not behind a recognised proxy: the header is the visitor's own claim and is ignored.
+    assert sedens_http._client(handler("", "203.0.113.9")) == "10.0.0.1"
 
 
 def test_pages(world):

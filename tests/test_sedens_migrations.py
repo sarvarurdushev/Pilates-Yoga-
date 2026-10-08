@@ -73,13 +73,13 @@ def test_migrations_apply_in_order_and_record_checksums(tmp_path):
     with sedens.db() as db:
         rows = db.execute("SELECT version,name,checksum FROM s_schema ORDER BY version").fetchall()
     files = migrations.available()
-    assert [r[0] for r in rows] == [v for v, _, _ in files] == [1, 2, 3, 4, 5]
+    assert [r[0] for r in rows] == [v for v, _, _ in files] == [1, 2, 3, 4, 5, 6]
     assert [r[2] for r in rows] == [migrations.checksum(sql) for _, _, sql in files]
 
 
 def test_migrations_are_idempotent(tmp_path):
     sedens = make_sedens(tmp_path / "a.db")
-    assert sedens.applied == [1, 2, 3, 4, 5]
+    assert sedens.applied == [1, 2, 3, 4, 5, 6]
     again = Sedens(sedens.repo, sedens.mode)
     assert again.applied == []
 

@@ -10,6 +10,7 @@ from datetime import timedelta
 import pytest
 
 from pilates.sedens import demo, rooms
+from pilates.sedens import http as sedens_http
 from pilates.sedens.util import Denied, iso, parse, utcnow
 from sedens_support import Client, enter_with_code, facility, make_sedens, pair, room_code, running_server
 
@@ -44,13 +45,16 @@ def test_valid_room_session(world):
     sedens, a, _ = world
     device = pair(sedens, a)
     entered = enter_code(sedens, device, a["customer_token"])
-    ctx = rooms.authorize(sedens, device, entered["token"], a["customer_token"])
+    # The customer never signs in on the screen: the session works without it...
+    ctx = rooms.authorize(sedens, device, entered["token"], "")
     assert (ctx.org_id, ctx.location_id, ctx.room_id, ctx.student_id) == (
         a["org_id"], a["location_id"], a["room_id"], a["customer_id"])
     assert ctx.entry_method == "access_code" and not ctx.simulated
-    # The customer never signed in on the screen: the session works without it.
-    assert rooms.authorize(sedens, device, entered["token"], "").student_id == a["customer_id"]
     assert parse(ctx.expires_at) > utcnow()
+    # ...and a sign-in on the shared screen, even the customer's own, is refused:
+    # it would outlive the room session.
+    denied("account_signed_in", rooms.authorize, sedens, device, entered["token"], a["customer_token"])
+    denied("account_signed_in", enter_code, sedens, device, a["customer_token"], a["customer_token"])
 
 
 def test_expired_room_session(world):
@@ -148,15 +152,15 @@ def test_admin_and_coach_do_not_bypass_room_authorization(world, who):
     denied("staff_signed_in", rooms.enter, sedens, device, method="qr", credential="x", platform_token=staff)
     # ...and cannot ride on a customer's live room session.
     entered = enter_code(sedens, device, a["customer_token"])
-    denied("different_account_signed_in", rooms.authorize, sedens, device, entered["token"], staff)
+    denied("account_signed_in", rooms.authorize, sedens, device, entered["token"], staff)
 
 
 def test_a_different_customer_cannot_use_someone_elses_session(world):
     sedens, a, _ = world
     device = pair(sedens, a)
     entered = enter_code(sedens, device, a["customer_token"])
-    denied("different_account_signed_in", rooms.authorize, sedens, device, entered["token"], a["other_token"])
-    denied("different_customer_signed_in", enter_code, sedens, device, a["customer_token"], a["other_token"])
+    denied("account_signed_in", rooms.authorize, sedens, device, entered["token"], a["other_token"])
+    denied("account_signed_in", enter_code, sedens, device, a["customer_token"], a["other_token"])
 
 
 def test_room_codes_are_single_use_short_lived_and_one_at_a_time(world):
@@ -214,15 +218,15 @@ def test_one_active_session_per_screen(world):
     first = enter_code(sedens, device, a["customer_token"])
     second = enter_code(sedens, device, a["other_token"])
     denied("room_session_ended", rooms.authorize, sedens, device, first["token"], "")
-    assert rooms.authorize(sedens, device, second["token"], a["other_token"]).student_id == a["other_id"]
+    assert rooms.authorize(sedens, device, second["token"]).student_id == a["other_id"]
 
 
 def test_ending_a_session(world):
     sedens, a, _ = world
     device = pair(sedens, a)
     entered = enter_code(sedens, device, a["customer_token"])
-    rooms.end(sedens, rooms.authorize(sedens, device, entered["token"], a["customer_token"]))
-    denied("room_session_ended", rooms.authorize, sedens, device, entered["token"], a["customer_token"])
+    rooms.end(sedens, rooms.authorize(sedens, device, entered["token"]))
+    denied("room_session_ended", rooms.authorize, sedens, device, entered["token"])
 
 
 def test_deleting_the_location_keeps_history_but_never_authorizes(world):
@@ -429,6 +433,7 @@ def test_demo_device_cannot_serve_a_real_facility_session(world, demo_world):
 
 @pytest.fixture
 def http_world(tmp_path):
+    sedens_http._LIMITS.clear()  # rate limits are per process; each test starts fresh
     sedens = make_sedens(tmp_path / "s.db")
     a = facility(sedens, "A")
     b = facility(sedens, "B")
@@ -521,6 +526,57 @@ def test_http_expired_session_clears_the_cookie(http_world):
         db.execute("UPDATE s_room_sessions SET expires_at=?", (iso(utcnow() - timedelta(seconds=1)),))
     status, body = screen.call("GET", "/sedens/room/session")
     assert status == 401 and body["code"] == "room_session_expired"
+    assert "sedens_room" not in screen.jar
+
+
+def test_an_abandoned_room_session_closes_when_idle(world):
+    """Leaving without pressing End must not leave a session for the next person."""
+    sedens, a, _ = world
+    device = pair(sedens, a)
+    entered = enter_code(sedens, device, a["customer_token"])
+    session_id = entered["context"].room_session_id
+    # Room requests keep it alive...
+    with sedens.db() as db:
+        db.execute("UPDATE s_room_sessions SET last_activity_at=? WHERE id=?",
+                   (iso(utcnow() - timedelta(minutes=rooms.idle_minutes() - 1)), session_id))
+    rooms.authorize(sedens, device, entered["token"])
+    with sedens.db() as db:
+        seen = db.execute("SELECT last_activity_at FROM s_room_sessions WHERE id=?", (session_id,)).fetchone()[0]
+    assert parse(seen) > utcnow() - timedelta(seconds=5)
+    # ...and none for the idle period ends it, well before the session's own expiry.
+    with sedens.db() as db:
+        db.execute("UPDATE s_room_sessions SET last_activity_at=? WHERE id=?",
+                   (iso(utcnow() - timedelta(minutes=rooms.idle_minutes(), seconds=1)), session_id))
+    denied("room_session_idle", rooms.authorize, sedens, device, entered["token"])
+    denied("room_session_ended", rooms.authorize, sedens, device, entered["token"])
+    with sedens.db() as db:
+        row = db.execute("SELECT state, end_reason FROM s_room_sessions WHERE id=?", (session_id,)).fetchone()
+    assert tuple(row) == ("expired", "idle")
+
+
+@pytest.mark.parametrize("value,expected", [(None, 15), ("2", 5), ("30", 30), ("999", 60), ("x", 15)])
+def test_idle_minutes_setting(value, expected):
+    assert rooms.idle_minutes({} if value is None else {"SEDENS_ROOM_IDLE_MINUTES": value}) == expected
+
+
+def test_http_room_codes_are_not_issued_on_a_room_screen(http_world):
+    sedens, a, _, base = http_world
+    screen = http_pair(base, a["admin_token"], a["room_id"])
+    screen.jar["motion_session"] = a["customer_token"]
+    status, body = screen.call("POST", "/sedens/access-code")
+    assert status == 403 and body["code"] == "room_screen"
+
+
+def test_http_idle_session_clears_the_cookie(http_world):
+    sedens, a, _, base = http_world
+    screen = http_pair(base, a["admin_token"], a["room_id"])
+    code = room_code(sedens, a["customer_token"])
+    status, entered = screen.call("POST", "/sedens/room/enter", {"method": "access_code", "credential": code})
+    assert status == 200 and entered["session"]["idle_minutes"] == rooms.idle_minutes()
+    with sedens.db() as db:
+        db.execute("UPDATE s_room_sessions SET last_activity_at=?", (iso(utcnow() - timedelta(hours=1)),))
+    status, body = screen.call("GET", "/sedens/room/library")
+    assert status == 401 and body["code"] == "room_session_idle"
     assert "sedens_room" not in screen.jar
 
 

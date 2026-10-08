@@ -2,7 +2,7 @@
 
 import pytest
 
-from pilates.sedens import analytics, consent, demo, rooms
+from pilates.sedens import analytics, consent, rooms
 from pilates.sedens.util import Denied
 from sedens_support import enter_with_code, facility, make_sedens, pair
 

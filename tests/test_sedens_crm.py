@@ -170,6 +170,23 @@ def test_no_crm_provider_uses_facility_location_assignment(tmp_path):
         assert crm.verify_entry(sedens, db, qr).reason == "method_not_supported"
 
 
+def test_booking_rules_need_a_provider_that_sees_bookings(tmp_path):
+    """Without a CRM there are no bookings to check, so the rule cannot look switched on."""
+    sedens = make_sedens(tmp_path / "s.db")
+    fac = facility(sedens, "N")
+    with sedens.db() as db:
+        public = crm.public_settings(db, fac["org_id"])
+        assert public["booking_rules"] is False and public["require_booking"] is False
+        for change in ({"require_booking": True}, {"booking_grace_minutes": 0}):
+            with pytest.raises(Denied) as exc:
+                crm.update_policy(sedens, db, fac["admin"], **change)
+            assert exc.value.code == "booking_rules_need_crm"
+        # Even a stored flag is not reported as a rule that is enforced.
+        db.execute("INSERT INTO s_crm_settings(org_id,provider,enabled,config,updated_at) VALUES (?,?,?,?,?)",
+                   (fac["org_id"], "none", 1, '{"require_booking": true}', iso(utcnow())))
+        assert crm.public_settings(db, fac["org_id"])["require_booking"] is False
+
+
 def test_facility_policy_switches_do_not_touch_fixtures(demo_sedens):
     admin = demo_sedens.repo.actor(demo_sedens.repo.demo_login(KEY, "admin"))
     coach = demo_sedens.repo.actor(demo_sedens.repo.demo_login(KEY, "coach"))
@@ -183,3 +200,24 @@ def test_facility_policy_switches_do_not_touch_fixtures(demo_sedens):
             crm.update_policy(demo_sedens, db, coach, require_booking=False)
         with pytest.raises(Denied):
             crm.update_policy(demo_sedens, db, admin, booking_grace_minutes=999)
+
+
+@pytest.mark.parametrize("deleted", ["client", "location", "coach"])
+def test_demo_layer_survives_edits_in_the_workspace_demo(tmp_path, deleted):
+    """The coaching-workspace demo is editable; the SEDENS demo layer must still open."""
+    sedens = make_sedens(tmp_path / "s.db")
+    key = "a" * 32
+    org = "demo-" + key
+    admin = sedens.repo.actor(sedens.repo.demo_login(key, "admin"))
+    target = {"client": ("users", f"{org}-student00"), "location": ("locations", f"{org}-location0"),
+              "coach": ("users", f"{org}-coach0")}[deleted]
+    sedens.repo.delete(admin, *target)
+    seeded = demo.ensure(sedens, org)
+    assert seeded["room_id"] == demo.room_id(org)
+    with sedens.db() as db:
+        room = db.execute("SELECT location_id FROM p_rooms WHERE id=?", (seeded["room_id"],)).fetchone()
+        assert room and db.execute("SELECT 1 FROM p_locations WHERE id=? AND org_id=?", (room[0], org)).fetchone()
+        linked = {r[0] for r in db.execute("SELECT external_member_id FROM s_crm_member_links WHERE org_id=?", (org,))}
+    assert ("DEMO-1001" in linked) == (deleted != "client")
+    # Running it again after the edit changes nothing.
+    assert demo.ensure(sedens, org)["room_id"] == seeded["room_id"]

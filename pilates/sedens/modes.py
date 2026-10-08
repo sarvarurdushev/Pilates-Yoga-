@@ -1,6 +1,7 @@
 """Explicit deployment modes: what this server is, and what it must not pretend.
 
-``demo_free``        the free hosted demonstration (Render free tier). Storage is
+``demo_free``        the free hosted demonstration (Render free tier, a free
+                     Hugging Face Space). Storage is
                      never reported as persistent, nothing paid is called, and
                      demonstration analysis may be precomputed.
 ``local_room``       a facility's own room computer or a developer machine. The
@@ -8,8 +9,9 @@
 ``cloud_production`` reserved. It is not implemented, so the server refuses to
                      start in it rather than run a half-configured production.
 
-The mode comes from ``$SEDENS_MODE``. Without it, a Render instance is
-``demo_free`` and anything else is ``local_room``.
+The mode comes from ``$SEDENS_MODE``. Without it, a recognised free host
+(Render, Hugging Face Spaces) is ``demo_free`` and anything else is
+``local_room``.
 """
 
 from __future__ import annotations
@@ -30,8 +32,21 @@ LABELS = {
 }
 
 
+# Hosting platforms recognised from their own environment variables, and the
+# disk path where each mounts persistent storage (a paid add-on on both).
+HOSTS = {"render": "/var/data", "huggingface": "/data"}
+
+
 class ModeError(RuntimeError):
     """The configured mode is unknown or cannot run on this build."""
+
+
+def detect_host(env) -> str:
+    if env.get("RENDER", "").strip().lower() in ("true", "1"):
+        return "render"
+    if env.get("SPACE_ID", "").strip() or env.get("SYSTEM", "").strip().lower() == "spaces":
+        return "huggingface"
+    return ""
 
 
 @dataclass(frozen=True)
@@ -40,11 +55,16 @@ class Mode:
     db_path: str
     analysis_enabled: bool
     demo_enabled: bool
-    render: bool
+    host: str = ""
 
     @property
     def label(self) -> str:
         return LABELS[self.name]
+
+    @property
+    def hosted(self) -> bool:
+        """Behind a hosting platform's proxy, which appends X-Forwarded-For."""
+        return self.host in HOSTS
 
     def storage(self) -> dict:
         """Whether saved records survive a restart, stated conservatively."""
@@ -57,7 +77,7 @@ class Mode:
         path = Path(self.db_path).resolve() if self.db_path else None
         if path is None:
             return {"persistent": False, "reason": "No database is configured."}
-        if self.render and not path.is_relative_to(Path("/var/data")):
+        if self.hosted and not path.is_relative_to(Path(HOSTS[self.host])):
             return {
                 "persistent": False,
                 "reason": "This hosted instance stores records outside a persistent disk.",
@@ -100,9 +120,9 @@ def _flag(value: str | None, default: bool) -> bool:
 def resolve(env=None, *, db_path: str = "", analysis_enabled: bool = False) -> Mode:
     """Read the mode from the environment. Raises :class:`ModeError`."""
     env = os.environ if env is None else env
-    render = env.get("RENDER", "").strip().lower() in ("true", "1")
+    host = detect_host(env)
     name = (env.get("SEDENS_MODE") or "").strip().lower() or (
-        DEMO_FREE if render else LOCAL_ROOM
+        DEMO_FREE if host else LOCAL_ROOM
     )
     if name not in MODES:
         raise ModeError(
@@ -117,4 +137,4 @@ def resolve(env=None, *, db_path: str = "", analysis_enabled: bool = False) -> M
     # Demonstration workspaces are the point of demo_free. A real room computer
     # can switch them off with SEDENS_DEMO=0.
     demo = True if name == DEMO_FREE else _flag(env.get("SEDENS_DEMO"), True)
-    return Mode(name, str(db_path or ""), bool(analysis_enabled), demo, render)
+    return Mode(name, str(db_path or ""), bool(analysis_enabled), demo, host)

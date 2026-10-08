@@ -5,9 +5,12 @@ existing platform catalog *read-only* and labels every entry ``unreviewed``.
 No entry claims expert or professor review: a review is recorded only with the
 reviewer, date, evidence/version and scope that prove it.
 
-Inside an authorized room the full list is available (:func:`room_library`).
-Outside a room only aggregate counts are (:func:`preview`), so the exercise
-engine cannot be used as a home-workout library.
+Through ``/sedens/`` the full list is served only inside an authorized room
+(:func:`room_library`); outside a room only aggregate counts are
+(:func:`preview`). This Phase 1 list is the platform's existing catalog, which
+the coaching workspace (and its public demonstration) already shows, so the
+gate protects the room engine, not the catalog text. The SEDENS Standard
+library, sessions and scans will be served only through room routes.
 """
 
 from __future__ import annotations
