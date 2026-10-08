@@ -12,7 +12,7 @@ Facility CRM ──(adapter)──> EntryDecision ──> SEDENS maps member →
 
 | Provider | Status | Use |
 |---|---|---|
-| `none` | REAL | Default for every facility. No CRM connection: a customer enters with a single-use room code requested on their own signed-in phone, and only at a location the facility assigned them to (`p_student_locations`, re-checked on every room request). No booking is required. |
+| `none` | REAL | Default for every facility. No CRM connection: a customer enters with a single-use room code requested on their own signed-in phone, and only at a location the facility assigned them to (`p_student_locations`, re-checked on every room request). It sees no bookings, so booking rules cannot be switched on for it (`booking_rules_need_crm`). |
 | `demo` | SIMULATED | Demonstration organizations only (refused for real facilities by `save_settings`, and ignored by `verify_entry` if written directly). Fixtures cover an active member with a booking, an active member without a booking, an inactive membership, and a booking for another room. Access codes are stored as SHA-256 hashes. Every decision is marked `simulated`. |
 | BROJ and others | FUTURE | Not built. No paid integration and no vendor credentials in this repository. |
 
@@ -36,6 +36,7 @@ class CRMProvider:
     simulated: bool      # True only for demonstration providers
     demo_only: bool      # True: refused for real facilities
     methods: tuple       # entry methods this provider supports
+    checks_bookings: bool  # True only if it sees bookings; booking rules apply only then
     def verify_entry(self, sedens, db, request, config) -> EntryDecision: ...
 ```
 
@@ -81,4 +82,4 @@ SEDENS, not the adapter, then: checks the decision allows entry and is authentic
 
 ## Facility settings (Phase 1)
 
-`GET /sedens/facility/crm` (facility admin) shows the provider, whether it is simulated, its entry methods, `require_booking` and the grace period. `POST /sedens/facility/crm` changes only `enabled`, `require_booking` and `booking_grace_minutes`; it never touches fixtures or credentials. Switching a real facility to a real provider is a deployment action, not a page setting, until a real adapter exists.
+`GET /sedens/facility/crm` (facility admin) shows the provider, whether it is simulated, its entry methods, whether booking rules apply (`booking_rules`), `require_booking` and the grace period. `POST /sedens/facility/crm` changes only `enabled`, `require_booking` and `booking_grace_minutes`; it never touches fixtures or credentials. Booking rules are accepted only for a provider with `checks_bookings`, and `require_booking` is reported `false` for any other, so the console never shows a rule that entry does not enforce. Switching a real facility to a real provider is a deployment action, not a page setting, until a real adapter exists.

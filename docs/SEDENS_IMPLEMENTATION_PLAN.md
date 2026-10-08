@@ -53,7 +53,7 @@ Course visibility is resolved by one function (`courses.visible_to(actor, room_c
 
 A new runner `pilates/sedens/migrations.py` applies numbered SQL files from `pilates/sedens/migrations/` inside one transaction each and records them in `s_schema(version, name, checksum, applied_at)`; an applied file whose text changes is refused. It is called from the `Sedens` constructor, after the platform `Repository` has created `p_*`. Every file is `CREATE TABLE IF NOT EXISTS`/`CREATE INDEX IF NOT EXISTS` only. Backup/restore (`platform/backup.py`) gaining the new org-scoped tables is still open (§19 limitations).
 
-**Numbering as built.** Phase 1 shipped the foundation as five files, `0001_tenancy_capabilities` … `0005_consent_analytics` (listed in §19). The room-journey, marketplace and governance tables below are therefore renumbered from `0006` when their phases start; their content is unchanged by this note. The table sketches that follow are the original proposal; where Phase 1 built a table, §19 and the SQL files are authoritative.
+**Numbering as built.** Phase 1 shipped the foundation as six files, `0001_tenancy_capabilities` … `0006_room_activity` (listed in §19). The room-journey, marketplace and governance tables below are therefore renumbered from `0007` when their phases start; their content is unchanged by this note. The table sketches that follow are the original proposal; where Phase 1 built a table, §19 and the SQL files are authoritative.
 
 ### 0001_foundation.sql — tenancy, rooms, consent, analytics
 
@@ -290,8 +290,9 @@ Implemented on `claude/sedens-ai-private-room-v1` and stopped here; Phase 2 wait
 | `0003_rooms.sql` | `s_room_devices`, `s_room_device_pairings`, `s_room_sessions`, `s_room_access_codes` |
 | `0004_crm.sql` | `s_crm_settings`, `s_crm_member_links` |
 | `0005_consent_analytics.sql` | `s_consents`, `s_events` |
+| `0006_room_activity.sql` | adds `s_room_sessions.last_activity_at` (idle sessions close) |
 
-The runner's own ledger is `s_schema`. No `p_*` table was altered or rebuilt.
+The runner's own ledger is `s_schema`. No `p_*` table was altered or rebuilt. `0006` is a separate file rather than an edit of `0003` because `0001`–`0005` were already pushed: an applied migration is never edited.
 
 **Modules:** `pilates/sedens/` — `modes`, `migrations`, `core`, `util`, `capabilities`, `creators`, `onboarding`, `crm`, `demo`, `rooms`, `consent`, `analytics`, `library`, `http`. `pilates/serve.py` gained only the `/sedens/` dispatch (before `/platform/`) and the mode resolution at start-up.
 
@@ -299,7 +300,9 @@ The runner's own ledger is `s_schema`. No `p_*` table was altered or rebuilt.
 
 **Endpoints:** listed in [the security model](SEDENS_SECURITY_MODEL.md) and the Phase 1 report.
 
-**Room entry:** customers never sign in on the shared room screen. They enter with a single-use, 5-minute room code requested on their own signed-in phone, or with a CRM credential (simulated in the demo). This replaced an earlier draft that let a customer sign in on the screen itself, after the Phase 1 adversarial review showed that it left a 7-day sign-in on a shared screen.
+**Room entry:** customers never sign in on the shared room screen. They enter with a single-use, 5-minute room code requested on their own signed-in phone, or with a CRM credential (simulated in the demo). This replaced an earlier draft that let a customer sign in on the screen itself, after the Phase 1 adversarial review showed that it left a 7-day sign-in on a shared screen. No account may be signed in on a room screen at all, and a room session left without pressing End closes after 15 minutes without a room request.
+
+**Staff roles in the SEDENS organization:** reviewers are `coach` accounts; the SEDENS organization's `admin` role is reserved for SEDENS platform administrators, because the coaching workspace lets any administrator manage every account in their organization. A verification names the exact profile content the reviewer saw.
 
 **Exercise review status:** the room library reads the existing catalog read-only and marks every item `{"status": "unreviewed", "reviewer": null, "reviewed_at": null, "evidence": null, "scope": null}`. No SEDENS content claims expert or professor review.
 

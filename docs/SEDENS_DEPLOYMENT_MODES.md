@@ -14,9 +14,10 @@ The server always knows, and says, which mode it runs in. The mode is chosen onc
 | `SEDENS_MODE=local_room` | Room computer or developer machine |
 | `SEDENS_MODE=cloud_production` | **Refuses to start** (not implemented) |
 | any other value | Refuses to start with the list of valid modes |
-| unset | `demo_free` when `RENDER=true`, otherwise `local_room` |
-| `SEDENS_DEMO=0` | `local_room` only: switches demonstration workspaces and simulated room screens off (demonstration routes return 404). `demo_free` always keeps them. |
+| unset | `demo_free` on a recognised free host (`RENDER=true`, or a Hugging Face Space: `SPACE_ID` set or `SYSTEM=spaces`), otherwise `local_room` |
+| `SEDENS_DEMO=0` | `local_room` only: switches SEDENS demonstrations and simulated room screens off (demonstration routes return 404, demonstration accounts are refused on every `/sedens/` route and the SEDENS home treats them as signed out). It does not change the coaching workspace, whose own "Explore" demonstration keeps working as before. `demo_free` always keeps them. |
 | `SEDENS_ROOM_SESSION_MINUTES` | Room session length, 15–240, default 120 |
+| `SEDENS_ROOM_IDLE_MINUTES` | A room session with no room request for this long closes, 5–60, default 15 |
 
 The legacy `/capabilities`, `/evidence/capabilities` and `/platform/me` responses are unchanged.
 
@@ -25,7 +26,7 @@ The legacy `/capabilities`, `/evidence/capabilities` and `/platform/me` response
 | | `demo_free` | `local_room` | `cloud_production` |
 |---|---|---|---|
 | Intended host | Render free (0.1 CPU, 512 MB, no disk) | the facility's room computer, or a developer machine | future |
-| Storage reported persistent | **never** | yes, unless the database is under `/tmp` or on Render without `/var/data` | — |
+| Storage reported persistent | **never** | yes, unless the database is under `/tmp`, or on a hosting platform outside its persistent disk (Render `/var/data`, Hugging Face `/data`) | — |
 | Real server-side analysis | `limited` (works, slow: about 30 s per photo measured on Render free) | `available` | — |
 | Precomputed demonstration analysis | allowed (Phase 3/7) | allowed for demonstration orgs | — |
 | Local camera | browser only | yes | — |
