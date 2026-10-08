@@ -42,7 +42,7 @@ const noAtlas = async () => {
 };
 
 try {
-  await page.goto(base + '/index.html');
+  await page.goto(base + '/workspace.html');
   await page.evaluate(value => sessionStorage.setItem('motion-demo-key', value), key);
   await page.getByRole('button', {name: 'Explore as coach', exact: true}).click();
   await page.getByRole('heading', {name: 'Your coaching day', exact: true}).waitFor({timeout: 180000});
@@ -56,7 +56,7 @@ try {
   const programId = assignment.program_id;
   report.client = client.id;
   report.program = programId;
-  const route = base + '/index.html#' + new URLSearchParams({page: 'program', id: programId, client: client.id});
+  const route = base + '/workspace.html#' + new URLSearchParams({page: 'program', id: programId, client: client.id});
   await page.goto(route);
   await page.getByRole('button', {name: 'Edit program', exact: true}).click();
   const card = page.locator('.pd-edit-step:not(.pd-edit-note)').first();

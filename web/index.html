@@ -1,28 +1,33 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="theme-color" content="#080f1e" />
-    <title>Motion Yoga · Studio</title>
-    <link rel="stylesheet" href="/src/studio/studio.css" />
-    <link rel="stylesheet" href="/src/platform/platform.css" />
-    <link rel="stylesheet" href="/src/platform/explain.css" />
+    <meta name="theme-color" content="#0b0c0e" />
+    <title>SEDENS · AI Private Room</title>
+    <script id="sedens-legacy-redirect">
+      // Legacy coaching-workspace links keep working. The server never sees a
+      // hash, so this runs before anything renders: a "#page=…", "#home" or any
+      // other non-SEDENS hash, and any query string (?reset=, ?verify=,
+      // ?session=), opens the unchanged workspace at /workspace.html with the
+      // same query and hash. SEDENS routes are "#/…" with no query string.
+      (function (root) {
+        function legacyWorkspaceTarget(search, hash) {
+          var legacyHash = hash && hash !== "#" && hash.indexOf("#/") !== 0;
+          var legacySearch = search && search !== "?";
+          return legacyHash || legacySearch ? "/workspace.html" + (search || "") + (hash || "") : null;
+        }
+        root.sedensLegacyWorkspaceTarget = legacyWorkspaceTarget;
+        var target = root.location && legacyWorkspaceTarget(root.location.search, root.location.hash);
+        if (target) root.location.replace(target);
+      })(typeof window !== "undefined" ? window : globalThis);
+    </script>
+    <link rel="stylesheet" href="/src/sedens/sedens.css" />
   </head>
   <body>
-    <aside id="sidebar"></aside>
-    <div id="workspace">
-      <header id="topbar"></header>
-      <div id="mode-banner"></div>
-      <main id="app">
-        <div class="empty">
-          <h1>Motion Yoga</h1>
-          <p>Opening your studio…</p>
-        </div>
-      </main>
+    <div id="sedens">
+      <main class="sd-main"><p class="sd-eyebrow">SEDENS International</p><h1>SEDENS AI Private Room</h1><p class="sd-muted">불러오는 중… · Loading…</p></main>
     </div>
-    <dialog id="modal"></dialog>
-    <div id="toast" role="status"></div>
-    <script type="module" src="/src/platform/app.js"></script>
+    <script type="module" src="/src/sedens/app.js"></script>
   </body>
 </html>

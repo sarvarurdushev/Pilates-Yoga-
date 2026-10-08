@@ -12,7 +12,7 @@ await page.route('**/platform/auth/demo',async route=>{
  else await route.continue();
 });
 try {
- await page.goto(base+'/index.html');await page.getByRole('button',{name:'Explore as coach',exact:true}).click();
+ await page.goto(base+'/workspace.html');await page.getByRole('button',{name:'Explore as coach',exact:true}).click();
  await page.getByText('Your demonstration is still being prepared. Reconnecting to the same workspace…',{exact:true}).waitFor({timeout:60000});
  await page.getByRole('heading',{name:'Your coaching day',exact:true}).waitFor({timeout:60000});
  assert.equal(payloads.length,2);assert.deepEqual(payloads[0],payloads[1]);assert.equal(new URL(page.url()).hash,'#page=dashboard');

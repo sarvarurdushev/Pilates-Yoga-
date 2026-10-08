@@ -29,7 +29,7 @@ async function openAndRefresh(hash, client, heading) {
       !content.textContent.includes("This view could not open") &&
       content.querySelector(".page-head h1")?.textContent?.includes(expected));
   }, heading, { timeout: 60000 });
-  await page.goto(`${base}/index.html${hash}`);
+  await page.goto(`${base}/workspace.html${hash}`);
   await page.locator(`.client-context[aria-label="${client.name} workspace"]`).waitFor({ timeout: 60000 });
   await waitForContent();
   await page.reload();
@@ -49,7 +49,7 @@ async function openAndRefresh(hash, client, heading) {
 }
 
 try {
-  await page.goto(`${base}/index.html`);
+  await page.goto(`${base}/workspace.html`);
   if (process.env.MOTION_DEMO_KEY) {
     await page.evaluate((key) => sessionStorage.setItem("motion-demo-key", key),
       process.env.MOTION_DEMO_KEY);
@@ -84,7 +84,7 @@ try {
   console.log(`Student program deep link, refresh and return: ${own.id}`);
 
   // A shared URL naming another client must become the student's own URL too.
-  await page.goto(`${base}/index.html#page=client&client=${other.id}&tab=notes`);
+  await page.goto(`${base}/workspace.html#page=client&client=${other.id}&tab=notes`);
   await page.locator(`.client-context[aria-label="${own.name} workspace"]`).waitFor({ timeout: 60000 });
   assert.equal(new URLSearchParams(new URL(page.url()).hash.slice(1)).get("client"), own.id);
   const noteLinks = await page.locator('.client-context a[href*="client="]').evaluateAll((links) =>

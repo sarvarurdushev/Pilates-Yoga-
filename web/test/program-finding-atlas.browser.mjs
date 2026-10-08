@@ -52,14 +52,14 @@ const atlasSelection=async(structure,region)=>{
   assert.ok(selected.canvas.width>0&&selected.canvas.height>0);return selected;
 };
 try{
-  await page.goto(base+'/index.html');await page.evaluate(k=>sessionStorage.setItem('motion-demo-key',k),key);
+  await page.goto(base+'/workspace.html');await page.evaluate(k=>sessionStorage.setItem('motion-demo-key',k),key);
   await page.getByRole('button',{name:'Explore as coach',exact:true}).click();
   await page.getByRole('heading',{name:'Your coaching day',exact:true}).waitFor({timeout:180000});
   const coach=await info('me');const client=coach.students.find(s=>s.name==='Sarah Kim');assert.ok(client);
   let data=await info('client?id='+client.id);const originalAssignment=data.programs.find(p=>p.active);assert.ok(originalAssignment);
   const historical=await info('record?collection=programs&id='+originalAssignment.program_id);
   const assessment=data.analyses.find(a=>a.kind==='movement')||data.analyses[0];assert.ok(assessment);
-  const assessmentRoute=base+'/index.html#'+new URLSearchParams({page:'report',id:assessment.id,client:client.id});
+  const assessmentRoute=base+'/workspace.html#'+new URLSearchParams({page:'report',id:assessment.id,client:client.id});
   await page.goto(assessmentRoute);await page.getByRole('button',{name:'Body regions',exact:true}).click();
   const plan=page.locator('a[href*="region=right_shoulder"]').filter({hasText:'Plan exercise →'}).first();await plan.waitFor();
   const planHref=await plan.getAttribute('href');const context=new URLSearchParams(planHref.slice(1));
@@ -108,7 +108,7 @@ try{
   const returnHref=await exactReturn.getAttribute('href');assert.equal(new URLSearchParams(returnHref.slice(1)).get('id'),assessment.id);
   await exactReturn.click();await page.getByRole('button',{name:'Body regions',exact:true}).waitFor();
   assert.equal(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('id'),assessment.id);report.returnToFinding=returnHref;
-  const workspace=base+'/index.html#'+new URLSearchParams({page:'client',client:client.id,tab:'programs'});
+  const workspace=base+'/workspace.html#'+new URLSearchParams({page:'client',client:client.id,tab:'programs'});
   await page.goto(workspace);await page.locator('.pd-current-main h2').getByText(name,{exact:true}).waitFor();
   await page.getByText('More program actions',{exact:true}).click();await page.locator('#pd-new-phase').click();
   await page.waitForFunction(()=>document.querySelector('[name=current_program_phase]')?.value==='Phase 2');
@@ -123,7 +123,7 @@ try{
   const studentLogin=page.waitForResponse(r=>r.url().endsWith('/platform/auth/demo')&&r.request().postDataJSON()?.role==='student');
   await page.locator('#demo-role').selectOption('student');assert.equal((await (await studentLogin).json()).role,'student');
   await page.getByRole('heading',{name:'Your practice, today',exact:true}).waitFor();
-  const studentRoute=base+'/index.html#'+new URLSearchParams({page:'program',id:programId,client:client.id});await page.goto(studentRoute);await page.reload();
+  const studentRoute=base+'/workspace.html#'+new URLSearchParams({page:'program',id:programId,client:client.id});await page.goto(studentRoute);await page.reload();
   const studentCard=page.locator('.pd-practice-card').first();await studentCard.locator('.pd-why').getByText(rationale,{exact:false}).waitFor();
   const bodyLink=studentCard.locator('a').filter({hasText:'Left Elbow region · View body'}).first();await bodyLink.waitFor();
   const bodyHref=await bodyLink.getAttribute('href');const bodyParams=new URLSearchParams(bodyHref.slice(1));assert.equal(bodyParams.get('region'),'left_elbow');assert.equal(bodyParams.get('client'),client.id);

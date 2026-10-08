@@ -12,9 +12,9 @@ const api=async(action,body)=>page.evaluate(async({action,body})=>{
  const r=await fetch('/platform/'+action,body?{method:'POST',headers:{'Content-Type':'application/json','X-Platform-Request':'1'},body:JSON.stringify(body)}:{});
  const value=await r.json();if(!r.ok)throw Error(value.error||r.status);return value;
 },{action,body});
-const open=async hash=>{await page.goto(base+'/index.html'+hash);await page.waitForFunction(()=>document.querySelector('#page-content .page-head h1')&&!document.querySelector('#page-content .loading'),null,{timeout:60000});};
+const open=async hash=>{await page.goto(base+'/workspace.html'+hash);await page.waitForFunction(()=>document.querySelector('#page-content .page-head h1')&&!document.querySelector('#page-content .loading'),null,{timeout:60000});};
 try{
- await page.goto(base+'/index.html');await page.evaluate(key=>sessionStorage.setItem('motion-demo-key',key),randomBytes(16).toString('hex'));
+ await page.goto(base+'/workspace.html');await page.evaluate(key=>sessionStorage.setItem('motion-demo-key',key),randomBytes(16).toString('hex'));
  await page.getByRole('button',{name:'Explore as coach',exact:true}).click();await page.getByRole('heading',{name:'Your coaching day',exact:true}).waitFor({timeout:180000});
  const me=await api('me');const c=await api('client?id='+encodeURIComponent(me.students.find(c=>c.name==='Sarah Kim').id));
  const text='Historical source acceptance: general feedback';

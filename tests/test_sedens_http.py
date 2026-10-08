@@ -196,3 +196,20 @@ def test_rate_limits_use_the_visitor_address_behind_the_render_proxy():
     assert sedens_http._client(handler(True, "203.0.113.9, 198.51.100.7")) == "198.51.100.7"
     assert sedens_http._client(handler(False, "203.0.113.9")) == "10.0.0.1"
     assert sedens_http._client(handler(True, "")) == "10.0.0.1"
+
+
+def test_pages(world):
+    import urllib.request
+
+    _, _, _, base = world
+    def page(path):
+        with urllib.request.urlopen(base + path, timeout=30) as response:
+            return response.status, response.read().decode()
+    status, home = page("/")
+    assert status == 200 and "SEDENS" in home and "/src/sedens/app.js" in home
+    assert page("/index.html")[1] == home
+    status, workspace = page("/workspace.html")
+    assert status == 200 and "/src/platform/app.js" in workspace
+    status, room = page("/room.html")
+    assert status == 200 and "/src/sedens/room.js" in room
+    assert page("/anatomy.html")[0] == 200

@@ -251,3 +251,16 @@ def test_backup_export_and_inspector_are_unchanged_by_sedens_tables(migrated):
         with zipfile.ZipFile(archive) as z:
             manifest = json.loads(z.read("manifest.json"))
     assert manifest["tables"] and all(t.startswith("p_") for t in manifest["tables"])
+
+
+def test_existing_pages_and_anatomy_are_still_served(migrated, monkeypatch):
+    sedens, _ = migrated
+    server, base = running_server(sedens.repo.path)
+    try:
+        for path in ("/anatomy.html", "/workspace.html", "/src/platform/app.js", "/src/main.js",
+                     "/src/generated/structures.json", "/models/frame.json"):
+            with urllib.request.urlopen(base + path, timeout=30) as response:
+                assert response.status == 200, path
+    finally:
+        server.shutdown()
+        server.server_close()

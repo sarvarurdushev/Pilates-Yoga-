@@ -33,7 +33,7 @@ const upload=async(exercise,bytes,filename,mime)=>{
 };
 const switchRole=async(role,user_id)=>{
   const result=await request('auth/demo',{key,role,user_id});assert.equal(result.status,200,JSON.stringify(result.body));
-  await page.goto(base+'/index.html');await page.locator('#demo-role').waitFor();return info('me');
+  await page.goto(base+'/workspace.html');await page.locator('#demo-role').waitFor();return info('me');
 };
 const openSummary=async(card,text)=>{
   const summary=card.getByText(text,{exact:true});
@@ -50,12 +50,12 @@ const save=async(reason)=>{
 };
 const edit=async(route)=>{await page.goto(route);await page.getByRole('button',{name:'Edit program',exact:true}).click();await page.locator('.pd-edit-step').first().waitFor();};
 try{
-  await page.goto(base+'/index.html');await page.evaluate(k=>sessionStorage.setItem('motion-demo-key',k),key);
+  await page.goto(base+'/workspace.html');await page.evaluate(k=>sessionStorage.setItem('motion-demo-key',k),key);
   await page.getByRole('button',{name:'Explore as coach',exact:true}).click();
   await page.getByRole('heading',{name:'Your coaching day',exact:true}).waitFor({timeout:180000});
   const coach=await info('me');const client=coach.students.find(s=>s.name==='Sarah Kim');assert.ok(client);
   const clientData=await info('client?id='+client.id);const assignment=clientData.programs.find(p=>p.active)||clientData.programs[0];
-  const route=base+'/index.html#'+new URLSearchParams({page:'program',id:assignment.program_id,client:client.id});
+  const route=base+'/workspace.html#'+new URLSearchParams({page:'program',id:assignment.program_id,client:client.id});
   await edit(route);
   const custom={};
   for(const scope of ['private','organization']){
@@ -163,13 +163,13 @@ try{
   const otherCoach=admin.coaches.find(c=>c.id!==coach.user.id);assert.ok(otherCoach);await switchRole('coach',otherCoach.id);
   assert.equal((await request('record?collection=exercises&id='+custom.private.id)).status,404);
   assert.equal((await info('record?collection=exercises&id='+custom.organization.id)).id,custom.organization.id);
-  await page.goto(base+'/index.html#page=exercises');await page.locator('[name=repertoire-search]').fill(prefix);
+  await page.goto(base+'/workspace.html#page=exercises');await page.locator('[name=repertoire-search]').fill(prefix);
   await page.locator('#repertoire-list').getByText(custom.organization.name,{exact:true}).waitFor();
   assert.equal(await page.locator('#repertoire-list').getByText(custom.private.name,{exact:true}).count(),0);
   report.exerciseScope='creator and organization Admin can access both; unrelated Coach sees organization item but private item returns404 and is absent from repertoire; assigned Student can open the private movement; unrelated Student can access organization exercise but private exercise returns404';
   await switchRole('coach',coach.user.id);
   const second=coach.students.find(s=>s.id!==client.id);assert.ok(second);
-  const foreignRoute=base+'/index.html#'+new URLSearchParams({page:'program',id:assignment.program_id,client:second.id});
+  const foreignRoute=base+'/workspace.html#'+new URLSearchParams({page:'program',id:assignment.program_id,client:second.id});
   await edit(foreignRoute);assert.equal(await page.locator('.pd-source-link').count(),0,'Original client report must not appear in destination draft.');
   const copied=await save('Reuse this plan for another assigned client without foreign evidence');assert.notEqual(copied.id,assignment.program_id);
   assert.equal(copied.detail.student_id,second.id);assert.equal(copied.detail.source_analysis_id,null);assert.equal(copied.detail.source_finding,'');

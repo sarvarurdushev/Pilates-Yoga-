@@ -16,7 +16,7 @@ const waitVisibleCount=async(n)=>page.waitForFunction(count=>{const doc=document
 const markerState=async()=>page.frameLocator('#atlas').locator('#client-feedback-markers button').evaluateAll(buttons=>buttons.map(b=>({region:b.dataset.feedbackRegion,noteId:b.dataset.noteId,anchorX:Number(b.dataset.anchorX),anchorY:Number(b.dataset.anchorY),hidden:b.hidden,x:b.offsetLeft,y:b.offsetTop,rect:b.getBoundingClientRect().toJSON(),stage:document.querySelector('#stage').getBoundingClientRect().toJSON()})));
 const visible=(rows)=>rows.filter(x=>!x.hidden&&x.rect.width>0&&x.rect.height>0);
 try{
-  await page.goto(base+'/index.html');
+  await page.goto(base+'/workspace.html');
   await page.evaluate(k=>sessionStorage.setItem('motion-demo-key',k),key);
   await page.getByRole('button',{name:'Explore as admin'}).click();
   await page.locator('#demo-role').waitFor({timeout:180000});
@@ -46,7 +46,7 @@ try{
   const shoulderNotes=c.notes.filter(n=>n.region_id==='right_shoulder').sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
   const note=shoulderNotes[0]; assert.ok(note);
   // A fresh untargeted map has never isolated a full-atlas structure.
-  await page.goto(base+'/index.html#page=client&client='+sarah.id+'&tab=anatomy');
+  await page.goto(base+'/workspace.html#page=client&client='+sarah.id+'&tab=anatomy');
   await waitConnected(); await waitVisibleCount(regions.length);
   const fresh = visible(await markerState());
   assert.deepEqual(fresh.map(x=>x.region).sort(), regions.slice().sort());
@@ -67,7 +67,7 @@ try{
   for(let i=0;i<separated.length;i++)for(let j=i+1;j<separated.length;j++)
     assert.ok(Math.hypot(separated[i].x-separated[j].x,separated[i].y-separated[j].y)>=46,'nearby markers have separate clickable centres');
   if(process.env.MOTION_SCREENSHOT) await page.screenshot({path:process.env.MOTION_SCREENSHOT});
-  await page.goto(base+'/index.html#page=client&client='+sarah.id+'&tab=anatomy&region=right_shoulder&id='+note.analysis_id);
+  await page.goto(base+'/workspace.html#page=client&client='+sarah.id+'&tab=anatomy&region=right_shoulder&id='+note.analysis_id);
   await page.reload();
   await waitConnected(); await waitVisibleCount(1);
   assert.equal(await page.locator('[name=anatomy-layer]').inputValue(),'region');
@@ -141,7 +141,7 @@ try{
   console.log('Student identity:',JSON.stringify({role:student.role,user:student.user.id,students:student.students.map(s=>s.id)}));
   const own=student.students.find(s=>s.id===student.user.id);assert.ok(own);
   const sc=await info('/platform/client?id='+own.id);
-  await page.goto(base+'/index.html#page=client&client='+own.id+'&tab=anatomy'); await page.reload(); await waitConnected(); await waitVisibleCount(1);
+  await page.goto(base+'/workspace.html#page=client&client='+own.id+'&tab=anatomy'); await page.reload(); await waitConnected(); await waitVisibleCount(1);
   rows=await markerState(); shown=visible(rows);
   console.log('Student own map:',own.id,'notes:',sc.notes.length,'visible regions:',shown.map(x=>x.region));
   assert.ok(shown.length>=1);
