@@ -106,13 +106,15 @@ Every `/sedens/` POST requires `X-Sedens-Request: 1` and, when the browser sends
 
 ## 7. Data lifecycle
 
+Organization backups carry every SEDENS table under an explicit policy: no live credentials, no other organization's people, and decisions made outside the organization (another organization's consent, SEDENS verifications) re-checked against this server rather than taken from the archive. See [SEDENS_BACKUP_RESTORE.md](SEDENS_BACKUP_RESTORE.md).
+
 `p_audit.actor_id` always names a user of the row's own organization, or nobody. When a SEDENS reviewer or admin acts on another organization, that organization's audit row records the action with no named user (`external_actor: true`), and a second row in the actor's own organization names them. Organization backups therefore keep restoring: a backup carries only its own users, and restore refuses a reference to anyone else (tested: `test_backups_still_restore_after_cross_organization_sedens_actions`).
 
 Every `s_*` foreign key cascades or nulls (never RESTRICT), and every `SET NULL` column is nullable, so platform deletions (users, locations, organizations) proceed exactly as before. Deleting a customer deletes their room sessions, consents and member links. Deleting a location removes its devices; the room-session history rows remain with location/room/device nulled and can never authorize again. Creator profiles cascade with the account.
 
 ## 8. Known limitations (Phase 1)
 
-- SEDENS tables are **not** included in organization backup archives or the admin inspector (they enumerate `p_*` tables only). Restoring an archive does not restore SEDENS rows.
+- The admin inspector (`/platform/inspect`) still lists platform tables only. Organization archives carry SEDENS tables since Phase 1.5 (see [SEDENS_BACKUP_RESTORE.md](SEDENS_BACKUP_RESTORE.md)); restored room screens must be paired again, verifications return to the review queue, and affiliations are re-linked only while this server's record still agrees.
 - Rate limits are per process and in memory.
 - QR scanning uses typed or keyboard-wedge input; camera QR scanning is not built.
 - No cross-organization identity: a coach who also coaches members in a second facility still needs a separate account there (the platform allows one organization per email). Affiliations cover content distribution only.

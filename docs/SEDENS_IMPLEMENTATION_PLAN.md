@@ -53,7 +53,7 @@ Course visibility is resolved by one function (`courses.visible_to(actor, room_c
 
 A new runner `pilates/sedens/migrations.py` applies numbered SQL files from `pilates/sedens/migrations/` inside one transaction each and records them in `s_schema(version, name, checksum, applied_at)`; an applied file whose text changes is refused. It is called from the `Sedens` constructor, after the platform `Repository` has created `p_*`. Every file is `CREATE TABLE IF NOT EXISTS`/`CREATE INDEX IF NOT EXISTS` only. Backup/restore (`platform/backup.py`) gaining the new org-scoped tables is still open (§19 limitations).
 
-**Numbering as built.** Phase 1 shipped the foundation as six files, `0001_tenancy_capabilities` … `0006_room_activity` (listed in §19). The room-journey, marketplace and governance tables below are therefore renumbered from `0007` when their phases start; their content is unchanged by this note. The table sketches that follow are the original proposal; where Phase 1 built a table, §19 and the SQL files are authoritative.
+**Numbering as built.** Phase 1 shipped the foundation as six files, `0001_tenancy_capabilities` … `0006_room_activity` (listed in §19). The room-journey, marketplace and governance tables below are therefore renumbered from `0008` (after Phase 1.5's `0007_backup_lineage`) when their phases start; their content is unchanged by this note. The table sketches that follow are the original proposal; where Phase 1 built a table, §19 and the SQL files are authoritative.
 
 ### 0001_foundation.sql — tenancy, rooms, consent, analytics
 
@@ -277,6 +277,10 @@ Coach: Creator Studio → new course → title → session → exercise → uplo
 4. Content review: Dr. Hong Jong Gi's review applies only to content that can be explicitly proven to have been reviewed by him. The whole catalog is not claimed as professor-reviewed. Until evidence exists, SEDENS Standard entries carry an internal status (`unreviewed`, `sedens_reviewed`, `expert_reviewed`) with reviewer identity, date, evidence/version and scope of review.
 5. Customer feedback: the existing 0–100 posture score is removed from all customer-facing SEDENS experiences (it may remain in an engineering/debug view where existing tests depend on it); no replacement overall posture score; feedback is observation-based and confidence-gated.
 
+## 19a. Phase 1.5 status (backup and restore)
+
+Organization archives now carry every `s_*` table under an explicit policy (`pilates/sedens/backup.py`), with live credentials excluded and decisions made outside the organization re-checked against this server (affiliation ledger, migration `0007_backup_lineage`). Details: [SEDENS_BACKUP_RESTORE.md](SEDENS_BACKUP_RESTORE.md). Phase 2 migrations start at `0008`.
+
 ## 19. Phase 1 status (foundation, room access, rebrand)
 
 Implemented on `claude/sedens-ai-private-room-v1` and stopped here; Phase 2 waits for approval.
@@ -308,4 +312,4 @@ The runner's own ledger is `s_schema`. No `p_*` table was altered or rebuilt. `0
 
 **Posture score:** no SEDENS page shows a posture score; the legacy workspace's engineering "Image alignment index" is unchanged (it is not part of any SEDENS customer view). Observation-based customer feedback is Phase 3/5 work.
 
-**Known limitations:** see [SEDENS_SECURITY_MODEL.md §8](SEDENS_SECURITY_MODEL.md) and [SEDENS_DEPLOYMENT_MODES.md](SEDENS_DEPLOYMENT_MODES.md). In short: SEDENS tables are not yet in organization backups; rate limits are in-memory; QR is typed or keyboard-wedge input; readiness, scan and workout steps are placeholders on the room screen; no cross-organization identity for coaches who coach members in two facilities.
+**Known limitations:** see [SEDENS_SECURITY_MODEL.md §8](SEDENS_SECURITY_MODEL.md) and [SEDENS_DEPLOYMENT_MODES.md](SEDENS_DEPLOYMENT_MODES.md). In short: rate limits are in-memory; QR is typed or keyboard-wedge input; readiness, scan and workout steps are placeholders on the room screen; no cross-organization identity for coaches who coach members in two facilities.
