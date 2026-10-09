@@ -1,0 +1,1359 @@
+{
+ "standard": "SEDENS Standard",
+ "version": "v0",
+ "catalog_sha256": "342e1d899347adfcdeea387fc02bebfb851e9d2fe15cb98fda842d5abe6de2b1",
+ "atlas_hash": "a88b685356121967",
+ "label": {
+  "en": "Demo content — not yet expert-reviewed",
+  "ko": "데모 콘텐츠 — 아직 전문가 검토 전"
+ },
+ "review_statuses": [
+  "unreviewed",
+  "sedens_reviewed",
+  "expert_reviewed"
+ ],
+ "exercises": [
+  {
+   "id": "std-breathing",
+   "catalog_key": "breathing",
+   "version": 1,
+   "title": {
+    "en": "Pilates Breathing",
+    "ko": "필라테스 호흡"
+   },
+   "category": "Pilates",
+   "level": "foundation",
+   "position": "supine",
+   "equipment": [
+    "mat"
+   ],
+   "dose": {
+    "mode": "reps",
+    "sets": 1,
+    "reps": 6,
+    "hold_seconds": 0,
+    "work_seconds": 0,
+    "rest_seconds": 15,
+    "sides": "none"
+   },
+   "steps": [
+    {
+     "en": "Lie on your back with knees bent and feet flat, hip-width apart.",
+     "ko": "무릎을 세우고 바로 누워 발을 골반 너비로 바닥에 둡니다."
+    },
+    {
+     "en": "Rest one hand on your lower ribs.",
+     "ko": "한 손을 아래쪽 갈비뼈 위에 올려 둡니다."
+    },
+    {
+     "en": "Breathe in through the nose and let the ribs widen into your hand.",
+     "ko": "코로 숨을 들이쉬며 갈비뼈가 손 쪽으로 넓어지는 것을 느낍니다."
+    },
+    {
+     "en": "Breathe out slowly through the mouth and let the ribs soften down.",
+     "ko": "입으로 천천히 내쉬며 갈비뼈가 부드럽게 내려가게 합니다."
+    }
+   ],
+   "cue": {
+    "en": "Let the ribs widen to the sides, like an umbrella opening.",
+    "ko": "우산이 펼쳐지듯 갈비뼈가 옆으로 넓어지게 하세요."
+   },
+   "breath": {
+    "en": "Slow and even. Never force a full breath.",
+    "ko": "느리고 고르게 쉽니다. 억지로 크게 들이쉬지 않습니다."
+   },
+   "regressions": [
+    {
+     "en": "Do it seated in a chair.",
+     "ko": "의자에 앉아서 합니다."
+    },
+    {
+     "en": "Take fewer breaths and rest between them.",
+     "ko": "호흡 수를 줄이고 사이에 쉽니다."
+    }
+   ],
+   "progressions": [
+    {
+     "en": "Keep the breath wide while you hold a gentle tabletop position with the legs.",
+     "ko": "다리를 테이블탑으로 가볍게 든 채 옆으로 넓은 호흡을 유지합니다."
+    }
+   ],
+   "stop_if": {
+    "en": "Stop and rest if anything hurts, if you feel dizzy or short of breath, or if you are unsure. Ask a facility coach before trying again.",
+    "ko": "통증이 있거나, 어지럽거나 숨이 차거나, 확신이 서지 않으면 멈추고 쉬세요. 다시 하기 전에 시설 코치에게 물어보세요."
+   },
+   "before_you_start": {
+    "en": "Check with a doctor or physiotherapist before exercising if you are pregnant, recovering from surgery or injury, or have a health condition.",
+    "ko": "임신 중이거나 수술·부상에서 회복 중이거나 건강 문제가 있다면 운동 전에 의사나 물리치료사와 상의하세요."
+   },
+   "anatomy": {
+    "atlas_depth": "taught",
+    "exercise": "breathing",
+    "structures": [
+     {
+      "key": "diaphragm",
+      "role": "prime"
+     },
+     {
+      "key": "external intercostal muscle",
+      "role": "assisting"
+     },
+     {
+      "key": "transversus abdominis",
+      "role": "assisting"
+     },
+     {
+      "key": "multifidus",
+      "role": "steadying"
+     },
+     {
+      "key": "internal oblique",
+      "role": "steadying"
+     }
+    ],
+    "label": {
+     "en": "Educational anatomy — not measured muscle activation.",
+     "ko": "교육용 해부학 — 측정된 근육 활성도가 아닙니다."
+    }
+   },
+   "provenance": {
+    "source": "Repository exercise catalog entry and anatomy illustration content for this exercise key (read only, never edited).",
+    "drafted_by": "SEDENS editorial draft",
+    "drafted_at": "2026-10-08",
+    "changes": [
+     "Customer steps rewritten in plain language for a self-guided room; template text not reused.",
+     "Generic progressions (such as an unstable surface) replaced with exercise-specific options.",
+     "Clinical contraindication wording replaced with a plain stop rule and a general before-you-start note.",
+     "Level taken from the anatomy content's difficulty, not the catalog's label.",
+     "Muscle roles shown as educational illustration; the source's uncited evidence tags are not carried over."
+    ]
+   },
+   "review": {
+    "status": "unreviewed",
+    "reviewer": null,
+    "reviewed_at": null,
+    "evidence": null,
+    "scope": null
+   }
+  },
+  {
+   "id": "std-imprint-release",
+   "catalog_key": "imprintRelease",
+   "version": 1,
+   "title": {
+    "en": "Imprint and Release",
+    "ko": "임프린트 앤 릴리즈"
+   },
+   "category": "Pilates",
+   "level": "foundation",
+   "position": "supine",
+   "equipment": [
+    "mat"
+   ],
+   "dose": {
+    "mode": "reps",
+    "sets": 1,
+    "reps": 8,
+    "hold_seconds": 0,
+    "work_seconds": 0,
+    "rest_seconds": 15,
+    "sides": "none"
+   },
+   "steps": [
+    {
+     "en": "Lie on your back with knees bent and feet flat.",
+     "ko": "무릎을 세우고 발을 바닥에 둔 채 바로 눕습니다."
+    },
+    {
+     "en": "Breathe out and gently tilt the pelvis so the lower back moves toward the mat.",
+     "ko": "숨을 내쉬며 골반을 부드럽게 기울여 허리를 매트 쪽으로 가져갑니다."
+    },
+    {
+     "en": "Breathe in and let the pelvis return to its natural position.",
+     "ko": "숨을 들이쉬며 골반을 자연스러운 위치로 되돌립니다."
+    },
+    {
+     "en": "Keep the movement small and the shoulders relaxed.",
+     "ko": "움직임은 작게, 어깨는 편안하게 유지합니다."
+    }
+   ],
+   "cue": {
+    "en": "Think of a small, slow rocking of the pelvis.",
+    "ko": "골반을 작고 천천히 흔드는 느낌으로 움직이세요."
+   },
+   "breath": {
+    "en": "Breathe out as the lower back moves toward the mat.",
+    "ko": "허리가 매트 쪽으로 갈 때 숨을 내쉽니다."
+   },
+   "regressions": [
+    {
+     "en": "Make the movement smaller.",
+     "ko": "움직임을 더 작게 합니다."
+    },
+    {
+     "en": "Rest after every two repetitions.",
+     "ko": "두 번마다 쉽니다."
+    }
+   ],
+   "progressions": [
+    {
+     "en": "Hold the tilted position for one more slow breath.",
+     "ko": "기울인 자세에서 느린 호흡 한 번을 더 유지합니다."
+    }
+   ],
+   "stop_if": {
+    "en": "Stop and rest if anything hurts, if you feel dizzy or short of breath, or if you are unsure. Ask a facility coach before trying again.",
+    "ko": "통증이 있거나, 어지럽거나 숨이 차거나, 확신이 서지 않으면 멈추고 쉬세요. 다시 하기 전에 시설 코치에게 물어보세요."
+   },
+   "before_you_start": {
+    "en": "Check with a doctor or physiotherapist before exercising if you are pregnant, recovering from surgery or injury, or have a health condition.",
+    "ko": "임신 중이거나 수술·부상에서 회복 중이거나 건강 문제가 있다면 운동 전에 의사나 물리치료사와 상의하세요."
+   },
+   "anatomy": {
+    "atlas_depth": "taught",
+    "exercise": "imprintRelease",
+    "structures": [
+     {
+      "key": "transversus abdominis",
+      "role": "prime"
+     },
+     {
+      "key": "rectus abdominis",
+      "role": "prime"
+     },
+     {
+      "key": "internal oblique",
+      "role": "assisting"
+     },
+     {
+      "key": "external oblique",
+      "role": "assisting"
+     },
+     {
+      "key": "multifidus",
+      "role": "steadying"
+     },
+     {
+      "key": "diaphragm",
+      "role": "steadying"
+     },
+     {
+      "key": "pubococcygeus",
+      "role": "steadying"
+     },
+     {
+      "key": "iliococcygeus",
+      "role": "steadying"
+     }
+    ],
+    "label": {
+     "en": "Educational anatomy — not measured muscle activation.",
+     "ko": "교육용 해부학 — 측정된 근육 활성도가 아닙니다."
+    }
+   },
+   "provenance": {
+    "source": "Repository exercise catalog entry and anatomy illustration content for this exercise key (read only, never edited).",
+    "drafted_by": "SEDENS editorial draft",
+    "drafted_at": "2026-10-08",
+    "changes": [
+     "Customer steps rewritten in plain language for a self-guided room; template text not reused.",
+     "Generic progressions (such as an unstable surface) replaced with exercise-specific options.",
+     "Clinical contraindication wording replaced with a plain stop rule and a general before-you-start note.",
+     "Level taken from the anatomy content's difficulty, not the catalog's label.",
+     "Muscle roles shown as educational illustration; the source's uncited evidence tags are not carried over."
+    ]
+   },
+   "review": {
+    "status": "unreviewed",
+    "reviewer": null,
+    "reviewed_at": null,
+    "evidence": null,
+    "scope": null
+   }
+  },
+  {
+   "id": "std-pelvic-curl",
+   "catalog_key": "pelvicCurl",
+   "version": 1,
+   "title": {
+    "en": "Pelvic Curl",
+    "ko": "펠빅 컬"
+   },
+   "category": "Pilates",
+   "level": "foundation",
+   "position": "supine",
+   "equipment": [
+    "mat"
+   ],
+   "dose": {
+    "mode": "reps",
+    "sets": 1,
+    "reps": 8,
+    "hold_seconds": 0,
+    "work_seconds": 0,
+    "rest_seconds": 20,
+    "sides": "none"
+   },
+   "steps": [
+    {
+     "en": "Lie on your back with knees bent, feet hip-width apart, arms beside you.",
+     "ko": "무릎을 세우고 발은 골반 너비, 팔은 몸 옆에 두고 바로 눕습니다."
+    },
+    {
+     "en": "Breathe out and roll the pelvis up, then the lower back, into a comfortable bridge.",
+     "ko": "숨을 내쉬며 골반부터 허리 순서로 말아 올려 편안한 브리지 자세를 만듭니다."
+    },
+    {
+     "en": "Keep your weight on the feet and upper back, not the neck.",
+     "ko": "체중은 목이 아니라 발과 등 윗부분에 둡니다."
+    },
+    {
+     "en": "Breathe in at the top, then roll down slowly to the mat.",
+     "ko": "위에서 숨을 들이쉰 뒤 천천히 매트로 내려옵니다."
+    }
+   ],
+   "cue": {
+    "en": "Roll up and down one small section of the spine at a time.",
+    "ko": "척추를 한 부분씩 작게 나누어 올라가고 내려오세요."
+   },
+   "breath": {
+    "en": "Breathe out as you roll up, breathe in at the top, breathe out as you roll down.",
+    "ko": "올라갈 때 내쉬고, 위에서 들이쉬고, 내려올 때 내쉽니다."
+   },
+   "regressions": [
+    {
+     "en": "Lift only a little way off the mat.",
+     "ko": "매트에서 조금만 들어 올립니다."
+    },
+    {
+     "en": "Do fewer repetitions.",
+     "ko": "반복 횟수를 줄입니다."
+    }
+   ],
+   "progressions": [
+    {
+     "en": "Pause for one breath at the top before rolling down.",
+     "ko": "내려오기 전에 위에서 한 호흡 동안 멈춥니다."
+    }
+   ],
+   "stop_if": {
+    "en": "Stop and rest if anything hurts, if you feel dizzy or short of breath, or if you are unsure. Ask a facility coach before trying again.",
+    "ko": "통증이 있거나, 어지럽거나 숨이 차거나, 확신이 서지 않으면 멈추고 쉬세요. 다시 하기 전에 시설 코치에게 물어보세요."
+   },
+   "before_you_start": {
+    "en": "Check with a doctor or physiotherapist before exercising if you are pregnant, recovering from surgery or injury, or have a health condition.",
+    "ko": "임신 중이거나 수술·부상에서 회복 중이거나 건강 문제가 있다면 운동 전에 의사나 물리치료사와 상의하세요."
+   },
+   "anatomy": {
+    "atlas_depth": "taught",
+    "exercise": "pelvicCurl",
+    "structures": [
+     {
+      "key": "gluteus maximus",
+      "role": "prime"
+     },
+     {
+      "key": "biceps femoris",
+      "role": "prime"
+     },
+     {
+      "key": "semitendinosus",
+      "role": "assisting"
+     },
+     {
+      "key": "rectus abdominis",
+      "role": "assisting"
+     },
+     {
+      "key": "transversus abdominis",
+      "role": "steadying"
+     },
+     {
+      "key": "multifidus",
+      "role": "steadying"
+     },
+     {
+      "key": "diaphragm",
+      "role": "steadying"
+     },
+     {
+      "key": "gluteus medius",
+      "role": "steadying"
+     }
+    ],
+    "label": {
+     "en": "Educational anatomy — not measured muscle activation.",
+     "ko": "교육용 해부학 — 측정된 근육 활성도가 아닙니다."
+    }
+   },
+   "provenance": {
+    "source": "Repository exercise catalog entry and anatomy illustration content for this exercise key (read only, never edited).",
+    "drafted_by": "SEDENS editorial draft",
+    "drafted_at": "2026-10-08",
+    "changes": [
+     "Customer steps rewritten in plain language for a self-guided room; template text not reused.",
+     "Generic progressions (such as an unstable surface) replaced with exercise-specific options.",
+     "Clinical contraindication wording replaced with a plain stop rule and a general before-you-start note.",
+     "Level taken from the anatomy content's difficulty, not the catalog's label.",
+     "Muscle roles shown as educational illustration; the source's uncited evidence tags are not carried over."
+    ]
+   },
+   "review": {
+    "status": "unreviewed",
+    "reviewer": null,
+    "reviewed_at": null,
+    "evidence": null,
+    "scope": null
+   }
+  },
+  {
+   "id": "std-knee-folds",
+   "catalog_key": "kneeFolds",
+   "version": 1,
+   "title": {
+    "en": "Knee Folds",
+    "ko": "니 폴드"
+   },
+   "category": "Pilates",
+   "level": "foundation",
+   "position": "supine",
+   "equipment": [
+    "mat"
+   ],
+   "dose": {
+    "mode": "reps",
+    "sets": 1,
+    "reps": 6,
+    "hold_seconds": 0,
+    "work_seconds": 0,
+    "rest_seconds": 20,
+    "sides": "alternate"
+   },
+   "steps": [
+    {
+     "en": "Lie on your back with knees bent and feet flat.",
+     "ko": "무릎을 세우고 발을 바닥에 둔 채 바로 눕습니다."
+    },
+    {
+     "en": "Breathe out and float one knee up until the shin is level with the floor.",
+     "ko": "숨을 내쉬며 한쪽 무릎을 들어 정강이가 바닥과 평행해질 때까지 올립니다."
+    },
+    {
+     "en": "Keep the pelvis still and level.",
+     "ko": "골반은 움직이지 않고 수평으로 유지합니다."
+    },
+    {
+     "en": "Breathe in and lower the foot back down. Change sides.",
+     "ko": "숨을 들이쉬며 발을 내려놓습니다. 반대쪽도 합니다."
+    }
+   ],
+   "cue": {
+    "en": "Lift the leg without letting the pelvis rock.",
+    "ko": "골반이 흔들리지 않게 다리만 들어 올리세요."
+   },
+   "breath": {
+    "en": "Breathe out to lift, breathe in to lower.",
+    "ko": "들어 올릴 때 내쉬고, 내릴 때 들이쉽니다."
+   },
+   "regressions": [
+    {
+     "en": "Lift the foot only a few centimetres.",
+     "ko": "발을 몇 센티미터만 들어 올립니다."
+    }
+   ],
+   "progressions": [
+    {
+     "en": "Lift and lower slower, taking three counts each way.",
+     "ko": "셋을 세며 더 천천히 올리고 내립니다."
+    }
+   ],
+   "stop_if": {
+    "en": "Stop and rest if anything hurts, if you feel dizzy or short of breath, or if you are unsure. Ask a facility coach before trying again.",
+    "ko": "통증이 있거나, 어지럽거나 숨이 차거나, 확신이 서지 않으면 멈추고 쉬세요. 다시 하기 전에 시설 코치에게 물어보세요."
+   },
+   "before_you_start": {
+    "en": "Check with a doctor or physiotherapist before exercising if you are pregnant, recovering from surgery or injury, or have a health condition.",
+    "ko": "임신 중이거나 수술·부상에서 회복 중이거나 건강 문제가 있다면 운동 전에 의사나 물리치료사와 상의하세요."
+   },
+   "anatomy": {
+    "atlas_depth": "taught",
+    "exercise": "kneeFolds",
+    "structures": [
+     {
+      "key": "psoas major",
+      "role": "prime"
+     },
+     {
+      "key": "iliacus",
+      "role": "prime"
+     },
+     {
+      "key": "rectus femoris",
+      "role": "assisting"
+     },
+     {
+      "key": "pectineus",
+      "role": "assisting"
+     },
+     {
+      "key": "transversus abdominis",
+      "role": "steadying"
+     },
+     {
+      "key": "multifidus",
+      "role": "steadying"
+     },
+     {
+      "key": "diaphragm",
+      "role": "steadying"
+     },
+     {
+      "key": "external oblique",
+      "role": "steadying"
+     },
+     {
+      "key": "internal oblique",
+      "role": "steadying"
+     }
+    ],
+    "label": {
+     "en": "Educational anatomy — not measured muscle activation.",
+     "ko": "교육용 해부학 — 측정된 근육 활성도가 아닙니다."
+    }
+   },
+   "provenance": {
+    "source": "Repository exercise catalog entry and anatomy illustration content for this exercise key (read only, never edited).",
+    "drafted_by": "SEDENS editorial draft",
+    "drafted_at": "2026-10-08",
+    "changes": [
+     "Customer steps rewritten in plain language for a self-guided room; template text not reused.",
+     "Generic progressions (such as an unstable surface) replaced with exercise-specific options.",
+     "Clinical contraindication wording replaced with a plain stop rule and a general before-you-start note.",
+     "Level taken from the anatomy content's difficulty, not the catalog's label.",
+     "Muscle roles shown as educational illustration; the source's uncited evidence tags are not carried over."
+    ]
+   },
+   "review": {
+    "status": "unreviewed",
+    "reviewer": null,
+    "reviewed_at": null,
+    "evidence": null,
+    "scope": null
+   }
+  },
+  {
+   "id": "std-supine-spine-twist",
+   "catalog_key": "spineTwistSupine",
+   "version": 1,
+   "title": {
+    "en": "Supine Spine Twist",
+    "ko": "누운 스파인 트위스트"
+   },
+   "category": "Pilates",
+   "level": "foundation",
+   "position": "supine",
+   "equipment": [
+    "mat"
+   ],
+   "dose": {
+    "mode": "reps",
+    "sets": 1,
+    "reps": 6,
+    "hold_seconds": 0,
+    "work_seconds": 0,
+    "rest_seconds": 20,
+    "sides": "alternate"
+   },
+   "steps": [
+    {
+     "en": "Lie on your back with knees bent and together, feet flat, arms out to the sides.",
+     "ko": "무릎을 모아 세우고 발은 바닥에, 팔은 옆으로 벌리고 바로 눕습니다."
+    },
+    {
+     "en": "Breathe out and let both knees lower a little way to one side.",
+     "ko": "숨을 내쉬며 두 무릎을 한쪽으로 조금 내립니다."
+    },
+    {
+     "en": "Keep both shoulders resting on the mat.",
+     "ko": "양쪽 어깨는 매트에 편안히 둡니다."
+    },
+    {
+     "en": "Breathe in and bring the knees back to the middle. Change sides.",
+     "ko": "숨을 들이쉬며 무릎을 가운데로 가져옵니다. 반대쪽도 합니다."
+    }
+   ],
+   "cue": {
+    "en": "Move only as far as the shoulders can stay down.",
+    "ko": "어깨가 바닥에 남아 있는 범위까지만 움직이세요."
+   },
+   "breath": {
+    "en": "Breathe out to lower the knees, breathe in to return.",
+    "ko": "무릎을 내릴 때 내쉬고, 돌아올 때 들이쉽니다."
+   },
+   "regressions": [
+    {
+     "en": "Make the movement smaller.",
+     "ko": "움직임을 더 작게 합니다."
+    }
+   ],
+   "progressions": [
+    {
+     "en": "Hold the twist for one slow breath before returning.",
+     "ko": "돌아오기 전에 비튼 자세에서 느린 호흡 한 번을 유지합니다."
+    }
+   ],
+   "stop_if": {
+    "en": "Stop and rest if anything hurts, if you feel dizzy or short of breath, or if you are unsure. Ask a facility coach before trying again.",
+    "ko": "통증이 있거나, 어지럽거나 숨이 차거나, 확신이 서지 않으면 멈추고 쉬세요. 다시 하기 전에 시설 코치에게 물어보세요."
+   },
+   "before_you_start": {
+    "en": "Check with a doctor or physiotherapist before exercising if you are pregnant, recovering from surgery or injury, or have a health condition.",
+    "ko": "임신 중이거나 수술·부상에서 회복 중이거나 건강 문제가 있다면 운동 전에 의사나 물리치료사와 상의하세요."
+   },
+   "anatomy": {
+    "atlas_depth": "taught",
+    "exercise": "spineTwistSupine",
+    "structures": [
+     {
+      "key": "external oblique",
+      "role": "prime"
+     },
+     {
+      "key": "internal oblique",
+      "role": "prime"
+     },
+     {
+      "key": "rectus abdominis",
+      "role": "assisting"
+     },
+     {
+      "key": "transversus abdominis",
+      "role": "steadying"
+     },
+     {
+      "key": "multifidus",
+      "role": "steadying"
+     },
+     {
+      "key": "diaphragm",
+      "role": "steadying"
+     }
+    ],
+    "label": {
+     "en": "Educational anatomy — not measured muscle activation.",
+     "ko": "교육용 해부학 — 측정된 근육 활성도가 아닙니다."
+    }
+   },
+   "provenance": {
+    "source": "Repository exercise catalog entry and anatomy illustration content for this exercise key (read only, never edited).",
+    "drafted_by": "SEDENS editorial draft",
+    "drafted_at": "2026-10-08",
+    "changes": [
+     "Customer steps rewritten in plain language for a self-guided room; template text not reused.",
+     "Generic progressions (such as an unstable surface) replaced with exercise-specific options.",
+     "Clinical contraindication wording replaced with a plain stop rule and a general before-you-start note.",
+     "Level taken from the anatomy content's difficulty, not the catalog's label.",
+     "Muscle roles shown as educational illustration; the source's uncited evidence tags are not carried over."
+    ]
+   },
+   "review": {
+    "status": "unreviewed",
+    "reviewer": null,
+    "reviewed_at": null,
+    "evidence": null,
+    "scope": null
+   }
+  },
+  {
+   "id": "std-arm-arcs",
+   "catalog_key": "shoulderPlacement",
+   "version": 1,
+   "title": {
+    "en": "Arm Arcs and Shoulder Placement",
+    "ko": "암 아크·어깨 배치"
+   },
+   "category": "Pilates",
+   "level": "foundation",
+   "position": "supine",
+   "equipment": [
+    "mat"
+   ],
+   "dose": {
+    "mode": "reps",
+    "sets": 1,
+    "reps": 8,
+    "hold_seconds": 0,
+    "work_seconds": 0,
+    "rest_seconds": 20,
+    "sides": "none"
+   },
+   "steps": [
+    {
+     "en": "Lie on your back with knees bent and arms reaching toward the ceiling.",
+     "ko": "무릎을 세우고 바로 누워 팔을 천장 쪽으로 뻗습니다."
+    },
+    {
+     "en": "Breathe in and move the arms overhead only as far as feels comfortable.",
+     "ko": "숨을 들이쉬며 편안한 범위까지만 팔을 머리 위로 가져갑니다."
+    },
+    {
+     "en": "Keep the ribs soft so the back does not arch.",
+     "ko": "허리가 뜨지 않도록 갈비뼈를 부드럽게 유지합니다."
+    },
+    {
+     "en": "Breathe out and bring the arms back over the shoulders.",
+     "ko": "숨을 내쉬며 팔을 어깨 위로 되돌립니다."
+    }
+   ],
+   "cue": {
+    "en": "Let the shoulder blades glide gently on the mat.",
+    "ko": "견갑골이 매트 위에서 부드럽게 미끄러지게 하세요."
+   },
+   "breath": {
+    "en": "Breathe in as the arms go overhead, breathe out as they return.",
+    "ko": "팔이 머리 위로 갈 때 들이쉬고, 돌아올 때 내쉽니다."
+   },
+   "regressions": [
+    {
+     "en": "Move the arms through a smaller arc.",
+     "ko": "팔을 더 작은 호로 움직입니다."
+    }
+   ],
+   "progressions": [
+    {
+     "en": "Move one arm at a time in opposite directions.",
+     "ko": "한 팔씩 서로 반대 방향으로 움직입니다."
+    }
+   ],
+   "stop_if": {
+    "en": "Stop and rest if anything hurts, if you feel dizzy or short of breath, or if you are unsure. Ask a facility coach before trying again.",
+    "ko": "통증이 있거나, 어지럽거나 숨이 차거나, 확신이 서지 않으면 멈추고 쉬세요. 다시 하기 전에 시설 코치에게 물어보세요."
+   },
+   "before_you_start": {
+    "en": "Check with a doctor or physiotherapist before exercising if you are pregnant, recovering from surgery or injury, or have a health condition.",
+    "ko": "임신 중이거나 수술·부상에서 회복 중이거나 건강 문제가 있다면 운동 전에 의사나 물리치료사와 상의하세요."
+   },
+   "anatomy": {
+    "atlas_depth": "taught",
+    "exercise": "shoulderPlacement",
+    "structures": [
+     {
+      "key": "deltoid",
+      "role": "prime"
+     },
+     {
+      "key": "serratus anterior",
+      "role": "prime"
+     },
+     {
+      "key": "trapezius",
+      "role": "assisting"
+     },
+     {
+      "key": "supraspinatus",
+      "role": "assisting"
+     },
+     {
+      "key": "infraspinatus muscle",
+      "role": "assisting"
+     },
+     {
+      "key": "transversus abdominis",
+      "role": "steadying"
+     },
+     {
+      "key": "multifidus",
+      "role": "steadying"
+     },
+     {
+      "key": "diaphragm",
+      "role": "steadying"
+     },
+     {
+      "key": "rhomboid major",
+      "role": "steadying"
+     },
+     {
+      "key": "pectoralis minor",
+      "role": "steadying"
+     }
+    ],
+    "label": {
+     "en": "Educational anatomy — not measured muscle activation.",
+     "ko": "교육용 해부학 — 측정된 근육 활성도가 아닙니다."
+    }
+   },
+   "provenance": {
+    "source": "Repository exercise catalog entry and anatomy illustration content for this exercise key (read only, never edited).",
+    "drafted_by": "SEDENS editorial draft",
+    "drafted_at": "2026-10-08",
+    "changes": [
+     "Customer steps rewritten in plain language for a self-guided room; template text not reused.",
+     "Generic progressions (such as an unstable surface) replaced with exercise-specific options.",
+     "Clinical contraindication wording replaced with a plain stop rule and a general before-you-start note.",
+     "Level taken from the anatomy content's difficulty, not the catalog's label.",
+     "Muscle roles shown as educational illustration; the source's uncited evidence tags are not carried over."
+    ]
+   },
+   "review": {
+    "status": "unreviewed",
+    "reviewer": null,
+    "reviewed_at": null,
+    "evidence": null,
+    "scope": null
+   }
+  },
+  {
+   "id": "std-dead-bug",
+   "catalog_key": "deadBug",
+   "version": 1,
+   "title": {
+    "en": "Dead Bug",
+    "ko": "데드 버그"
+   },
+   "category": "Pilates",
+   "level": "intermediate",
+   "position": "supine",
+   "equipment": [
+    "mat"
+   ],
+   "dose": {
+    "mode": "reps",
+    "sets": 1,
+    "reps": 6,
+    "hold_seconds": 0,
+    "work_seconds": 0,
+    "rest_seconds": 30,
+    "sides": "alternate"
+   },
+   "steps": [
+    {
+     "en": "Lie on your back with knees bent above the hips and arms reaching to the ceiling.",
+     "ko": "무릎을 골반 위로 들어 구부리고 팔은 천장 쪽으로 뻗은 채 바로 눕습니다."
+    },
+    {
+     "en": "Breathe out and reach one arm back and the opposite leg away, only as far as you can keep the back steady.",
+     "ko": "숨을 내쉬며 한 팔은 뒤로, 반대쪽 다리는 멀리 뻗되 허리가 안정된 범위까지만 갑니다."
+    },
+    {
+     "en": "Breathe in and return to the start.",
+     "ko": "숨을 들이쉬며 처음 자세로 돌아옵니다."
+    },
+    {
+     "en": "Change sides.",
+     "ko": "반대쪽도 합니다."
+    }
+   ],
+   "cue": {
+    "en": "Reach long while the middle of your body stays quiet.",
+    "ko": "몸의 중심은 고요하게 두고 길게 뻗으세요."
+   },
+   "breath": {
+    "en": "Breathe out as you reach, breathe in as you return.",
+    "ko": "뻗을 때 내쉬고, 돌아올 때 들이쉽니다."
+   },
+   "regressions": [
+    {
+     "en": "Move only the leg, keeping the arms still.",
+     "ko": "팔은 그대로 두고 다리만 움직입니다."
+    },
+    {
+     "en": "Keep the moving foot close to the mat.",
+     "ko": "움직이는 발을 매트 가까이에 둡니다."
+    }
+   ],
+   "progressions": [
+    {
+     "en": "Pause for one breath at the reach before returning.",
+     "ko": "뻗은 자세에서 한 호흡 멈춘 뒤 돌아옵니다."
+    }
+   ],
+   "stop_if": {
+    "en": "Stop and rest if anything hurts, if you feel dizzy or short of breath, or if you are unsure. Ask a facility coach before trying again.",
+    "ko": "통증이 있거나, 어지럽거나 숨이 차거나, 확신이 서지 않으면 멈추고 쉬세요. 다시 하기 전에 시설 코치에게 물어보세요."
+   },
+   "before_you_start": {
+    "en": "Check with a doctor or physiotherapist before exercising if you are pregnant, recovering from surgery or injury, or have a health condition.",
+    "ko": "임신 중이거나 수술·부상에서 회복 중이거나 건강 문제가 있다면 운동 전에 의사나 물리치료사와 상의하세요."
+   },
+   "anatomy": {
+    "atlas_depth": "taught",
+    "exercise": "deadBug",
+    "structures": [
+     {
+      "key": "transversus abdominis",
+      "role": "prime"
+     },
+     {
+      "key": "rectus abdominis",
+      "role": "prime"
+     },
+     {
+      "key": "external oblique",
+      "role": "assisting"
+     },
+     {
+      "key": "internal oblique",
+      "role": "assisting"
+     },
+     {
+      "key": "psoas major",
+      "role": "assisting"
+     },
+     {
+      "key": "multifidus",
+      "role": "steadying"
+     },
+     {
+      "key": "diaphragm",
+      "role": "steadying"
+     },
+     {
+      "key": "serratus anterior",
+      "role": "steadying"
+     }
+    ],
+    "label": {
+     "en": "Educational anatomy — not measured muscle activation.",
+     "ko": "교육용 해부학 — 측정된 근육 활성도가 아닙니다."
+    }
+   },
+   "provenance": {
+    "source": "Repository exercise catalog entry and anatomy illustration content for this exercise key (read only, never edited).",
+    "drafted_by": "SEDENS editorial draft",
+    "drafted_at": "2026-10-08",
+    "changes": [
+     "Customer steps rewritten in plain language for a self-guided room; template text not reused.",
+     "Generic progressions (such as an unstable surface) replaced with exercise-specific options.",
+     "Clinical contraindication wording replaced with a plain stop rule and a general before-you-start note.",
+     "Level taken from the anatomy content's difficulty, not the catalog's label.",
+     "Muscle roles shown as educational illustration; the source's uncited evidence tags are not carried over."
+    ]
+   },
+   "review": {
+    "status": "unreviewed",
+    "reviewer": null,
+    "reviewed_at": null,
+    "evidence": null,
+    "scope": null
+   }
+  },
+  {
+   "id": "std-cat-stretch",
+   "catalog_key": "catStretchMat",
+   "version": 1,
+   "title": {
+    "en": "Cat Stretch",
+    "ko": "캣 스트레치"
+   },
+   "category": "Pilates",
+   "level": "foundation",
+   "position": "quadruped",
+   "equipment": [
+    "mat"
+   ],
+   "dose": {
+    "mode": "reps",
+    "sets": 1,
+    "reps": 6,
+    "hold_seconds": 0,
+    "work_seconds": 0,
+    "rest_seconds": 20,
+    "sides": "none"
+   },
+   "steps": [
+    {
+     "en": "Come onto hands and knees, hands under shoulders and knees under hips.",
+     "ko": "손은 어깨 아래, 무릎은 골반 아래에 두고 네발 자세를 합니다."
+    },
+    {
+     "en": "Breathe out and round the back gently toward the ceiling.",
+     "ko": "숨을 내쉬며 등을 천장 쪽으로 부드럽게 둥글게 맙니다."
+    },
+    {
+     "en": "Breathe in and return to a long, flat back.",
+     "ko": "숨을 들이쉬며 길고 평평한 등으로 돌아옵니다."
+    },
+    {
+     "en": "Move slowly and stay in a comfortable range.",
+     "ko": "천천히, 편안한 범위 안에서 움직입니다."
+    }
+   ],
+   "cue": {
+    "en": "Round the back from the tailbone up to the head.",
+    "ko": "꼬리뼈부터 머리까지 차례로 등을 둥글게 마세요."
+   },
+   "breath": {
+    "en": "Breathe out to round, breathe in to lengthen.",
+    "ko": "둥글게 할 때 내쉬고, 길게 펼 때 들이쉽니다."
+   },
+   "regressions": [
+    {
+     "en": "Place a folded towel under the knees.",
+     "ko": "무릎 아래에 접은 수건을 둡니다."
+    },
+    {
+     "en": "Make the movement smaller.",
+     "ko": "움직임을 더 작게 합니다."
+    }
+   ],
+   "progressions": [
+    {
+     "en": "Hold the rounded position for one slow breath.",
+     "ko": "둥근 자세에서 느린 호흡 한 번을 유지합니다."
+    }
+   ],
+   "stop_if": {
+    "en": "Stop and rest if anything hurts, if you feel dizzy or short of breath, or if you are unsure. Ask a facility coach before trying again.",
+    "ko": "통증이 있거나, 어지럽거나 숨이 차거나, 확신이 서지 않으면 멈추고 쉬세요. 다시 하기 전에 시설 코치에게 물어보세요."
+   },
+   "before_you_start": {
+    "en": "Check with a doctor or physiotherapist before exercising if you are pregnant, recovering from surgery or injury, or have a health condition.",
+    "ko": "임신 중이거나 수술·부상에서 회복 중이거나 건강 문제가 있다면 운동 전에 의사나 물리치료사와 상의하세요."
+   },
+   "anatomy": {
+    "atlas_depth": "taught",
+    "exercise": "catStretchMat",
+    "structures": [
+     {
+      "key": "rectus abdominis",
+      "role": "prime"
+     },
+     {
+      "key": "multifidus",
+      "role": "prime"
+     },
+     {
+      "key": "external oblique",
+      "role": "assisting"
+     },
+     {
+      "key": "longissimus thoracis",
+      "role": "assisting"
+     },
+     {
+      "key": "serratus anterior",
+      "role": "assisting"
+     },
+     {
+      "key": "transversus abdominis",
+      "role": "steadying"
+     },
+     {
+      "key": "diaphragm",
+      "role": "steadying"
+     },
+     {
+      "key": "lumbar rotator",
+      "role": "steadying"
+     },
+     {
+      "key": "thoracic rotator",
+      "role": "steadying"
+     }
+    ],
+    "label": {
+     "en": "Educational anatomy — not measured muscle activation.",
+     "ko": "교육용 해부학 — 측정된 근육 활성도가 아닙니다."
+    }
+   },
+   "provenance": {
+    "source": "Repository exercise catalog entry and anatomy illustration content for this exercise key (read only, never edited).",
+    "drafted_by": "SEDENS editorial draft",
+    "drafted_at": "2026-10-08",
+    "changes": [
+     "Customer steps rewritten in plain language for a self-guided room; template text not reused.",
+     "Generic progressions (such as an unstable surface) replaced with exercise-specific options.",
+     "Clinical contraindication wording replaced with a plain stop rule and a general before-you-start note.",
+     "Level taken from the anatomy content's difficulty, not the catalog's label.",
+     "Muscle roles shown as educational illustration; the source's uncited evidence tags are not carried over."
+    ]
+   },
+   "review": {
+    "status": "unreviewed",
+    "reviewer": null,
+    "reviewed_at": null,
+    "evidence": null,
+    "scope": null
+   }
+  },
+  {
+   "id": "std-opposite-reach",
+   "catalog_key": "birdDog",
+   "version": 1,
+   "title": {
+    "en": "Opposite Arm and Leg Reach",
+    "ko": "버드독"
+   },
+   "category": "Pilates",
+   "level": "intermediate",
+   "position": "quadruped",
+   "equipment": [
+    "mat"
+   ],
+   "dose": {
+    "mode": "reps",
+    "sets": 1,
+    "reps": 6,
+    "hold_seconds": 0,
+    "work_seconds": 0,
+    "rest_seconds": 30,
+    "sides": "alternate"
+   },
+   "steps": [
+    {
+     "en": "Come onto hands and knees with a long, flat back.",
+     "ko": "길고 평평한 등으로 네발 자세를 합니다."
+    },
+    {
+     "en": "Breathe out and reach one arm forward and the opposite leg back.",
+     "ko": "숨을 내쉬며 한 팔은 앞으로, 반대쪽 다리는 뒤로 뻗습니다."
+    },
+    {
+     "en": "Keep the hips level, as if balancing a cup on the lower back.",
+     "ko": "허리 위에 컵을 올려 둔 것처럼 골반을 수평으로 유지합니다."
+    },
+    {
+     "en": "Breathe in and return. Change sides.",
+     "ko": "숨을 들이쉬며 돌아옵니다. 반대쪽도 합니다."
+    }
+   ],
+   "cue": {
+    "en": "Reach long rather than high.",
+    "ko": "높이보다 길게 뻗는다고 생각하세요."
+   },
+   "breath": {
+    "en": "Breathe out as you reach, breathe in as you return.",
+    "ko": "뻗을 때 내쉬고, 돌아올 때 들이쉽니다."
+   },
+   "regressions": [
+    {
+     "en": "Reach only the leg, keeping both hands down.",
+     "ko": "두 손은 바닥에 두고 다리만 뻗습니다."
+    },
+    {
+     "en": "Slide the foot along the mat instead of lifting it.",
+     "ko": "발을 들지 않고 매트 위로 미끄러뜨립니다."
+    }
+   ],
+   "progressions": [
+    {
+     "en": "Hold the reach for one slow breath.",
+     "ko": "뻗은 자세에서 느린 호흡 한 번을 유지합니다."
+    }
+   ],
+   "stop_if": {
+    "en": "Stop and rest if anything hurts, if you feel dizzy or short of breath, or if you are unsure. Ask a facility coach before trying again.",
+    "ko": "통증이 있거나, 어지럽거나 숨이 차거나, 확신이 서지 않으면 멈추고 쉬세요. 다시 하기 전에 시설 코치에게 물어보세요."
+   },
+   "before_you_start": {
+    "en": "Check with a doctor or physiotherapist before exercising if you are pregnant, recovering from surgery or injury, or have a health condition.",
+    "ko": "임신 중이거나 수술·부상에서 회복 중이거나 건강 문제가 있다면 운동 전에 의사나 물리치료사와 상의하세요."
+   },
+   "anatomy": {
+    "atlas_depth": "taught",
+    "exercise": "birdDog",
+    "structures": [
+     {
+      "key": "multifidus",
+      "role": "prime"
+     },
+     {
+      "key": "gluteus maximus",
+      "role": "prime"
+     },
+     {
+      "key": "longissimus thoracis",
+      "role": "prime"
+     },
+     {
+      "key": "biceps femoris",
+      "role": "assisting"
+     },
+     {
+      "key": "deltoid",
+      "role": "assisting"
+     },
+     {
+      "key": "serratus anterior",
+      "role": "assisting"
+     },
+     {
+      "key": "transversus abdominis",
+      "role": "steadying"
+     },
+     {
+      "key": "diaphragm",
+      "role": "steadying"
+     },
+     {
+      "key": "quadratus lumborum",
+      "role": "steadying"
+     },
+     {
+      "key": "external oblique",
+      "role": "steadying"
+     }
+    ],
+    "label": {
+     "en": "Educational anatomy — not measured muscle activation.",
+     "ko": "교육용 해부학 — 측정된 근육 활성도가 아닙니다."
+    }
+   },
+   "provenance": {
+    "source": "Repository exercise catalog entry and anatomy illustration content for this exercise key (read only, never edited).",
+    "drafted_by": "SEDENS editorial draft",
+    "drafted_at": "2026-10-08",
+    "changes": [
+     "Customer steps rewritten in plain language for a self-guided room; template text not reused.",
+     "Generic progressions (such as an unstable surface) replaced with exercise-specific options.",
+     "Clinical contraindication wording replaced with a plain stop rule and a general before-you-start note.",
+     "Level taken from the anatomy content's difficulty, not the catalog's label.",
+     "Muscle roles shown as educational illustration; the source's uncited evidence tags are not carried over."
+    ]
+   },
+   "review": {
+    "status": "unreviewed",
+    "reviewer": null,
+    "reviewed_at": null,
+    "evidence": null,
+    "scope": null
+   }
+  },
+  {
+   "id": "std-clam",
+   "catalog_key": "clam",
+   "version": 1,
+   "title": {
+    "en": "Clam",
+    "ko": "클램"
+   },
+   "category": "Pilates",
+   "level": "foundation",
+   "position": "side-lying",
+   "equipment": [
+    "mat"
+   ],
+   "dose": {
+    "mode": "reps",
+    "sets": 1,
+    "reps": 8,
+    "hold_seconds": 0,
+    "work_seconds": 0,
+    "rest_seconds": 20,
+    "sides": "each_side"
+   },
+   "steps": [
+    {
+     "en": "Lie on your side with hips and knees bent and feet together.",
+     "ko": "옆으로 누워 골반과 무릎을 구부리고 두 발을 모읍니다."
+    },
+    {
+     "en": "Rest your head on your arm or a folded towel.",
+     "ko": "머리는 팔이나 접은 수건 위에 둡니다."
+    },
+    {
+     "en": "Breathe out and open the top knee, keeping the feet together.",
+     "ko": "숨을 내쉬며 발은 붙인 채 위쪽 무릎을 엽니다."
+    },
+    {
+     "en": "Breathe in and close the knee slowly. Finish one side, then the other.",
+     "ko": "숨을 들이쉬며 무릎을 천천히 닫습니다. 한쪽을 마친 뒤 반대쪽을 합니다."
+    }
+   ],
+   "cue": {
+    "en": "Open the knee without rolling the hips backward.",
+    "ko": "골반이 뒤로 넘어가지 않게 무릎만 여세요."
+   },
+   "breath": {
+    "en": "Breathe out to open, breathe in to close.",
+    "ko": "열 때 내쉬고, 닫을 때 들이쉽니다."
+   },
+   "regressions": [
+    {
+     "en": "Open the knee only a little way.",
+     "ko": "무릎을 조금만 엽니다."
+    }
+   ],
+   "progressions": [
+    {
+     "en": "Pause with the knee open for one breath.",
+     "ko": "무릎을 연 채 한 호흡 멈춥니다."
+    }
+   ],
+   "stop_if": {
+    "en": "Stop and rest if anything hurts, if you feel dizzy or short of breath, or if you are unsure. Ask a facility coach before trying again.",
+    "ko": "통증이 있거나, 어지럽거나 숨이 차거나, 확신이 서지 않으면 멈추고 쉬세요. 다시 하기 전에 시설 코치에게 물어보세요."
+   },
+   "before_you_start": {
+    "en": "Check with a doctor or physiotherapist before exercising if you are pregnant, recovering from surgery or injury, or have a health condition.",
+    "ko": "임신 중이거나 수술·부상에서 회복 중이거나 건강 문제가 있다면 운동 전에 의사나 물리치료사와 상의하세요."
+   },
+   "anatomy": {
+    "atlas_depth": "taught",
+    "exercise": "clam",
+    "structures": [
+     {
+      "key": "gluteus medius",
+      "role": "prime"
+     },
+     {
+      "key": "piriformis",
+      "role": "prime"
+     },
+     {
+      "key": "gluteus maximus",
+      "role": "assisting"
+     },
+     {
+      "key": "obturator internus",
+      "role": "assisting"
+     },
+     {
+      "key": "quadratus femoris",
+      "role": "assisting"
+     },
+     {
+      "key": "transversus abdominis",
+      "role": "steadying"
+     },
+     {
+      "key": "multifidus",
+      "role": "steadying"
+     },
+     {
+      "key": "diaphragm",
+      "role": "steadying"
+     },
+     {
+      "key": "quadratus lumborum",
+      "role": "steadying"
+     }
+    ],
+    "label": {
+     "en": "Educational anatomy — not measured muscle activation.",
+     "ko": "교육용 해부학 — 측정된 근육 활성도가 아닙니다."
+    }
+   },
+   "provenance": {
+    "source": "Repository exercise catalog entry and anatomy illustration content for this exercise key (read only, never edited).",
+    "drafted_by": "SEDENS editorial draft",
+    "drafted_at": "2026-10-08",
+    "changes": [
+     "Customer steps rewritten in plain language for a self-guided room; template text not reused.",
+     "Generic progressions (such as an unstable surface) replaced with exercise-specific options.",
+     "Clinical contraindication wording replaced with a plain stop rule and a general before-you-start note.",
+     "Level taken from the anatomy content's difficulty, not the catalog's label.",
+     "Muscle roles shown as educational illustration; the source's uncited evidence tags are not carried over."
+    ]
+   },
+   "review": {
+    "status": "unreviewed",
+    "reviewer": null,
+    "reviewed_at": null,
+    "evidence": null,
+    "scope": null
+   }
+  }
+ ]
+}
