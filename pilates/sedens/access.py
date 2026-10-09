@@ -308,10 +308,12 @@ def media_access(sedens, db, actor, room, object_id) -> dict:
     if found is None:
         raise hidden
     allowed = False
-    # The creator's own files.
+    # The creator's own files (a file whose creator profile is gone stays with the
+    # organization's administrator; a colleague's files are never shared).
     if actor is not None and actor.org_id == found["owner_org_id"] and capabilities.has(sedens, db, actor, "creator"):
         profile = db.execute("SELECT id FROM s_creator_profiles WHERE user_id=?", (actor.user_id,)).fetchone()
-        allowed = profile is not None and (found["creator_id"] in (None, profile[0]) or actor.role == "admin")
+        allowed = profile is not None and (found["creator_id"] == profile[0]
+                                           or (found["creator_id"] is None and actor.role == "admin"))
     courses = [r for r in db.execute(
         "SELECT DISTINCT c.*, v.version AS v_version, v.state AS v_state FROM s_course_version_media m "
         "JOIN s_course_versions v ON v.id=m.version_id JOIN s_courses c ON c.id=v.course_id WHERE m.object_id=?",

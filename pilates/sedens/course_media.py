@@ -166,7 +166,7 @@ def describe(db, object_id) -> dict:
 
 def list_for_creator(sedens, db, actor) -> list[dict]:
     profile = _creator(sedens, db, actor)
-    rows = db.execute("SELECT id FROM s_media_objects WHERE owner_org_id=? AND (creator_id=? OR creator_id IS NULL) "
+    rows = db.execute("SELECT id FROM s_media_objects WHERE owner_org_id=? AND creator_id=? "
                       "AND state='ready' ORDER BY created_at DESC", (actor.org_id, profile["id"])).fetchall()
     return [describe(db, r[0]) for r in rows]
 

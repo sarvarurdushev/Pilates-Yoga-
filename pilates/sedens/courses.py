@@ -383,11 +383,13 @@ def set_access(sedens, db, actor, data) -> dict:
 
 
 def _own_media(db, course, media_id, kind):
-    """A media object of this course's owner, of the given kind, with rights recorded."""
+    """A file of this course's own creator (not a colleague's, even in the same
+    organization), of the given kind, with rights recorded."""
     found = db.execute(
-        "SELECT o.kind, o.state, o.owner_org_id, r.object_id AS rights FROM s_media_objects o "
+        "SELECT o.kind, o.state, o.owner_org_id, o.creator_id, r.object_id AS rights FROM s_media_objects o "
         "LEFT JOIN s_media_rights r ON r.object_id=o.id WHERE o.id=?", (media_id,)).fetchone()
-    if found is None or found["owner_org_id"] != course["owner_org_id"] or found["state"] != "ready":
+    if found is None or found["owner_org_id"] != course["owner_org_id"] or found["creator_id"] != course["creator_id"] \
+            or found["state"] != "ready":
         raise Denied("Choose a file from your course media.", 404, "unknown_media")
     if found["kind"] != kind:
         raise Denied(f"Choose a {kind} file here.", 400, "wrong_media_kind")
