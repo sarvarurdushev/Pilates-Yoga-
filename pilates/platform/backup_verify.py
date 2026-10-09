@@ -75,6 +75,11 @@ def verify_archive(path: str | Path) -> dict:
                 raise ArchiveVerificationError("Archive table list does not match the restore schema.")
             expected = {"manifest.json", *(f"records/{table}.jsonl" for table in tables)}
             expected.update(media_files.values())
+            try:
+                course_files = sedens_backup.archived_files(manifest)
+            except Refused as error:
+                raise ArchiveVerificationError("Archive course file list is invalid.") from error
+            expected.update(course_files.values())
             if set(names) != expected:
                 raise ArchiveVerificationError("Archive is missing records/media or has unexpected files.")
             if any(not isinstance(part, str) or not part.startswith("media/") or part.endswith("/") or ".." in part.split("/") for part in media_files.values()):
@@ -136,6 +141,8 @@ def verify_archive(path: str | Path) -> dict:
                 ) from error
             if restored["media_files"] != len(media_rows):
                 raise ArchiveVerificationError("Restore media count does not match the archive.")
+            if restored.get("sedens", {}).get("course_files", 0) != len(course_files):
+                raise ArchiveVerificationError("Restore course file count does not match the archive.")
             return {
                 "format": manifest["format"],
                 "organization_id": manifest["organization_id"],
@@ -144,6 +151,7 @@ def verify_archive(path: str | Path) -> dict:
                 "sha256": digest.hexdigest(),
                 "table_counts": dict(sorted(counts.items())),
                 "media_files": len(media_rows),
+                "course_files": len(course_files),
                 "dry_run_restored_records": restored["restored_records"],
             }
     except (BadZipFile, KeyError, TypeError, UnicodeDecodeError, json.JSONDecodeError, RuntimeError) as error:

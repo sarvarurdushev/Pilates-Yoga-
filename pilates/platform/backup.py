@@ -70,7 +70,7 @@ def export_archive(repo, actor):
             ext = _sedens(db)
             if ext:
                 meta.update(ext.schema(db))
-                ctx = ext.ExportContext.open(db, actor.org_id, meta)
+                ctx = ext.ExportContext.open(db, actor.org_id, meta, repo)
             tables = sorted(set(meta) - PUBLIC)
             files, paths = {}, {}
             for table in tables:
@@ -114,7 +114,10 @@ def export_archive(repo, actor):
             if ext:
                 manifest["sedens"], extra = ext.export_extras(ctx)
                 for part, body in extra.items():
-                    z.writestr(part, body)
+                    if isinstance(body, Path):
+                        z.write(body, part)
+                    else:
+                        z.writestr(part, body)
             z.writestr("manifest.json", encode(manifest))
         yield archive
 
@@ -197,6 +200,7 @@ def rows(z, table):
 def restore_archive(repo, actor, archive):
     admin_only(actor)
     created = []
+    ctx = None
     try:
         with zipfile.ZipFile(archive) as z, repo.db() as db:
             entries = z.infolist()
@@ -230,7 +234,7 @@ def restore_archive(repo, actor, archive):
                     "The backup schema does not match this application version."
                 )
             db.execute("BEGIN IMMEDIATE")
-            ctx = ext.open_restore(db, actor, manifest, z, meta) if ext else None
+            ctx = ext.open_restore(db, actor, manifest, z, meta, repo) if ext else None
             for table in tables:
                 if table in {"p_organizations", "p_users", "p_roles", "p_audit"}:
                     continue
@@ -467,11 +471,11 @@ def restore_archive(repo, actor, archive):
             result["sedens"] = ctx.summary
         return result
     except (zipfile.BadZipFile, KeyError, json.JSONDecodeError) as e:
-        for path in created:
+        for path in created + (ctx.files if ctx is not None else []):
             path.unlink(missing_ok=True)
         raise Refused("This backup is incomplete or invalid.") from e
     except Exception:
-        for path in created:
+        for path in created + (ctx.files if ctx is not None else []):
             path.unlink(missing_ok=True)
         raise
 

@@ -83,15 +83,32 @@ class Received:
         Path(self.path).unlink(missing_ok=True)
 
 
-def receive(repo, stream, length: int, kind: str, mode_name: str) -> Received:
-    """Stream, hash and check an upload. The caller has already authorized it."""
+def _capped(kind: str, length: int, mode_name: str):
     if kind not in KINDS:
         raise Denied("Choose a video, a photo or a PDF.", 400, "invalid_media_kind")
     cap = limit(mode_name, kind)
     if not 0 < length <= cap:
         raise Denied(f"Choose a file up to {cap // (1024 * 1024)} MB.", 413, "media_too_large")
+
+
+def receive(repo, stream, length: int, kind: str, mode_name: str) -> Received:
+    """Stream, hash and check an upload. The caller has already authorized it."""
+    _capped(kind, length, mode_name)
     if not _UPLOADS.acquire(blocking=False):
         raise Denied("Another upload is in progress. Try again in a moment.", 429, "uploads_busy")
+    try:
+        return _ingest(repo, stream, length, kind)
+    finally:
+        _UPLOADS.release()
+
+
+def adopt(repo, stream, length: int, kind: str, mode_name: str) -> Received:
+    """A file from a backup archive: the same limits and checks as an upload."""
+    _capped(kind, length, mode_name)
+    return _ingest(repo, stream, length, kind)
+
+
+def _ingest(repo, stream, length: int, kind: str) -> Received:
     handle, name = tempfile.mkstemp(dir=root(repo) / "incoming")
     path = Path(name)
     try:
@@ -113,8 +130,6 @@ def receive(repo, stream, length: int, kind: str, mode_name: str) -> Received:
     except BaseException:
         path.unlink(missing_ok=True)
         raise
-    finally:
-        _UPLOADS.release()
 
 
 def check(path: Path, kind: str) -> tuple[str, dict]:

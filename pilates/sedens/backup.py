@@ -20,17 +20,28 @@ Three rules decide what an archive may carry and what a restore may believe:
    server's affiliation ledger (``s_affiliation_ledger``, kept even when rows
    are deleted) still records exactly that decision for its lineage, and at
    most once while that lineage lives. Anything else is left out and reported.
+4. **Courses come back for SEDENS to confirm.** A restored course is not
+   published: the version that was published returns to the review queue (its
+   snapshot rebuilt with the new IDs and hashed again by this server), and
+   every other version is kept as history. Course files travel in the archive
+   and pass the same checks as an upload. Media-rights approvals return to
+   review; a rejection stays. Purchases, entitlements and enrollments for
+   another organization's course come back only while this server can confirm
+   them (simulated purchases never move between organizations).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import hashlib
+import json
 import re
 
 from ..platform.inspection import scope as platform_scope
 from ..platform.repository import Refused
-from . import creators
-from .util import digest, now, token, uid
+from . import access, creators, media_store, modes, video_providers
+from .core import Sedens
+from .util import Denied, digest, encode, now, token, uid
 
 FORMAT = 1
 
@@ -46,6 +57,9 @@ class Policy:
     # JSON columns whose IDs are remapped on restore.
     json: tuple = ("detail",)
 
+
+_COURSES = "SELECT id FROM s_courses WHERE owner_org_id=?"
+_CREATORS = "SELECT c.id FROM s_creator_profiles c JOIN p_users u ON u.id=c.user_id WHERE u.org_id=?"
 
 POLICIES: dict[str, Policy] = {
     "s_org_profiles": Policy(True, "facility or creator-studio profile", json=("detail",)),
@@ -66,6 +80,41 @@ POLICIES: dict[str, Policy] = {
     "s_crm_member_links": Policy(True, "CRM member to client links", json=()),
     "s_consents": Policy(True, "consent decisions of this organization's people", json=()),
     "s_events": Policy(True, "local product analytics events", json=("props",)),
+    "s_media_objects": Policy(True, "this organization's course files; the files travel in the archive and are checked again",
+                              scope="owner_org_id=?", drop=("object_key",), json=()),
+    "s_media_rights": Policy(True, "rights and attestations of those files; SEDENS approvals are reviewed again",
+                             scope="object_id IN (SELECT id FROM s_media_objects WHERE owner_org_id=?)", json=()),
+    "s_verification_evidence": Policy(True, "evidence this organization's creators offered for verification",
+                                      scope=f"creator_id IN ({_CREATORS})", json=()),
+    "s_courses": Policy(True, "courses this organization's creators own; publication is confirmed again by SEDENS",
+                        scope="owner_org_id=?", json=()),
+    "s_course_prices": Policy(True, "course prices", scope=f"course_id IN ({_COURSES})", json=()),
+    "s_course_facility_terms": Policy(True, "facilities a course is offered to, or free for",
+                                      scope=f"course_id IN ({_COURSES})", json=()),
+    "s_course_modules": Policy(True, "course modules", scope=f"course_id IN ({_COURSES})", json=()),
+    "s_course_sessions": Policy(True, "guided training sessions", scope=f"course_id IN ({_COURSES})", json=()),
+    "s_course_steps": Policy(True, "guided training steps", scope=f"course_id IN ({_COURSES})", json=()),
+    "s_course_step_anatomy": Policy(True, "anatomy of guided training steps",
+                                    scope=f"step_id IN (SELECT id FROM s_course_steps WHERE course_id IN ({_COURSES}))",
+                                    json=()),
+    "s_course_step_timeline": Policy(True, "anatomy timelines of guided training steps",
+                                     scope=f"step_id IN (SELECT id FROM s_course_steps WHERE course_id IN ({_COURSES}))",
+                                     json=()),
+    "s_course_lessons": Policy(True, "professional education lessons", scope=f"course_id IN ({_COURSES})"),
+    "s_course_versions": Policy(True, "submitted and published course versions; restored for SEDENS to confirm",
+                                scope=f"course_id IN ({_COURSES})", json=()),
+    "s_course_version_media": Policy(True, "files each course version uses",
+                                     scope=f"version_id IN (SELECT id FROM s_course_versions WHERE course_id IN ({_COURSES}))",
+                                     json=()),
+    "s_course_reviews": Policy(True, "review decisions and comments on this organization's courses (reviewer names left out)",
+                               scope=f"course_id IN ({_COURSES})", json=()),
+    "s_facility_course_settings": Policy(True, "which courses this facility enabled, included or featured", json=()),
+    "s_purchases": Policy(True, "simulated purchases by this organization's customers", json=()),
+    "s_entitlements": Policy(True, "courses this organization's customers may use", json=()),
+    "s_enrollments": Policy(True, "this organization's customers' enrollments", json=()),
+    "s_course_progress": Policy(True, "completed sessions and lessons",
+                                scope="enrollment_id IN (SELECT id FROM s_enrollments WHERE org_id=?)", json=()),
+    "s_demo_layers": Policy(False, "which demonstration content this server seeded"),
     "s_schema": Policy(False, "this server's migration ledger"),
     "s_affiliation_ledger": Policy(False, "this server's record of affiliation decisions, which restores are checked against"),
     "s_room_device_pairings": Policy(False, "short-lived pairing codes and secrets"),
@@ -75,8 +124,11 @@ INCLUDED = frozenset(t for t, p in POLICIES.items() if p.include)
 # Attribution columns: who did something. Emptied when that person is outside the archive.
 ATTRIBUTION = {
     "granted_by", "revoked_by", "verified_by", "requested_by", "decided_by",
-    "created_by", "updated_by", "confirmed_by",
+    "created_by", "updated_by", "confirmed_by", "uploaded_by", "attested_by",
+    "reviewed_by", "reviewer_id", "submitted_by",
 }
+MEDIA_PREFIX = "sedens-media/"
+RESTORED_VERSION = "Restored from a backup: this version was published. Confirm it to publish it again."
 
 
 def present(db) -> bool:
@@ -134,11 +186,13 @@ class ExportContext:
     org_id: str
     meta: dict
     users: set = field(default_factory=set)
+    repo: object = None
+    files: dict = field(default_factory=dict)  # object id -> (path on disk, archive part)
 
     @classmethod
-    def open(cls, db, org_id, meta):
+    def open(cls, db, org_id, meta, repo=None):
         users = {r[0] for r in db.execute("SELECT id FROM p_users WHERE org_id=?", (org_id,))}
-        return cls(db, org_id, meta, users)
+        return cls(db, org_id, meta, users, repo)
 
 
 def export_row(ctx: ExportContext, table: str, item: dict) -> dict | None:
@@ -151,12 +205,20 @@ def export_row(ctx: ExportContext, table: str, item: dict) -> dict | None:
             item[column] = None
     if table == "s_capabilities" and item["capability"] != "creator":
         return None
+    if table == "s_media_objects" and item["source"] != "repo":
+        key = ctx.db.execute("SELECT object_key FROM s_media_objects WHERE id=?", (item["id"],)).fetchone()[0]
+        path = media_store.object_path(ctx.repo, key)
+        if not path.is_file():
+            raise Refused("A saved course file is missing. Restore it or remove it from its course before "
+                          "creating a complete backup.", 409)
+        ctx.files[item["id"]] = (path, MEDIA_PREFIX + item["id"] + media_store.EXTENSIONS[item["mime"]])
     return item
 
 
 def export_extras(ctx: ExportContext) -> tuple[dict, dict]:
-    """(manifest entry, {archive part: bytes})."""
-    return {"format": FORMAT}, {}
+    """(manifest entry, {archive part: bytes or a file Path})."""
+    entry = {"format": FORMAT, "media_files": {object_id: part for object_id, (_, part) in ctx.files.items()}}
+    return entry, {part: path for path, part in ctx.files.values()}
 
 
 # -- restore ---------------------------------------------------------------------
@@ -172,6 +234,14 @@ class RestoreContext:
     kind: str = "facility"
     exporter_profile: str | None = None
     existing_profile: str | None = None
+    repo: object = None
+    archive: object = None
+    media_files: dict = field(default_factory=dict)
+    mode_name: str = modes.DEMO_FREE
+    files: list = field(default_factory=list)  # course files written so far (removed if the restore fails)
+    text_ids: dict | None = None
+    inside_courses: set = field(default_factory=set)
+    dropped: set = field(default_factory=set)  # (table, archived id) left out by decision
     summary: dict = field(default_factory=lambda: {
         "room_screens_to_pair_again": 0,
         "room_sessions_closed": 0,
@@ -180,14 +250,42 @@ class RestoreContext:
         "affiliations_not_restored": 0,
         "sedens_permissions_not_restored": 0,
         "crm_settings_reset": 0,
+        "courses_to_confirm": 0,
+        "media_rights_to_review": 0,
+        "course_terms_not_restored": 0,
+        "course_settings_not_restored": 0,
+        "purchases_not_restored": 0,
+        "course_access_not_restored": 0,
+        "course_files": 0,
     })
 
 
-def open_restore(db, actor, manifest, archive, meta) -> RestoreContext:
+def _media_parts(entry) -> dict:
+    files = entry.get("media_files", {}) if isinstance(entry, dict) else {}
+    if not isinstance(files, dict) or any(
+        not isinstance(k, str) or not isinstance(v, str) or not v.startswith(MEDIA_PREFIX) or v.endswith("/")
+        or ".." in v.split("/") for k, v in files.items()
+    ):
+        raise Refused("Invalid course file entry in backup.")
+    return files
+
+
+def archived_files(manifest) -> dict:
+    """{media object id: archive part} for the course files an archive carries."""
+    entry = manifest.get("sedens")
+    return _media_parts(entry) if isinstance(entry, dict) else {}
+
+
+def open_restore(db, actor, manifest, archive, meta, repo=None) -> RestoreContext:
     entry = manifest.get("sedens")
     if entry is not None and (not isinstance(entry, dict) or entry.get("format") != FORMAT):
         raise Refused("The SEDENS part of this backup is not supported.")
-    return RestoreContext(db, actor, manifest, meta)
+    try:
+        mode_name = modes.resolve(db_path=str(repo.path) if repo is not None else "").name
+    except modes.ModeError:
+        mode_name = modes.DEMO_FREE
+    return RestoreContext(db, actor, manifest, meta, repo=repo, archive=archive,
+                          media_files=_media_parts(entry or {}), mode_name=mode_name)
 
 
 def blocks_restore(ctx: RestoreContext, table, meta) -> bool:
@@ -231,6 +329,7 @@ def prepare(ctx: RestoreContext, rows, mapping):
     for row in rows("p_organizations"):
         # Read once here: the manifest's table order must not decide the environment.
         ctx.demo = bool(row.get("demo"))
+    _decide_course_access(ctx, rows)
     exporter = ctx.manifest["exporter_id"]
     existing = ctx.db.execute("SELECT id FROM s_creator_profiles WHERE user_id=?", (ctx.actor.user_id,)).fetchone()
     for row in rows("s_creator_profiles"):
@@ -241,6 +340,174 @@ def prepare(ctx: RestoreContext, rows, mapping):
             if existing is not None:
                 ctx.existing_profile = existing[0]
                 mapping[("s_creator_profiles", row["id"])] = existing[0]
+
+
+def _environment(ctx) -> str:
+    return access.environment({"demo": ctx.demo, "id": ctx.actor.org_id})
+
+
+def _external_course(ctx, course_id):
+    """Another organization's course on this server, in the same environment, or None."""
+    course = ctx.db.execute("SELECT * FROM s_courses WHERE id=?", (course_id,)).fetchone() if course_id else None
+    if course is None:
+        return None
+    owner = Sedens.org(ctx.db, course["owner_org_id"])
+    return course if owner is not None and access.environment(owner) == _environment(ctx) else None
+
+
+def _decide_course_access(ctx, rows):
+    """Decide up front which purchases, entitlements, enrollments and progress rows
+    come back, because the tables are restored in name order, children first.
+
+    A course in the archive comes back with them. For another organization's
+    course, this server decides: a simulated purchase never moves between
+    organizations; a free marketplace entitlement stands only while the course is
+    still free on the marketplace; a facility's free or included offer is checked
+    again whenever it is used; an enrollment needs its entitlement and a version
+    this server published."""
+    ctx.inside_courses = {r["id"] for r in rows("s_courses")}
+    facilities_inside = {r["id"] for r in rows("p_organizations")}
+    for p in rows("s_purchases"):
+        if not (ctx.demo and p.get("course_id") in ctx.inside_courses):
+            ctx.dropped.add(("s_purchases", p["id"]))
+    for e in rows("s_entitlements"):
+        keep = True
+        if e.get("purchase_id") and ("s_purchases", e["purchase_id"]) in ctx.dropped:
+            keep = False
+        elif e.get("source") == "demo_purchase" and not e.get("purchase_id"):
+            keep = False
+        elif e.get("facility_id") and e["facility_id"] not in facilities_inside:
+            keep = False
+        elif e.get("course_id") not in ctx.inside_courses:
+            course = _external_course(ctx, e.get("course_id"))
+            if course is None or e.get("source") == "demo_purchase":
+                keep = False
+            elif e.get("source") == "marketplace_free":
+                keep = course["distribution"] == "marketplace" and access.is_free(ctx.db, course["id"])
+        if not keep:
+            ctx.dropped.add(("s_entitlements", e["id"]))
+    for n in rows("s_enrollments"):
+        keep = not (n.get("entitlement_id") and ("s_entitlements", n["entitlement_id"]) in ctx.dropped)
+        if keep and n.get("course_id") not in ctx.inside_courses:
+            keep = bool(n.get("entitlement_id")) and _external_course(ctx, n.get("course_id")) is not None \
+                and ctx.db.execute("SELECT 1 FROM s_course_versions WHERE course_id=? AND version=? "
+                                   "AND state IN ('published','superseded')",
+                                   (n.get("course_id"), n.get("version"))).fetchone() is not None
+        if not keep:
+            ctx.dropped.add(("s_enrollments", n["id"]))
+
+
+def _ids(ctx, mapping) -> dict:
+    if ctx.text_ids is None:
+        ctx.text_ids = {old: new for (_, old), new in mapping.items() if isinstance(old, str)}
+    return ctx.text_ids
+
+
+def _remap(value, ids):
+    if isinstance(value, str):
+        return ids.get(value, value)
+    if isinstance(value, list):
+        return [_remap(v, ids) for v in value]
+    if isinstance(value, dict):
+        return {ids.get(k, k): _remap(v, ids) for k, v in value.items()}
+    return value
+
+
+def _restore_media(ctx, row, original):
+    """Bring a course file back through the same checks as an upload."""
+    if row["source"] == "repo":
+        asset = video_providers.repo_asset(row.get("repo_asset"))
+        if asset is None or asset["kind"] != row["kind"]:
+            raise Refused("This backup uses a demonstration file this server does not have.")
+        path = video_providers.REPO / asset["path"]
+        row.update(object_key=None, mime=asset["mime"], size=path.stat().st_size, sha256=asset["sha256"])
+        return
+    part = ctx.media_files.get(original["id"])
+    if not part:
+        raise Refused("A course file is missing from this backup.")
+    info = ctx.archive.getinfo(part)
+    if info.is_dir() or row.get("kind") not in media_store.KINDS:
+        raise Refused("Invalid course file entry in backup.")
+    try:
+        with ctx.archive.open(part) as source:
+            received = media_store.adopt(ctx.repo, source, info.file_size, row["kind"], ctx.mode_name)
+    except Denied as refused:
+        raise Refused(f"A course file in this backup was not accepted: {refused}") from refused
+    try:
+        key = received.keep(ctx.repo, ctx.actor.org_id)
+    except BaseException:
+        received.discard()
+        raise
+    ctx.files.append(media_store.object_path(ctx.repo, key))
+    ctx.summary["course_files"] += 1
+    row.update(object_key=key, mime=received.mime, size=received.size, sha256=received.sha256,
+               width=received.detail.get("width", row.get("width")),
+               height=received.detail.get("height", row.get("height")))
+
+
+def _external_facility(ctx, org_id, location_id):
+    org = Sedens.org(ctx.db, org_id) if org_id else None
+    if org is None or org["kind"] != "facility" or access.environment(org) != _environment(ctx):
+        return False
+    return not location_id or ctx.db.execute(
+        "SELECT 1 FROM p_locations WHERE id=? AND org_id=?", (location_id, org_id)).fetchone() is not None
+
+
+def _restore_course_row(ctx, table, original, row, mapping):
+    """The course tables' part of :func:`restore_row`: (row, external) or None."""
+    external = set()
+    if table == "s_media_objects":
+        _restore_media(ctx, row, original)
+    elif table == "s_media_rights":
+        if row["review_status"] == "approved":
+            row.update(review_status="unreviewed", reviewed_at=None,
+                       review_note="Restored from a backup. Waiting for SEDENS to review the rights again.")
+            ctx.summary["media_rights_to_review"] += 1
+        row["reviewed_by"] = None
+    elif table == "s_courses":
+        if row.get("published_version"):
+            ctx.summary["courses_to_confirm"] += 1
+        row["published_version"] = None
+    elif table == "s_course_versions":
+        # The snapshot names the course's own rows; rebuild it with the new IDs and
+        # hash it here. The archive's hash is never trusted.
+        snapshot = _remap(json.loads(original["snapshot"]), _ids(ctx, mapping))
+        encoded = encode(snapshot)
+        row.update(snapshot=encoded, snapshot_sha256=hashlib.sha256(encoded.encode()).hexdigest())
+        if original["state"] == "published":
+            note = (RESTORED_VERSION + " " + (original.get("note") or "")).strip()
+            row.update(state="submitted", decided_at=None, note=note)
+        elif original["state"] in ("approved", "superseded"):
+            row["state"] = "withdrawn"
+    elif table == "s_course_reviews":
+        row["reviewer_id"] = None
+    elif table == "s_course_facility_terms":
+        if ("p_organizations", original["org_id"]) not in mapping:
+            if not _external_facility(ctx, original["org_id"], original.get("location_id")):
+                ctx.summary["course_terms_not_restored"] += 1
+                return None
+            external = {"org_id", "location_id"}
+    elif table == "s_facility_course_settings":
+        if original["course_id"] not in ctx.inside_courses:
+            # Whether the course is still offered here is decided each time it is used.
+            if _external_course(ctx, original["course_id"]) is None:
+                ctx.summary["course_settings_not_restored"] += 1
+                return None
+            external = {"course_id"}
+    elif table in ("s_purchases", "s_entitlements", "s_enrollments"):
+        if (table, original["id"]) in ctx.dropped:
+            ctx.summary["purchases_not_restored" if table == "s_purchases" else "course_access_not_restored"] += 1
+            return None
+        if original["course_id"] not in ctx.inside_courses:
+            external = {"course_id"}
+    elif table == "s_course_progress":
+        if ("s_enrollments", original["enrollment_id"]) in ctx.dropped:
+            return None
+        ids = _ids(ctx, mapping)
+        row.update(item_id=ids.get(original["item_id"], original["item_id"]),
+                   module_id=ids.get(original["module_id"], original["module_id"]))
+        external = {"item_id", "module_id"}
+    return row, external
 
 
 def _lineage_live(db, origin) -> bool:
@@ -395,6 +662,11 @@ def restore_row(ctx: RestoreContext, table, original, mapping):
         if row["provider"] == "demo" and not ctx.demo:
             row.update(provider="none", config="{}")
             ctx.summary["crm_settings_reset"] += 1
+    else:
+        decided = _restore_course_row(ctx, table, original, row, mapping)
+        if decided is None:
+            return None
+        row, external = decided
     return row, external, conflict
 
 
