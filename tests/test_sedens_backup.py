@@ -443,3 +443,28 @@ def test_restore_still_refuses_a_studio_with_its_own_sedens_records(world, tmp_p
         analytics.record(db, "room_screen_viewed", org_id=owner.org_id, source="client", props={})
     with pytest.raises(Refused, match="empty studio"):
         restore_archive(sedens.repo, owner, path)
+
+
+def test_restore_refuses_media_records_the_studio_would_never_accept(tmp_path):
+    """A crafted archive must not plant an HTML (or other unaccepted) file that the
+    workspace would later serve from its own origin."""
+    legacy = Repository(tmp_path / "studio.db")
+    admin = legacy.actor(legacy.create_org("Owner", "owner@example.test", PASSWORD, "Studio"))
+    student = legacy.save_person(admin, {"name": "Client", "email": "c@example.test", "roles": ["student"]})
+    picture = tmp_path / "p.png"
+    from PIL import Image
+
+    Image.new("RGB", (8, 8)).save(picture)
+    from pilates.platform import media
+
+    with picture.open("rb") as stream:
+        media.upload(legacy, admin, stream, picture.stat().st_size, "p.png", "image/png", "capture",
+                     student_id=student["id"])
+    path = save(legacy, admin, tmp_path / "studio.zip")
+    for change in ({"mime": "text/html"}, {"kind": "page"}):
+        crafted = tamper(path, "p_media", lambda r, c=change: {**r, **c}, next(iter(change)))
+        fresh = legacy.actor(legacy.create_org("New", f"new-{next(iter(change))}@example.test", PASSWORD, "New"))
+        with pytest.raises(Refused, match="Invalid media entry"):
+            restore_archive(legacy, fresh, crafted)
+    fresh = legacy.actor(legacy.create_org("New", "new-ok@example.test", PASSWORD, "New"))
+    assert restore_archive(legacy, fresh, path)["media_files"] == 1

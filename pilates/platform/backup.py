@@ -19,6 +19,9 @@ from .repository import (
     Refused, uid, now, encode, backfill_session_exercise_events,
 )
 from .inspection import schema, scope, PUBLIC
+from .media import TYPES as MEDIA_TYPES
+
+MEDIA_KINDS = {"capture", "exercise", "scan", "profile"}
 
 MAX_ARCHIVE = 256 * 1024 * 1024
 MAX_EXPANDED = 1024 * 1024 * 1024
@@ -320,12 +323,16 @@ def restore_archive(repo, actor, archive):
                             not part.startswith("media/")
                             or ".." in part.split("/")
                             or z.getinfo(part).is_dir()
+                            # Only types the studio itself accepts: a crafted
+                            # text/html record would otherwise be served same-origin.
+                            or row.get("mime") not in MEDIA_TYPES
+                            or row.get("kind") not in MEDIA_KINDS
                         ):
                             raise Refused("Invalid media entry in backup.")
                         target = (
                             repo.media_root
                             / actor.org_id
-                            / (row["id"] + Path(part).suffix)
+                            / (row["id"] + MEDIA_TYPES[row["mime"]])
                         )
                         target.parent.mkdir(parents=True, exist_ok=True)
                         created.append(target)
