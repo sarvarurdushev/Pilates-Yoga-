@@ -332,3 +332,19 @@ def test_drafts_are_invisible_to_customers_and_facilities(world):
     with sedens.db() as db:
         assert marketplace.catalog(sedens, db, customer(sedens, a)) == []
         assert marketplace.facility_courses(sedens, db, a["admin"]) == []
+
+
+def test_the_room_lists_what_the_facility_features_first(world):
+    sedens, reviewer, a, _, _ = world
+    coach = coach_creator(sedens, a)
+    ids = []
+    for title in ("Alpha course", "Beta course"):
+        ids.append(publish(sedens, coach, reviewer, build_guided(sedens, coach, title), "selected_facilities",
+                           [{"org_id": a["org_id"], "free": True}])["course"]["id"])
+    facility_setting(sedens, a, ids[0], enabled=True)
+    facility_setting(sedens, a, ids[1], enabled=True, featured=True)
+    room = room_for(sedens, a)
+    with sedens.db() as db:
+        listed = marketplace.room_courses(sedens, db, room)
+    assert [c["title"] for c in listed] == ["Beta course", "Alpha course"] and listed[0]["featured"]
+

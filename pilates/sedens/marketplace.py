@@ -171,9 +171,11 @@ def room_courses(sedens, db, room) -> list[dict]:
         if decision["reason"] == "not_enabled_here":
             continue
         snapshot = _snapshot(db, c["id"], c["published_version"])
+        featured = access.facility_setting(db, room.org_id, c["id"])["featured"]
         out.append({"id": c["id"], "title": snapshot["course"]["title"], "playable": decision["ok"],
-                    "reason": decision["reason"], "outline": _outline(snapshot)})
-    return out
+                    "reason": decision["reason"], "featured": featured, "outline": _outline(snapshot)})
+    # What the facility features comes first, then what this customer can play.
+    return sorted(out, key=lambda c: (not c["featured"], not c["playable"], c["title"]))
 
 
 def room_session_plan(sedens, db, room, course_id, session_id) -> dict:
