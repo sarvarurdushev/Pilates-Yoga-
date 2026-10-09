@@ -89,3 +89,17 @@ def test_python_registry_matches_the_browser_registry(tmp_path):
     )
     out = subprocess.run(["node", str(script)], capture_output=True, text=True, timeout=120, check=True)
     assert set(json.loads(out.stdout)) == set(atlas.registry()["structures"])
+
+
+def test_the_anatomy_picker_searches_and_previews_by_name():
+    from pilates.sedens import atlas
+
+    found = atlas.search("trapez")
+    assert found[0] == {"key": "trapezius", "layer": "muscles_superficial", "whole": True}
+    assert all(atlas.depth_of(atlas.get(r["key"])) in (None, "taught") for r in atlas.search("", "taught", 5000))
+    assert all(atlas.depth_of(atlas.get(r["key"])) in (None, "complete") for r in atlas.search("scapula", "complete"))
+    drawn = atlas.drawn_ids(["trapezius", "rectus abdominis", "not a structure", 5])
+    parts = [atlas.get(k)["id"] for k in atlas.get("trapezius")["parts"]]
+    assert drawn["ids"][: len(parts)] == parts and drawn["missing"] == ["not a structure", 5]
+    assert atlas.key_for_id(atlas.get("rectus abdominis")["id"]) == "rectus abdominis"
+    assert atlas.key_for_id(-1) is None

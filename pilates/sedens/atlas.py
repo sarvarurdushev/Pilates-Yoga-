@@ -133,3 +133,46 @@ def exercise_structures(muscles: str) -> list[str]:
         if name and name in structures and name not in out:
             out.append(name)
     return out
+
+
+def search(query: str = "", depth: str = "taught", limit: int = 60) -> list[dict]:
+    """Structures whose name contains the query, for the Creator Studio's picker.
+    Whole muscles come first; each answers with its key and layer."""
+    q = str(query or "").strip().lower()[:80]
+    out = []
+    for key, record in registry()["structures"].items():
+        if record["set"] == "brain" or depth_of(record) not in (None, depth):
+            continue
+        if q and q not in key.lower():
+            continue
+        out.append({"key": key, "layer": record["layer"], "whole": record["parts"] is not None})
+    out.sort(key=lambda r: (not r["whole"], not r["key"].lower().startswith(q), len(r["key"]), r["key"]))
+    return out[:limit]
+
+
+def drawn_ids(keys) -> dict:
+    """{"ids": numeric ids the viewer draws for these keys (aggregates expanded),
+    "missing": keys it cannot draw}. For previews only: ids are never stored."""
+    structures = registry()["structures"]
+    ids, missing = [], []
+    for key in keys if isinstance(keys, (list, tuple)) else []:
+        record = structures.get(key) if isinstance(key, str) else None
+        if record is None:
+            missing.append(key)
+            continue
+        members = [structures[p] for p in record["parts"]] if record["parts"] else [record]
+        for member in members:
+            number = member.get("id")
+            if number is None and member["set"] == "brain":
+                number = int(member["key"].split(":")[1])
+            if number is not None and number not in ids:
+                ids.append(number)
+    return {"ids": ids, "missing": missing}
+
+
+def key_for_id(number) -> str | None:
+    for key, record in registry()["structures"].items():
+        if record.get("id") == number:
+            return key
+    return None
+

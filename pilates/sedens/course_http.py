@@ -14,8 +14,8 @@ import json
 import shutil
 from urllib.parse import unquote
 
-from . import (access, capabilities, course_export, course_media, course_review, courses, creators, marketplace,
-               media_store, payments, standard, video_providers)
+from . import (access, atlas, capabilities, course_export, course_media, course_review, courses, creators,
+               marketplace, media_store, payments, standard, video_providers)
 from ..platform.repository import Refused
 from .util import Denied
 
@@ -111,6 +111,33 @@ def _course_version(r):
 def _exercises(r):
     _creator(r)
     return {"items": courses.search_exercises(r.query.get("q", ""), 60), "label": standard.label()}
+
+
+def _anatomy(r):
+    _creator(r)
+    depth = r.query.get("depth", "taught")
+    if depth not in atlas.DEPTHS:
+        raise Denied("Choose the taught body or the complete atlas.", 400, "invalid_atlas_depth")
+    return {"items": atlas.search(r.query.get("q", ""), depth), "atlas_hash": atlas.atlas_hash(),
+            "label": vocabulary()["anatomy_label"]}
+
+
+def _anatomy_preview(r):
+    """Viewer ids for a preview of the given keys (a JSON list in ``keys``)."""
+    _creator(r)
+    try:
+        keys = json.loads(r.query.get("keys", "[]"))
+    except ValueError as exc:
+        raise Denied("Choose body structures from the anatomy list.", 400, "invalid_structures") from exc
+    if not isinstance(keys, list) or len(keys) > atlas.MAX_STRUCTURES:
+        raise Denied("Choose body structures from the anatomy list.", 400, "invalid_structures")
+    picked = None
+    if r.query.get("id"):
+        try:
+            picked = atlas.key_for_id(int(r.query["id"]))
+        except ValueError:
+            picked = None
+    return {**atlas.drawn_ids(keys), "picked": picked}
 
 
 def _media_sources(r):
@@ -305,6 +332,8 @@ ROUTES = {
     ("GET", "creator/studio"): _studio,
     ("GET", "creator/exercises"): _exercises,
     ("GET", "creator/media/sources"): _media_sources,
+    ("GET", "creator/anatomy"): _anatomy,
+    ("GET", "creator/anatomy/preview"): _anatomy_preview,
     ("POST", "creator/media/repo-asset"): _repo_asset,
     ("POST", "creator/media/retire"): _retire,
     ("POST", "creator/evidence"): _evidence,
