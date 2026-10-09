@@ -464,3 +464,33 @@ def test_affiliation_requests_target_facilities_only(world):
         assert exc.value.code == "unknown_facility"
         with pytest.raises(Denied):
             creators.request_affiliation(sedens, db, coach, a["org_id"])
+
+
+def test_a_demonstration_reviewer_stays_in_their_own_demonstration(tmp_path):
+    """Demonstrations are isolated per visitor key, not just from real organizations."""
+    from pilates.platform.repository import Actor
+    from pilates.sedens.util import now
+
+    sedens = make_sedens(tmp_path / "demo.db")
+    mine, theirs = "e" * 32, "f" * 32
+    for key in (mine, theirs):
+        sedens.repo.logout(sedens.repo.demo_login(key, "admin"))
+    staff_org = f"demo-{mine}-sedens"
+    with sedens.db() as db:
+        db.execute("INSERT INTO p_organizations(id,name,demo,created_at) VALUES (?,?,1,?)", (staff_org, "Demo SEDENS", now()))
+        sedens.set_org_profile(db, staff_org, "sedens", "SEDENS (demo)", "en")
+        db.execute("INSERT INTO p_users(id,org_id,name,email) VALUES (?,?,?,?)",
+                   (f"{staff_org}-reviewer", staff_org, "Reviewer", "r@demo.invalid"))
+        db.execute("INSERT INTO p_roles VALUES (?,?)", (f"{staff_org}-reviewer", "coach"))
+        capabilities.grant(sedens, db, None, f"{staff_org}-reviewer", "sedens_reviewer", cli=True)
+        reviewer = Actor(f"{staff_org}-reviewer", staff_org, "coach", True)
+        profiles = {}
+        for key in (mine, theirs):
+            coach = Actor(f"demo-{key}-coach0", f"demo-{key}", "coach", True)
+            capabilities.grant(sedens, db, None, coach.user_id, "creator", cli=True)
+            profiles[key] = creators.save_profile(sedens, db, coach, {"display_name": "Coach " + key[:2]})
+            creators.request_verification(sedens, db, coach)
+        with pytest.raises(Denied) as refused:
+            creators.decide_verification(sedens, db, reviewer, profiles[theirs]["id"], "rejected")
+        assert refused.value.code == "environment_mismatch"
+        creators.decide_verification(sedens, db, reviewer, profiles[mine]["id"], "rejected", "Demo.")

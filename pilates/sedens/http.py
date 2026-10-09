@@ -26,7 +26,7 @@ from urllib.parse import parse_qs, urlparse
 from . import analytics, capabilities, consent, creators, crm, demo, library, onboarding, rooms
 from ..platform import http as platform_http
 from ..platform.repository import Refused
-from .util import Denied
+from .util import Denied, environment
 
 _LIMITS = defaultdict(deque)
 _LIMIT_LOCK = threading.Lock()
@@ -434,12 +434,15 @@ def _review_creators(r):
     actor = r.actor()
     with r.sedens.db() as db:
         capabilities.require(r.sedens, db, actor, "sedens_reviewer")
+        here = environment(r.sedens.org(db, actor.org_id))
         rows = db.execute(
-            "SELECT c.* FROM s_creator_profiles c JOIN p_users u ON u.id=c.user_id JOIN p_organizations o ON o.id=u.org_id "
-            "WHERE o.demo=? ORDER BY CASE c.verification_state WHEN 'pending' THEN 0 ELSE 1 END, c.updated_at DESC",
+            "SELECT c.*, u.org_id AS home_org FROM s_creator_profiles c JOIN p_users u ON u.id=c.user_id "
+            "JOIN p_organizations o ON o.id=u.org_id WHERE o.demo=? "
+            "ORDER BY CASE c.verification_state WHEN 'pending' THEN 0 ELSE 1 END, c.updated_at DESC",
             (int(actor.demo),),
         ).fetchall()
-        return {"items": [creators.public(row) for row in rows]}
+        return {"items": [creators.public(row) for row in rows
+                          if environment(r.sedens.org(db, row["home_org"])) == here]}
 
 
 def _review_decide(r):

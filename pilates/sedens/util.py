@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
@@ -74,3 +76,14 @@ def text(value, limit: int, field: str = "This field") -> str:
     if len(value) > limit:
         raise Refused(f"{field} is too long (at most {limit} characters).")
     return value
+
+
+_DEMO_KEY = re.compile(r"^demo-([0-9a-f]{32})(?:-|$)")
+
+
+def environment(org) -> str:
+    """'real', or 'demo:<key>': one visitor's demonstration never meets another's."""
+    if not org["demo"]:
+        return "real"
+    match = _DEMO_KEY.match(org["id"])
+    return "demo:" + (match.group(1) if match else org["id"])

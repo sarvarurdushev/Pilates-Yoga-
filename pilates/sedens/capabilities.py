@@ -27,7 +27,7 @@ profile confers nothing.
 
 from __future__ import annotations
 
-from .util import Denied, now
+from .util import Denied, environment, now
 
 CAPABILITIES = ("creator", "sedens_reviewer", "sedens_admin")
 SEDENS_ONLY = ("sedens_reviewer", "sedens_admin")
@@ -126,7 +126,7 @@ def grant(sedens, db, granter, user_id, capability, *, cli=False):
             raise Denied("Sign in to grant permissions.", 401, "sign_in")
         granter_org = sedens.org(db, granter.org_id)
         # Demonstration and real organizations never grant into each other.
-        if granter_org["demo"] != target_org["demo"]:
+        if environment(granter_org) != environment(target_org):
             raise Denied("Choose an account in the same environment.", 403, "environment_mismatch")
         is_platform_admin = has(sedens, db, granter, "sedens_admin")
         if capability == "creator":
@@ -161,7 +161,7 @@ def revoke(sedens, db, granter, user_id, capability, *, cli=False):
             raise Denied("Sign in to change permissions.", 401, "sign_in")
         granter_org = sedens.org(db, granter.org_id)
         target_org = sedens.org(db, target["org_id"])
-        if granter_org["demo"] != target_org["demo"]:
+        if environment(granter_org) != environment(target_org):
             raise Denied("Choose an account in the same environment.", 403, "environment_mismatch")
         is_platform_admin = has(sedens, db, granter, "sedens_admin")
         same_org_admin = _same_org_admin(granter, granter_org, target)

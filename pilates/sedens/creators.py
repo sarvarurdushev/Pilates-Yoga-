@@ -19,7 +19,7 @@ import re
 from datetime import timedelta
 
 from . import capabilities
-from .util import Denied, decode, digest, encode, now, parse, text, uid, utcnow
+from .util import Denied, decode, digest, encode, environment, now, parse, text, uid, utcnow
 
 TYPES_BY_ORG_KIND = {
     "facility": ("coach", "professor", "expert"),
@@ -159,7 +159,7 @@ def decide_verification(sedens, db, actor, creator_id, decision, note="", versio
     ).fetchone()
     if row is None:
         raise Denied("Choose an existing creator.", 404, "unknown_creator")
-    if sedens.org(db, row["org_id"])["demo"] != actor.demo:
+    if environment(sedens.org(db, row["org_id"])) != environment(sedens.org(db, actor.org_id)):
         raise Denied("Choose a creator in the same environment.", 403, "environment_mismatch")
     if row["user_id"] == actor.user_id:
         raise Denied("Another SEDENS reviewer must review your own creator profile.", 403, "self_review")
