@@ -23,14 +23,16 @@ import threading
 import time
 from urllib.parse import parse_qs, urlparse
 
-from . import analytics, capabilities, consent, creators, crm, demo, library, onboarding, rooms
+from . import (analytics, capabilities, consent, course_http, creators, crm, demo, demo_marketplace, library,
+               onboarding, rooms)
 from ..platform import http as platform_http
 from ..platform.repository import Refused
 from .util import Denied, environment
 
 _LIMITS = defaultdict(deque)
 _LIMIT_LOCK = threading.Lock()
-RATE = {"pairing": 10, "enter": 20, "demo": 10, "register": 5, "confirm": 20, "code": 10, "affiliation": 10}
+RATE = {"pairing": 10, "enter": 20, "demo": 10, "register": 5, "confirm": 20, "code": 10, "affiliation": 10,
+        "upload": 12}
 
 
 def _client(h):
@@ -127,6 +129,9 @@ class Request:
 
     def cookie(self, name, value, path, max_age):
         self.set_cookies.append(_cookie(self.h, name, value, path, max_age))
+
+    def limit(self, bucket):
+        _limit(self.h, bucket)
 
     def demo_allowed(self):
         if not self.sedens.mode.demo_enabled:
@@ -261,8 +266,16 @@ def _demo_enter(r):
     r.demo_allowed()
     _limit(r.h, "demo")
     key = str(r.body.get("key", ""))
-    token = r.sedens.repo.demo_login(key, r.body.get("role", "student"), r.body.get("user_id"))
-    demo.ensure(r.sedens, "demo-" + key)
+    role = r.body.get("role", "student")
+    if role in ("creator", "professor", "reviewer"):
+        # Demonstration-marketplace roles: Minji Lee, the fictional professor, the fictional reviewer.
+        r.sedens.repo.logout(r.sedens.repo.demo_login(key, "admin"))  # seeds the demonstration once
+        demo.ensure(r.sedens, "demo-" + key)
+        user_id, platform_role = demo_marketplace.actor_for("demo-" + key, role)
+        token = r.sedens.repo.issue(user_id, platform_role)
+    else:
+        token = r.sedens.repo.demo_login(key, role, r.body.get("user_id"))
+        demo.ensure(r.sedens, "demo-" + key)
     r.set_cookies.append(platform_http.cookie(r.h, token))
     r.cookies["motion_session"] = token
     return {"me": _me(r)}
@@ -500,6 +513,7 @@ ROUTES = {
     ("GET", "review/creators"): _review_creators,
     ("POST", "review/creators/decide"): _review_decide,
 }
+ROUTES.update(course_http.ROUTES)
 
 
 def dispatch(h, method, route):
@@ -511,6 +525,15 @@ def dispatch(h, method, route):
     query = {k: v[0] for k, v in parse_qs(route.query).items()}
     request = Request(h, sedens, method, action, query)
     try:
+        stream = course_http.STREAMS.get((method, action))
+        if stream is not None:
+            # These read the body or write the response themselves.
+            if method == "POST":
+                _guard(h)
+            result = stream(request)
+            if result is not None:
+                _respond(h, result, 200, request.set_cookies)
+            return
         handler = ROUTES.get((method, action))
         if handler is None:
             raise Denied("This SEDENS route is not available.", 404, "not_found")
