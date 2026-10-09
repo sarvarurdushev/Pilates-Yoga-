@@ -7,7 +7,8 @@ On top of the existing connected-platform demo seed (unchanged), this adds:
 * a self-guided room, "AI Private Room 01", at the first location;
 * the simulated demo CRM with four fictional memberships covering an allowed
   entry, no booking, an inactive membership and a booking for another room;
-* a creator permission and unverified creator profile for the first coach.
+* a creator permission and unverified creator profile for the first coach;
+* the demonstration marketplace (:mod:`pilates.sedens.demo_marketplace`).
 
 The access codes below are public demonstration values, shown on the demo room
 screen. They are stored only as hashes and work only in demonstration orgs.
@@ -17,7 +18,7 @@ from __future__ import annotations
 
 import threading
 
-from . import capabilities, creators, crm
+from . import capabilities, creators, crm, demo_marketplace
 from ..platform.repository import Actor
 from .util import Denied, digest, now
 
@@ -104,7 +105,9 @@ def ensure(sedens, org_id) -> dict:
                     "display_name": "Hana Lee", "creator_type": "coach",
                     "bio": "Fictional demonstration coach.",
                 })
-            return {"org_id": org_id, "room_id": room, "facility": FACILITY_NAME, "seeded_at": now()}
+        # Courses, a fictional creator studio and a demonstration reviewer (seeded once).
+        demo_marketplace.ensure(sedens, org_id)
+        return {"org_id": org_id, "room_id": room, "facility": FACILITY_NAME, "seeded_at": now()}
 
 
 def _location(db, org_id):
