@@ -2,6 +2,11 @@
 
 Sessions and password hashes are never exported. Every private ID is remapped on
 restore, and every foreign key must resolve inside the archive or public anatomy.
+
+SEDENS tables (``s_*``) travel in the same archive under the per-table policies
+of :mod:`pilates.sedens.backup`: live credentials are never exported, and
+decisions made outside the organization are re-checked against this server
+rather than taken from the archive.
 """
 
 from contextlib import contextmanager
@@ -28,6 +33,19 @@ OPTIONAL_RESTORE_TABLES = {
 }
 
 
+def _sedens(db):
+    """The SEDENS backup policies when this database has SEDENS tables."""
+    from ..sedens import backup as sedens_backup
+
+    return sedens_backup if sedens_backup.present(db) else None
+
+
+def _foreign_actor(db, org_id, actor_id):
+    return actor_id is not None and not db.execute(
+        "SELECT 1 FROM p_users WHERE id=? AND org_id=?", (actor_id, org_id)
+    ).fetchone()
+
+
 def admin_only(actor):
     if actor.role != "admin":
         raise Refused("Only administrators can back up or restore a studio.", 403)
@@ -46,16 +64,27 @@ def export_archive(repo, actor):
         ):
             db.execute("BEGIN")  # one consistent snapshot across all entity tables
             meta = schema(db)
+            ext = _sedens(db)
+            if ext:
+                meta.update(ext.schema(db))
+                ctx = ext.ExportContext.open(db, actor.org_id, meta)
             tables = sorted(set(meta) - PUBLIC)
             files, paths = {}, {}
             for table in tables:
-                where, args = scope(table, meta, actor.org_id)
+                owned = bool(ext and ext.owns(table))
+                where, args = (ext.scope if owned else scope)(table, meta, actor.org_id)
                 with z.open("records/" + table + ".jsonl", "w") as output:
                     for row in db.execute(
                         f'SELECT * FROM "{table}" WHERE {where}', args
                     ):
                         item = dict(row)
                         item.pop("password_hash", None)
+                        if table == "p_audit" and _foreign_actor(db, actor.org_id, item["actor_id"]):
+                            item["actor_id"] = None  # the archive carries only this studio's people
+                        if owned:
+                            item = ext.export_row(ctx, table, item)
+                            if item is None:
+                                continue
                         if table == "p_media":
                             path = Path(item.pop("path"))
                             if not path.is_file():
@@ -70,20 +99,20 @@ def export_archive(repo, actor):
                         output.write((encode(item) + "\n").encode())
             for path, part in paths.items():
                 z.write(path, part)
-            z.writestr(
-                "manifest.json",
-                encode(
-                    {
-                        "format": "motion-yoga-organization",
-                        "version": 1,
-                        "created_at": now(),
-                        "organization_id": actor.org_id,
-                        "exporter_id": actor.user_id,
-                        "tables": tables,
-                        "media_files": files,
-                    }
-                ),
-            )
+            manifest = {
+                "format": "motion-yoga-organization",
+                "version": 1,
+                "created_at": now(),
+                "organization_id": actor.org_id,
+                "exporter_id": actor.user_id,
+                "tables": tables,
+                "media_files": files,
+            }
+            if ext:
+                manifest["sedens"], extra = ext.export_extras(ctx)
+                for part, body in extra.items():
+                    z.writestr(part, body)
+            z.writestr("manifest.json", encode(manifest))
         yield archive
 
 
@@ -117,17 +146,33 @@ def restore_archive(repo, actor, archive):
             ):
                 raise Refused("Choose a Motion Yoga organization backup.")
             meta = schema(db)
+            ext = _sedens(db)
+            if ext:
+                meta.update(ext.schema(db))
             tables = manifest.get("tables", [])
+            if not isinstance(tables, list) or not all(isinstance(t, str) for t in tables):
+                raise Refused("The backup schema does not match this application version.")
+            # The server decides the order (organizations first), never the manifest.
+            tables = sorted(tables)
             expected = set(meta) - PUBLIC
-            optional_new = OPTIONAL_RESTORE_TABLES
+            # Archives made before SEDENS (or before a SEDENS table existed) omit them.
+            optional_new = OPTIONAL_RESTORE_TABLES | (ext.INCLUDED if ext else set())
             missing = expected - set(tables)
             if (set(tables) - expected) or (missing - optional_new) or len(tables) != len(set(tables)):
                 raise Refused(
                     "The backup schema does not match this application version."
                 )
             db.execute("BEGIN IMMEDIATE")
+            ctx = ext.open_restore(db, actor, manifest, z, meta) if ext else None
             for table in tables:
                 if table in {"p_organizations", "p_users", "p_roles", "p_audit"}:
+                    continue
+                if ext and ext.owns(table):
+                    if ext.blocks_restore(ctx, table, meta):
+                        raise Refused(
+                            "Restore into a new, empty studio. Existing client records are never overwritten.",
+                            409,
+                        )
                     continue
                 where, args = scope(table, meta, actor.org_id)
                 if db.execute(
@@ -190,6 +235,8 @@ def restore_archive(repo, actor, archive):
                                 raise Refused(
                                     "A profile references an account outside this backup."
                                 )
+            if ext:
+                ext.prepare(ctx, lambda t: rows(z, t) if t in tables else iter(()), mapping)
             text_ids = {
                 old: new for (_, old), new in mapping.items() if isinstance(old, str)
             }
@@ -208,9 +255,22 @@ def restore_archive(repo, actor, archive):
             for table in tables:
                 keys = meta[table]["primary_key"]
                 fks = {f["from"]: f for f in meta[table]["foreign_keys"]}
+                owned = bool(ext and ext.owns(table))
+                if owned:
+                    ext.begin_rows(ctx)
+                json_columns = (
+                    ext.json_columns(table) if owned
+                    else {"detail", "result", "summary", "completed", "snapshot"}
+                )
                 for original in rows(z, table):
                     if set(original) - set(meta[table]["columns"]):
                         raise Refused("Unknown fields in the backup.")
+                    external, conflict = set(), None
+                    if owned:
+                        decided = ext.restore_row(ctx, table, original, mapping)
+                        if decided is None:
+                            continue
+                        original, external, conflict = decided
                     if table == "p_organizations":
                         if original["id"] != manifest["organization_id"]:
                             raise Refused(
@@ -234,6 +294,8 @@ def restore_archive(repo, actor, archive):
                         continue
                     row = dict(original)
                     for key, value in original.items():
+                        if key in external:
+                            continue  # already names an existing row on this server
                         if key in fks and value is not None:
                             parent = fks[key]["table"]
                             if parent not in PUBLIC:
@@ -248,7 +310,7 @@ def restore_archive(repo, actor, archive):
                             row[key] = text_ids.get(value, value)
                         elif table == "p_session_exercise_events" and key == "completed_key" and value:
                             row[key] = text_ids.get(value, value)
-                        elif key in {"detail", "result", "summary", "completed", "snapshot"}:
+                        elif key in json_columns and value is not None:
                             row[key] = encode(remap_json(json.loads(value)))
                     if table == "p_users":
                         row["password_hash"] = ""
@@ -277,12 +339,19 @@ def restore_archive(repo, actor, archive):
                             error="The server restarted. Submit the preserved capture again.",
                             finished_at=now(),
                         )
+                    upsert = ""
+                    if conflict:
+                        targets = {c.strip() for c in conflict.split(",")}
+                        upsert = f" ON CONFLICT({conflict}) DO UPDATE SET " + ",".join(
+                            f'"{k}"=excluded."{k}"' for k in row if k not in targets
+                        )
                     db.execute(
                         f'INSERT INTO "{table}" ('
                         + ",".join('"' + k + '"' for k in row)
                         + ") VALUES ("
                         + ",".join("?" for _ in row)
-                        + ")",
+                        + ")"
+                        + upsert,
                         list(row.values()),
                     )
                     count += 1
@@ -305,11 +374,14 @@ def restore_archive(repo, actor, archive):
             repo.audit(
                 db, actor, "restore:organization", actor.org_id, {"records": count}
             )
-        return {
+        result = {
             "restored_records": count,
             "media_files": len(created),
             "message": "Records restored. Set passwords for restored coach and student accounts before they sign in.",
         }
+        if ctx is not None:
+            result["sedens"] = ctx.summary
+        return result
     except (zipfile.BadZipFile, KeyError, json.JSONDecodeError) as e:
         for path in created:
             path.unlink(missing_ok=True)

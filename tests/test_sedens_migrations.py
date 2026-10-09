@@ -73,13 +73,13 @@ def test_migrations_apply_in_order_and_record_checksums(tmp_path):
     with sedens.db() as db:
         rows = db.execute("SELECT version,name,checksum FROM s_schema ORDER BY version").fetchall()
     files = migrations.available()
-    assert [r[0] for r in rows] == [v for v, _, _ in files] == [1, 2, 3, 4, 5, 6]
+    assert [r[0] for r in rows] == [v for v, _, _ in files] == list(range(1, len(files) + 1))
     assert [r[2] for r in rows] == [migrations.checksum(sql) for _, _, sql in files]
 
 
 def test_migrations_are_idempotent(tmp_path):
     sedens = make_sedens(tmp_path / "a.db")
-    assert sedens.applied == [1, 2, 3, 4, 5, 6]
+    assert sedens.applied == [v for v, _, _ in migrations.available()]
     again = Sedens(sedens.repo, sedens.mode)
     assert again.applied == []
 
@@ -234,9 +234,10 @@ def test_deleting_an_organization_removes_its_sedens_rows(tmp_path):
         assert db.execute("SELECT 1 FROM p_organizations WHERE id=?", (other["org_id"],)).fetchone()
 
 
-def test_backup_export_and_inspector_are_unchanged_by_sedens_tables(migrated):
-    """Phase 1 limitation, made explicit: SEDENS rows are not in org archives."""
-    from pilates.platform.backup import export_archive
+def test_inspector_is_unchanged_and_backups_carry_sedens_tables(migrated):
+    """The admin inspector still lists platform tables only; organization archives
+    now carry SEDENS tables too (Phase 1.5), and a migrated demo org round-trips."""
+    from pilates.platform.backup import export_archive, restore_archive
     from pilates.platform.inspection import overview, schema
     import json
     import zipfile
@@ -247,10 +248,13 @@ def test_backup_export_and_inspector_are_unchanged_by_sedens_tables(migrated):
     with repo.db() as db:
         assert not [t for t in schema(db) if t.startswith("s_")]
     assert not [t for t in overview(repo, admin) if t.startswith("s_")]
+    fresh = repo.actor(repo.create_org("Owner", "migrated-restore@example.test", PASSWORD, "Restored"))
     with export_archive(repo, admin) as archive:
         with zipfile.ZipFile(archive) as z:
             manifest = json.loads(z.read("manifest.json"))
-    assert manifest["tables"] and all(t.startswith("p_") for t in manifest["tables"])
+        result = restore_archive(repo, fresh, archive)
+    assert {t for t in manifest["tables"] if t.startswith("s_")} >= {"s_org_profiles", "s_crm_settings"}
+    assert result["restored_records"] > 1000
 
 
 def test_existing_pages_and_anatomy_are_still_served(migrated, monkeypatch):

@@ -58,17 +58,20 @@ def verify_archive(path: str | Path) -> dict:
                 raise ArchiveVerificationError("This is not a supported Motion Yoga archive.")
             tables = manifest.get("tables")
             media_files = manifest.get("media_files")
-            if not isinstance(tables, list) or not tables or any(not isinstance(table, str) or not table.startswith("p_") or not table.replace("_", "").isalnum() for table in tables) or len(tables) != len(set(tables)):
+            if not isinstance(tables, list) or not tables or any(not isinstance(table, str) or not table.startswith(("p_", "s_")) or not table.replace("_", "").isalnum() for table in tables) or len(tables) != len(set(tables)):
                 raise ArchiveVerificationError("Archive table list is invalid.")
             if not isinstance(media_files, dict) or not isinstance(manifest.get("organization_id"), str) or not manifest["organization_id"] or not isinstance(manifest.get("exporter_id"), str) or not manifest["exporter_id"]:
                 raise ArchiveVerificationError("Archive identity or media list is invalid.")
             # Match the same current/legacy table coverage rules as restore.
+            from ..sedens import backup as sedens_backup, migrations as sedens_migrations
+
             with closing(sqlite3.connect(":memory:")) as db:
                 db.row_factory = sqlite3.Row
                 db.executescript(Path(__file__).with_name("schema.sql").read_text())
-                expected_tables = set(schema(db)) - PUBLIC
+                sedens_migrations.migrate(db)
+                expected_tables = (set(schema(db)) | set(sedens_backup.schema(db))) - PUBLIC
             missing_tables = expected_tables - set(tables)
-            if set(tables) - expected_tables or missing_tables - OPTIONAL_RESTORE_TABLES:
+            if set(tables) - expected_tables or missing_tables - (OPTIONAL_RESTORE_TABLES | sedens_backup.INCLUDED):
                 raise ArchiveVerificationError("Archive table list does not match the restore schema.")
             expected = {"manifest.json", *(f"records/{table}.jsonl" for table in tables)}
             expected.update(media_files.values())
@@ -114,7 +117,10 @@ def verify_archive(path: str | Path) -> dict:
             # relationships. Exercise the real importer in a disposable studio.
             try:
                 with tempfile.TemporaryDirectory(prefix="motion-verify-") as folder:
+                    from ..sedens.core import Sedens
+
                     temporary = Repository(Path(folder) / "studio.db")
+                    Sedens(temporary)
                     owner = temporary.actor(temporary.create_org(
                         "Backup verifier", "verifier@example.test",
                         "temporary-verification-password", "Disposable verification studio",
