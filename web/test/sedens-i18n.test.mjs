@@ -20,14 +20,23 @@ test("no empty strings", () => {
 
 const BANNED = [
   /posture score/i, /clinically/i, /corrects? (your )?posture/i, /prevents? injur/i, /injury prevention/i,
-  /medical supervision/i, /supervised by/i, /ai knows/i, /diagnos(e|is) (your|the)/i, /muscle activation/i,
-  /자세 점수/, /임상적으로/, /부상 예방/, /자세 교정/, /진단해/, /근육 활성도/,
+  /medical supervision/i, /supervised by/i, /ai knows/i, /diagnos(e|is) (your|the)/i,
+  /자세 점수/, /임상적으로/, /부상 예방/, /자세 교정/, /진단해/,
 ];
 
 test("no banned medical or outcome claims", () => {
   for (const lang of ["en", "ko"]) {
     for (const [key, value] of Object.entries(STRINGS[lang])) {
       for (const pattern of BANNED) assert.ok(!pattern.test(value), `${lang}.${key} matches ${pattern}`);
+    }
+  }
+});
+
+test("muscle activation is only ever mentioned to say the anatomy is not a measurement", () => {
+  for (const lang of ["en", "ko"]) {
+    for (const [key, value] of Object.entries(STRINGS[lang])) {
+      if (/muscle activation|근육 활성도/i.test(value))
+        assert.ok(/not measured muscle activation|측정된 근육 활성도가 아닙니다/.test(value), `${lang}.${key}`);
     }
   }
 });

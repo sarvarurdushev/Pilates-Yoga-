@@ -34,3 +34,71 @@ export function time(iso) {
   if (!iso) return "";
   return new Date(iso).toLocaleTimeString(lang() === "ko" ? "ko-KR" : "en-US", { hour: "2-digit", minute: "2-digit" });
 }
+
+export function date(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString(lang() === "ko" ? "ko-KR" : "en-US", { year: "numeric", month: "short", day: "numeric" });
+}
+
+/** A price as people read it: "Free", "₩29,000", "$12.00". amount_minor is in the
+ * currency's smallest unit (KRW has none, so 29000 means ₩29,000). */
+export function money(price) {
+  if (!price || price.price_type !== "paid") return t("price.free");
+  const digits = price.currency === "KRW" ? 0 : 2;
+  const amount = price.currency === "KRW" ? price.amount_minor : price.amount_minor / 100;
+  return new Intl.NumberFormat(lang() === "ko" ? "ko-KR" : "en-US", {
+    style: "currency", currency: price.currency, minimumFractionDigits: digits, maximumFractionDigits: digits,
+  }).format(amount);
+}
+
+/** Read a form with types: data-type="int" → number (or null when empty), checkboxes →
+ * booleans, and checkboxes sharing a name with data-list → an array of the checked values. */
+export function values(form) {
+  const out = {};
+  for (const el of form.elements) {
+    if (!el.name || el.disabled || el.type === "submit" || el.type === "button" || el.type === "file") continue;
+    if (el.type === "checkbox" && el.dataset.list !== undefined) {
+      out[el.name] = out[el.name] || [];
+      if (el.checked) out[el.name].push(el.value);
+    } else if (el.type === "checkbox") {
+      out[el.name] = el.checked;
+    } else if (el.type === "radio") {
+      if (el.checked) out[el.name] = el.value;
+    } else if (el.dataset.type === "int") {
+      out[el.name] = el.value === "" ? null : Number.parseInt(el.value, 10);
+    } else {
+      out[el.name] = el.value;
+    }
+  }
+  return out;
+}
+
+/** The message to show for a failed call: the known code's translation, else the server's text. */
+export function problem(error) {
+  const key = "error." + (error?.code || "");
+  const translated = t(key);
+  return translated !== key ? translated : error?.message || t("common.error");
+}
+
+/** Move focus to the page title after a route change (screen readers announce it). */
+export function focusTitle(root = document) {
+  const h1 = root.querySelector("main h1");
+  if (h1) {
+    h1.setAttribute("tabindex", "-1");
+    h1.focus({ preventScroll: true });
+    document.title = h1.textContent + " · SEDENS";
+  }
+}
+
+/** Only https or same-origin links reach an href; anything else becomes inert text. */
+export function safeLink(url, label) {
+  const text = esc(label || url);
+  try {
+    const parsed = new URL(url, location.origin);
+    if (parsed.protocol === "https:" || parsed.origin === location.origin)
+      return `<a href="${esc(parsed.href)}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+  } catch {
+    // fall through
+  }
+  return text;
+}

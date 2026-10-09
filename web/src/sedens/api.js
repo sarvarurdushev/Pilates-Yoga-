@@ -62,3 +62,28 @@ export async function withDemo(path, body = {}) {
     return sedens(path, { ...body, key: demoKey(true) });
   }
 }
+
+/** Send a file as the raw request body (the server checks the rights in `query` before
+ * reading it). Resolves with the JSON answer; progress is reported from 0 to 1. */
+export function upload(route, file, query = {}, onProgress = null) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/sedens/" + route + "?" + new URLSearchParams(query));
+    xhr.setRequestHeader("X-Sedens-Request", "1");
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+    xhr.withCredentials = true;
+    if (onProgress) xhr.upload.onprogress = (event) => event.lengthComputable && onProgress(event.loaded / event.total);
+    xhr.onload = () => {
+      let body = {};
+      try {
+        body = JSON.parse(xhr.responseText || "{}");
+      } catch {
+        body = {};
+      }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(body);
+      else reject(new ApiError(body.error || xhr.statusText, xhr.status, body.code || "", body));
+    };
+    xhr.onerror = () => reject(new ApiError("The upload was interrupted. Choose the file and try again.", 0, "upload_interrupted", {}));
+    xhr.send(file);
+  });
+}
