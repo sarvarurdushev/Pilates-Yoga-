@@ -1,0 +1,169 @@
+{
+ "version": 1,
+ "rules": [
+  "Every file used in a course has rights metadata and an attestation, or is listed here with its licence.",
+  "Nothing is downloaded automatically. A stock clip is added only after a person watched it, checked the movement and the licence page, and recorded both below.",
+  "Stock and generated media show 'Demo media — movement not yet expert reviewed' until a SEDENS reviewer approves the movement.",
+  "Generated video (Higgsfield or any other generator) is never approved automatically.",
+  "Social media, video sites and search results are never sources."
+ ],
+ "sources": [
+  {
+   "id": "repo",
+   "kind": "repo_owned",
+   "name": "SEDENS repository assets",
+   "enabled": true,
+   "export": "allowed",
+   "attribution": "not required"
+  },
+  {
+   "id": "creator_upload",
+   "kind": "creator_upload",
+   "name": "Creator uploads",
+   "enabled": true,
+   "export": "allowed for the creator's own uploads",
+   "attribution": "as the creator records it"
+  },
+  {
+   "id": "pexels",
+   "kind": "stock",
+   "name": "Pexels",
+   "enabled": true,
+   "auto_download": false,
+   "licence_url": "https://www.pexels.com/license/",
+   "export": "reference only (the licence allows use, not redistribution as a library)",
+   "attribution": "appreciated, not required",
+   "notes": "People shown must not appear to endorse SEDENS; review each clip before use."
+  },
+  {
+   "id": "pixabay",
+   "kind": "stock",
+   "name": "Pixabay",
+   "enabled": true,
+   "auto_download": false,
+   "licence_url": "https://pixabay.com/service/license-summary/",
+   "export": "reference only",
+   "attribution": "not required",
+   "notes": "Review each clip before use."
+  },
+  {
+   "id": "higgsfield",
+   "kind": "generated",
+   "name": "Higgsfield (future)",
+   "enabled": false,
+   "export": "not applicable",
+   "attribution": "not applicable",
+   "notes": "Inactive. Future workflow: approved reference movement, generation, comparison, expert review, publish."
+  }
+ ],
+ "assets": [
+  {
+   "id": "repo-bridge",
+   "path": "web/assets/studio/bridge.png",
+   "kind": "image",
+   "mime": "image/png",
+   "shows": "pelvicCurl",
+   "description": {
+    "en": "A fictional adult in a bridge position on a mat (side view).",
+    "ko": "매트 위 브리지 자세의 가상 인물(측면)."
+   },
+   "provenance": "Generated with an image-generation tool for this repository; prompt recorded in docs/STUDIO_ASSETS.md.",
+   "sha256": "8442702f9111dff5e5c318dc11aebebd4651c0177e6c09d61aed5843b04e54ec",
+   "rights": {
+    "licence_type": "repo_owned",
+    "original_creator": "SEDENS repository (generated imagery)",
+    "source_url": null,
+    "licence_url": null,
+    "restrictions": "Show with the AI-generated label. Never present as a real instructor or a measured movement.",
+    "identifiable_person": "no",
+    "review_status": "unreviewed"
+   },
+   "label": {
+    "en": "AI-generated illustration — not a real instructor; movement not yet expert reviewed",
+    "ko": "AI 생성 일러스트 — 실제 강사가 아니며 동작은 아직 전문가 검토 전"
+   }
+  },
+  {
+   "id": "repo-bird-dog",
+   "path": "web/assets/studio/bird-dog.png",
+   "kind": "image",
+   "mime": "image/png",
+   "shows": "birdDog",
+   "description": {
+    "en": "A fictional adult reaching an opposite arm and leg on all fours.",
+    "ko": "네발 자세에서 반대쪽 팔과 다리를 뻗는 가상 인물."
+   },
+   "provenance": "Generated with an image-generation tool for this repository; prompt recorded in docs/STUDIO_ASSETS.md.",
+   "sha256": "df7cd7b27dacbc385d77693c2ed450bebcd52b41db040eac8d3b2b6e92536bcf",
+   "rights": {
+    "licence_type": "repo_owned",
+    "original_creator": "SEDENS repository (generated imagery)",
+    "source_url": null,
+    "licence_url": null,
+    "restrictions": "Show with the AI-generated label. Never present as a real instructor or a measured movement.",
+    "identifiable_person": "no",
+    "review_status": "unreviewed"
+   },
+   "label": {
+    "en": "AI-generated illustration — not a real instructor; movement not yet expert reviewed",
+    "ko": "AI 생성 일러스트 — 실제 강사가 아니며 동작은 아직 전문가 검토 전"
+   }
+  },
+  {
+   "id": "repo-exercise-sheet",
+   "path": "web/assets/platform/exercise-sheet.png",
+   "kind": "image",
+   "mime": "image/png",
+   "shows": "sheet",
+   "cells": {
+    "breathing": 0,
+    "spineTwistSeated": 1,
+    "shoulderPlacement": 2,
+    "headNods": 3,
+    "catStretchMat": 4,
+    "clam": 5,
+    "sideLyingLegLift": 6,
+    "deadBug": 7
+   },
+   "description": {
+    "en": "A 3×3 sheet of fictional adults in nine mat exercises.",
+    "ko": "가상 인물이 9가지 매트 동작을 하는 3×3 이미지."
+   },
+   "provenance": "Generated with an image-generation tool for this repository; prompt recorded in docs/PLATFORM_EXERCISE_IMAGE.json.",
+   "sha256": "67bb9c83702a03ca8b0a02b08c75ca0892b190b414f94cc3edb5e7948ab1d6ed",
+   "rights": {
+    "licence_type": "repo_owned",
+    "original_creator": "SEDENS repository (generated imagery)",
+    "source_url": null,
+    "licence_url": null,
+    "restrictions": "Show with the AI-generated label. Never present as a real instructor or a measured movement.",
+    "identifiable_person": "no",
+    "review_status": "unreviewed"
+   },
+   "label": {
+    "en": "AI-generated illustration — not a real instructor; movement not yet expert reviewed",
+    "ko": "AI 생성 일러스트 — 실제 강사가 아니며 동작은 아직 전문가 검토 전"
+   }
+  }
+ ],
+ "import_manifest": {
+  "status": "empty",
+  "reason": "No stock clip has been watched and checked by a person yet, so none is listed. Demonstrations use the repository illustrations above.",
+  "entry_fields": [
+   "id",
+   "source",
+   "page_url",
+   "file_url",
+   "licence_url",
+   "original_creator",
+   "retrieved_at",
+   "sha256",
+   "shows_exercise",
+   "checked_by",
+   "checked_at",
+   "movement_notes",
+   "identifiable_person"
+  ],
+  "entries": []
+ }
+}
