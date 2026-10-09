@@ -130,6 +130,10 @@ def verify_archive(path: str | Path) -> dict:
                 raise ArchiveVerificationError(
                     f"Archive could not be restored into an empty studio: {error}"
                 ) from error
+            except Exception as error:  # noqa: BLE001 - a crafted archive must not crash the checker
+                raise ArchiveVerificationError(
+                    "Archive could not be restored into an empty studio: it contains invalid records."
+                ) from error
             if restored["media_files"] != len(media_rows):
                 raise ArchiveVerificationError("Restore media count does not match the archive.")
             return {

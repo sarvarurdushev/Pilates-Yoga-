@@ -25,6 +25,7 @@ Three rules decide what an archive may carry and what a restore may believe:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import re
 
 from ..platform.inspection import scope as platform_scope
 from ..platform.repository import Refused
@@ -204,16 +205,29 @@ def blocks_restore(ctx: RestoreContext, table, meta) -> bool:
     return ctx.db.execute(f'SELECT 1 FROM "{table}" WHERE {where} LIMIT 1', args).fetchone() is not None
 
 
+KIND_MESSAGES = {
+    "facility": "This is a facility backup. Restore it into a new facility.",
+    "creator_studio": "This is a creator studio backup. Restore it into a new creator studio.",
+}
+
+
 def prepare(ctx: RestoreContext, rows, mapping):
-    """Run after IDs are allocated: map the exporter's creator profile onto the
-    restoring administrator's existing one, and refuse a SEDENS organization."""
-    current = ctx.db.execute("SELECT kind FROM s_org_profiles WHERE org_id=?", (ctx.actor.org_id,)).fetchone()
-    ctx.kind = current[0] if current else "facility"
+    """Run after IDs are allocated: decide the kind of organization, map the
+    exporter's creator profile onto the restoring administrator's existing one,
+    and refuse a SEDENS organization (as an archive or as the target)."""
+    archived = "facility"  # an organization without a SEDENS profile row is a facility
     for row in rows("s_org_profiles"):
         if row.get("kind") == "sedens":
             raise Refused("The SEDENS organization is recreated from the command line, not restored from a backup.")
-        if row.get("kind") in ("facility", "creator_studio"):
-            ctx.kind = row["kind"]
+        if row.get("kind") not in ("facility", "creator_studio"):
+            raise Refused("Invalid backup record.")
+        archived = row["kind"]
+    current = ctx.db.execute("SELECT kind FROM s_org_profiles WHERE org_id=?", (ctx.actor.org_id,)).fetchone()
+    if current is not None and current[0] == "sedens":
+        raise Refused("A backup is never restored into the SEDENS organization.")
+    if current is not None and current[0] != archived:
+        raise Refused(KIND_MESSAGES[archived], 409)
+    ctx.kind = archived
     for row in rows("p_organizations"):
         # Read once here: the manifest's table order must not decide the environment.
         ctx.demo = bool(row.get("demo"))
@@ -221,6 +235,8 @@ def prepare(ctx: RestoreContext, rows, mapping):
     existing = ctx.db.execute("SELECT id FROM s_creator_profiles WHERE user_id=?", (ctx.actor.user_id,)).fetchone()
     for row in rows("s_creator_profiles"):
         if row.get("user_id") == exporter:
+            if ctx.exporter_profile is not None:
+                raise Refused("The backup contains a record twice.")
             ctx.exporter_profile = row["id"]
             if existing is not None:
                 ctx.existing_profile = existing[0]
@@ -234,7 +250,11 @@ def _lineage_live(db, origin) -> bool:
 
 
 def _restore_affiliation(ctx, original, mapping):
-    """(row, external columns) or None when it cannot be restored."""
+    """(row, external columns) or None when it cannot be restored.
+
+    The ledger decides. An approval comes back only while the ledger still
+    records exactly it; a facility's "no" recorded later comes back as that "no"
+    (it grants nothing, and keeps the facility's cooldown), dated by the ledger."""
     row = dict(original)
     creator_inside = ("s_creator_profiles", original["creator_id"]) in mapping
     facility_inside = ("p_organizations", original["org_id"]) in mapping
@@ -244,23 +264,29 @@ def _restore_affiliation(ctx, original, mapping):
         return None
     origin = original.get("origin_id") or original["id"]
     recorded = ctx.db.execute(
-        "SELECT creator_id, org_id, location_id, status FROM s_affiliation_ledger WHERE origin_id=?", (origin,)
+        "SELECT creator_id, org_id, location_id, status, changed_at, facility_no FROM s_affiliation_ledger "
+        "WHERE origin_id=?", (origin,)
     ).fetchone()
-    archived = (original["creator_id"], original["org_id"], original["location_id"], original["status"])
-    if recorded is None or tuple(recorded) != archived:
-        return None  # this server never recorded it, or a later decision replaced it
+    if recorded is None or tuple(recorded[:3]) != (original["creator_id"], original["org_id"], original["location_id"]):
+        return None  # this server never recorded it
+    if recorded["status"] != original["status"]:
+        if recorded["status"] not in ("declined", "revoked") or not recorded["facility_no"]:
+            return None  # a later decision replaced it (or the affiliation ended)
+        row["status"] = recorded["status"]
+    if row["status"] in ("declined", "revoked"):
+        row["decided_at"] = recorded["changed_at"]
     if _lineage_live(ctx.db, origin):
         return None  # the original (or an earlier restore of it) still exists
     row["origin_id"] = origin
     if facility_inside:
         # This facility's archive; the creator lives in another organization.
         creator = ctx.db.execute(
-            "SELECT o.demo FROM s_creator_profiles c JOIN p_users u ON u.id=c.user_id "
+            "SELECT o.demo, o.id FROM s_creator_profiles c JOIN p_users u ON u.id=c.user_id "
             "JOIN p_organizations o ON o.id=u.org_id WHERE c.id=?",
             (original["creator_id"],),
         ).fetchone()
-        if creator is None or bool(creator[0]) != ctx.demo:
-            return None
+        if ctx.kind != "facility" or creator is None or bool(creator[0]) != ctx.demo or creator[1] == ctx.actor.org_id:
+            return None  # only a facility takes affiliations, and never from its own creators
         return row, {"creator_id"}
     if creator_inside:
         # This creator's archive; the facility lives in another organization.
@@ -269,7 +295,8 @@ def _restore_affiliation(ctx, original, mapping):
             "LEFT JOIN s_org_profiles p ON p.org_id=o.id WHERE o.id=?",
             (original["org_id"],),
         ).fetchone()
-        if facility is None or facility[1] != "facility" or bool(facility[0]) != ctx.demo:
+        if facility is None or facility[1] != "facility" or bool(facility[0]) != ctx.demo \
+                or original["org_id"] == ctx.actor.org_id:
             return None
         if original["location_id"] and not ctx.db.execute(
             "SELECT 1 FROM p_locations WHERE id=? AND org_id=?", (original["location_id"], original["org_id"])
@@ -277,6 +304,18 @@ def _restore_affiliation(ctx, original, mapping):
             return None
         return row, {"org_id", "location_id"}
     return None
+
+
+SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*-[0-9a-f]{6}$")
+
+
+def _slug(ctx, wanted, fallback, own_id=None):
+    """The archived address when it is one this server would issue and is free,
+    otherwise ``fallback()``."""
+    if isinstance(wanted, str) and len(wanted) <= 48 and SLUG.match(wanted) and not ctx.db.execute(
+            "SELECT 1 FROM s_creator_profiles WHERE slug=? AND id IS NOT ?", (wanted, own_id)).fetchone():
+        return wanted
+    return fallback()
 
 
 def restore_row(ctx: RestoreContext, table, original, mapping):
@@ -297,7 +336,8 @@ def restore_row(ctx: RestoreContext, table, original, mapping):
             return None
         conflict = "user_id,capability"
     elif table == "s_creator_profiles":
-        upsert = original["id"] == ctx.exporter_profile and ctx.existing_profile
+        upsert = bool(original["id"] == ctx.exporter_profile and original.get("user_id") == ctx.manifest["exporter_id"]
+                      and ctx.existing_profile)
         # A SEDENS decision is never taken from an archive: a verified profile
         # returns to the review queue for a reviewer to confirm again.
         if row["verification_state"] == "verified" and not upsert:
@@ -311,9 +351,11 @@ def restore_row(ctx: RestoreContext, table, original, mapping):
             row["creator_type"] = creators.DEFAULT_TYPE[ctx.kind]
         if upsert:
             conflict = "id"
-            external = {"verified_by"}  # the server's own reviewer reference, kept as it is
+            external = {"verified_by", "user_id"}  # the server's own rows, kept as they are
             existing = ctx.db.execute("SELECT * FROM s_creator_profiles WHERE id=?", (ctx.existing_profile,)).fetchone()
-            row["slug"] = existing["slug"]
+            row["user_id"] = ctx.actor.user_id
+            row["slug"] = _slug(ctx, original.get("slug"), lambda: existing["slug"], existing["id"])
+            archived_state = original.get("verification_state")
             # The profile already on this server keeps its SEDENS decision (a suspension
             # stays a suspension); changed content needs a new review, as in save_profile.
             for column in ("verification_state", "verified_by", "verified_at", "verification_note"):
@@ -322,8 +364,13 @@ def restore_row(ctx: RestoreContext, table, original, mapping):
             if changed and existing["verification_state"] in ("verified", "pending"):
                 row.update(verification_state="unverified", verified_by=None, verified_at=None,
                            verification_note="Profile changed by a restore. Ask for review again.")
+            elif existing["verification_state"] == "unverified" and archived_state in ("verified", "pending"):
+                # A studio registered afresh: the archived verification waits for a reviewer again.
+                row.update(verification_state="pending", verified_by=None, verified_at=None,
+                           verification_note="Restored from a backup. Waiting for SEDENS to confirm the verification again.")
+                ctx.summary["verifications_to_confirm"] += 1
         else:
-            row["slug"] = creators._slug(ctx.db, row["display_name"])
+            row["slug"] = _slug(ctx, original.get("slug"), lambda: creators._slug(ctx.db, row["display_name"]))
     elif table == "s_creator_facility_affiliations":
         result = _restore_affiliation(ctx, original, mapping)
         if result is None:

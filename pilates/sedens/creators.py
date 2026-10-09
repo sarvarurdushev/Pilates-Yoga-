@@ -230,7 +230,8 @@ def request_affiliation(sedens, db, actor, org_id, location_id=None, note=""):
     stamp = now()
     if existing and existing["status"] in ("requested", "approved"):
         return _affiliation(existing)
-    if existing and _facility_said_no(existing) and parse(existing["decided_at"]) > utcnow() - timedelta(days=DECLINE_COOLDOWN_DAYS):
+    said_no = _facility_said_no(db, existing) if existing else None
+    if said_no and parse(said_no) > utcnow() - timedelta(days=DECLINE_COOLDOWN_DAYS):
         raise Denied("This facility declined your request recently. You can ask again later.", 409, "recently_declined")
     if existing:
         db.execute(
@@ -250,11 +251,20 @@ def request_affiliation(sedens, db, actor, org_id, location_id=None, note=""):
     return _affiliation(db.execute("SELECT * FROM s_creator_facility_affiliations WHERE id=?", (identifier,)).fetchone())
 
 
-def _facility_said_no(row) -> bool:
-    """Declined, or withdrawn by the facility rather than by the creator."""
+def _facility_said_no(db, row) -> str | None:
+    """When the facility said no (declined, or withdrew rather than the creator), or None.
+
+    The server's affiliation ledger decides, not the row: a restored row's
+    ``decided_by`` and ``decided_at`` came from an archive."""
+    ledger = db.execute("SELECT status, facility_no, changed_at FROM s_affiliation_ledger WHERE origin_id=?",
+                        (row["origin_id"] or row["id"],)).fetchone()
+    if ledger is not None and ledger["status"] == row["status"]:
+        return ledger["changed_at"] if ledger["facility_no"] and row["status"] in ("declined", "revoked") else None
     if row["decided_at"] is None:
-        return False
-    return row["status"] == "declined" or (row["status"] == "revoked" and row["decided_by"] != row["requested_by"])
+        return None
+    if row["status"] == "declined" or (row["status"] == "revoked" and row["decided_by"] != row["requested_by"]):
+        return row["decided_at"]
+    return None
 
 
 def decide_affiliation(sedens, db, actor, affiliation_id, decision):

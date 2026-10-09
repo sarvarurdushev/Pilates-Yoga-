@@ -119,6 +119,70 @@ def export_archive(repo, actor):
         yield archive
 
 
+def _check_types(row, declared):
+    """Every value must have its column's type. SQLite would otherwise keep, for
+    example, text in an INTEGER column, and a page might print it unescaped."""
+    for column, value in row.items():
+        kind = declared.get(column, "")
+        if value is None:
+            continue
+        if "INT" in kind:
+            ok = isinstance(value, int)
+        elif any(t in kind for t in ("REAL", "FLOA", "DOUB")):
+            ok = isinstance(value, (int, float)) and not isinstance(value, bool)
+        elif any(t in kind for t in ("TEXT", "CHAR", "CLOB")):
+            ok = isinstance(value, str)
+        else:
+            ok = isinstance(value, (str, int, float))
+        if not ok:
+            raise Refused("Invalid backup record.")
+
+
+ARCHIVED_DETAIL = {"generated": bool, "sample": bool, "demo": bool, "panel": int, "provenance": str,
+                   "attribution": str, "source_url": str, "copied_from": str}
+
+
+def media_detail(path, mime, archived, text_ids):
+    """A restored media record's detail: measured from the file with the upload's
+    own checks, plus the archive's labelled facts of the expected types."""
+    from .media import dicom_metadata
+
+    detail = {}
+    if mime.startswith("image/"):
+        from PIL import Image
+
+        try:
+            with Image.open(path) as img:
+                if img.format not in ("JPEG", "PNG", "WEBP") or img.width * img.height > 16_000_000:
+                    raise Refused("Invalid media entry in backup.")
+                detail = {"width": img.width, "height": img.height}
+                img.verify()
+        except Refused:
+            raise
+        except Exception as exc:
+            raise Refused("Invalid media entry in backup.") from exc
+    elif mime == "application/dicom":
+        detail = dicom_metadata(path)
+    else:
+        with path.open("rb") as f:
+            signature = f.read(64)
+        if not ((mime == "video/mp4" and b"ftyp" in signature)
+                or (mime == "video/webm" and signature.startswith(b"\x1aE\xdf\xa3"))):
+            raise Refused("Invalid media entry in backup.")
+    if isinstance(archived, dict):
+        for key, kind in ARCHIVED_DETAIL.items():
+            value = archived.get(key)
+            if isinstance(value, kind) and not (kind is int and isinstance(value, bool)):
+                if kind is str:
+                    value = value[:2000]
+                    if key == "source_url" and not value.startswith(("https://", "http://")):
+                        continue
+                    if key == "copied_from":
+                        value = text_ids.get(value, value)
+                detail[key] = value
+    return detail
+
+
 def rows(z, table):
     with z.open("records/" + table + ".jsonl") as source:
         for line in source:
@@ -258,6 +322,8 @@ def restore_archive(repo, actor, archive):
             for table in tables:
                 keys = meta[table]["primary_key"]
                 fks = {f["from"]: f for f in meta[table]["foreign_keys"]}
+                declared = {r[1]: r[2].upper() for r in db.execute(f'PRAGMA table_info("{table}")')}
+                seen = set()
                 owned = bool(ext and ext.owns(table))
                 if owned:
                     ext.begin_rows(ctx)
@@ -268,6 +334,13 @@ def restore_archive(repo, actor, archive):
                 for original in rows(z, table):
                     if set(original) - set(meta[table]["columns"]):
                         raise Refused("Unknown fields in the backup.")
+                    _check_types(original, declared)
+                    if keys:
+                        # A record twice would let an update apply twice to one target.
+                        identity = tuple(original.get(k) for k in keys)
+                        if identity in seen:
+                            raise Refused("The backup contains a record twice.")
+                        seen.add(identity)
                     external, conflict = set(), None
                     if owned:
                         decided = ext.restore_row(ctx, table, original, mapping)
@@ -340,6 +413,10 @@ def restore_archive(repo, actor, archive):
                             shutil.copyfileobj(source, output, length=65536)
                         row["path"] = str(target)
                         row["size"] = target.stat().st_size
+                        # What the file says about itself comes from the file, checked
+                        # as an upload is; only a few labelled facts come from the archive.
+                        row["detail"] = encode(media_detail(target, row["mime"], json.loads(original.get("detail") or "{}"),
+                                                            text_ids))
                     if table == "p_jobs" and row["state"] in {"queued", "running"}:
                         row.update(
                             state="failed",

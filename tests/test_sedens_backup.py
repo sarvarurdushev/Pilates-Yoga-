@@ -267,10 +267,11 @@ def test_a_withdrawn_affiliation_is_not_revived_by_an_older_archive(world, tmp_p
         creators.revoke_affiliation(sedens, db, b["admin"], request["id"])
     destroy(sedens, a["org_id"])
     owner = fresh_org(sedens, "a")
-    result = restore_archive(sedens.repo, owner, path)
-    assert result["sedens"]["affiliations_not_restored"] == 1
+    restore_archive(sedens.repo, owner, path)
     with sedens.db() as db:
-        assert not db.execute("SELECT 1 FROM s_creator_facility_affiliations WHERE org_id=?", (b["org_id"],)).fetchone()
+        # The facility's revocation comes back, not the archived approval.
+        rows = db.execute("SELECT status FROM s_creator_facility_affiliations WHERE org_id=?", (b["org_id"],)).fetchall()
+        assert [r[0] for r in rows] == ["revoked"]
         assert db.execute("SELECT status FROM s_affiliation_ledger WHERE origin_id=?", (request["id"],)).fetchone()[0] == "revoked"
 
 
@@ -468,3 +469,220 @@ def test_restore_refuses_media_records_the_studio_would_never_accept(tmp_path):
             restore_archive(legacy, fresh, crafted)
     fresh = legacy.actor(legacy.create_org("New", "new-ok@example.test", PASSWORD, "New"))
     assert restore_archive(legacy, fresh, path)["media_files"] == 1
+
+
+# -- second review: crafted archives and lineage ---------------------------------------
+
+
+def add_rows(path, label, extra):
+    """Copy an archive with extra rows: extra = {table: [row, ...]}."""
+    target = path.with_name(f"{path.stem}-{label}.zip")
+    with zipfile.ZipFile(path) as source, zipfile.ZipFile(target, "w") as out:
+        for info in source.infolist():
+            data = source.read(info)
+            table = info.filename[len("records/"):-len(".jsonl")] if info.filename.startswith("records/") else None
+            if table in extra:
+                data += b"".join((json.dumps(r) + "\n").encode() for r in extra[table])
+            out.writestr(info, data)
+    return target
+
+
+def verified_studio(sedens, reviewer, email):
+    prof = sedens.repo.actor(onboarding.register_creator_studio(
+        sedens, name="Prof", email=email, password=PASSWORD, display_name="Prof. Verified"))
+    with sedens.db() as db:
+        seen = creators.request_verification(sedens, db, prof)
+        creators.decide_verification(sedens, db, reviewer, seen["id"], "verified", version=seen["version"])
+    return prof, seen
+
+
+def test_a_duplicated_record_is_refused(world, tmp_path):
+    """A second profile row with the exporter's profile id must not move the verified
+    profile to another account (the upsert would otherwise run twice)."""
+    sedens, _, _ = world
+    _, reviewer, _ = sedens_staff(sedens)
+    prof, seen = verified_studio(sedens, reviewer, "dup@uni.test")
+    path = save(sedens.repo, prof, tmp_path / "dup.zip")
+    with zipfile.ZipFile(path) as z:
+        profile = json.loads(z.read("records/s_creator_profiles.jsonl").splitlines()[0])
+    other = "u-dup-" + uid_suffix()
+    crafted = add_rows(path, "dup", {
+        "p_users": [{"id": other, "org_id": prof.org_id, "name": "Someone else", "email": "x@example.test",
+                     "active": 1, "avatar": "", "detail": "{}"}],
+        "p_roles": [{"user_id": other, "role": "coach"}],
+        "s_creator_profiles": [{**profile, "user_id": other}],
+    })
+    with pytest.raises(Refused, match="twice"):
+        restore_archive(sedens.repo, prof, crafted)
+    with sedens.db() as db:
+        mine = creators.own_profile(sedens, db, prof)
+        assert mine["id"] == seen["id"] and mine["verification_state"] == "verified"
+
+
+def test_a_restore_keeps_the_organization_kind_it_was_made_for(world, tmp_path):
+    sedens, a, _ = world
+    onboarding.bootstrap_sedens_org(sedens, name="Root", email="kind-root@sedens.test", password=PASSWORD)
+    root = sedens.repo.actor(sedens.repo.login("kind-root@sedens.test", PASSWORD))
+    facility_archive = save(sedens.repo, a["admin"], tmp_path / "a.zip")
+    studio = sedens.repo.actor(onboarding.register_creator_studio(
+        sedens, name="Prof", email="kind@uni.test", password=PASSWORD, display_name="Prof"))
+    studio_archive = save(sedens.repo, studio, tmp_path / "studio.zip")
+    fresh_studio = sedens.repo.actor(onboarding.register_creator_studio(
+        sedens, name="Prof", email="kind2@uni.test", password=PASSWORD, display_name="Prof"))
+    with pytest.raises(Refused, match="new facility"):
+        restore_archive(sedens.repo, fresh_studio, facility_archive)
+    # The SEDENS organization never receives a restore, whatever the archive.
+    for archive in (facility_archive, studio_archive):
+        with pytest.raises(Refused, match="SEDENS"):
+            restore_archive(sedens.repo, root, archive)
+    with sedens.db() as db:
+        assert sedens.org(db, root.org_id)["kind"] == "sedens"
+        assert capabilities.effective(sedens, db, root) == {"sedens_admin"}
+
+
+def test_a_restore_never_affiliates_a_creator_with_their_own_organization(world, tmp_path):
+    sedens, a, b = world
+    prof = sedens.repo.actor(onboarding.register_creator_studio(
+        sedens, name="Prof", email="self@uni.test", password=PASSWORD, display_name="Prof"))
+    with sedens.db() as db:
+        request = creators.request_affiliation(sedens, db, prof, b["org_id"])
+        creators.decide_affiliation(sedens, db, b["admin"], request["id"], "approve")
+    path = save(sedens.repo, b["admin"], tmp_path / "b.zip")
+    destroy(sedens, b["org_id"])
+    # Into the creator's own studio: refused (a facility backup belongs in a facility).
+    with pytest.raises(Refused):
+        restore_archive(sedens.repo, prof, path)
+    # Relabelled as a creator studio: the affiliation is not re-linked to a non-facility.
+    relabelled = add_rows(path, "studio", {"s_org_profiles": [{
+        "org_id": b["org_id"], "kind": "creator_studio", "display_name": "B", "default_language": "ko",
+        "timezone": "Asia/Seoul", "created_at": "2026-01-01T00:00:00Z", "detail": "{}"}]})
+    owner = fresh_org(sedens, "relabelled")
+    result = restore_archive(sedens.repo, owner, relabelled)
+    assert result["sedens"]["affiliations_restored"] == 0
+    # The facility's own archive, restored properly, still re-links it.
+    owner = fresh_org(sedens, "proper")
+    assert restore_archive(sedens.repo, owner, path)["sedens"]["affiliations_restored"] == 1
+
+
+def test_a_fresh_studio_restore_returns_the_verification_to_review(world, tmp_path):
+    sedens, _, _ = world
+    _, reviewer, _ = sedens_staff(sedens)
+    prof, seen = verified_studio(sedens, reviewer, "fresh@uni.test")
+    with sedens.db() as db:
+        slug = creators.own_profile(sedens, db, prof)["slug"]
+    path = save(sedens.repo, prof, tmp_path / "fresh.zip")
+    destroy(sedens, prof.org_id)
+    again = sedens.repo.actor(onboarding.register_creator_studio(
+        sedens, name="Prof", email="fresh2@uni.test", password=PASSWORD, display_name="New"))
+    result = restore_archive(sedens.repo, again, path)
+    assert result["sedens"]["verifications_to_confirm"] == 1
+    with sedens.db() as db:
+        profile = creators.own_profile(sedens, db, again)
+    assert profile["verification_state"] == "pending" and profile["display_name"] == "Prof. Verified"
+    assert profile["slug"] == slug  # the public address survives when it is free
+
+
+def test_restored_profiles_keep_their_address(world, tmp_path):
+    sedens, a, b = world
+    profile, _ = affiliated_creator(sedens, a, b)
+    path = save(sedens.repo, a["admin"], tmp_path / "a.zip")
+    destroy(sedens, a["org_id"])
+    owner = fresh_org(sedens, "slug")
+    restore_archive(sedens.repo, owner, path)
+    with sedens.db() as db:
+        slugs = [r[0] for r in db.execute("SELECT c.slug FROM s_creator_profiles c JOIN p_users u ON u.id=c.user_id "
+                                          "WHERE u.org_id=?", (owner.org_id,))]
+    assert slugs == [profile["slug"]]
+
+
+def test_values_of_the_wrong_type_are_refused(world, tmp_path):
+    from pilates.platform.backup_verify import ArchiveVerificationError, verify_archive
+
+    sedens, a, b = world
+    affiliated_creator(sedens, a, b)
+    path = save(sedens.repo, a["admin"], tmp_path / "a.zip")
+    for table, change in (("s_creator_profiles", {"display_name": 5}),
+                          ("p_locations", {"capacity": "<img src=x onerror=alert(1)>"})):
+        crafted = tamper(path, table, lambda r, c=change: {**r, **c}, table)
+        with pytest.raises(Refused, match="Invalid backup record"):
+            restore_archive(sedens.repo, fresh_org(sedens, table), crafted)
+        with pytest.raises(ArchiveVerificationError):
+            verify_archive(crafted)
+
+
+def test_restored_media_detail_comes_from_the_file(tmp_path):
+    legacy = Repository(tmp_path / "studio.db")
+    admin = legacy.actor(legacy.create_org("Owner", "owner@example.test", PASSWORD, "Studio"))
+    student = legacy.save_person(admin, {"name": "Client", "email": "c@example.test", "roles": ["student"]})
+    picture = tmp_path / "p.png"
+    from PIL import Image
+
+    Image.new("RGB", (20, 10)).save(picture)
+    from pilates.platform import media
+
+    with picture.open("rb") as stream:
+        media.upload(legacy, admin, stream, picture.stat().st_size, "p.png", "image/png", "capture",
+                     student_id=student["id"])
+    path = save(legacy, admin, tmp_path / "studio.zip")
+    payload = "<img src=x onerror=alert(document.domain)>"
+    crafted = tamper(path, "p_media", lambda r: {**r, "detail": json.dumps({
+        "frames": payload, "width": payload, "provenance": "Kept as text.", "sample": "yes"})}, "detail")
+    fresh = legacy.actor(legacy.create_org("New", "new@example.test", PASSWORD, "New"))
+    restore_archive(legacy, fresh, crafted)
+    with legacy.db() as db:
+        detail = json.loads(db.execute("SELECT detail FROM p_media WHERE org_id=?", (fresh.org_id,)).fetchone()[0])
+    assert detail == {"width": 20, "height": 10, "provenance": "Kept as text."}
+
+
+def test_an_ended_affiliation_is_not_revived_in_a_second_organization(world, tmp_path):
+    """Deleting a location (or a creator's account) while both organizations exist
+    ends the affiliation for good; only a deleted organization's archive re-links."""
+    sedens, a, b = world
+    coach = sedens.repo.actor(a["coach_token"])
+    with sedens.db() as db:
+        capabilities.grant(sedens, db, a["admin"], a["coach_id"], "creator")
+        creators.save_profile(sedens, db, coach, {"display_name": "Coach"})
+        request = creators.request_affiliation(sedens, db, coach, b["org_id"], b["location_id"])
+        creators.decide_affiliation(sedens, db, b["admin"], request["id"], "approve")
+    path = save(sedens.repo, b["admin"], tmp_path / "b.zip")
+    with sedens.db() as db:
+        db.execute("DELETE FROM p_locations WHERE id=?", (b["location_id"],))
+        assert db.execute("SELECT status FROM s_affiliation_ledger WHERE origin_id=?", (request["id"],)).fetchone()[0] == "ended"
+    result = restore_archive(sedens.repo, fresh_org(sedens, "second"), path)
+    assert result["sedens"]["affiliations_restored"] == 0
+
+    # The creator's account removed while facility A still exists: also ended.
+    sedens2, c, d = make_sedens(tmp_path / "t.db"), None, None
+    c, d = facility(sedens2, "C"), facility(sedens2, "D")
+    _, request = affiliated_creator(sedens2, c, d)
+    archive = save(sedens2.repo, c["admin"], tmp_path / "c.zip")
+    with sedens2.db() as db:
+        db.execute("DELETE FROM p_users WHERE id=?", (c["coach_id"],))
+        assert db.execute("SELECT status FROM s_affiliation_ledger WHERE origin_id=?", (request["id"],)).fetchone()[0] == "ended"
+    result = restore_archive(sedens2.repo, fresh_org(sedens2, "c2"), archive)
+    assert result["sedens"]["affiliations_restored"] == 0
+
+
+def test_a_facilitys_no_survives_a_restore(world, tmp_path):
+    """The facility revoked after the archive was made: the restored creator gets the
+    revocation back, with the facility's cooldown, whatever the archive says."""
+    sedens, a, b = world
+    _, request = affiliated_creator(sedens, a, b)
+    path = save(sedens.repo, a["admin"], tmp_path / "a.zip")
+    with sedens.db() as db:
+        creators.revoke_affiliation(sedens, db, b["admin"], request["id"])
+    destroy(sedens, a["org_id"])
+    disguised = tamper(path, "s_creator_facility_affiliations",
+                       lambda r: {**r, "decided_by": r["requested_by"], "decided_at": "2020-01-01T00:00:00Z"}, "disguised")
+    # (Restoring consumes the lineage, so this checks the disguised archive; the plain
+    # one is covered by test_a_withdrawn_affiliation_is_not_revived_by_an_older_archive.)
+    owner = fresh_org(sedens, "disguised")
+    restore_archive(sedens.repo, owner, disguised)
+    restored = next(p for p in sedens.repo.people(owner, "coach") if p["name"] == "Coach A")
+    coach = sedens.repo.actor(sedens.repo.issue(restored["id"], "coach"))
+    with sedens.db() as db:
+        rows = creators.creator_affiliations(sedens, db, coach)
+        assert [r["status"] for r in rows] == ["revoked"] and rows[0]["decided_at"] > "2026"
+        with pytest.raises(Exception) as refused:
+            creators.request_affiliation(sedens, db, coach, b["org_id"])
+        assert getattr(refused.value, "code", "") == "recently_declined"

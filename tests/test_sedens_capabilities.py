@@ -353,8 +353,12 @@ def test_a_facility_decline_stands(world):
         with pytest.raises(Denied) as exc:
             creators.request_affiliation(sedens, db, coach, b["org_id"])
         assert exc.value.code == "recently_declined"
-        # After the cooling-off period the creator may ask again.
+        # After the cooling-off period the creator may ask again. (The server's ledger
+        # holds the date of the facility's "no"; the row's own date is not trusted.)
         db.execute("UPDATE s_creator_facility_affiliations SET decided_at='2020-01-01T00:00:00+00:00' WHERE id=?", (req["id"],))
+        with pytest.raises(Denied):
+            creators.request_affiliation(sedens, db, coach, b["org_id"])
+        db.execute("UPDATE s_affiliation_ledger SET changed_at='2020-01-01T00:00:00+00:00' WHERE origin_id=?", (req["id"],))
         again = creators.request_affiliation(sedens, db, coach, b["org_id"])
         assert again["status"] == "requested"
         # A creator who withdraws their own request may ask again straight away.
