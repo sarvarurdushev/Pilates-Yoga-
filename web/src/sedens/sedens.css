@@ -177,3 +177,8 @@ body.sd-room-body { font-size: clamp(18px, 1.4vw, 24px); }
 .sd-checklist fieldset { border: 1px solid var(--sd-line); border-radius: 10px; padding: 10px 14px; margin: 0; }
 .sd-advanced summary { color: var(--sd-muted); }
 .sd-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.sd-room-courses { margin-top: 24px; }
+.sd-room-outline { list-style: none; padding: 0; }
+.sd-room-figure { margin: 12px 0; max-width: 560px; }
+.sd-room-figure figcaption { font-size: 0.85rem; margin-top: 6px; }
+.sd-room-courses h2 { margin-top: 0; }

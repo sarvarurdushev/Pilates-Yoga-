@@ -191,10 +191,107 @@ async function sessionView() {
   }
   sedens("room/event", { name: "room_screen_viewed", props: { screen: "session_home" } }).catch(() => {});
   const step = (text) => `<li><span>${esc(text)}</span><span class="sd-badge">${esc(t("room.coming"))}</span></li>`;
-  frame(`<section class="sd-room-card"><p class="sd-eyebrow">${esc(t("room.facility_line", { facility: s.facility.name, location: s.location.name }))} · ${esc(s.room.name)}</p><h1>${esc(t("room.session_title", { name: s.customer.first_name }))}</h1><p class="sd-lead">${esc(t("room.session_body", { time: time(s.expires_at) }))}</p><h2>${esc(t("room.next_steps"))}</h2><ol class="sd-steps">${step(t("room.step_readiness"))}${step(t("room.step_scan"))}${step(t("room.step_session"))}</ol>${library ? `<p class="sd-muted">${esc(t("room.library_count", { count: library.items.length }))}</p>` : ""}<button class="sd-large" id="end">${esc(t("room.end"))}</button></section>`);
+  frame(`<section class="sd-room-card"><p class="sd-eyebrow">${esc(t("room.facility_line", { facility: s.facility.name, location: s.location.name }))} · ${esc(s.room.name)}</p><h1>${esc(t("room.session_title", { name: s.customer.first_name }))}</h1><p class="sd-lead">${esc(t("room.session_body", { time: time(s.expires_at) }))}</p><h2>${esc(t("room.next_steps"))}</h2><ol class="sd-steps">${step(t("room.step_readiness"))}${step(t("room.step_scan"))}${step(t("room.step_session"))}</ol>${library ? `<p class="sd-muted">${esc(t("room.library_count", { count: library.items.length }))}</p>` : ""}<button class="sd-large" id="end">${esc(t("room.end"))}</button></section><section class="sd-room-card sd-room-courses" id="room-courses" aria-live="polite"><h2>${esc(t("roomc.title"))}</h2><p class="sd-muted">${esc(t("roomc.loading"))}</p></section>`);
   $("#end").onclick = () => endSession(t("room.ended"));
   stopPolling();
   watchActivity(s.idle_minutes);
+  state.view = sessionView;
+  await roomCourses();
+}
+
+// -- courses offered in this room (Phase 2: a read-only outline; the guided player is Phase 3) --
+
+const mediaURL = (id) => "/sedens/media/file?id=" + encodeURIComponent(id);
+const localized = (value) => (value && typeof value === "object" ? value[lang()] || value.en || "" : value || "");
+
+async function roomCourses() {
+  const box = $("#room-courses");
+  if (!box) return;
+  let items;
+  try {
+    items = (await sedens("room/courses")).items;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) return render();
+    box.innerHTML = `<h2>${esc(t("roomc.title"))}</h2><p class="sd-notice error" role="alert">${esc(t("roomc.error"))}</p>`;
+    return;
+  }
+  if (!$("#room-courses")) return; // the screen moved on while the list loaded
+  const state_ = (course) => {
+    if (course.playable) return `<span class="sd-badge ok">${esc(t(course.reason === "entitled" ? "roomc.state_entitled" : "roomc.state_free_here"))}</span>`;
+    return `<p class="sd-muted">${esc(t(course.reason === "purchase_required" ? "roomc.purchase_required" : "roomc.not_available"))}</p>`;
+  };
+  const sessions = (course) =>
+    course.outline
+      .map((module) => `<li><strong>${esc(module.title)}</strong>${module.sessions.length ? `<ul class="sd-list">${module.sessions
+        .map((session) => `<li><span>${esc(session.title)} <span class="sd-muted">${esc(t("roomc.session_steps", { n: session.steps }))}${session.estimated_minutes ? " · " + esc(t("roomc.minutes", { n: session.estimated_minutes })) : ""}</span></span><button class="sd-primary" data-course="${esc(course.id)}" data-session="${esc(session.id)}" aria-label="${esc(t("roomc.open_session") + " · " + session.title)}">${esc(t("roomc.open_session"))}</button></li>`)
+        .join("")}</ul>` : ""}</li>`)
+      .join("");
+  box.innerHTML = `<h2>${esc(t("roomc.title"))}</h2>${items.length ? `<ul class="sd-tree">${items
+    .map((course) => `<li><div class="sd-spread"><h3>${esc(course.title)}</h3><span>${course.featured ? `<span class="sd-badge info">${esc(t("roomc.featured"))}</span> ` : ""}${course.playable ? state_(course) : ""}</span></div>${course.playable ? `<ol class="sd-tree">${sessions(course)}</ol>` : state_(course)}</li>`)
+    .join("")}</ul>` : `<p class="sd-muted">${esc(t("roomc.empty"))}</p>`}`;
+  box.querySelectorAll("[data-session]").forEach((button) => (button.onclick = () => sessionOutline(button.dataset.course, button.dataset.session)));
+}
+
+function doseText(step) {
+  const parts = [];
+  if (step.sets > 1) parts.push(t("roomc.sets", { n: step.sets }));
+  if (step.reps) parts.push(t("roomc.reps", { n: step.reps }));
+  if (step.hold_seconds) parts.push(t("roomc.hold", { n: step.hold_seconds }));
+  if (step.work_seconds) parts.push(t("roomc.work", { n: step.work_seconds }));
+  if (step.sides && step.sides !== "none") parts.push(t("roomc.side_" + step.sides));
+  if (step.rest_seconds) parts.push(t("roomc.rest", { n: step.rest_seconds }));
+  return parts.join(" · ");
+}
+
+function stepHTML(step, index, anatomyLabel) {
+  const picture = step.image_media_id
+    ? `<figure class="sd-room-figure"><img class="sd-cover" src="${esc(mediaURL(step.image_media_id))}" alt="${esc(localized(step.exercise?.title) || step.title)}" loading="lazy">${step.image?.source === "repo" ? `<figcaption class="sd-muted">${esc(t("roomc.ai_label"))}</figcaption>` : ["pexels", "pixabay"].includes(step.image?.licence_type) ? `<figcaption class="sd-muted">${esc(t("roomc.stock_label"))}</figcaption>` : ""}</figure>`
+    : "";
+  const video = step.video_media_id
+    ? `<video class="sd-cover" controls preload="metadata" src="${esc(mediaURL(step.video_media_id))}" aria-label="${esc(localized(step.exercise?.title))}"></video>`
+    : "";
+  const options = [
+    step.regression ? `<p><strong>${esc(t("roomc.easier"))}:</strong> ${esc(step.regression)}</p>` : "",
+    step.progression ? `<p><strong>${esc(t("roomc.harder"))}:</strong> ${esc(step.progression)}</p>` : "",
+  ].join("");
+  const anatomy = step.anatomy?.length
+    ? `<p class="sd-muted">${esc(t("roomc.structures"))} · ${esc(anatomyLabel)}</p><div class="sd-chips">${step.anatomy.map((a) => `<span class="sd-chip">${esc(a.key)}</span>`).join("")}</div>`
+    : "";
+  return `<li class="sd-step"><p class="sd-eyebrow">${esc(t("roomc.step_n", { n: index + 1 }))} · ${esc(t("roomc.phase_" + step.phase))}</p><h3>${esc(step.title || localized(step.exercise?.title))}</h3><p class="sd-lead">${esc(doseText(step))}</p>${step.customer_cue ? `<p>${esc(step.customer_cue)}</p>` : ""}${picture}${video}${options}${anatomy}</li>`;
+}
+
+async function sessionOutline(courseId, sessionId) {
+  let plan;
+  try {
+    plan = await sedens("room/course/session", { course_id: courseId, session_id: sessionId });
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) return render();
+    const message = error instanceof ApiError && error.status === 403 ? t("roomc.not_offered") : t("roomc.error");
+    $("#room-courses")?.insertAdjacentHTML("afterbegin", `<p class="sd-notice error" role="alert">${esc(message)}</p>`);
+    return;
+  }
+  const anatomyLabel = localized(plan.anatomy_label);
+  const view = () => {
+    frame(`<section class="sd-room-card"><button class="sd-ghost" id="back">← ${esc(t("roomc.back"))}</button><h1>${esc(plan.session.title)}</h1><p class="sd-notice">${esc(t("roomc.outline_note"))}</p><ol class="sd-steps sd-room-outline">${plan.session.steps.map((step, i) => stepHTML(step, i, anatomyLabel)).join("")}</ol><div class="sd-actions"><button class="sd-primary sd-large" id="mark-done">${esc(t("roomc.mark_done"))}</button></div><p id="outline-status" role="status"></p></section>`);
+    $("#back").onclick = sessionView;
+    $("#mark-done").onclick = async (event) => {
+      event.target.disabled = true;
+      try {
+        const result = await sedens("room/course/complete", { course_id: courseId, session_id: sessionId });
+        const progress = result.progress;
+        $("#outline-status").textContent = t("roomc.progress", { done: progress.completed_items, total: progress.total_items });
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) return render();
+        event.target.disabled = false;
+        $("#outline-status").textContent = error instanceof ApiError && error.status === 403 ? t("roomc.not_offered") : t("roomc.error");
+      }
+    };
+  };
+  view();
+  stopPolling();
+  watchActivity(state.session?.idle_minutes);
+  state.view = view;
+  sedens("room/event", { name: "room_screen_viewed", props: { screen: "course_outline" } }).catch(() => {});
 }
 
 async function render() {
