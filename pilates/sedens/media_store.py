@@ -20,6 +20,7 @@ module only stores bytes safely and streams them back.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import hashlib
 import io
 import os
@@ -53,6 +54,18 @@ def root(repo) -> Path:
 
 def limit(mode_name: str, kind: str) -> int:
     return LIMITS.get(mode_name, LIMITS["demo_free"])[kind]
+
+
+@contextmanager
+def upload_slot():
+    """One of the server's two upload slots, for any large body being received
+    (an upload or a course import), or 429 when both are taken."""
+    if not _UPLOADS.acquire(blocking=False):
+        raise Denied("Another upload is in progress. Try again in a moment.", 429, "uploads_busy")
+    try:
+        yield
+    finally:
+        _UPLOADS.release()
 
 
 def object_path(repo, object_key: str) -> Path:
@@ -94,12 +107,8 @@ def _capped(kind: str, length: int, mode_name: str):
 def receive(repo, stream, length: int, kind: str, mode_name: str) -> Received:
     """Stream, hash and check an upload. The caller has already authorized it."""
     _capped(kind, length, mode_name)
-    if not _UPLOADS.acquire(blocking=False):
-        raise Denied("Another upload is in progress. Try again in a moment.", 429, "uploads_busy")
-    try:
+    with upload_slot():
         return _ingest(repo, stream, length, kind)
-    finally:
-        _UPLOADS.release()
 
 
 def adopt(repo, stream, length: int, kind: str, mode_name: str) -> Received:

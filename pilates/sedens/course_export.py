@@ -30,7 +30,11 @@ from .util import Denied, encode, now
 
 FORMAT = "sedens-course"
 VERSION = 1
-MAX_ARCHIVE = 400 * 1024 * 1024
+# A course export may hold several files, so its cap is above any single file's, and
+# like theirs it follows the deployment mode: the free demonstration host has little
+# disk, and its demonstration creators are anyone who opens it.
+ARCHIVE_LIMITS = {"local_room": 400 * 1024 * 1024, "demo_free": 60 * 1024 * 1024}
+MAX_ARCHIVE = ARCHIVE_LIMITS["local_room"]
 MAX_JSON = 8 * 1024 * 1024
 _NAME = re.compile(r"^(course\.json|media\.json|versions/[0-9]{1,4}\.json|media/[A-Za-z0-9_-]{1,64}\.(mp4|webm|jpg|png|webp|pdf))$")
 
@@ -126,8 +130,9 @@ def _read_json(z, name):
     return json.loads(z.read(info))
 
 
-def validate(z) -> tuple[dict, dict, list]:
-    """(manifest, course body, media list) after checking every member and checksum."""
+def validate(z, cap: int = MAX_ARCHIVE) -> tuple[dict, dict, list]:
+    """(manifest, course body, media list) after checking every member and checksum.
+    ``cap`` bounds the members' unpacked size together."""
     names = [i.filename for i in z.infolist()]
     if len(names) != len(set(names)) or len(names) > 2000 or "manifest.json" not in names:
         raise Denied("Choose a SEDENS course export.", 400, "invalid_import")
@@ -138,7 +143,7 @@ def validate(z) -> tuple[dict, dict, list]:
     if not isinstance(files, dict) or set(files) != set(names) - {"manifest.json"} \
             or any(not _NAME.match(n) for n in files):
         raise Denied("This course export is incomplete or has unexpected files.", 400, "invalid_import")
-    if sum(i.file_size for i in z.infolist()) > MAX_ARCHIVE:
+    if sum(i.file_size for i in z.infolist()) > cap:
         raise Denied("This course export is too large.", 413, "import_too_large")
     for name, expected in files.items():
         digest = hashlib.sha256()
@@ -154,19 +159,25 @@ def validate(z) -> tuple[dict, dict, list]:
     return manifest, body, media
 
 
+def archive_limit(mode_name: str) -> int:
+    return ARCHIVE_LIMITS.get(mode_name, ARCHIVE_LIMITS["demo_free"])
+
+
 def import_upload(sedens, actor, stream, length, attest: bool, attestation_version: str) -> dict:
     with sedens.db() as db:
         courses.creator_of(sedens, db, actor)
-    if not 0 < length <= MAX_ARCHIVE:
-        raise Denied("Choose a course export up to 400 MB.", 413, "import_too_large")
+    cap = archive_limit(sedens.mode.name)
+    if not 0 < length <= cap:
+        raise Denied(f"Choose a course export up to {cap // (1024 * 1024)} MB.", 413, "import_too_large")
     with tempfile.TemporaryFile() as f:
-        remaining = length
-        while remaining:
-            block = stream.read(min(65536, remaining))
-            if not block:
-                raise Denied("The upload was interrupted. Choose the file and try again.", 400, "upload_interrupted")
-            f.write(block)
-            remaining -= len(block)
+        with media_store.upload_slot():
+            remaining = length
+            while remaining:
+                block = stream.read(min(65536, remaining))
+                if not block:
+                    raise Denied("The upload was interrupted. Choose the file and try again.", 400, "upload_interrupted")
+                f.write(block)
+                remaining -= len(block)
         f.seek(0)
         try:
             with zipfile.ZipFile(f) as z:
@@ -177,7 +188,7 @@ def import_upload(sedens, actor, stream, length, attest: bool, attestation_versi
 
 def import_archive(sedens, actor, z, attest: bool, attestation_version: str) -> dict:
     """A new draft from an export, through the Creator Studio's own validation."""
-    _, body, media = validate(z)
+    _, body, media = validate(z, archive_limit(sedens.mode.name))
     needs_files = [m for m in media if m.get("file")]
     if needs_files and (not attest or attestation_version != course_media.ATTESTATION_VERSION):
         raise Denied("Confirm that you own the course's files or have permission to distribute them.", 400,

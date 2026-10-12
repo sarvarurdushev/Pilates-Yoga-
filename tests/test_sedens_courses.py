@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import io
 import sqlite3
+from zipfile import ZipFile
 
 import pytest
 
-from pilates.sedens import access, course_media, course_review, courses, marketplace
+from pilates.sedens import access, course_export, course_media, course_review, courses, marketplace, media_store
 from pilates.sedens.util import Denied
 from course_support import (PASS_ALL, approve, build_education, build_guided, coach_creator, customer, facility,
                             facility_setting, make_sedens, professor_studio, publish, room_for, sedens_staff,
@@ -430,3 +431,33 @@ def test_reviewers_can_open_verification_evidence(world):
         db.execute("UPDATE p_organizations SET demo=1 WHERE id=?", (a["org_id"],))
         with pytest.raises(Denied):
             access.media_access(sedens, db, reviewer, None, document["id"])
+
+
+class _Unread(io.RawIOBase):
+    """A request body that fails the test if anything reads it."""
+
+    def read(self, *_):
+        raise AssertionError("the body was read")
+
+
+def test_course_imports_follow_the_deployment_mode_and_share_the_upload_slots(tmp_path):
+    """On the free demonstration host anyone can be a demonstration creator, so a course
+    import is capped by the mode, before and after unpacking, and waits for an upload slot."""
+    sedens = make_sedens(tmp_path / "free.db", "demo_free")
+    a = facility(sedens, "A")
+    coach = coach_creator(sedens, a)
+    cap = course_export.archive_limit("demo_free")
+    assert cap < course_export.archive_limit("local_room")
+    with pytest.raises(Denied) as refused:
+        course_export.import_upload(sedens, coach, _Unread(), cap + 1, True, course_media.ATTESTATION_VERSION)
+    assert (refused.value.status, refused.value.code) == (413, "import_too_large")
+    with media_store.upload_slot(), media_store.upload_slot(), pytest.raises(Denied) as refused:
+        course_export.import_upload(sedens, coach, _Unread(), 1000, True, course_media.ATTESTATION_VERSION)
+    assert (refused.value.status, refused.value.code) == (429, "uploads_busy")
+    # A small archive that unpacks past the cap is refused too.
+    view = build_guided(sedens, coach)
+    with course_export.export(sedens, coach, view["course"]["id"]) as (path, _), ZipFile(path) as z:
+        course_export.validate(z)
+        with pytest.raises(Denied) as refused:
+            course_export.validate(z, cap=sum(i.file_size for i in z.infolist()) - 1)
+    assert refused.value.code == "import_too_large"
