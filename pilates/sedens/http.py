@@ -23,8 +23,8 @@ import threading
 import time
 from urllib.parse import parse_qs, urlparse
 
-from . import (analytics, capabilities, consent, course_http, creators, crm, demo, demo_marketplace, library,
-               onboarding, rooms)
+from . import (analytics, capabilities, consent, course_http, course_media, creators, crm, demo, demo_marketplace,
+               library, onboarding, rooms)
 from ..platform import http as platform_http
 from ..platform.repository import Refused
 from .util import Denied, environment
@@ -454,7 +454,8 @@ def _review_creators(r):
             "ORDER BY CASE c.verification_state WHEN 'pending' THEN 0 ELSE 1 END, c.updated_at DESC",
             (int(actor.demo),),
         ).fetchall()
-        return {"items": [creators.public(row) for row in rows
+        # The evidence each creator offered goes with the profile the reviewer decides on.
+        return {"items": [{**creators.public(row), "evidence": course_media.evidence(db, row["id"])} for row in rows
                           if environment(r.sedens.org(db, row["home_org"])) == here]}
 
 

@@ -109,10 +109,15 @@ def test_reviewer_verifies_over_http(world):
     signed_in(base, a["admin_token"]).call("POST", "/sedens/facility/capabilities", {"user_id": a["coach_id"], "capability": "creator"})
     coach = signed_in(base, a["coach_token"])
     coach.call("POST", "/sedens/creator/profile", {"display_name": "Coach A"})
+    coach.call("POST", "/sedens/creator/evidence", {"kind": "qualification", "description": "Pilates teacher licence",
+                                                     "url": "https://registry.example/123"})
     coach.call("POST", "/sedens/creator/verification/request")
     reviewer = signed_in(base, reviewer_token)
     status, queue = reviewer.call("GET", "/sedens/review/creators")
     assert status == 200 and queue["items"][0]["verification_state"] == "pending"
+    # The reviewer decides with the evidence the creator offered in front of them.
+    assert [(e["kind"], e["description"]) for e in queue["items"][0]["evidence"]] == \
+        [("qualification", "Pilates teacher licence")]
     status, body = signed_in(base, a["admin_token"]).call("GET", "/sedens/review/creators")
     assert status == 403
     pending = queue["items"][0]

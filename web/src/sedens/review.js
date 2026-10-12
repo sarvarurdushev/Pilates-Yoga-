@@ -81,7 +81,7 @@ function drawCreators(ctx, profiles, flash = "") {
     const form = buttons
       ? `<form class="sd-decide" data-creator="${esc(p.id)}" data-version="${esc(p.version)}"><label class="sd-field"><span>${esc(t("review.decision_note"))} · ${esc(t("review.decision_note_hint"))}</span><textarea name="note" rows="2" maxlength="1000"></textarea></label><div class="sd-actions">${buttons}</div><p class="sd-error" role="alert"></p></form>`
       : `<p class="sd-muted">${esc(t("review.no_action"))}</p>`;
-    return `<article class="sd-panel"><div class="sd-spread"><h2>${esc(name)}</h2>${verificationBadge(p)}</div><p>${esc(creatorType(p))}</p>${p.bio ? `<p>${lines(p.bio)}</p>` : ""}<div class="sd-grid-2">${field("review.institution", p.institution)}${field("review.qualifications", (p.qualifications || []).join(", "))}${field("review.specialties", (p.specialties || []).join(", "))}</div>${form}</article>`;
+    return `<article class="sd-panel"><div class="sd-spread"><h2>${esc(name)}</h2>${verificationBadge(p)}</div><p>${esc(creatorType(p))}</p>${p.bio ? `<p>${lines(p.bio)}</p>` : ""}<div class="sd-grid-2">${field("review.institution", p.institution)}${field("review.qualifications", (p.qualifications || []).join(", "))}${field("review.specialties", (p.specialties || []).join(", "))}</div>${evidenceList(p.evidence)}${form}</article>`;
   };
   $("#review-body").innerHTML = `${flash}${ctx.notice(t("review.creators_note"))}${profiles.length ? profiles.map(panel).join("") : `<p class="sd-muted">${esc(t("review.creators_empty"))}</p>`}`;
   document.querySelectorAll("form.sd-decide").forEach((form) => {
@@ -266,9 +266,14 @@ function outline(snap) {
   return section("review.outline", modules.length ? `<ol class="sd-tree">${modules.join("")}</ol>` : `<p class="sd-muted">${esc(t("review.outline_empty"))}</p>`);
 }
 
+/** The evidence a creator offered: its kind, description, link and attached file. */
+function evidenceList(items) {
+  const rows = (items || []).map((e) => `<li><span><strong>${esc(word("review.ev_", e.kind))}</strong> · ${esc(e.description)}</span><span>${e.url ? safeLink(e.url) : ""}${e.object_id ? ` <a href="/sedens/media/file?id=${esc(encodeURIComponent(e.object_id))}" target="_blank" rel="noopener noreferrer">${esc(t("review.evidence_file"))}</a>` : ""}</span></li>`).join("");
+  return `<h3>${esc(t("review.evidence"))}</h3>${rows ? `<ul class="sd-list">${rows}</ul>` : `<p class="sd-muted">${esc(t("review.evidence_none"))}</p>`}`;
+}
+
 function creatorSection(creator) {
-  const evidence = (creator.evidence || []).map((e) => `<li><span><strong>${esc(word("review.ev_", e.kind))}</strong> · ${esc(e.description)}</span><span>${e.url ? safeLink(e.url) : ""}${e.object_id ? ` <a href="/sedens/media/file?id=${esc(encodeURIComponent(e.object_id))}" target="_blank" rel="noopener noreferrer">${esc(t("review.evidence_file"))}</a>` : ""}</span></li>`).join("");
-  return section("review.creator", `<p>${creatorLine(creator)}</p><p class="sd-muted">${esc(t("review.creators_note"))}</p><div class="sd-grid-2">${pair("review.creator_type", esc(creatorType(creator)))}${pair("review.institution", text(creator.institution))}${pair("review.qualifications", text((creator.qualifications || []).join(", ")))}</div><h3>${esc(t("review.evidence"))}</h3>${evidence ? `<ul class="sd-list">${evidence}</ul>` : `<p class="sd-muted">${esc(t("review.evidence_none"))}</p>`}`);
+  return section("review.creator", `<p>${creatorLine(creator)}</p><p class="sd-muted">${esc(t("review.creators_note"))}</p><div class="sd-grid-2">${pair("review.creator_type", esc(creatorType(creator)))}${pair("review.institution", text(creator.institution))}${pair("review.qualifications", text((creator.qualifications || []).join(", ")))}</div>${evidenceList(creator.evidence)}`);
 }
 
 // Titles and kinds come from the snapshot's media summaries (the rights rows carry neither).
