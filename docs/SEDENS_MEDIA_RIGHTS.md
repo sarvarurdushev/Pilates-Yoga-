@@ -204,7 +204,7 @@ The registry allows two stock sources, both `enabled` with `auto_download: false
 | Pexels | `https://www.pexels.com/license/` | reference only (the licence allows use, not redistribution as a library) | People shown must not appear to endorse SEDENS; review each clip before use. |
 | Pixabay | `https://pixabay.com/service/license-summary/` | reference only | Review each clip before use. |
 
-The registry's rules: nothing is downloaded automatically; a stock clip is added only after a person watched it, checked the movement and the licence page, and recorded both; stock and generated media show the stock label until a SEDENS reviewer approves the movement; social media, video sites and search results are never sources.
+The registry's rules: nothing is downloaded automatically; a stock clip is added only after a person watched it, checked the movement and the licence page, and recorded both; stock and generated media always show the stock label, which only an expert review of the movement (not built) could remove; social media, video sites and search results are never sources.
 
 **The import manifest is empty** (`"status": "empty"`, `"entries": []`). Its recorded reason: "No stock clip has been watched and checked by a person yet, so none is listed. Demonstrations use the repository illustrations above." An entry, once added, must record `id`, `source`, `page_url`, `file_url`, `licence_url`, `original_creator`, `retrieved_at`, `sha256`, `shows_exercise`, `checked_by`, `checked_at`, `movement_notes` and `identifiable_person`; `video_providers.problems()` reports any entry without who checked it, when, its licence page and its checksum. The test asserts the manifest is empty and that no source downloads automatically.
 

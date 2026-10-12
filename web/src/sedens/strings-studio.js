@@ -552,7 +552,7 @@ export const STUDIO = {
     "studio.source_kind.generated": "AI-generated",
     "studio.source_on": "Available",
     "studio.source_off": "Not active",
-    "studio.stock_rule": "Stock and generated media show “{label}” until a SEDENS reviewer approves the movement.",
+    "studio.stock_rule": "Stock and generated media always show “{label}”. SEDENS does not review movements yet, and approving a file's rights does not remove the label.",
 
     "studio.error.unknown_course": "This course does not exist, or it is not yours.",
     "studio.error.unknown_version": "This version does not exist.",
@@ -1129,7 +1129,7 @@ export const STUDIO = {
     "studio.source_kind.generated": "AI 생성",
     "studio.source_on": "사용 가능",
     "studio.source_off": "사용 안 함",
-    "studio.stock_rule": "스톡 미디어와 생성 미디어에는 SEDENS 검토자가 동작을 승인할 때까지 “{label}” 표시가 붙습니다.",
+    "studio.stock_rule": "스톡 미디어와 생성 미디어에는 항상 “{label}” 표시가 붙습니다. SEDENS는 아직 동작을 검토하지 않으며, 파일의 권리를 승인해도 이 표시는 사라지지 않습니다.",
 
     "studio.error.unknown_course": "이 코스가 없거나 내 코스가 아닙니다.",
     "studio.error.unknown_version": "이 버전은 없습니다.",

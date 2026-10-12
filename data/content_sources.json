@@ -3,7 +3,7 @@
  "rules": [
   "Every file used in a course has rights metadata and an attestation, or is listed here with its licence.",
   "Nothing is downloaded automatically. A stock clip is added only after a person watched it, checked the movement and the licence page, and recorded both below.",
-  "Stock and generated media show 'Demo media — movement not yet expert reviewed' until a SEDENS reviewer approves the movement.",
+  "Stock and generated media always show 'Demo media — movement not yet expert reviewed'. Only an expert review of the movement could remove it, and SEDENS has no such review yet; approving a file's rights does not.",
   "Generated video (Higgsfield or any other generator) is never approved automatically.",
   "Social media, video sites and search results are never sources."
  ],
