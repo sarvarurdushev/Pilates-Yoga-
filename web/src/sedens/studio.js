@@ -519,7 +519,7 @@ export async function courseEdit(ctx) {
     const amount = price.price_type === "paid" ? (price.currency === "KRW" ? price.amount_minor : (price.amount_minor / 100).toFixed(2)) : "";
     const termFor = (x) => view.facilities.find((f) => f.org_id === x.org_id && (!x.location_id || f.location_id === x.location_id));
     panel("access").innerHTML =
-      `<h2>${esc(T("tab.access"))}</h2><form data-form="access">` +
+      `<h2>${esc(T("tab.access"))}</h2>${view.published_version ? `<p class="sd-notice">${esc(T("access_after_review", { n: view.published_version }))}</p>` : ""}<form data-form="access">` +
       group(T("distribution_title"), radios("distribution", words("distribution", vocab.distributions), view.course.distribution, (d) => T("distribution_explain." + d))) +
       group(
         T("facilities_title"),

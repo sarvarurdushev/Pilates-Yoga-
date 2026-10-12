@@ -383,7 +383,7 @@ def _decide_course_access(ctx, rows):
             if course is None or e.get("source") == "demo_purchase":
                 keep = False
             elif e.get("source") == "marketplace_free":
-                keep = course["distribution"] == "marketplace" and access.is_free(ctx.db, course["id"])
+                keep = access.in_force(ctx.db, course)["distribution"] == "marketplace" and access.is_free(ctx.db, course)
         if not keep:
             ctx.dropped.add(("s_entitlements", e["id"]))
     for n in rows("s_enrollments"):

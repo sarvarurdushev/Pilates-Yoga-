@@ -9,7 +9,7 @@ implement :class:`PaymentProvider`; none is integrated.
 
 from __future__ import annotations
 
-from . import access, courses
+from . import access
 from .util import Denied, now, uid
 
 NOTICE = {"en": "DEMO — no real payment occurred.", "ko": "데모 — 실제 결제는 이루어지지 않았습니다."}
@@ -37,12 +37,12 @@ class DemoPaymentProvider(PaymentProvider):
             raise Denied("This course does not exist.", 404, "unknown_course")
         if course["course_type"] == "guided_training" and actor.role != "student":
             raise Denied("Guided training is bought by customers.", 403, "customers_only")
-        if not access.on_sale(db, course["id"]):
+        if not access.on_sale(db, course):
             raise Denied("This course is not for sale.", 409, "not_for_sale")
         held = access.entitlements(sedens, db, actor.user_id, course)
         if held:
             raise Denied("You already have this course.", 409, "already_entitled")
-        price = courses.price(db, course["id"])
+        price = access.in_force(db, course)["price"]  # the price SEDENS approved, never a draft
         stamp, purchase_id, entitlement_id = now(), uid(), uid()
         db.execute("INSERT INTO s_purchases(id,user_id,org_id,course_id,provider,amount_minor,currency,state,created_at) "
                    "VALUES (?,?,?,?,?,?,?,?,?)", (purchase_id, actor.user_id, actor.org_id, course["id"], self.name,

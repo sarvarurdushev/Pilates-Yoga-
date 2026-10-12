@@ -28,6 +28,10 @@ Three independent course settings feed them:
 * **visibility**: only a published, unsuspended, unarchived version is seen by
   anyone other than its creator and SEDENS reviewers.
 
+Customers live under the distribution, facility terms and price of the
+**published version**, as SEDENS approved them (:func:`in_force`). A creator's
+later change to any of them is a draft until the next version is approved.
+
 A facility then decides, for courses offered to it, whether they are
 **enabled** in its rooms, **included** for its members (only where the course
 is free there: a facility cannot give away a paid course) and **featured**.
@@ -49,19 +53,37 @@ def published(course) -> bool:
     return bool(course["published_version"]) and not course["suspended_at"] and not course["archived_at"]
 
 
-def _price(db, course_id):
-    found = db.execute("SELECT * FROM s_course_prices WHERE course_id=?", (course_id,)).fetchone()
-    return found
+NOT_OFFERED = {"distribution": "creator_only",
+               "price": {"price_type": "free", "amount_minor": 0, "currency": "KRW", "sale_state": "not_for_sale"},
+               "facilities": []}
 
 
-def is_free(db, course_id) -> bool:
-    found = _price(db, course_id)
-    return found is None or found["price_type"] == "free"
+def in_force(db, course) -> dict:
+    """The access settings customers live under: those recorded in the published
+    version's snapshot, exactly as the reviewer approved them ({'distribution',
+    'price', 'facilities'}). The live rows are the creator's draft: changing who
+    may offer the course, a facility's terms or the price reaches customers only
+    when SEDENS approves the next version. An unpublished course offers nothing."""
+    if not course["published_version"]:
+        return NOT_OFFERED
+    found = db.execute(
+        "SELECT json_extract(snapshot,'$.distribution'), json_extract(snapshot,'$.price'), "
+        "json_extract(snapshot,'$.facilities') FROM s_course_versions WHERE course_id=? AND version=?",
+        (course["id"], course["published_version"])).fetchone()
+    if found is None or found[0] is None:
+        return NOT_OFFERED
+    return {"distribution": found[0], "price": decode(found[1], NOT_OFFERED["price"]),
+            "facilities": [{"org_id": t["org_id"], "location_id": t.get("location_id"), "free": bool(t.get("free"))}
+                           for t in decode(found[2], [])]}
 
 
-def on_sale(db, course_id) -> bool:
-    found = _price(db, course_id)
-    return found is not None and found["price_type"] == "paid" and found["sale_state"] == "active"
+def is_free(db, course) -> bool:
+    return in_force(db, course)["price"]["price_type"] == "free"
+
+
+def on_sale(db, course) -> bool:
+    price = in_force(db, course)["price"]
+    return price["price_type"] == "paid" and price["sale_state"] == "active"
 
 
 def _creator_home(db, course):
@@ -84,7 +106,7 @@ def network_basis(db, course, facility_id, location_id=None) -> str | None:
     return None
 
 
-def offered_to(sedens, db, course, facility_id, location_id=None, *, draft_ok=False) -> dict | None:
+def offered_to(sedens, db, course, facility_id, location_id=None) -> dict | None:
     """Whether a facility (or one of its locations) may offer this course, and
     whether it is free there. None when it may not.
 
@@ -96,13 +118,13 @@ def offered_to(sedens, db, course, facility_id, location_id=None, *, draft_ok=Fa
         return None
     if environment(facility) != environment(owner):
         return None
-    if not draft_ok and not published(course):
+    if not published(course):
         return None
+    settings = in_force(db, course)
     network = network_basis(db, course, facility_id, location_id)
-    terms = [t for t in db.execute(
-        "SELECT location_id, free FROM s_course_facility_terms WHERE course_id=? AND org_id=?",
-        (course["id"], facility_id)) if location_id is None or t[0] in (None, location_id)] if network else []
-    distribution = course["distribution"]
+    terms = [t for t in settings["facilities"] if t["org_id"] == facility_id
+             and (location_id is None or t["location_id"] in (None, location_id))] if network else []
+    distribution = settings["distribution"]
     basis = None
     if distribution == "marketplace":
         basis = "marketplace"
@@ -112,7 +134,7 @@ def offered_to(sedens, db, course, facility_id, location_id=None, *, draft_ok=Fa
         basis = network
     if basis is None:
         return None
-    return {"basis": basis, "free": is_free(db, course["id"]) or any(t[1] for t in terms),
+    return {"basis": basis, "free": settings["price"]["price_type"] == "free" or any(t["free"] for t in terms),
             "own_program": course["owner_org_id"] == facility_id}
 
 
@@ -217,7 +239,7 @@ def can_view_metadata(sedens, db, actor, course) -> bool:
     viewer, owner = sedens.org(db, actor.org_id), sedens.org(db, course["owner_org_id"])
     if environment(viewer) != environment(owner):
         return False
-    if course["distribution"] == "marketplace":
+    if in_force(db, course)["distribution"] == "marketplace":
         return True
     if actor.role == "student":
         if entitlements(sedens, db, actor.user_id, course) or enrollment(db, actor.user_id, course["id"]):
@@ -244,9 +266,9 @@ def enroll_option(sedens, db, actor, course) -> dict:
         if offer and offer["free"] and _member_location_ok(sedens, db, course, actor.user_id, actor.org_id):
             return {"ok": True, "reason": "facility", "source": "facility_included" if offer["included"] else "facility_free",
                     "facility_id": actor.org_id}
-    if course["distribution"] == "marketplace" and is_free(db, course["id"]):
+    if in_force(db, course)["distribution"] == "marketplace" and is_free(db, course):
         return {"ok": True, "reason": "free", "source": "marketplace_free"}
-    if on_sale(db, course["id"]):
+    if on_sale(db, course):
         return {"ok": False, "reason": "purchase_required"}
     return {"ok": False, "reason": "not_available"}
 
@@ -347,7 +369,7 @@ def media_access(sedens, db, actor, room, object_id) -> dict:
 
 
 def course_card(sedens, db, actor, course, *, facility_id=None) -> dict:
-    """What a customer list shows for a course (no draft content)."""
+    """What a customer list shows for a course (no draft content, no draft price)."""
     from . import courses as course_store
 
     snapshot = decode(db.execute("SELECT snapshot FROM s_course_versions WHERE course_id=? AND version=?",
@@ -370,9 +392,9 @@ def course_card(sedens, db, actor, course, *, facility_id=None) -> dict:
         "creator": {"display_name": creator["display_name"], "creator_type": creator["creator_type"],
                     "verified": creator["verification_state"] == "verified",
                     "verification_state": creator["verification_state"]} if creator else None,
-        "price": course_store.price(db, course["id"]),
+        "price": in_force(db, course)["price"],
         "free_here": bool(here and here["free"]), "included_here": bool(here and here["included"]),
         "enabled_here": here is not None, "featured_here": bool(here and here["featured"]),
         "enrolled": enrolled is not None, "purchased": any(e["source"] == "demo_purchase" for e in held),
-        "distribution": course["distribution"],
+        "distribution": in_force(db, course)["distribution"],
     }

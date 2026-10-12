@@ -11,8 +11,9 @@ import pytest
 from pilates.platform.repository import uid
 from pilates.sedens import access, course_review, courses, marketplace
 from pilates.sedens.util import Denied
-from course_support import (add_user, affiliate, build_guided, coach_creator, customer, facility, facility_setting,
-                            make_sedens, professor_studio, publish, room_for, sedens_staff)
+from course_support import (add_user, affiliate, approve, build_guided, coach_creator, customer, facility,
+                            facility_setting, make_sedens, professor_studio, publish, room_for, sedens_staff,
+                            set_access, submit)
 from sedens_support import enter_with_code, pair
 
 KRW_29000 = {"price_type": "paid", "amount_minor": 29000, "currency": "KRW", "sale_state": "active"}
@@ -267,6 +268,40 @@ def test_course_disabled_by_facility_cannot_launch(world):
     # The facility's included entitlement no longer stands either.
     with sedens.db() as db:
         assert access.entitlements(sedens, db, member.user_id, courses.row(db, cid)) == []
+
+
+# -- access settings are reviewed like the content -----------------------------------------------
+
+
+def test_access_and_price_changes_wait_for_the_next_approved_version(world):
+    """Customers and facilities follow the settings SEDENS approved: making a published
+    facility course a paid marketplace course changes nothing until it is approved."""
+    sedens, reviewer, a, b, _ = world
+    coach = coach_creator(sedens, a)
+    view = publish(sedens, coach, reviewer, build_guided(sedens, coach), "selected_facilities",
+                   [{"org_id": a["org_id"], "free": True}])
+    cid = view["course"]["id"]
+    facility_setting(sedens, a, cid, enabled=True, included=True)
+
+    def card(actor):
+        return decide(sedens, access.course_card, actor, course_row(sedens, cid))
+
+    view = set_access(sedens, coach, view, "marketplace", price=KRW_29000)
+    assert view["price"]["amount_minor"] == 29000 and view["course"]["distribution"] == "marketplace"  # the draft
+    assert not can_view(sedens, customer(sedens, b), cid)
+    with pytest.raises(Denied):
+        facility_setting(sedens, b, cid, enabled=True)
+    assert play(sedens, room_for(sedens, a), cid) == {"ok": True, "reason": "free_here"}
+    assert card(customer(sedens, a))["price"]["price_type"] == "free" and card(customer(sedens, a))["included_here"]
+    assert card(customer(sedens, a))["distribution"] == "selected_facilities"
+
+    submit(sedens, coach, view)
+    assert not can_view(sedens, customer(sedens, b), cid)  # still waiting for review
+    approve(sedens, reviewer, cid)
+    assert can_view(sedens, customer(sedens, b), cid)
+    assert enroll_option(sedens, customer(sedens, b), cid)["reason"] == "purchase_required"
+    assert play(sedens, room_for(sedens, a), cid)["reason"] == "purchase_required"
+    assert card(customer(sedens, a))["price"] == KRW_29000 and not card(customer(sedens, a))["included_here"]
 
 
 # -- room-only playback, suspension, environments ----------------------------------------------

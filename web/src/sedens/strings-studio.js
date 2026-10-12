@@ -302,6 +302,7 @@ export const STUDIO = {
 
     "studio.submit_explain": "A SEDENS reviewer checks rights and licences, wording, safety information, exercise instructions, demonstrations, anatomy and price before anyone can use the course.",
     "studio.submit_versions": "Editing a published course creates a new version for review. Customers who already enrolled keep the version they have.",
+    "studio.access_after_review": "Customers and facilities follow the settings SEDENS approved with version {n}. A change here reaches them when SEDENS approves your next version.",
     "studio.submit_waiting": "Version {n} is waiting for review. Submitting again replaces it.",
     "studio.submit_blocked": "Finish the checklist at the top of the page first.",
     "studio.submit_note": "Note to the reviewer (optional)",
@@ -878,6 +879,7 @@ export const STUDIO = {
 
     "studio.submit_explain": "누군가 코스를 이용하기 전에 SEDENS 검토자가 권리와 라이선스, 표현, 안전 안내, 운동 설명, 시연, 해부학, 가격을 확인합니다.",
     "studio.submit_versions": "게시된 코스를 고치면 검토받을 새 버전이 만들어집니다. 이미 등록한 고객은 가지고 있는 버전을 그대로 이용합니다.",
+    "studio.access_after_review": "고객과 시설은 SEDENS가 버전 {n}과 함께 승인한 설정을 따릅니다. 여기서 바꾼 내용은 SEDENS가 다음 버전을 승인할 때 적용됩니다.",
     "studio.submit_waiting": "버전 {n}이 검토를 기다리고 있습니다. 다시 제출하면 그 버전을 대신합니다.",
     "studio.submit_blocked": "먼저 페이지 위쪽의 할 일을 마치세요.",
     "studio.submit_note": "검토자에게 남길 메모 (선택)",
