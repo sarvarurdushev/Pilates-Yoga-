@@ -314,6 +314,12 @@ def media_access(sedens, db, actor, room, object_id) -> dict:
         profile = db.execute("SELECT id FROM s_creator_profiles WHERE user_id=?", (actor.user_id,)).fetchone()
         allowed = profile is not None and (found["creator_id"] == profile[0]
                                            or (found["creator_id"] is None and actor.role == "admin"))
+    # Verification evidence: a SEDENS reviewer of the same environment reads it.
+    if not allowed and actor is not None and capabilities.has(sedens, db, actor, "sedens_reviewer") and db.execute(
+            "SELECT 1 FROM s_verification_evidence e JOIN s_creator_profiles c ON c.id=e.creator_id "
+            "WHERE e.object_id=? AND c.user_id<>?", (object_id, actor.user_id)).fetchone():
+        owner = sedens.org(db, found["owner_org_id"])
+        allowed = owner is not None and environment(owner) == environment(sedens.org(db, actor.org_id))
     courses = [r for r in db.execute(
         "SELECT DISTINCT c.*, v.version AS v_version, v.state AS v_state FROM s_course_version_media m "
         "JOIN s_course_versions v ON v.id=m.version_id JOIN s_courses c ON c.id=v.course_id WHERE m.object_id=?",
@@ -328,8 +334,9 @@ def media_access(sedens, db, actor, room, object_id) -> dict:
         elif actor is not None and c["cover_media_id"] == object_id and found["kind"] == "image" \
                 and c["v_version"] == c["published_version"] and can_view_metadata(sedens, db, actor, c):
             allowed = True
-        elif c["v_version"] == c["published_version"] or (
-                actor is not None and c["v_version"] == effective_version(db, c, enrollment(db, actor.user_id, c["id"]))):
+        elif c["v_version"] == c["published_version"] or any(
+                c["v_version"] == effective_version(db, c, enrollment(db, person, c["id"]))
+                for person in {actor.user_id if actor is not None else None, room.student_id if room else None} - {None}):
             if room is not None and can_play_in_room(sedens, db, room, c)["ok"]:
                 allowed = True
             elif actor is not None and can_download_resource(sedens, db, actor, c, object_id):

@@ -333,3 +333,69 @@ def test_rejected_rights_block_submission(world):
                                                           "note": "We cannot confirm permission."})
     view = set_access(sedens, coach, view, "selected_facilities", [{"org_id": a["org_id"], "free": True}])
     assert "media_rights_rejected" in view["readiness"]
+
+
+# -- follow-ups from the documentation review ---------------------------------------------
+
+
+def test_a_customer_on_an_older_version_still_sees_its_pictures_in_the_room(world):
+    sedens, reviewer, a, coach = world
+    first, second = (png_bytes(c) for c in ((200, 0, 0), (0, 200, 0)))
+    old = course_media.upload(sedens, coach, io.BytesIO(first), len(first), "image", "old.png", RIGHTS)
+    new = course_media.upload(sedens, coach, io.BytesIO(second), len(second), "image", "new.png", RIGHTS)
+
+    def with_picture(view, media_id):
+        step = view["modules"][0]["sessions"][0]["steps"][0]
+        with sedens.db() as db:
+            return courses.save_step(sedens, db, coach, {
+                **{k: step[k] for k in ("id", "phase", "sets", "reps")}, "course_id": view["course"]["id"],
+                "revision": view["revision"], "session_id": view["modules"][0]["sessions"][0]["id"],
+                "exercise_source": "standard", "exercise_ref": "std-breathing", "image_media_id": media_id})
+
+    view = publish(sedens, coach, reviewer, with_picture(build_guided(sedens, coach), old["id"]),
+                   "selected_facilities", [{"org_id": a["org_id"], "free": True}])
+    cid = view["course"]["id"]
+    facility_setting(sedens, a, cid, enabled=True)
+    early = customer(sedens, a)
+    call(sedens, marketplace.enroll, early, cid)
+    view = submit(sedens, coach, with_picture(view, new["id"]))
+    approve(sedens, reviewer, cid)
+    late = customer(sedens, a, "other_token")
+    call(sedens, marketplace.enroll, late, cid)
+    early_room, late_room = room_for(sedens, a), room_for(sedens, a, "other_token")
+    with sedens.db() as db:
+        assert access.media_access(sedens, db, None, early_room, old["id"])["object"]["id"] == old["id"]
+        assert access.media_access(sedens, db, None, late_room, new["id"])["object"]["id"] == new["id"]
+        with pytest.raises(Denied):
+            access.media_access(sedens, db, None, late_room, old["id"])
+
+
+def test_a_reviewer_never_decides_the_rights_of_their_own_file(world):
+    sedens, reviewer, _, _ = world
+    from pilates.sedens import capabilities, creators
+
+    root = sedens.repo.actor(sedens.repo.login("root@sedens.test", "correct horse battery"))
+    with sedens.db() as db:
+        capabilities.grant(sedens, db, root, reviewer.user_id, "creator")
+        creators.save_profile(sedens, db, reviewer, {"display_name": "Reviewer as editor"})
+    own = course_media.upload(sedens, reviewer, io.BytesIO(png_bytes()), len(png_bytes()), "image", "own.png", RIGHTS)
+    with sedens.db() as db, pytest.raises(Denied) as refused:
+        course_review.decide_media(sedens, db, reviewer, {"object_id": own["id"], "decision": "approved"})
+    assert refused.value.code == "self_review"
+
+
+def test_reviewers_can_open_verification_evidence(world):
+    sedens, reviewer, a, coach = world
+    pdf = b"%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n"
+    document = course_media.upload(sedens, coach, io.BytesIO(pdf), len(pdf), "pdf", "certificate.pdf", RIGHTS)
+    other = facility(sedens, "Z")
+    with sedens.db() as db:
+        course_media.add_evidence(sedens, db, coach, {"kind": "qualification", "description": "Pilates teacher course",
+                                                      "object_id": document["id"]})
+        assert access.media_access(sedens, db, reviewer, None, document["id"])["download"] is True
+        for outsider in (other["admin"], customer(sedens, a), a["admin"]):
+            with pytest.raises(Denied):
+                access.media_access(sedens, db, outsider, None, document["id"])
+        db.execute("UPDATE p_organizations SET demo=1 WHERE id=?", (a["org_id"],))
+        with pytest.raises(Denied):
+            access.media_access(sedens, db, reviewer, None, document["id"])

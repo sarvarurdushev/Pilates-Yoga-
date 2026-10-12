@@ -117,10 +117,11 @@ def save_profile(sedens, db, actor, data):
             (*values.values(), stamp, existing["id"]),
         )
         if changed and existing["verification_state"] in ("verified", "pending"):
-            # A verification covers the profile as reviewed; an edit needs a new review.
+            # A verification covers the profile as reviewed; an edit goes back to the
+            # review queue ("Verification requested") for the new content.
             db.execute(
-                "UPDATE s_creator_profiles SET verification_state='unverified', verified_by=NULL, verified_at=NULL, "
-                "verification_note='Profile changed after review.' WHERE id=?",
+                "UPDATE s_creator_profiles SET verification_state='pending', verified_by=NULL, verified_at=NULL, "
+                "verification_note='Profile changed after review. Waiting for SEDENS to review it again.' WHERE id=?",
                 (existing["id"],),
             )
             sedens.audit(db, actor.org_id, actor.user_id, "creator:verification-reset", existing["id"])

@@ -206,7 +206,8 @@ def test_sedens_reviewer_verifies(world):
         changed = creators.save_profile(sedens, db, coach, {
             "display_name": "Dr. C, MD", "creator_type": "professor", "institution": "A hospital",
             "qualifications": ["MD"]})
-        assert changed["verification_state"] == "unverified" and changed["self_declared"] is True
+        # It goes back to the review queue, never stays verified.
+        assert changed["verification_state"] == "pending" and changed["self_declared"] is True
         row = db.execute("SELECT verified_by, verified_at FROM s_creator_profiles WHERE id=?", (profile["id"],)).fetchone()
         assert tuple(row) == (None, None)
 

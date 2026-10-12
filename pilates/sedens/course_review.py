@@ -158,11 +158,15 @@ def decide_media(sedens, db, actor, data) -> dict:
     from . import capabilities
 
     capabilities.require(sedens, db, actor, "sedens_reviewer")
-    found = db.execute("SELECT o.owner_org_id FROM s_media_objects o JOIN s_media_rights r ON r.object_id=o.id WHERE o.id=?",
-                       (data.get("object_id"),)).fetchone()
+    found = db.execute(
+        "SELECT o.owner_org_id, o.uploaded_by, c.user_id AS creator_user FROM s_media_objects o "
+        "JOIN s_media_rights r ON r.object_id=o.id LEFT JOIN s_creator_profiles c ON c.id=o.creator_id WHERE o.id=?",
+        (data.get("object_id"),)).fetchone()
     owner = sedens.org(db, found[0]) if found else None
     if owner is None or access.environment(owner) != access.environment(sedens.org(db, actor.org_id)):
         raise Denied("This file does not exist.", 404, "media_not_found")
+    if actor.user_id in (found["uploaded_by"], found["creator_user"]):
+        raise Denied("Another SEDENS reviewer must review the rights of your own file.", 403, "self_review")
     status = data.get("decision")
     if status not in ("approved", "rejected"):
         raise Denied("Choose approve or reject.", 400, "invalid")
