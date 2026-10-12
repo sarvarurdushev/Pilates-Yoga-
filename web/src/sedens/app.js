@@ -141,7 +141,7 @@ function homeView() {
         location.hash = { admin: "#/facility", coach: "#/creator", creator: "#/creator", professor: "#/creator", reviewer: "#/review" }[role] || "#/";
         render();
       } catch (error) {
-        $("#demo-status").textContent = error.message;
+        $("#demo-status").textContent = problem(error);
         document.querySelectorAll("[data-demo]").forEach((b) => (b.disabled = false));
       }
     };
