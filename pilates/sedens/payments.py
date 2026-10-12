@@ -9,7 +9,7 @@ implement :class:`PaymentProvider`; none is integrated.
 
 from __future__ import annotations
 
-from . import access
+from . import access, sales
 from .util import Denied, now, uid
 
 NOTICE = {"en": "DEMO — no real payment occurred.", "ko": "데모 — 실제 결제는 이루어지지 않았습니다."}
@@ -38,6 +38,8 @@ class DemoPaymentProvider(PaymentProvider):
         if course["course_type"] == "guided_training" and actor.role != "student":
             raise Denied("Guided training is bought by customers.", 403, "customers_only")
         if not access.on_sale(db, course):
+            if sales.paused(db, course):
+                raise Denied("New sales of this course are paused.", 409, "sales_paused")
             raise Denied("This course is not for sale.", 409, "not_for_sale")
         held = access.entitlements(sedens, db, actor.user_id, course)
         if held:

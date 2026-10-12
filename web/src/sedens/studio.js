@@ -440,7 +440,7 @@ export async function courseEdit(ctx) {
         ? `<p class="sd-notice" role="status">${esc(T("readiness_ok"))}</p>`
         : view.review_state === "published" ? `<p class="sd-muted">${esc(T("submit_versions"))}</p>` : "";
     $("#course-head").innerHTML =
-      `<p class="sd-row">${stateBadge(view.review_state)}<span class="sd-muted">${esc(T("language." + view.course.language))} · ${esc(money(view.price))} · ${esc(T("offered_by", { who: T("distribution." + view.course.distribution) }))}${view.published_version ? " · " + esc(T("live_version", { n: view.published_version })) : ""}</span></p>` +
+      `<p class="sd-row">${stateBadge(view.review_state)}${view.sales?.paused ? `<span class="sd-badge warn">${esc(T("sales_paused_badge"))}</span>` : ""}<span class="sd-muted">${esc(T("language." + view.course.language))} · ${esc(money(view.price))} · ${esc(T("offered_by", { who: T("distribution." + view.course.distribution) }))}${view.published_version ? " · " + esc(T("live_version", { n: view.published_version })) : ""}</span></p>` +
       (view.suspended_reason ? ctx.notice(T("suspended_because", { reason: view.suspended_reason }), "error") : "") +
       (archived ? ctx.notice(T("archived_note")) : checklist) +
       (notes.length ? `<div class="sd-notice"><strong>${esc(T("wording_title"))}</strong><p>${esc(T("wording_body"))}</p><div class="sd-chips">${notes.map((n) => `<span class="sd-chip">${esc(n)}</span>`).join("")}</div></div>` : "");
@@ -513,13 +513,23 @@ export async function courseEdit(ctx) {
   };
 
   // Who can offer it & price ----------------------------------------------
+  // Commercial availability: immediate, outside review (the approved content never changes).
+  const salesBox = () => {
+    const s = view.sales || {};
+    const state = s.paused ? T("sales_paused_since", { date: date(s.paused_at) }) : s.can_pause ? T("sales_open", { n: s.version }) : T("sales_none");
+    const button = s.can_resume
+      ? `<button type="button" data-act="sales" data-paused="false" class="sd-primary">${esc(T("sales_resume"))}</button>`
+      : s.can_pause ? `<button type="button" data-act="sales" data-paused="true">${esc(T("sales_pause"))}</button>` : "";
+    return `<h3>${esc(T("sales_title"))}</h3><p>${esc(state)}</p><p class="sd-muted">${esc(T("sales_explain"))}</p>${button ? `<div class="sd-actions">${button}</div>` : ""}<p class="sd-muted" role="status" data-status></p>${errorLine()}`;
+  };
+
   const access = () => {
     const targets = studio.targets || [];
     const price = view.price;
     const amount = price.price_type === "paid" ? (price.currency === "KRW" ? price.amount_minor : (price.amount_minor / 100).toFixed(2)) : "";
     const termFor = (x) => view.facilities.find((f) => f.org_id === x.org_id && (!x.location_id || f.location_id === x.location_id));
     panel("access").innerHTML =
-      `<h2>${esc(T("tab.access"))}</h2>${view.published_version ? `<p class="sd-notice">${esc(T("access_after_review", { n: view.published_version }))}</p>` : ""}<form data-form="access">` +
+      `<h2>${esc(T("tab.access"))}</h2>${view.published_version ? `<div id="sales-box" data-scope>${salesBox()}</div><p class="sd-notice">${esc(T("access_after_review", { n: view.published_version }))}</p>` : ""}<form data-form="access">` +
       group(T("distribution_title"), radios("distribution", words("distribution", vocab.distributions), view.course.distribution, (d) => T("distribution_explain." + d))) +
       group(
         T("facilities_title"),
@@ -740,6 +750,17 @@ export async function courseEdit(ctx) {
     const act = button.dataset.act;
     const scope = scopeOf(button);
     if (act === "goto") showTab(button.dataset.tab, true);
+    if (act === "sales")
+      attempt(ctx, scope, async () => {
+        const paused = button.dataset.paused === "true";
+        const next = await sedens("creator/course/sales", { id: view.course.id, paused });
+        if (ctx.stale()) return;
+        view.sales = next;
+        head();
+        const box = $("#sales-box");
+        keepFocus(box, () => (box.innerHTML = salesBox()), "button[data-act='sales']");
+        say(box, T(paused ? "sales_paused_done" : "sales_resumed_done"));
+      });
     if (act === "move")
       attempt(ctx, scope, async () => {
         if (await edit("move", { kind: button.dataset.kind, id: button.dataset.id, position: Number(button.dataset.pos) })) rerender("structure");

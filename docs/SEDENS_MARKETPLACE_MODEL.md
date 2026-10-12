@@ -72,6 +72,27 @@ Needs revision and reject require a comment; reviews are stored per version (`s_
 - **Free terms** make a course free at one facility (or one of its locations) whatever its price, only for facilities in the creator's network.
 - What customers see and pay is the approved version's price (`access.in_force`), never a draft price.
 
+### Content review state vs commercial availability
+
+Two separate things decide whether a new customer can buy a course:
+
+| | Content review state | Commercial availability |
+|---|---|---|
+| What it is | what the course is: content, who may offer it, its price and reviewed sale status | whether new customers may buy the approved version **right now** |
+| Stored in | the published version's snapshot (`s_course_versions`), read through `access.in_force` | `s_course_sales` (migration `0013_course_sales.sql`), read through `sales.paused` |
+| Changed by | the creator's draft, then SEDENS review (a new version) | the course's own creator, at once, with no review (`POST /sedens/creator/course/sales {id, paused}`, `sales.set_paused`) |
+| Takes effect | when SEDENS approves the version | immediately |
+
+**Pausing new sales** (the studio's "New sales" box on the access tab, shown as "Sales paused" / "판매 일시 중지"):
+
+- needs a published course whose approved price is paid and on sale (`not_for_sale` otherwise), that is not suspended (`course_suspended`) or archived;
+- changes nothing reviewed: not the snapshot, the published version, the content revision, enrollments, entitlements or facility settings;
+- stops new purchases at once: the course page and catalog show "Sales paused", `enroll_option` answers `sales_paused`, and a purchase is refused with 409 `sales_paused`;
+- keeps everyone who already has the course: a bought course still plays in the room and shows its progress; a facility's free or included offer works as before (it is the facility's offer, not a sale);
+- applies to the published version and approved price it was made on. When SEDENS approves a newer version, that version's reviewed sale status applies and the creator can pause again.
+
+**Resuming** needs the course still published, not suspended, and the same approved version and price as when it was paused (`not_paused` otherwise). Only the course's creator pauses or resumes (404 for anyone else). **SEDENS suspension** still takes the whole course down at once, whatever its sales state, and a reinstated course keeps the creator's pause. Every pause and resume is in the audit log. Tests: `tests/test_sedens_sales.py`; over HTTP, `tests/test_sedens_course_http.py::test_investor_journey` step 9.
+
 ## 7. Payments: simulated only
 
 `pilates/sedens/payments.py`:
@@ -154,4 +175,3 @@ All under `/sedens/`, JSON unless noted, POSTs guarded by the `X-Sedens-Request`
 | Home playback of guided training | off (`access.HOME_PLAYBACK = False`) |
 | Quizzes and anatomy tasks as interactive lessons | stored as lesson kinds with free-form `detail`; no player |
 | Un-archiving a course | no route |
-| Stopping sales at once on a published course | the sale state is part of the approved settings; archive the course to stop at once |

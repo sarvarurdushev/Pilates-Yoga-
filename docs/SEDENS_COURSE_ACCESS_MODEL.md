@@ -30,7 +30,7 @@ A creator chooses three things separately. None of them implies another.
 - `price_type` is `free` (amount 0) or `paid` (a positive amount); a database CHECK keeps the two consistent. A new course starts free and `not_for_sale`.
 - A **free term** (`s_course_facility_terms.free = 1`) makes the course free at that facility whatever its price, for any distribution. Example 4 below is a paid marketplace course that is free at one partner facility.
 - A `selected_facilities` term with `free = 0` offers the course there at its normal price.
-- `access.is_free` is true for a `free` price (or no price row); `access.on_sale` is true only for a `paid` price whose sale state is `active`.
+- `access.is_free` is true for a `free` price (or no price row); `access.on_sale` is true only for a `paid` price whose sale state is `active` and whose new sales the creator has not paused (`docs/SEDENS_MARKETPLACE_MODEL.md` §6, "Content review state vs commercial availability").
 
 ### Visibility
 
@@ -131,6 +131,7 @@ An enrolled customer keeps seeing the course and their progress after the facili
 | 5 | a customer of a facility that enabled the course, free there, at their location | yes, `facility`, `facility_included` when included, else `facility_free` |
 | 6 | marketplace distribution and free | yes, `free`, `marketplace_free` |
 | 7 | paid and on sale | no, `purchase_required` |
+| 7a | paid and on sale, but its creator paused new sales (`sales.paused`, an operational control outside review) | no, `sales_paused` |
 | 8 | anything else | no, `not_available` |
 
 `POST /sedens/courses/enroll` turns these into 402 (`purchase_required`), 409 (`already_enrolled`), 403 (`customers_only`) or 404.
@@ -238,7 +239,6 @@ Rules around the examples:
 
 These are true of the code today and are not covered by tests unless named.
 
-- **A creator cannot stop selling at once.** Because the sale state is part of the approved settings, pausing a paid course reaches customers with the next approved version. A creator who must stop at once archives the course (it leaves every catalog and room; enrollments stay).
 - **Home playback** is not built (`HOME_PLAYBACK = False`, section 7).
 - **The guided room player is Phase 3.** Phase 2 provides the room's course list (`GET /sedens/room/courses`), one session's steps (`POST /sedens/room/course/session`) and completion (`POST /sedens/room/course/complete`). Step-by-step playback with the anatomy timeline is not built.
 - **Payments are simulated.** Only `DemoPaymentProvider` exists, and only in demonstrations (`docs/SEDENS_MARKETPLACE_MODEL.md`).

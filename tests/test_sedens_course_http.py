@@ -194,6 +194,16 @@ def test_investor_journey(web):
     assert status == 206 and len(data) == 10 and headers["X-Content-Type-Options"] == "nosniff"
     assert "sandbox" in headers["Content-Security-Policy"] and headers["Content-Type"] == "image/png"
 
+    # 9. The professor pauses new sales at once, with no review; the buyer keeps the course.
+    paused = ok(professor.call("POST", "/sedens/creator/course/sales", {"id": paid_id, "paused": True}))
+    assert paused["paused"] and paused["can_resume"]
+    assert ok(phone.call("GET", f"/sedens/courses/detail?id={paid_id}"))["card"]["sales_paused"]
+    rooms_courses = {c["title"]: c for c in ok(screen.call("GET", "/sedens/room/courses"))["items"]}
+    assert rooms_courses["Hip Mobility Lab"]["playable"]
+    status, body = admin.call("POST", "/sedens/creator/course/sales", {"id": paid_id, "paused": False})
+    assert status == 404  # only the course's creator decides
+    assert not ok(professor.call("POST", "/sedens/creator/course/sales", {"id": paid_id, "paused": False}))["paused"]
+
 
 def test_course_routes_need_sign_in_and_the_csrf_header(web):
     _, base = web

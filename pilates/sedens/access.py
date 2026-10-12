@@ -42,7 +42,7 @@ courses of the same demonstration key.
 
 from __future__ import annotations
 
-from . import capabilities
+from . import capabilities, sales
 from .util import Denied, decode, environment
 
 HOME_PLAYBACK = False  # B2C home playback is designed for, and off.
@@ -82,8 +82,10 @@ def is_free(db, course) -> bool:
 
 
 def on_sale(db, course) -> bool:
+    """A purchase can start now: the approved price is on sale and its creator has
+    not paused new sales (``sales``, an operational control outside review)."""
     price = in_force(db, course)["price"]
-    return price["price_type"] == "paid" and price["sale_state"] == "active"
+    return price["price_type"] == "paid" and price["sale_state"] == "active" and not sales.paused(db, course)
 
 
 def _creator_home(db, course):
@@ -270,6 +272,8 @@ def enroll_option(sedens, db, actor, course) -> dict:
         return {"ok": True, "reason": "free", "source": "marketplace_free"}
     if on_sale(db, course):
         return {"ok": False, "reason": "purchase_required"}
+    if sales.paused(db, course):
+        return {"ok": False, "reason": "sales_paused"}
     return {"ok": False, "reason": "not_available"}
 
 
@@ -397,4 +401,5 @@ def course_card(sedens, db, actor, course, *, facility_id=None) -> dict:
         "enabled_here": here is not None, "featured_here": bool(here and here["featured"]),
         "enrolled": enrolled is not None, "purchased": any(e["source"] == "demo_purchase" for e in held),
         "distribution": in_force(db, course)["distribution"],
+        "sales_paused": sales.paused(db, course),
     }

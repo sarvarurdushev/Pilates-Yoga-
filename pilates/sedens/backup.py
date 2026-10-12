@@ -114,6 +114,8 @@ POLICIES: dict[str, Policy] = {
     "s_enrollments": Policy(True, "this organization's customers' enrollments", json=()),
     "s_course_progress": Policy(True, "completed sessions and lessons",
                                 scope="enrollment_id IN (SELECT id FROM s_enrollments WHERE org_id=?)", json=()),
+    "s_course_sales": Policy(True, "creators' pauses of new sales (applies only while the paused version is published)",
+                             scope=f"course_id IN ({_COURSES})", json=()),
     "s_demo_layers": Policy(False, "which demonstration content this server seeded"),
     "s_schema": Policy(False, "this server's migration ledger"),
     "s_affiliation_ledger": Policy(False, "this server's record of affiliation decisions, which restores are checked against"),
@@ -125,7 +127,7 @@ INCLUDED = frozenset(t for t, p in POLICIES.items() if p.include)
 ATTRIBUTION = {
     "granted_by", "revoked_by", "verified_by", "requested_by", "decided_by",
     "created_by", "updated_by", "confirmed_by", "uploaded_by", "attested_by",
-    "reviewed_by", "reviewer_id", "submitted_by",
+    "reviewed_by", "reviewer_id", "submitted_by", "paused_by",
 }
 MEDIA_PREFIX = "sedens-media/"
 RESTORED_VERSION = "Restored from a backup: this version was published. Confirm it to publish it again."

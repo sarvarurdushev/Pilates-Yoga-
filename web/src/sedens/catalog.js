@@ -86,6 +86,7 @@ function badges(card) {
     card.featured_here ? `<span class="sd-badge ok">${esc(t("catalog.featured"))}</span>` : "",
     card.enrolled ? `<span class="sd-badge ok">${esc(t("catalog.enrolled"))}</span>` : "",
     card.purchased ? `<span class="sd-badge warn">${esc(t("catalog.purchased"))}</span>` : "",
+    card.sales_paused && !card.purchased && !card.enrolled ? `<span class="sd-badge">${esc(t("catalog.sales_paused"))}</span>` : "",
   ].join(" ");
 }
 
@@ -241,7 +242,7 @@ function actionPanel(ctx, detail) {
   } else if (option.reason === "purchase_required") {
     body = ctx.notice(t("catalog.purchase_unavailable"));
   } else {
-    body = ctx.notice(t({ customers_only: "catalog.reason_customers_only", already_enrolled: "catalog.reason_already_enrolled" }[option.reason] || "catalog.reason_not_available"));
+    body = ctx.notice(t({ customers_only: "catalog.reason_customers_only", already_enrolled: "catalog.reason_already_enrolled", sales_paused: "catalog.reason_sales_paused" }[option.reason] || "catalog.reason_not_available"));
   }
   return `<section class="sd-panel">${price}${body}</section>`;
 }

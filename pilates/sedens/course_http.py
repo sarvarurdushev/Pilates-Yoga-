@@ -15,7 +15,7 @@ import shutil
 from urllib.parse import unquote
 
 from . import (access, atlas, capabilities, course_export, course_media, course_review, courses, creators,
-               marketplace, media_store, payments, standard, video_providers)
+               marketplace, media_store, payments, sales, standard, video_providers)
 from ..platform.repository import Refused
 from .util import Denied
 
@@ -350,6 +350,7 @@ ROUTES = {
     ("POST", "creator/course/move"): _edit(courses.move),
     ("POST", "creator/course/remove"): _edit(courses.remove),
     ("POST", "creator/course/submit"): _edit(courses.submit, batch=True),
+    ("POST", "creator/course/sales"): _edit(sales.set_paused, batch=True),
     ("POST", "creator/course/archive"): _edit(courses.archive),
     # SEDENS review
     ("GET", "review/courses"): _review_queue,

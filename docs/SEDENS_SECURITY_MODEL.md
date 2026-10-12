@@ -172,7 +172,7 @@ Each was attempted in `tests/test_sedens_phase2_security.py`; the HTTP and brows
 
 ### Known limitations (Phase 2)
 
-- A creator cannot pause sales at once on a published course: the sale state is part of the approved settings. Archiving stops it at once.
+- Pausing new sales is immediate and outside review (`s_course_sales`, Phase 2.5); it only ever closes sales, and resuming needs the same approved version and price.
 - PDF active-content detection reads uncompressed markers only; every PDF is therefore served as a sandboxed download, never inline.
 - Videos are checked by their container header only, not decoded.
 - Upload and import limits, like every rate limit, are per process and in memory.

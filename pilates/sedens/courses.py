@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import hashlib
 
-from . import atlas, capabilities, creators, standard, wording
+from . import atlas, capabilities, creators, sales, standard, wording
 from .util import Denied, decode, encode, now, text, uid
 
 TYPES = ("guided_training", "professional_education")
@@ -802,6 +802,7 @@ def editor_view(sedens, db, actor, course_id) -> dict:
         "versions": versions(db, course_id),
         "reviews": reviews(db, course_id),
         "readiness": readiness(sedens, db, course),
+        "sales": sales.describe(db, course),
         "wording_notes": wording.findings(course["title"], course["description"], course["outcomes"])
         if course["course_type"] == "professional_education" else [],
     }
