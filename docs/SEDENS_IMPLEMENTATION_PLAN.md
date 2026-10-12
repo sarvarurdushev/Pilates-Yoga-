@@ -1,6 +1,6 @@
 # SEDENS AI Private Room — implementation plan (V1)
 
-Status: **Phase 0 approved; Phase 1 implemented** (see §19). Written after [the repository audit](SEDENS_REPO_AUDIT.md). Phase 2 has not started and waits for approval.
+Status: **Phases 0, 1 and 1.5 approved; Phase 2 implemented** (see §20). Written after [the repository audit](SEDENS_REPO_AUDIT.md). Phase 3 (readiness, scan, recommendation, workout player) has not started and waits for approval.
 Branch: `claude/sedens-ai-private-room-v1` (from `23dc14d`). Never merged into, force-pushed over, or deployed from the original branch.
 
 Labels used throughout: **REAL** (works with real data), **DEMO** (fictional data/content, labelled on screen), **SIMULATED** (a stand-in for a future integration, e.g. CRM, payment, room device), **EXPERIMENTAL** (implemented but not validated), **FUTURE** (designed, not built).
@@ -53,7 +53,7 @@ Course visibility is resolved by one function (`courses.visible_to(actor, room_c
 
 A new runner `pilates/sedens/migrations.py` applies numbered SQL files from `pilates/sedens/migrations/` inside one transaction each and records them in `s_schema(version, name, checksum, applied_at)`; an applied file whose text changes is refused. It is called from the `Sedens` constructor, after the platform `Repository` has created `p_*`. Every file is `CREATE TABLE IF NOT EXISTS`/`CREATE INDEX IF NOT EXISTS` only. Backup/restore (`platform/backup.py`) gaining the new org-scoped tables is still open (§19 limitations).
 
-**Numbering as built.** Phase 1 shipped the foundation as six files, `0001_tenancy_capabilities` … `0006_room_activity` (listed in §19). The room-journey, marketplace and governance tables below are therefore renumbered from `0008` (after Phase 1.5's `0007_backup_lineage`) when their phases start; their content is unchanged by this note. The table sketches that follow are the original proposal; where Phase 1 built a table, §19 and the SQL files are authoritative.
+**Numbering as built.** Phase 1 shipped the foundation as six files, `0001_tenancy_capabilities` … `0006_room_activity` (listed in §19). Phase 1.5 added `0007_backup_lineage` and `0008_affiliation_endings`; Phase 2 built the marketplace and governance tables as `0009`–`0012` (§20), with guided sessions as normalized steps rather than the `s_course_items` sketch below. The room-journey tables will be numbered from `0013` when Phase 3 starts. The table sketches that follow are the original proposal; where a phase built a table, §19, §20 and the SQL files are authoritative.
 
 ### 0001_foundation.sql — tenancy, rooms, consent, analytics
 
@@ -279,11 +279,11 @@ Coach: Creator Studio → new course → title → session → exercise → uplo
 
 ## 19a. Phase 1.5 status (backup and restore)
 
-Organization archives now carry every `s_*` table under an explicit policy (`pilates/sedens/backup.py`), with live credentials excluded and decisions made outside the organization re-checked against this server (affiliation ledger, migration `0007_backup_lineage`). Details: [SEDENS_BACKUP_RESTORE.md](SEDENS_BACKUP_RESTORE.md). Phase 2 migrations start at `0008`.
+Organization archives now carry every `s_*` table under an explicit policy (`pilates/sedens/backup.py`), with live credentials excluded and decisions made outside the organization re-checked against this server (affiliation ledger, migrations `0007_backup_lineage` and `0008_affiliation_endings`). Details: [SEDENS_BACKUP_RESTORE.md](SEDENS_BACKUP_RESTORE.md). Phase 2 extended the same policies to courses, files, entitlements and progress.
 
 ## 19. Phase 1 status (foundation, room access, rebrand)
 
-Implemented on `claude/sedens-ai-private-room-v1` and stopped here; Phase 2 waits for approval.
+Implemented on `claude/sedens-ai-private-room-v1` and approved; Phase 2 followed (§20).
 
 **Migrations** (`pilates/sedens/migrations/`, additive, FKs cascade or null):
 
@@ -313,3 +313,32 @@ The runner's own ledger is `s_schema`. No `p_*` table was altered or rebuilt. `0
 **Posture score:** no SEDENS page shows a posture score; the legacy workspace's engineering "Image alignment index" is unchanged (it is not part of any SEDENS customer view). Observation-based customer feedback is Phase 3/5 work.
 
 **Known limitations:** see [SEDENS_SECURITY_MODEL.md §8](SEDENS_SECURITY_MODEL.md) and [SEDENS_DEPLOYMENT_MODES.md](SEDENS_DEPLOYMENT_MODES.md). In short: rate limits are in-memory; QR is typed or keyboard-wedge input; readiness, scan and workout steps are placeholders on the room screen; no cross-organization identity for coaches who coach members in two facilities.
+
+## 20. Phase 2 status (Creator Studio and course marketplace foundation)
+
+Implemented on `claude/sedens-ai-private-room-v1` and stopped here; Phase 3 waits for approval. Report: [SEDENS_PHASE_2_REPORT.md](SEDENS_PHASE_2_REPORT.md).
+
+**Migrations** (additive; no `p_*` table altered):
+
+| File | Tables |
+|---|---|
+| `0009_course_media.sql` | `s_media_objects`, `s_media_rights`, `s_verification_evidence` |
+| `0010_courses.sql` | `s_courses`, `s_course_prices`, `s_course_facility_terms`, `s_course_modules`, `s_course_sessions`, `s_course_steps`, `s_course_step_anatomy`, `s_course_step_timeline`, `s_course_lessons` |
+| `0011_course_versions.sql` | `s_course_versions` (immutable by trigger), `s_course_version_media`, `s_course_reviews` |
+| `0012_marketplace.sql` | `s_facility_course_settings`, `s_purchases`, `s_entitlements`, `s_enrollments`, `s_course_progress`, `s_demo_layers` |
+
+**Modules:** `courses` (authoring, readiness, snapshots), `access` (the six questions and media access), `course_review`, `course_media`, `media_store`, `payments` (`DemoPaymentProvider`), `marketplace` (catalog, enrollment, room course list, progress, facility settings), `course_export`, `wording`, `standard` (SEDENS Standard v0), `atlas` (anatomy registry), `video_providers`, `demo_marketplace`, `course_http` (routes).
+
+**Pages:** Creator Studio (`#/creator`, `#/creator/courses/new`, `#/creator/courses/:course`, `#/creator/courses/:course/sessions/:session`, `#/creator/media`), SEDENS review (`#/review`, `#/review/courses/:course/:version`), customer catalog (`#/courses`, `#/courses/:course`, `#/my`), facility courses (`#/facility/courses`), and the room screen's course list and session outline.
+
+**Docs:** [SEDENS_MARKETPLACE_MODEL.md](SEDENS_MARKETPLACE_MODEL.md), [SEDENS_COURSE_ACCESS_MODEL.md](SEDENS_COURSE_ACCESS_MODEL.md), [SEDENS_MEDIA_RIGHTS.md](SEDENS_MEDIA_RIGHTS.md), [SEDENS_CONTENT_GOVERNANCE.md](SEDENS_CONTENT_GOVERNANCE.md), [SEDENS_FREE_DEPLOYMENT.md](SEDENS_FREE_DEPLOYMENT.md), [SEDENS_FUTURE_INTEGRATIONS.md](SEDENS_FUTURE_INTEGRATIONS.md), and the Phase 2 section of [SEDENS_SECURITY_MODEL.md](SEDENS_SECURITY_MODEL.md).
+
+**Differences from the original plan:**
+
+- Guided sessions are normalized steps (`s_course_steps` with anatomy and timeline tables), not a `detail` JSON on generic course items, as the Phase 2 brief required. Professional lessons keep a flexible `detail`.
+- The access settings and price are part of each reviewed version: customers follow the published version's settings, and a creator's later change waits for the next approval.
+- A version is approved only after every file's rights were accepted.
+- The Creator Studio is a new set of pages rather than a reuse of the coaching workspace's program builder: the builder's data model (programs for one client, `p_*` tables) does not fit versioned, reviewed, multi-facility courses. It reuses the exercise catalog read-only and the anatomy viewer (`/anatomy.html`, embedded for previews).
+- `SEDENS_FREE_DEPLOYMENT.md` and `SEDENS_FUTURE_INTEGRATIONS.md`, planned for phases 7 and 8, were written now because the brief asked for them; they describe the state after Phase 2.
+- Not built from §17: a creator's preview of a course **in a simulated room**. It needs the Phase 3 player; the session editor previews anatomy and the review page shows the exact snapshot.
+
