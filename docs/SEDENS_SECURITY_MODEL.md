@@ -1,4 +1,4 @@
-# SEDENS security model (Phase 1)
+# SEDENS security model (Phases 1–2)
 
 Scope: what is enforced on the server in Phase 1, how, and what is not built yet. Everything here is checked in `pilates/sedens/*` and tested in `tests/test_sedens_*.py`. The page never decides access; it only shows what the server returned.
 
@@ -97,7 +97,7 @@ Room access codes are never cookies: they are typed by the customer and stored o
 
 All are `HttpOnly; SameSite=Strict`, plus `Secure` over HTTPS. Tokens are 32 random bytes (`secrets.token_urlsafe`); only SHA-256 hashes are stored. Expired or ended room sessions clear the `sedens_room` cookie in the response.
 
-Every `/sedens/` POST requires `X-Sedens-Request: 1` and, when the browser sends `Origin`, an origin matching `Host` (the same rule as `/platform/`). In-memory rate limits per visitor address: pairing start 10/min, room entry 20/min, room codes 10/min, demo 10/min, creator registration 5/min, pairing confirmation 20/min, affiliation requests and withdrawals 10/min. Behind a recognised hosting proxy (Render, Hugging Face Spaces) the visitor address is the right-most `X-Forwarded-For` hop (appended by the proxy), so one visitor cannot exhaust a limit for everyone; elsewhere the socket address is used and the header is ignored. Empty buckets are pruned. Error responses carry a stable `code` and never echo credentials.
+Every `/sedens/` POST requires `X-Sedens-Request: 1` and, when the browser sends `Origin`, an origin matching `Host` (the same rule as `/platform/`). In-memory rate limits per visitor address: pairing start 10/min, room entry 20/min, room codes 10/min, demo 10/min, creator registration 5/min, pairing confirmation 20/min, affiliation requests and withdrawals 10/min, course file uploads and course imports 12/min (Phase 2; at most two received at once on the whole server). Behind a recognised hosting proxy (Render, Hugging Face Spaces) the visitor address is the right-most `X-Forwarded-For` hop (appended by the proxy), so one visitor cannot exhaust a limit for everyone; elsewhere the socket address is used and the header is ignored. Empty buckets are pruned. Error responses carry a stable `code` and never echo credentials.
 
 ## 6. Consent and analytics
 
@@ -124,3 +124,57 @@ Every `s_*` foreign key cascades or nulls (never RESTRICT), and every `SET NULL`
 - Booking rules (`require_booking`, early-entry grace) apply only to a provider that can see bookings (`checks_bookings`: today the demonstration CRM). A facility without a CRM cannot switch them on (`booking_rules_need_crm`); its customers assigned to a location may enter that location's rooms at any time. Using the platform's own reservations as a booking source would be a future adapter.
 - The Phase 1 room library is the platform's existing exercise catalog, which the coaching workspace and its public demonstration already show. The room gate protects SEDENS room routes, not the catalog text.
 - A fully seeded demonstration organization cannot be deleted as a whole because of pre-existing platform `ON DELETE RESTRICT` program links. This predates SEDENS and is unchanged.
+
+## 9. Phase 2: courses, files and the marketplace
+
+The full rules are in [SEDENS_COURSE_ACCESS_MODEL.md](SEDENS_COURSE_ACCESS_MODEL.md) (who may see, enroll, play, download, edit, review), [SEDENS_MEDIA_RIGHTS.md](SEDENS_MEDIA_RIGHTS.md) (files) and [SEDENS_CONTENT_GOVERNANCE.md](SEDENS_CONTENT_GOVERNANCE.md) (review). The security-relevant points:
+
+- **One access module.** Every course decision is a function of `pilates/sedens/access.py`; routes and pages never infer access from a list. Refusals that would reveal a course or file answer 404.
+- **Course files have their own layer.** They are stored outside `p_media` and outside `web/`, served only by `GET /sedens/media/file` after `access.media_access`, with `nosniff`, a sandboxing CSP, `Cache-Control: private, no-store` and PDFs as downloads. Platform media routes cannot reach them. Uploads are authorized and their rights validated before the body is read, then checked by their bytes (images re-encoded without metadata, PDFs with active content refused).
+- **Content distribution is not data access** (section 3): an affiliation lets a creator offer courses to a facility; it never opens the facility's customers.
+- **Creators own their content.** Only the course's own creator edits it, uses its files or exports it; never a colleague, a facility administrator or SEDENS staff.
+- **What customers get is what SEDENS approved.** Customers read published snapshots, which a trigger keeps immutable; the access settings and price in force are those of the published version (`access.in_force`); a version is approved only when every file's rights were accepted by a reviewer who is not the file's owner.
+- **Guided training plays only in an authorized room**, even when owned (`HOME_PLAYBACK = False`).
+- **No real money.** Purchases are simulated and only in demonstrations; no card data exists.
+- **Demonstrations are isolated** per visitor key (`util.environment`); a real reviewer never reviews demonstration content and the reverse.
+
+### The twelve attacks of the Phase 2 brief
+
+Each was attempted in `tests/test_sedens_phase2_security.py`; the HTTP and browser journeys repeat the main ones (`tests/test_sedens_course_http.py`, `web/test/sedens-courses.browser.mjs`).
+
+| # | Attack | Result | Test |
+|---|---|---|---|
+| 1 | A creator reads a facility's members through an affiliation | refused: affiliation grants distribution only | `test_1_affiliation_never_opens_the_facilitys_members` |
+| 2 | A creator edits another creator's course | 404 on every edit route | `test_2_a_creator_never_edits_another_creators_course` |
+| 3 | A facility enables a course not offered to it | 404 `not_offered`; a coach of the facility gets 403 | `test_3_a_facility_cannot_enable_what_is_not_offered_to_it` |
+| 4 | A customer gets a paid entitlement without a purchase | no route grants one; an entitlement without a completed simulated purchase does not count | `test_4_no_paid_entitlement_without_a_purchase` |
+| 5 | A customer reads course media of another organization | 404 outside a room that may play it; course files never in `p_media` | `test_5_course_media_never_crosses_organizations` |
+| 6 | An unpublished course leaks through search or the catalog | drafts, submitted and suspended versions appear nowhere | `test_6_unpublished_courses_never_leak` |
+| 7 | An old published version changes after the creator edits | snapshot immutable; enrolled customers keep theirs | `test_7_a_published_version_never_changes` |
+| 8 | An unverified creator appears verified | only `verified` sets the flag; titles are self-declared | `test_8_an_unverified_creator_never_appears_verified` |
+| 9 | A file upload bypasses the rights attestation | refused before the body is read | `test_9_no_file_enters_a_course_without_rights` |
+| 10 | A demo payment is presented as real money | `real_money` false, DEMO notice, demonstrations only | `test_10_a_demo_payment_is_never_real_money` |
+| 11 | A creator exports unrelated media | only the course's own files; a colleague's file cannot even be attached | `test_11_an_export_carries_only_the_course_s_own_files` |
+| 12 | A facility administrator changes creator-owned content | refused, even after granting themselves creator tools | `test_12_a_facility_admin_never_changes_a_creators_content` |
+
+### Issues found and fixed during Phase 2
+
+| Issue | Fix | Test |
+|---|---|---|
+| A colleague in the same organization could attach and read another creator's files | files belong to their creator profile, not only to the organization (`courses._own_media`, `access.media_access`) | `test_11_…`, `test_media_with_rights_is_kept_and_served_only_to_those_allowed` |
+| A course version could be approved while its files' rights were unreviewed, and those files then reached customers | approval refused with `rights_not_reviewed` | `test_a_version_is_approved_only_after_every_file_has_accepted_rights` |
+| A creator could widen who sees a published course, or change its price, without review | customers follow the approved version's settings (`access.in_force`) | `test_access_and_price_changes_wait_for_the_next_approved_version` |
+| A reviewer could approve the rights of their own file | refused with `self_review` | `test_a_reviewer_never_decides_the_rights_of_their_own_file` |
+| A course import accepted 400 MB on the free host outside the upload slots | capped by mode (60 MB on the free host), sent and unpacked, and takes an upload slot | `test_course_imports_follow_the_deployment_mode_and_share_the_upload_slots` |
+| A customer enrolled in an older version lost its files in the room | the room's customer's enrolled version counts | `test_a_customer_on_an_older_version_still_sees_its_pictures_in_the_room` |
+| Reviewers could not open verification evidence, and the verification queue did not show it | evidence files readable by reviewers of the same environment; evidence listed in the queue | `test_reviewers_can_open_verification_evidence`, `test_reviewer_verifies_over_http` |
+| A verified profile edited after review fell to Unverified, leaving the review queue | it returns to Verification requested with the new content | `test_sedens_reviewer_verifies` |
+
+### Known limitations (Phase 2)
+
+- A creator cannot pause sales at once on a published course: the sale state is part of the approved settings. Archiving stops it at once.
+- PDF active-content detection reads uncompressed markers only; every PDF is therefore served as a sandboxed download, never inline.
+- Videos are checked by their container header only, not decoded.
+- Upload and import limits, like every rate limit, are per process and in memory.
+- No refunds, entitlement revocation or enrollment migration routes exist yet.
+

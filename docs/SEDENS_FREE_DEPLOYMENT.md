@@ -1,0 +1,90 @@
+# SEDENS on free hosting
+
+Scope: how this branch behaves on a free host (the `demo_free` mode), what Phase 2 adds to that, what an operator must know before deploying it, and what is deliberately not done. Mode selection itself is in `docs/SEDENS_DEPLOYMENT_MODES.md`.
+
+**Nothing has been deployed by this work.** The existing Render service (`srv-daf50ov40ujc739kfh4g`, branch `claude/multi-person-pilates-analysis-w28tt0`) is untouched and keeps serving the original branch. Deploying this branch is an owner decision; the plan is a **second** free Render service pointed at `claude/sedens-ai-private-room-v1`, never switching the existing one.
+
+## 1. What the free host is
+
+| | Render free |
+|---|---|
+| CPU and memory | 0.1 CPU, 512 MB |
+| Disk | none that survives: the filesystem is lost on every restart, redeploy or spin-down (after about fifteen minutes without requests) |
+| Start command | `sh deploy/render-start.sh`: `python -m pilates web --host 0.0.0.0 --db ${STUDIO_DB_PATH:-/tmp/studio.db}` |
+| Mode | `demo_free`, chosen automatically because Render sets `RENDER=true` (or forced with `SEDENS_MODE=demo_free`) |
+
+`demo_free` never reports storage as persistent. Every SEDENS page shows "Demonstration storage: records and uploads can be erased whenever this server restarts."
+
+## 2. No credentials, no paid services
+
+The branch runs with **no secrets and no API keys**:
+
+- No payment provider: purchases are simulated (`DemoPaymentProvider`) and only in demonstration organizations; elsewhere they answer `payments_unavailable`. No card data exists anywhere.
+- No video generation: `HiggsfieldVideoProvider` is disabled, reads no key, and refuses with `provider_disabled`.
+- No stock downloads: the stock sources have `auto_download: false` and the import manifest is empty.
+- No CRM vendor: the `demo` CRM adapter is simulated and refused for real facilities.
+- No object storage, database service, analytics or e-mail service: one Python process, SQLite and the local filesystem.
+
+The test suites and the app need none of these either.
+
+## 3. What Phase 2 stores, and where
+
+Everything lives next to the database file, so on the free host everything is in `/tmp` and disappears together:
+
+| What | Where |
+|---|---|
+| Courses, versions, reviews, facility settings, purchases (simulated), entitlements, enrollments, progress | the SQLite database (`s_*` tables, migrations 0009–0012) |
+| Uploaded course files | `<database>.sedens-media/objects/<org>/…`, folders `0700`, files `0600`, never under `web/` |
+| Files being received | `<database>.sedens-media/incoming/` (removed on failure) |
+| Course imports being received | a temporary file, removed after the import |
+
+## 4. Limits on the free host
+
+The free host keeps every upload small, and the limits are enforced on the server from the request's declared length before the body is read:
+
+| | `demo_free` | `local_room` (room computer) |
+|---|---|---|
+| Video (MP4, WebM) | 25 MB | 300 MB |
+| Picture (JPEG, PNG, WebP; at most 16 megapixels, re-encoded) | 8 MB | 12 MB |
+| PDF | 10 MB | 25 MB |
+| Course import (as sent and as unpacked) | 60 MB | 400 MB |
+
+Shared by both modes: at most two uploads or imports received at once (`uploads_busy`, 429); at most 12 uploads or imports per minute per address, 10 demonstration entries per minute per address (`rate_limited`, 429). Files are streamed to disk in 64 KB blocks, never held whole in memory. Videos are not transcoded (that would not fit in 0.1 CPU).
+
+## 5. Demonstrations on the free host
+
+Each visitor who opens a demonstration gets their own isolated set of organizations (`demo-<key>`): the facility "SEDENS Demo Fitness Center" with its customers, coaches and simulated room screen, the coaching workspace's sample data, and the Phase 2 marketplace (three courses, a fictional coach, a fictional professor, a fictional reviewer; `docs/SEDENS_MARKETPLACE_MODEL.md` §11). Nothing one visitor does is visible to another.
+
+Measured on a development machine (`SEDENS_MODE=demo_free`, a fresh database): entering a new demonstration takes about **5–6 seconds** and adds about **76 MB** to the database. Almost all of that is the coaching workspace's sample analyses (`p_coordinates`, `p_analyses`, `p_movement_analyses`, `p_video_analyses`), which predate SEDENS; all SEDENS tables together, the Phase 2 marketplace included, add about 240 rows and no files (the one picture is a repository illustration read from the repository). On 0.1 CPU the first entry will be slower than measured here; the SEDENS home shows "Preparing the demonstration. The first opening can take a minute." meanwhile and reconnects if the host answers with a gateway error while waking up (`web/test/platform-demo-auth.browser.mjs`).
+
+Nothing removes old demonstrations while the server runs; a restart removes all of them. On a host that stays up for a long time with many visitors, the database grows by roughly 76 MB per visitor.
+
+## 6. Keeping work on a host that forgets
+
+A creator or facility using the free host must assume everything can vanish:
+
+- **Course export** (`#/creator/courses/:course`, Export, import, archive): one course as a ZIP with its files, versions, anatomy, access and price, and a checksummed manifest. Importing it later creates a new draft that SEDENS reviews again. Details: `docs/SEDENS_MARKETPLACE_MODEL.md` §10.
+- **Organization backup** (`docs/SEDENS_BACKUP_RESTORE.md`): the whole organization, SEDENS records and course files included. A restore returns published courses, file rights and creator verification to SEDENS review, and never brings back simulated purchases into another organization.
+
+For durable records, run on a machine with a persistent disk (`local_room` with the database outside `/tmp`), or a paid host with a mounted disk and `STUDIO_DB_PATH` on it (`render.yaml` explains the options). `cloud_production` refuses to start until durable storage, secrets and monitoring exist.
+
+## 7. Before deploying this branch on a second free service
+
+An owner who decides to deploy should know:
+
+1. Create a **new** free web service from this branch with the same start command; do not change the existing service or its branch.
+2. No environment variables are required. `SEDENS_MODE` may be left unset (Render sets `RENDER=true`).
+3. Everything resets on each restart: demonstrations, creator courses, uploads. Say so to anyone invited to try it.
+4. Only demonstrations can buy (simulated). A real facility or creator account on the free host can build and review courses but cannot sell them.
+5. The guided room player is not built yet (Phase 3): the room screen lists a facility's courses and a session's steps, and can mark a session done.
+
+## 8. What would change with money
+
+None of this is planned without the owner's decision; each needs a paid service or a contract:
+
+| Need | Free today | Would require |
+|---|---|---|
+| Records that survive restarts | `/tmp` SQLite | a persistent disk, or a managed database |
+| Course files that survive restarts | `<database>.sedens-media` on the same disk | a persistent disk, or object storage behind `media_store` |
+| Faster demonstrations and real video analysis | 0.1 CPU | a larger instance, or the facility's own room computer |
+| Real purchases | none | a payment provider contract (`docs/SEDENS_FUTURE_INTEGRATIONS.md`) |

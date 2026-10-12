@@ -47,7 +47,8 @@ The legacy `/capabilities`, `/evidence/capabilities` and `/platform/me` response
 
 - Uses the existing real analysis pipeline (RTMO + optional MediaPipe) and local camera/media exactly as `python -m pilates web` does today.
 - Real room screens pair through the facility console (`docs/SEDENS_SECURITY_MODEL.md`).
-- For durable records, place the database on persistent disk (not `/tmp`). Back up with the existing organization archive; note that SEDENS tables are not yet included in it.
+- For durable records, place the database on persistent disk (not `/tmp`). Back up with the organization archive, which carries the SEDENS records and course files (`docs/SEDENS_BACKUP_RESTORE.md`).
+- Free-host behaviour, limits and what Phase 2 stores: `docs/SEDENS_FREE_DEPLOYMENT.md`.
 
 ## cloud_production
 
