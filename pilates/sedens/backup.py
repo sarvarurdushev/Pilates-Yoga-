@@ -117,6 +117,7 @@ POLICIES: dict[str, Policy] = {
     "s_course_sales": Policy(True, "creators' pauses of new sales (applies only while the paused version is published)",
                              scope=f"course_id IN ({_COURSES})", json=()),
     "s_demo_layers": Policy(False, "which demonstration content this server seeded"),
+    "s_demo_activity": Policy(False, "when this server's demonstrations were created and last used"),
     "s_schema": Policy(False, "this server's migration ledger"),
     "s_affiliation_ledger": Policy(False, "this server's record of affiliation decisions, which restores are checked against"),
     "s_room_device_pairings": Policy(False, "short-lived pairing codes and secrets"),

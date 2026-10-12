@@ -56,16 +56,30 @@ def limit(mode_name: str, kind: str) -> int:
     return LIMITS.get(mode_name, LIMITS["demo_free"])[kind]
 
 
+_RECEIVING = [0]
+_RECEIVING_LOCK = threading.Lock()
+
+
 @contextmanager
 def upload_slot():
     """One of the server's two upload slots, for any large body being received
     (an upload or a course import), or 429 when both are taken."""
     if not _UPLOADS.acquire(blocking=False):
         raise Denied("Another upload is in progress. Try again in a moment.", 429, "uploads_busy")
+    with _RECEIVING_LOCK:
+        _RECEIVING[0] += 1
     try:
         yield
     finally:
+        with _RECEIVING_LOCK:
+            _RECEIVING[0] -= 1
         _UPLOADS.release()
+
+
+def uploads_running() -> bool:
+    """Whether any course upload or import is being received right now."""
+    with _RECEIVING_LOCK:
+        return _RECEIVING[0] > 0
 
 
 def object_path(repo, object_key: str) -> Path:

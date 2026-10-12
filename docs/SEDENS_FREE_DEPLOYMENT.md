@@ -57,7 +57,18 @@ Each visitor who opens a demonstration gets their own isolated set of organizati
 
 Measured on a development machine (`SEDENS_MODE=demo_free`, a fresh database): entering a new demonstration takes about **5–6 seconds** and adds about **76 MB** to the database. Almost all of that is the coaching workspace's sample analyses (`p_coordinates`, `p_analyses`, `p_movement_analyses`, `p_video_analyses`), which predate SEDENS; all SEDENS tables together, the Phase 2 marketplace included, add about 240 rows and no files (the one picture is a repository illustration read from the repository). On 0.1 CPU the first entry will be slower than measured here; the SEDENS home shows "Preparing the demonstration. The first opening can take a minute." meanwhile and reconnects if the host answers with a gateway error while waking up (`web/test/platform-demo-auth.browser.mjs`).
 
-Nothing removes old demonstrations while the server runs; a restart removes all of them. On a host that stays up for a long time with many visitors, the database grows by roughly 76 MB per visitor.
+### Unused demonstrations are removed (Phase 2.5)
+
+`pilates/sedens/demo_cleanup.py` removes demonstrations nobody has used for **`SEDENS_DEMO_TTL_HOURS`** (default **6** in `demo_free`; in `local_room` only when the variable is set; `0` switches it off; values under an hour count as an hour).
+
+- **Creation and last use.** `s_demo_activity` (migration `0014_demo_activity.sql`) records each demonstration key's creation and last use. Every signed-in request of a demonstration account passes through `Repository.actor`, whose optional observer writes the last use at most once every 5 minutes per key. A demonstration with no row yet counts from its organizations' creation time.
+- **What may be removed.** Only organizations flagged `demo` **and** named `demo-<32 hex characters>` (with `-sedens` or `-professor` for the marketplace's two). Both are checked again inside the deleting transaction. A real organization is never considered, even one whose id happens to look like a demonstration's or one flagged by mistake (`tests/test_sedens_demo_cleanup.py::test_real_organizations_are_never_cleaned_even_when_named_or_flagged_like_one`).
+- **What keeps a demonstration.** Use within the time-to-live, an active room session, a queued or running analysis job, or any course upload or import being received. Any refusal by the database (for example a real program pointing at a demonstration exercise) rolls the whole demonstration back and it stays.
+- **What is removed.** The demonstration's three organizations and everything that cascades from them (the two `RESTRICT` program links are removed first), its workspace media files and its course-file folder. The database is left consistent (`PRAGMA foreign_key_check` is empty).
+- **When.** Once at start-up, then at most every 15 minutes, triggered by demonstration use and run once in a short-lived thread; no permanent background thread. At most 3 demonstrations go per sweep, so each sweep stays short.
+- **Logging.** One line per removal with the demonstration key and the approximate organizations, records, files and megabytes reclaimed. Never names or other content.
+
+A restart still removes everything on the free host, since its database lives in `/tmp`.
 
 ## 6. Keeping work on a host that forgets
 

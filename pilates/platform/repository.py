@@ -293,7 +293,16 @@ class Repository:
             ).fetchone()
         if not row:
             raise Refused("Sign in to open your workspace.", 401)
-        return Actor(row["id"], row["org_id"], row["role"], bool(row["demo"]))
+        actor = Actor(row["id"], row["org_id"], row["role"], bool(row["demo"]))
+        hook = getattr(self, "activity_hook", None)
+        if hook is not None and actor.demo:
+            # Optional observer (SEDENS records when a demonstration was last used);
+            # it can never fail the request.
+            try:
+                hook(actor)
+            except Exception:  # noqa: BLE001
+                pass
+        return actor
 
     def logout(self, token):
         with self.db() as db:

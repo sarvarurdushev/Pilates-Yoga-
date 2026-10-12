@@ -18,6 +18,7 @@ The server always knows, and says, which mode it runs in. The mode is chosen onc
 | `SEDENS_DEMO=0` | `local_room` only: switches SEDENS demonstrations and simulated room screens off (demonstration routes return 404, demonstration accounts are refused on every `/sedens/` route and the SEDENS home treats them as signed out). It does not change the coaching workspace, whose own "Explore" demonstration keeps working as before. `demo_free` always keeps them. |
 | `SEDENS_ROOM_SESSION_MINUTES` | Room session length, 15–240, default 120 |
 | `SEDENS_ROOM_IDLE_MINUTES` | A room session with no room request for this long closes, 5–60, default 15 |
+| `SEDENS_DEMO_TTL_HOURS` | Demonstrations unused for this many hours are removed (`docs/SEDENS_FREE_DEPLOYMENT.md` §5). Default 6 in `demo_free`, off in `local_room` unless set, `0` = off, minimum 1 |
 
 The legacy `/capabilities`, `/evidence/capabilities` and `/platform/me` responses are unchanged.
 

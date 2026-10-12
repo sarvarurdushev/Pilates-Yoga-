@@ -22,6 +22,14 @@ class Sedens:
         self.mode = mode or modes.resolve(db_path=repo.path)
         with repo.db() as db:
             self.applied = migrations.migrate(db)
+        # Every signed-in demonstration request marks its demonstration as used
+        # (throttled), so unused ones can be removed (demo_cleanup).
+        repo.activity_hook = self._demonstration_used
+
+    def _demonstration_used(self, actor):
+        from . import demo_cleanup
+
+        demo_cleanup.touch(self, actor.org_id)
 
     @contextmanager
     def db(self):

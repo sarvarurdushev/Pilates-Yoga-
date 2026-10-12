@@ -1067,6 +1067,12 @@ def serve(bundle: dict | None, root: Path = WEB, port: int = 8000,
     Handler.sedens = Sedens(Handler.platform_repository, sedens_mode) if db else None
     print(f"SEDENS mode: {sedens_mode.name} ({sedens_mode.label}); "
           f"persistent storage: {sedens_mode.storage()['persistent']}", flush=True)
+    if Handler.sedens is not None:
+        # Remove demonstrations nobody used for SEDENS_DEMO_TTL_HOURS (a short
+        # one-off thread; later sweeps are triggered by demonstration use).
+        from .sedens import demo_cleanup
+
+        demo_cleanup.maybe_sweep(Handler.sedens)
     if db and Handler.require_auth:
         claim_owner(db)
     server = ThreadingHTTPServer((host, port), handler)
