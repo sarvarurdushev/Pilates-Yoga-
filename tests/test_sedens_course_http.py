@@ -119,9 +119,14 @@ def test_investor_journey(web):
     assert [q["title"] for q in queue["items"]] == ["Morning Mobility"]
     detail = ok(reviewer.call("GET", f"/sedens/review/course?id={cid}&version=1"))
     assert detail["media_rights"] and detail["creator"]["display_name"] == "Minji Lee"
-    ok(reviewer.call("POST", "/sedens/review/course/decide", {
-        "course_id": cid, "version": 1, "decision": "approved", "snapshot_sha256": detail["snapshot_sha256"],
-        "checklist": CHECKLIST}))
+    decision = {"course_id": cid, "version": 1, "decision": "approved", "snapshot_sha256": detail["snapshot_sha256"],
+                "checklist": CHECKLIST}
+    # No file reaches customers before a reviewer accepts its rights.
+    status, body = reviewer.call("POST", "/sedens/review/course/decide", decision)
+    assert (status, body["code"]) == (409, "rights_not_reviewed")
+    for item in detail["media_rights"]:
+        ok(reviewer.call("POST", "/sedens/review/media/decide", {"object_id": item["object_id"], "decision": "approved"}))
+    ok(reviewer.call("POST", "/sedens/review/course/decide", decision))
 
     # 3. The facility enables and includes it.
     admin = demo(base, "admin")

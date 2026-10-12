@@ -102,7 +102,8 @@ def test_creator_studio_courses_and_files_survive_backup_and_restore(world, tmp_
     owner = fresh_org(sedens, "studio")
     result = restore_archive(sedens.repo, owner, path)["sedens"]
     assert result["course_files"] == 3
-    assert result["courses_to_confirm"] == 1 and result["media_rights_to_review"] == 1
+    # The published course waits for SEDENS again, and so do the rights of its cover and step picture.
+    assert result["courses_to_confirm"] == 1 and result["media_rights_to_review"] == 2
     with sedens.db() as db:
         after = {c["title"]: courses.editor_view(sedens, db, owner, c["id"])
                  for c in courses.list_for_creator(sedens, db, owner)}

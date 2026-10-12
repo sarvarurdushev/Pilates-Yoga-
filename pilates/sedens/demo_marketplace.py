@@ -95,6 +95,10 @@ def _publish(sedens, db, creator, reviewer, view, distribution, facilities=(), p
                                                 "note": "Demonstration course."})
     cid = view["course"]["id"]
     found = courses.version(db, cid, 1)
+    for (object_id,) in db.execute("SELECT m.object_id FROM s_course_version_media m JOIN s_course_versions v "
+                                   "ON v.id=m.version_id WHERE v.course_id=? AND v.version=1", (cid,)).fetchall():
+        course_review.decide_media(sedens, db, reviewer, {"object_id": object_id, "decision": "approved",
+                                                          "note": "Demonstration review."})
     course_review.decide(sedens, db, reviewer, {
         "course_id": cid, "version": 1, "decision": "approved", "snapshot_sha256": found["snapshot_sha256"],
         "checklist": PASS, "comment": "Demonstration review: fictional content, approved for the demo only."})

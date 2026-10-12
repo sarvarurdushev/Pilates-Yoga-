@@ -109,6 +109,11 @@ def decide(sedens, db, actor, data) -> dict:
     if data.get("snapshot_sha256") != found["snapshot_sha256"]:
         raise Denied("Review the version you opened.", 409, "version_changed")
     checklist = _checklist(data.get("checklist"), decision)
+    if decision == "approved" and db.execute(
+            "SELECT 1 FROM s_course_version_media m LEFT JOIN s_media_rights r ON r.object_id=m.object_id "
+            "WHERE m.version_id=? AND COALESCE(r.review_status,'') <> 'approved'", (found["id"],)).fetchone():
+        # A file reaches customers only with rights a reviewer accepted.
+        raise Denied("Approve the rights of every file in this version first.", 409, "rights_not_reviewed")
     comment = text(data.get("comment", ""), 4000, "Comment")
     if decision != "approved" and not comment:
         raise Denied("Tell the creator what to change.", 400, "comment_required")

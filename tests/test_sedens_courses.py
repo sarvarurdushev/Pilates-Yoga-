@@ -335,6 +335,37 @@ def test_rejected_rights_block_submission(world):
     assert "media_rights_rejected" in view["readiness"]
 
 
+def test_a_version_is_approved_only_after_every_file_has_accepted_rights(world):
+    """Files reach customers only with rights a reviewer accepted: not unreviewed, not
+    rejected after the creator submitted."""
+    sedens, reviewer, a, coach = world
+    body = png_bytes()
+    media = course_media.upload(sedens, coach, io.BytesIO(body), len(body), "image", "cover.png", RIGHTS)
+    view = build_guided(sedens, coach)
+    with sedens.db() as db:
+        view = courses.update(sedens, db, coach, {"id": view["course"]["id"], "revision": view["revision"],
+                                                  "cover_media_id": media["id"]})
+    view = submit(sedens, coach, set_access(sedens, coach, view, "selected_facilities",
+                                            [{"org_id": a["org_id"], "free": True}]))
+    cid = view["course"]["id"]
+    with sedens.db() as db:
+        detail = course_review.detail(sedens, db, reviewer, cid, 1)
+    decision = {"course_id": cid, "version": 1, "decision": "approved", "snapshot_sha256": detail["snapshot_sha256"],
+                "checklist": PASS_ALL}
+    for state in ("unreviewed", "rejected"):
+        if state == "rejected":
+            call(sedens, course_review.decide_media, reviewer, {"object_id": media["id"], "decision": "rejected",
+                                                                "note": "We cannot confirm permission."})
+        with sedens.batch(), sedens.db() as db, pytest.raises(Denied) as refused:
+            course_review.decide(sedens, db, reviewer, decision)
+        assert (refused.value.status, refused.value.code) == (409, "rights_not_reviewed")
+        with sedens.db() as db:
+            assert courses.row(db, cid)["published_version"] is None
+    call(sedens, course_review.decide_media, reviewer, {"object_id": media["id"], "decision": "approved"})
+    with sedens.batch(), sedens.db() as db:
+        assert course_review.decide(sedens, db, reviewer, decision)["published_version"] == 1
+
+
 # -- follow-ups from the documentation review ---------------------------------------------
 
 

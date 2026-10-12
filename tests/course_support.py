@@ -88,6 +88,10 @@ def approve(sedens, reviewer, course_id, number=None):
             number = db.execute("SELECT MAX(version) FROM s_course_versions WHERE course_id=?", (course_id,)).fetchone()[0]
         detail = course_review.detail(sedens, db, reviewer, course_id, number)
     with sedens.batch(), sedens.db() as db:
+        # The reviewer accepts the rights of each file still waiting, then the version.
+        for item in detail["media_rights"]:
+            if item["review_status"] == "unreviewed":
+                course_review.decide_media(sedens, db, reviewer, {"object_id": item["object_id"], "decision": "approved"})
         return course_review.decide(sedens, db, reviewer, {
             "course_id": course_id, "version": number, "decision": "approved",
             "snapshot_sha256": detail["snapshot_sha256"], "checklist": PASS_ALL})
