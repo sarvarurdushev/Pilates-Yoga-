@@ -24,7 +24,7 @@ import time
 from urllib.parse import parse_qs, urlparse
 
 from . import (analytics, capabilities, consent, course_http, course_media, creators, crm, demo, demo_marketplace,
-               journey, library, onboarding, rooms, scans)
+               journey, library, onboarding, plans, rooms, scans)
 from ..platform import http as platform_http
 from ..platform.repository import Refused
 from .util import Denied, environment
@@ -232,7 +232,7 @@ def _lang(value) -> str:
 def _notice(notice, locale):
     if not notice:
         return None
-    text = None
+    text = plans.notice_text(notice, locale)
     return {**notice, "text": text}
 
 

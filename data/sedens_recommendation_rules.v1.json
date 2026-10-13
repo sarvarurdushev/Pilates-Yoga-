@@ -1,0 +1,425 @@
+{
+  "version": "sedens-recommend-1.0.0",
+  "reviewed_at": "2026-10-13",
+  "status": "provisional",
+  "note": "Deterministic SEDENS Standard session builder. No language model, no randomness: the same inputs and library always give the same plan. Priority (brief section 21): readiness, then the customer's goal, duration, experience, room equipment, recent sessions, scan observations, variety. Durations, rests and transition times are design defaults inside the ranges in docs/SEDENS_FEEDBACK_EVIDENCE.md, to be recalibrated from pilot timings. Explained in docs/RECOMMENDATION_RULES.md.",
+  "goals": {
+    "mobility": {
+      "label": {
+        "en": "Mobility",
+        "ko": "모빌리티"
+      },
+      "description": {
+        "en": "Gentle movement for the spine, hips and shoulders.",
+        "ko": "척추, 엉덩이, 어깨를 부드럽게 움직여요."
+      },
+      "phases": {
+        "warm_up": [
+          "breathing",
+          "mobility"
+        ],
+        "main": [
+          "mobility",
+          "pilates"
+        ],
+        "cool_down": [
+          "mobility",
+          "breathing"
+        ]
+      }
+    },
+    "pilates": {
+      "label": {
+        "en": "Beginner Pilates",
+        "ko": "기초 필라테스"
+      },
+      "description": {
+        "en": "Foundational mat Pilates at a comfortable pace.",
+        "ko": "편안한 속도로 하는 기초 매트 필라테스예요."
+      },
+      "phases": {
+        "warm_up": [
+          "breathing",
+          "mobility"
+        ],
+        "main": [
+          "pilates",
+          "core",
+          "stability",
+          "mobility"
+        ],
+        "cool_down": [
+          "mobility",
+          "breathing"
+        ]
+      }
+    },
+    "core": {
+      "label": {
+        "en": "Core and stability",
+        "ko": "코어와 안정성"
+      },
+      "description": {
+        "en": "Controlled exercises for the trunk and hips.",
+        "ko": "몸통과 엉덩이를 조절하며 움직이는 운동이에요."
+      },
+      "phases": {
+        "warm_up": [
+          "breathing",
+          "mobility"
+        ],
+        "main": [
+          "core",
+          "stability",
+          "pilates",
+          "mobility"
+        ],
+        "cool_down": [
+          "mobility",
+          "breathing"
+        ]
+      }
+    },
+    "general": {
+      "label": {
+        "en": "Mobility and Pilates mix",
+        "ko": "모빌리티와 필라테스"
+      },
+      "description": {
+        "en": "A balanced mix of mobility and mat Pilates.",
+        "ko": "모빌리티와 매트 필라테스를 고르게 섞었어요."
+      },
+      "phases": {
+        "warm_up": [
+          "breathing",
+          "mobility"
+        ],
+        "main": [
+          "mobility",
+          "pilates",
+          "core",
+          "stability"
+        ],
+        "cool_down": [
+          "mobility",
+          "breathing"
+        ]
+      }
+    }
+  },
+  "durations": {
+    "30": {
+      "min_minutes": 27,
+      "max_minutes": 33,
+      "split": {
+        "warm_up": 0.18,
+        "main": 0.7,
+        "cool_down": 0.12
+      }
+    },
+    "60": {
+      "min_minutes": 55,
+      "max_minutes": 65,
+      "split": {
+        "warm_up": 0.17,
+        "main": 0.71,
+        "cool_down": 0.12
+      }
+    }
+  },
+  "intensities": {
+    "light": {
+      "label": {
+        "en": "Light",
+        "ko": "가볍게"
+      },
+      "description": {
+        "en": "Easy and relaxed. Your breathing stays calm and chatting is easy.",
+        "ko": "편안한 강도예요. 호흡이 차분하고 대화가 편해요."
+      },
+      "efforts": [
+        "light"
+      ],
+      "rest_between_sets": 45,
+      "effort_band": [
+        3,
+        4
+      ]
+    },
+    "moderate": {
+      "label": {
+        "en": "Moderate",
+        "ko": "적당히"
+      },
+      "description": {
+        "en": "Steady work. You breathe faster but can still speak in full sentences.",
+        "ko": "꾸준히 힘을 쓰는 강도예요. 숨이 빨라지지만 문장으로 말할 수 있어요."
+      },
+      "efforts": [
+        "light",
+        "moderate"
+      ],
+      "rest_between_sets": 35,
+      "effort_band": [
+        5,
+        6
+      ]
+    }
+  },
+  "intensity_footer": {
+    "en": "You can always slow down or choose an easier option during the session.",
+    "ko": "운동 중에도 언제든 천천히 하거나 쉬운 동작을 고를 수 있어요."
+  },
+  "experience": {
+    "returning_after_sessions": 3,
+    "max_sets": {
+      "new": 2,
+      "returning": 3
+    },
+    "levels": {
+      "new": [
+        "foundation"
+      ],
+      "returning": [
+        "foundation",
+        "intermediate"
+      ]
+    }
+  },
+  "room_equipment": [
+    "mat"
+  ],
+  "timing": {
+    "seconds_per_rep_default": 5,
+    "side_switch": 5,
+    "hold_rest_between_sets": 10,
+    "first_demo": 15,
+    "transition_same_position": 10,
+    "transition_floor": 20,
+    "transition_standing": 30,
+    "phase_slack": 45,
+    "basis": "Tempo 3-8 s per slow repetition (ACSM 2009, Schoenfeld 2015, ACSM 2026); rest under 90 s between light sets (ACSM 2009, ACSM 2026); transitions and the first demonstration are design assumptions with no published source, logged for recalibration."
+  },
+  "positions": [
+    "supine",
+    "side-lying",
+    "prone",
+    "quadruped",
+    "kneeling",
+    "seated",
+    "standing"
+  ],
+  "rules": [
+    {
+      "id": "READINESS_REQUIRED",
+      "kind": "gate",
+      "applies": "A plan is built only after this visit's readiness check ended ready. Any other outcome ends the room journey before a plan exists.",
+      "excluded_situations": [
+        "readiness do_not_start",
+        "readiness urgent_help",
+        "no readiness check this visit"
+      ],
+      "sources": [
+        "riebe2015",
+        "who_2020",
+        "pag_2018"
+      ],
+      "customer_explanation": null,
+      "last_reviewed": "2026-10-13"
+    },
+    {
+      "id": "GOAL_PHASE_CATEGORIES",
+      "kind": "selection",
+      "applies": "The customer's goal decides which exercise categories may fill the warm-up, main block and cool-down, in order of preference (see goals); a later category is used only when the earlier ones cannot fill the time. Warm-up and cool-down prefer exercises that do not belong in the main block, so the main block keeps its exercises.",
+      "sources": [
+        "PAG-WARM",
+        "WHO-MS",
+        "CRUZFERREIRA-2011",
+        "KAMIOKA-2016"
+      ],
+      "customer_explanation": {
+        "en": "Your goal: {goal}",
+        "ko": "선택한 목표: {goal}"
+      },
+      "last_reviewed": "2026-10-13"
+    },
+    {
+      "id": "INTENSITY_EFFORT",
+      "kind": "selection",
+      "applies": "Light keeps to exercises marked light effort with 45 s rests between sets; Moderate allows light and moderate exercises with 35 s rests. Vigorous is not offered in an unsupervised room in v1.",
+      "sources": [
+        "CDC-INT",
+        "CDC-TALK",
+        "PAG-REL",
+        "PAG-SAFE"
+      ],
+      "customer_explanation": {
+        "en": "Your selected effort: {intensity}",
+        "ko": "선택한 강도: {intensity}"
+      },
+      "last_reviewed": "2026-10-13"
+    },
+    {
+      "id": "DURATION_BUDGET",
+      "kind": "timing",
+      "applies": "Every step's time is calculated (demonstration, sets x reps x seconds per rep or hold, side switches, rests, transitions). The plan must land inside the duration's range or the customer is told it cannot be filled.",
+      "sources": [
+        "ACSM-2009",
+        "SCHOENFELD-2015",
+        "ACSM-2026-TEMPO-REST"
+      ],
+      "customer_explanation": {
+        "en": "Your time: about {minutes} minutes",
+        "ko": "운동 시간: 약 {minutes}분"
+      },
+      "last_reviewed": "2026-10-13"
+    },
+    {
+      "id": "SHORTER_PLAN_OFFERED",
+      "kind": "timing",
+      "applies": "When the audited library cannot fill the chosen duration (for example 60 minutes for a first session, where only foundation exercises and at most 2 sets are used), the customer is offered the shorter plan with its real length and told why. Plans under 20 minutes are not offered.",
+      "sources": [
+        "PAG-SAFE"
+      ],
+      "customer_explanation": null,
+      "last_reviewed": "2026-10-13"
+    },
+    {
+      "id": "EXPERIENCE_SETS",
+      "kind": "dose",
+      "applies": "Fewer than three completed room sessions: foundation-level exercises only, at most 2 sets each. After that: intermediate exercises may be included and at most 3 sets. Sets are added only to fill the main block's time.",
+      "sources": [
+        "PAG-MS",
+        "ACSM-2026-SETS"
+      ],
+      "customer_explanation": null,
+      "last_reviewed": "2026-10-13"
+    },
+    {
+      "id": "ROOM_EQUIPMENT",
+      "kind": "selection",
+      "applies": "Only exercises that need nothing beyond the room's equipment (a mat).",
+      "sources": [],
+      "customer_explanation": null,
+      "last_reviewed": "2026-10-13"
+    },
+    {
+      "id": "REVIEW_POLICY",
+      "kind": "selection",
+      "applies": "Demonstration facilities may use every SEDENS Standard entry (each is labelled with its review status). Real facilities use only entries reviewed by SEDENS or an expert; until such entries exist, the personalized session explains that it is not available yet.",
+      "sources": [],
+      "customer_explanation": null,
+      "last_reviewed": "2026-10-13"
+    },
+    {
+      "id": "RECENT_DISCOMFORT_HOLD",
+      "kind": "history",
+      "applies": "If the customer reported pain or unusual discomfort after their last room session (within 30 days), today's plan uses light-effort exercises only, no harder options are offered, and the customer is told why. Nothing about the discomfort is interpreted.",
+      "window_days": 30,
+      "sources": [
+        "PAG-SYMPT",
+        "PAG-OVERUSE",
+        "CHEUNG-2003"
+      ],
+      "customer_explanation": {
+        "en": "Last time you noted discomfort, so today stays light and won't get harder.",
+        "ko": "지난번에 불편감이 있다고 알려 주셔서, 오늘은 가볍게 하고 더 어렵게 하지 않아요."
+      },
+      "last_reviewed": "2026-10-13"
+    },
+    {
+      "id": "RECENT_HARD_STEP_DOWN",
+      "kind": "history",
+      "applies": "If the last room session's effort rating was at least 2 above the band of the intensity chosen for it (within 14 days), light-effort exercises are preferred today.",
+      "window_days": 14,
+      "sources": [
+        "PAG-SAFE",
+        "ACSM-2026-PROG"
+      ],
+      "customer_explanation": {
+        "en": "Your last session felt harder than planned, so today starts with lighter exercises.",
+        "ko": "지난 운동이 계획보다 힘들게 느껴져서, 오늘은 가벼운 동작부터 해요."
+      },
+      "last_reviewed": "2026-10-13"
+    },
+    {
+      "id": "LAST_SESSION_CONTEXT",
+      "kind": "context",
+      "applies": "When the customer has an earlier room session, the reasons say how long ago it was. It changes nothing in the plan.",
+      "sources": [],
+      "customer_explanation": {
+        "en": "Your last session: {days} days ago",
+        "ko": "지난 운동: {days}일 전"
+      },
+      "customer_explanation_today": {
+        "en": "Your last session: earlier today",
+        "ko": "지난 운동: 오늘"
+      },
+      "last_reviewed": "2026-10-13"
+    },
+    {
+      "id": "SCAN_SHOULDER_LINE_VARIETY_V1",
+      "kind": "scan",
+      "observation_required": "shoulder_line shown (feedback rules sedens-feedback-1.0.0: both front and back views clear, same side, at least the provisional threshold)",
+      "minimum_quality": "clear front and back views",
+      "goals": [
+        "mobility",
+        "pilates",
+        "general"
+      ],
+      "allowed_categories": [
+        "mobility"
+      ],
+      "allowed_scan_tags": [
+        "shoulder_mobility"
+      ],
+      "excluded_situations": [
+        "scan skipped",
+        "scan withheld or below threshold",
+        "goal core (the customer's goal wins)",
+        "no shoulder-mobility exercise fits the warm-up"
+      ],
+      "applies": "Adds at most one gentle shoulder-mobility exercise to the warm-up, as variety only. It never replaces the customer's goal, never changes a creator's course, and makes no claim that the exercise changes the shoulder line.",
+      "evidence_note": "Posture changes from exercise in adults rest on very low to low certainty evidence (ROQUE-2024); there is no basis to say this exercise changes the observation. The rule is a transparent variety choice, ranked last in priority.",
+      "sources": [
+        "ROQUE-2024",
+        "KONRAD-2024",
+        "S14"
+      ],
+      "customer_explanation": {
+        "en": "Today's scan: a shoulder-line difference was visible, so one gentle shoulder-mobility exercise is included for variety. It isn't meant to change your shoulder line.",
+        "ko": "오늘 스캔: 어깨선 차이가 보여서 부드러운 어깨 가동 운동을 하나 넣었어요. 어깨선을 바꾸기 위한 것은 아니에요."
+      },
+      "last_reviewed": "2026-10-13"
+    },
+    {
+      "id": "VARIETY_LAST_PLAN",
+      "kind": "variety",
+      "applies": "Exercises from the customer's previous SEDENS Standard session move behind unused ones of the same preference, so a returning customer sees some variety when the library allows it.",
+      "sources": [],
+      "customer_explanation": null,
+      "last_reviewed": "2026-10-13"
+    }
+  ],
+  "messages": {
+    "cannot_fill": {
+      "en": "The SEDENS library can't put together a {minutes}-minute session for this goal and effort yet. Try another goal or effort.",
+      "ko": "SEDENS 라이브러리로는 아직 이 목표와 강도로 {minutes}분 세션을 구성할 수 없어요. 다른 목표나 강도를 선택해 주세요."
+    },
+    "no_reviewed_content": {
+      "en": "Personalized sessions will be available here once SEDENS has reviewed its exercise library.",
+      "ko": "SEDENS가 운동 라이브러리 검토를 마치면 이곳에서도 맞춤 세션을 이용할 수 있어요."
+    },
+    "label": {
+      "en": "SEDENS Standard session",
+      "ko": "SEDENS 스탠다드 세션"
+    },
+    "shorter_plan": {
+      "en": "The SEDENS library can't fill {minutes} minutes for you yet, so this plan is about {available} minutes. You can start it, or choose a shorter time.",
+      "ko": "SEDENS 라이브러리로는 아직 {minutes}분을 채울 수 없어, 이 계획은 약 {available}분이에요. 이대로 시작하거나 더 짧은 시간을 선택할 수 있어요."
+    }
+  },
+  "shorter_plan": {
+    "min_minutes": 20
+  }
+}

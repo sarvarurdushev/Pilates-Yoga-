@@ -126,6 +126,7 @@ POLICIES: dict[str, Policy] = {
                                 json=()),
     "s_room_scan_observations": Policy(True, "which feedback rule each scan observation passed or failed",
                                        scope="scan_id IN (SELECT id FROM s_room_scans WHERE org_id=?)", json=()),
+    "s_recommendations": Policy(True, "SEDENS Standard plans with their inputs, rules and reasons", json=()),
     "s_demo_layers": Policy(False, "which demonstration content this server seeded"),
     "s_demo_activity": Policy(False, "when this server's demonstrations were created and last used"),
     "s_schema": Policy(False, "this server's migration ledger"),

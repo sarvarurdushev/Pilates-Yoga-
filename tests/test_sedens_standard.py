@@ -26,7 +26,40 @@ def customer_text(entry):
 
 def test_the_standard_file_is_sound():
     assert standard.problems() == []
-    assert 8 <= len(standard.exercises()) <= 20, "only enough to prove the architecture"
+    # v1 holds enough audited content for the four room session types, and no more.
+    assert 8 <= len(standard.exercises()) <= 40
+
+
+def test_v1_keeps_every_v0_entry_and_its_customer_text():
+    """Courses built on v0 point at these ids; v1 only adds fields to them."""
+    current = {e["id"]: e for e in standard.exercises()}
+    for old in standard.previous("v0")["exercises"]:
+        new = current[old["id"]]
+        for field in ("catalog_key", "title", "steps", "cue", "breath", "regressions", "progressions", "stop_if",
+                      "before_you_start", "dose", "position", "level"):
+            if field == "dose":
+                assert {k: v for k, v in new["dose"].items()} == old["dose"], old["id"]
+            else:
+                assert new[field] == old[field], (old["id"], field)
+
+
+def test_easier_and_harder_links_are_mutual_and_real():
+    by_id = {e["id"]: e for e in standard.exercises()}
+    linked = 0
+    for entry in by_id.values():
+        for field, back in (("easier", "harder"), ("harder", "easier")):
+            if entry[field]:
+                linked += 1
+                assert by_id[entry[field]][back] == entry["id"]
+                assert by_id[entry[field]]["position"] in (entry["position"], "supine", "side-lying", "quadruped")
+    assert linked >= 6
+
+
+def test_media_only_shows_its_own_exercise():
+    assets = standard.content_assets()
+    for entry in standard.exercises():
+        for asset_id in entry["media"]:
+            assert assets[asset_id]["shows"] == entry["catalog_key"]
 
 
 def test_the_original_catalog_is_untouched_and_pinned():
@@ -52,7 +85,8 @@ def test_customer_wording_stays_general_fitness(entry):
         assert not re.search(pattern, text, re.IGNORECASE), (entry["id"], pattern)
     # Anatomy is labelled as illustration wherever it is shown.
     assert entry["anatomy"]["label"]["en"] == "Educational anatomy — not measured muscle activation."
-    assert all(s["role"] in ("prime", "assisting", "steadying") for s in entry["anatomy"]["structures"])
+    # "focus" marks the structure a stretch is aimed at (the course vocabulary); never an intensity.
+    assert all(s["role"] in ("focus", "prime", "assisting", "steadying") for s in entry["anatomy"]["structures"])
 
 
 def test_atlas_accepts_registry_names_including_whole_muscles():
