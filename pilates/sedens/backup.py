@@ -127,6 +127,10 @@ POLICIES: dict[str, Policy] = {
     "s_room_scan_observations": Policy(True, "which feedback rule each scan observation passed or failed",
                                        scope="scan_id IN (SELECT id FROM s_room_scans WHERE org_id=?)", json=()),
     "s_recommendations": Policy(True, "SEDENS Standard plans with their inputs, rules and reasons", json=()),
+    "s_workouts": Policy(True, "guided workouts as played; open ones restored as incomplete", json=("plan",)),
+    "s_workout_steps": Policy(True, "each workout step and whether it was completed or skipped",
+                              scope="workout_id IN (SELECT id FROM s_workouts WHERE org_id=?)", json=()),
+    "s_session_feedback": Policy(True, "customers' own effort and discomfort reports", json=()),
     "s_demo_layers": Policy(False, "which demonstration content this server seeded"),
     "s_demo_activity": Policy(False, "when this server's demonstrations were created and last used"),
     "s_schema": Policy(False, "this server's migration ledger"),
@@ -679,6 +683,9 @@ def restore_row(ctx: RestoreContext, table, original, mapping):
         if row["state"] in ("capturing", "processing"):
             row.update(state="abandoned", completed_at=now())
         row["images_retained"] = 0  # photos are not in archives
+    elif table == "s_workouts":
+        if row["state"] in ("ready", "active", "paused"):
+            row.update(state="abandoned", ended_at=now(), end_reason="room_session_closed", segment_started_at=None)
     elif table == "s_crm_settings":
         if row["provider"] == "demo" and not ctx.demo:
             row.update(provider="none", config="{}")

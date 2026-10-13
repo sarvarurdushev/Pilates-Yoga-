@@ -252,8 +252,16 @@ def _room_course_session(r):
 
 
 def _room_course_complete(r):
+    """Course progress is written by the room's player when a workout of that session
+    completes (pilates/sedens/workouts.py). This route only confirms it: a session
+    this visit did not play to the end is refused."""
     room = r.room()
     with r.sedens.db() as db:
+        played = db.execute("SELECT 1 FROM s_workouts WHERE room_session_id=? AND kind='course' AND course_id=? "
+                            "AND course_session_id=? AND state='completed'",
+                            (room.room_session_id, r.body.get("course_id"), r.body.get("session_id"))).fetchone()
+        if played is None:
+            raise Denied("Play this session in the room to complete it.", 409, "play_first")
         return marketplace.complete_room_session(r.sedens, db, room, r.body.get("course_id"), r.body.get("session_id"))
 
 

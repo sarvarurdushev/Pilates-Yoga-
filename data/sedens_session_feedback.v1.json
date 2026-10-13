@@ -1,0 +1,61 @@
+{
+  "version": "sedens-session-feedback-1.0.0",
+  "reviewed_at": "2026-10-13",
+  "status": "provisional",
+  "note": "SEDENS's own 0-10 effort wording (scale id sedens-effort-0-10). It paraphrases the public-domain CDC relative-intensity anchors (0 sitting, 5-6 moderate, 7-8 vigorous, 10 maximal) in original words and is not the Borg, CR10, session-RPE or OMNI scale, which are licensed. It records how a session felt, never a measurement, and is unvalidated until tested (docs/SEDENS_FEEDBACK_EVIDENCE.md). The discomfort questions record what the customer reports and never classify it.",
+  "effort": {
+    "scale": "sedens-effort-0-10",
+    "question": {"en": "Overall, how hard did today's session feel to you?", "ko": "오늘 운동은 전체적으로 얼마나 힘들게 느껴졌나요?"},
+    "helper": {"en": "Pick a number from 0 to 10. Think about the whole session, not just the hardest moment. There are no right or wrong answers.", "ko": "0부터 10 중에서 골라 주세요. 가장 힘들었던 순간이 아니라 운동 전체를 떠올려 주세요. 정답은 없어요."},
+    "labels": [
+      {"from": 0, "to": 0, "en": "Sitting still — no effort", "ko": "가만히 앉아 있는 상태 — 힘이 들지 않음"},
+      {"from": 1, "to": 2, "en": "Barely working — breathing stayed calm", "ko": "거의 힘 안 듦 — 호흡이 내내 차분했어요"},
+      {"from": 3, "to": 4, "en": "Comfortably working — easy to chat", "ko": "편하게 움직임 — 대화가 쉬웠어요"},
+      {"from": 5, "to": 6, "en": "Steady work — breathing faster, full sentences still fine", "ko": "꾸준히 힘씀 — 숨은 빨랐지만 문장으로 말할 수 있었어요"},
+      {"from": 7, "to": 8, "en": "Tough — only a few words between breaths", "ko": "꽤 힘듦 — 몇 마디마다 숨을 골라야 했어요"},
+      {"from": 9, "to": 9, "en": "Near my limit — hard to keep going", "ko": "한계에 가까움 — 이어가기 어려웠어요"},
+      {"from": 10, "to": 10, "en": "All-out — I could not have done more", "ko": "전력을 다함 — 더는 할 수 없었어요"}
+    ],
+    "footnote": {"en": "This records how the session felt to you. It is not a measurement of your fitness.", "ko": "이 답은 운동이 어떻게 느껴졌는지에 대한 기록이에요. 체력을 측정한 값이 아니에요."},
+    "skip": {"en": "Skip", "ko": "건너뛰기"},
+    "sources": ["CDC-INT", "CDC-TALK", "BORG-FAQ", "HADDAD-2017-ANCHORS", "CHRISTEN-2016", "CHEN-2002"]
+  },
+  "discomfort": {
+    "question": {"en": "Did you notice any pain or unusual discomfort during or after today's session?", "ko": "오늘 운동 중이나 운동 후에 통증이나 평소와 다른 불편감이 있었나요?"},
+    "helper": {"en": "If you're not sure, choose Yes.", "ko": "잘 모르겠다면 \"네\"를 선택해 주세요."},
+    "urgent_question": {"en": "Right now, do you have chest pain or pressure, trouble breathing, or feel faint or dizzy?", "ko": "지금 가슴 통증이나 압박감, 숨쉬기 어려움, 또는 어지럽거나 쓰러질 것 같은 느낌이 있나요?"},
+    "regions_question": {"en": "Where did you notice it? (choose any)", "ko": "어느 부위였나요? (여러 개 선택 가능)"},
+    "regions": {
+      "neck": {"en": "Neck", "ko": "목"},
+      "shoulder": {"en": "Shoulder", "ko": "어깨"},
+      "upper_back": {"en": "Upper back", "ko": "등 위쪽"},
+      "lower_back": {"en": "Lower back", "ko": "허리"},
+      "hip": {"en": "Hip", "ko": "엉덩이·고관절"},
+      "knee": {"en": "Knee", "ko": "무릎"},
+      "wrist_hand": {"en": "Wrist or hand", "ko": "손목·손"},
+      "ankle_foot": {"en": "Ankle or foot", "ko": "발목·발"},
+      "other": {"en": "Somewhere else", "ko": "기타"}
+    },
+    "when_question": {"en": "When did you notice it?", "ko": "언제 느꼈나요?"},
+    "when": {
+      "during": {"en": "During the session", "ko": "운동 중"},
+      "after": {"en": "After the session", "ko": "운동 후"},
+      "not_sure": {"en": "Not sure", "ko": "잘 모르겠어요"}
+    },
+    "strength_question": {"en": "How strong was it?", "ko": "어느 정도였나요?"},
+    "strength": {
+      "mild": {"en": "Mild", "ko": "약함"},
+      "moderate": {"en": "Moderate", "ko": "중간"},
+      "strong": {"en": "Strong", "ko": "강함"}
+    },
+    "still_question": {"en": "Is it still there now?", "ko": "지금도 느껴지나요?"},
+    "closing": {"en": "Thank you for telling us. We've saved this note. Your next session won't get harder automatically, and we'll check how you feel before it starts. If the discomfort is strong, doesn't ease, or worries you, please talk to a health professional.", "ko": "알려 주셔서 감사해요. 기록해 두었어요. 다음 운동은 자동으로 어려워지지 않으며, 시작하기 전에 상태를 다시 여쭤볼게요. 불편감이 심하거나, 나아지지 않거나, 걱정된다면 의료 전문가와 상담해 주세요."},
+    "sources": ["PAG-SYMPT", "PAG-OVERUSE", "CHEUNG-2003", "CDC-HA"]
+  },
+  "urgent": {
+    "title": {"en": "Please get help now.", "ko": "지금 바로 도움을 요청하세요."},
+    "body": {"en": "Please stop exercising and stay where you are. Call 119 now, or ask staff for help.", "ko": "운동을 멈추고 그 자리에서 쉬어 주세요. 지금 바로 119에 전화하거나 직원에게 도움을 요청해 주세요."}
+  },
+  "thanks": {"en": "Thank you. Your session is saved.", "ko": "감사합니다. 운동 기록이 저장되었어요."},
+  "note_label": {"en": "Anything you'd like your facility to know? (optional)", "ko": "시설에 남기고 싶은 말이 있나요? (선택)"}
+}
