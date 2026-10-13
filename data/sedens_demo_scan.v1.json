@@ -1,0 +1,26 @@
+{
+  "version": "sedens-demo-scan-1",
+  "label": {"en": "DEMO PRECOMPUTED ANALYSIS", "ko": "데모 사전 계산 분석"},
+  "note": {
+    "en": "Fictional precomputed measurements for this demonstration. They are not measured from your photos.",
+    "ko": "이 시연을 위해 미리 계산한 가상의 측정값이에요. 고객님의 사진에서 측정한 값이 아니에요."
+  },
+  "provenance": "Hand-written fictional values for a neutral demonstration: a mild shoulder-line difference just above the provisional threshold in both front and back views, everything else small. No real person, no photo, no dramatic finding (brief section 52).",
+  "measurement_version": "demo",
+  "model": "demo",
+  "views": {
+    "front": {"people": 1, "suitable": true, "metrics": {
+      "shoulder_tilt": {"value": -3.1, "unit": "deg", "confidence": 0.93, "status": "measured"},
+      "pelvic_obliquity": {"value": 0.8, "unit": "deg", "confidence": 0.9, "status": "measured"},
+      "head_lateral_tilt": {"value": -0.6, "unit": "deg", "confidence": 0.86, "status": "measured"},
+      "trunk_lean_lateral": {"value": 0.4, "unit": "deg", "confidence": 0.9, "status": "measured"}}},
+    "left": {"people": 1, "suitable": true, "metrics": {
+      "forward_head": {"value": 0.04, "unit": "ratio", "confidence": 0.84, "status": "estimated"}}},
+    "back": {"people": 1, "suitable": true, "metrics": {
+      "shoulder_tilt": {"value": -2.9, "unit": "deg", "confidence": 0.91, "status": "measured"},
+      "pelvic_obliquity": {"value": 0.6, "unit": "deg", "confidence": 0.88, "status": "measured"},
+      "trunk_lean_lateral": {"value": 0.3, "unit": "deg", "confidence": 0.9, "status": "measured"}}},
+    "right": {"people": 1, "suitable": true, "metrics": {
+      "forward_head": {"value": 0.05, "unit": "ratio", "confidence": 0.83, "status": "estimated"}}}
+  }
+}

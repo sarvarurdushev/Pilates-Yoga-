@@ -1,0 +1,260 @@
+{
+  "version": "sedens-feedback-1.0.0",
+  "reviewed_at": "2026-10-12",
+  "status": "provisional",
+  "protocol": "sedens_room_scan_v1",
+  "note": "Every observation passes: measurement -> quality gate -> evidence rule -> customer wording. Thresholds here are internal technical thresholds meaning 'our measurement can distinguish this from measurement noise'. They are not clinical thresholds and say nothing about what is normal. All are provisional until SEDENS measures its own repeatability (docs/SEDENS_VISION_IMPROVEMENT_PLAN.md).",
+  "quality": {
+    "min_confidence": 0.65,
+    "copy": {
+      "clear": {
+        "en": "Your scan was captured clearly.",
+        "ko": "스캔이 선명하게 촬영되었어요."
+      },
+      "limited": {
+        "en": "Some views weren't clear enough, so we're only sharing what we could see reliably.",
+        "ko": "일부 방향은 충분히 선명하지 않아, 확실하게 확인된 내용만 알려 드려요."
+      },
+      "retake": {
+        "en": "We couldn't see you clearly enough this time. A retake is recommended.",
+        "ko": "이번에는 충분히 선명하게 보이지 않았어요. 다시 촬영하는 것을 권해 드려요."
+      }
+    },
+    "view_reasons": {
+      "no_person": {
+        "en": "We couldn't see a person in this view. Step onto the floor marks and try again.",
+        "ko": "이 방향에서 사람이 보이지 않았어요. 바닥 표시 위에 서서 다시 시도해 주세요."
+      },
+      "several_people": {
+        "en": "More than one person was in this view. Only you should be in the frame.",
+        "ko": "이 방향에 두 사람 이상이 보였어요. 화면에는 고객님만 있어야 해요."
+      },
+      "not_full_body": {
+        "en": "We couldn't see your full body clearly. Step back slightly and try again.",
+        "ko": "몸 전체가 선명하게 보이지 않았어요. 조금 뒤로 물러나서 다시 시도해 주세요."
+      },
+      "wrong_direction": {
+        "en": "You seemed to be facing a different direction. Follow the arrow and try again.",
+        "ko": "다른 방향을 보고 계신 것 같아요. 화살표 방향에 맞춰 다시 시도해 주세요."
+      },
+      "not_standing": {
+        "en": "Stand tall with your arms relaxed at your sides, then try again.",
+        "ko": "팔을 몸 옆에 편하게 두고 바르게 선 다음 다시 시도해 주세요."
+      },
+      "unclear": {
+        "en": "This view wasn't clear enough. Check the lighting and stand still for the countdown.",
+        "ko": "이 방향은 충분히 선명하지 않았어요. 조명을 확인하고 카운트다운 동안 움직이지 말아 주세요."
+      }
+    }
+  },
+  "meaning": {
+    "en": "Small side-to-side differences are common and can change with how you stand on the day. This is one camera observation. It can't tell us anything about pain, injury or your health.",
+    "ko": "좌우가 조금 다른 것은 흔하고, 그날 서 있는 방식에 따라 달라지기도 해요. 카메라로 본 한 번의 관찰일 뿐이며, 통증이나 부상, 건강 상태에 대해서는 알 수 없어요."
+  },
+  "comparison": {
+    "none": {
+      "en": "There's no earlier scan taken under the same conditions yet, so there's nothing to compare today.",
+      "ko": "아직 같은 조건에서 촬영한 이전 스캔이 없어, 오늘은 비교할 내용이 없어요."
+    },
+    "no_difference": {
+      "en": "Compared with your last comparable scan, we didn't measure a difference larger than our usual variation.",
+      "ko": "지난번 같은 조건의 스캔과 비교해, 평소 측정 오차보다 큰 차이는 없었어요."
+    },
+    "difference": {
+      "en": "Compared with your last comparable scan, your shoulder line measured {direction}. The difference is larger than our usual measurement variation. It doesn't mean better or worse.",
+      "ko": "지난번 같은 조건의 스캔과 비교했을 때, 어깨선이 {direction} 측정되었어요. 평소 측정 오차보다 큰 차이지만, 좋아지거나 나빠졌다는 뜻은 아니에요."
+    },
+    "directions": {
+      "more_level": {
+        "en": "closer to level",
+        "ko": "더 수평에 가깝게"
+      },
+      "less_level": {
+        "en": "further from level",
+        "ko": "수평에서 조금 더 멀게"
+      }
+    }
+  },
+  "observations": [
+    {
+      "id": "shoulder_line",
+      "status": "provisional",
+      "metric": "shoulder_tilt",
+      "unit": "deg",
+      "views": [
+        "front",
+        "back"
+      ],
+      "definition": "Angle of the line between the two shoulder keypoints against the image horizontal; positive means the person's left shoulder keypoint is higher. Keypoints are estimated joint centres, not bony landmarks. The sign is anatomical, so front and back views agree.",
+      "eligibility": "Both front and back views measured (status measured, confidence at least 0.65, one person, quality clear), both values on the same side of zero, and both at least the threshold.",
+      "threshold_deg": 2.7,
+      "threshold_basis": "Provisional: twice the published MDC95 of 1.33 deg for a pose-estimation shoulder line on standardized photos (S14, Roggio 2024), as margin for camera roll and body rotation in an unsupervised room. Distinguishes the reading from measurement noise only. Replaced by SEDENS's own between-day SEM study.",
+      "change_threshold_deg": 2.7,
+      "heading": {
+        "en": "Shoulder line",
+        "ko": "어깨선"
+      },
+      "observed": {
+        "en": "In both your front and back photos, your {side} shoulder sat slightly higher than the other one.",
+        "ko": "앞모습과 뒷모습 사진 모두에서 {side} 어깨가 반대쪽보다 약간 높게 보였어요."
+      },
+      "sides": {
+        "left": {
+          "en": "left",
+          "ko": "왼쪽"
+        },
+        "right": {
+          "en": "right",
+          "ko": "오른쪽"
+        }
+      },
+      "below_threshold": {
+        "en": "Your shoulder line didn't show a difference larger than our camera's usual variation.",
+        "ko": "어깨선에서 카메라의 일반적인 측정 오차보다 큰 차이는 보이지 않았어요."
+      },
+      "withheld": {
+        "en": "We didn't describe your shoulder line today because the photos weren't steady enough.",
+        "ko": "오늘은 사진이 충분히 안정적이지 않아 어깨선은 설명하지 않았어요."
+      },
+      "limitation": {
+        "en": "Measured from estimated keypoints in two still photos. Camera angle and how you stand change it.",
+        "ko": "두 장의 정지 사진에서 추정한 관절 위치로 측정했어요. 카메라 각도와 서 있는 방식에 따라 달라져요."
+      },
+      "focus": "shoulder_mobility",
+      "sources": [
+        "S14",
+        "S15",
+        "S16",
+        "S08",
+        "S09",
+        "S27"
+      ]
+    }
+  ],
+  "withheld_metrics": [
+    {
+      "metric": "forward_head",
+      "views": [
+        "left",
+        "right"
+      ],
+      "reason": "side_view_convention_under_review",
+      "note": "Head position needs a reference (only a comparable earlier scan is acceptable) and the pipeline's side-view direction convention is under review (docs/SEDENS_VISION_IMPROVEMENT_PLAN.md). Advanced only, labelled not CVA."
+    },
+    {
+      "metric": "pelvic_obliquity",
+      "views": [
+        "front",
+        "back"
+      ],
+      "reason": "no_established_validity",
+      "note": "Repeatable but no established validity without markers (S15, S16, S17); hip keypoints are estimated joint centres. Advanced only."
+    },
+    {
+      "metric": "trunk_lean_lateral",
+      "views": [
+        "front",
+        "back"
+      ],
+      "reason": "advanced_only",
+      "note": "Depends on hip keypoints and true vertical; no pain association (S05). Advanced only."
+    },
+    {
+      "metric": "head_lateral_tilt",
+      "views": [
+        "front",
+        "back"
+      ],
+      "reason": "advanced_only",
+      "note": "Ear keypoints are often hidden by hair; Advanced only."
+    },
+    {
+      "metric": "sagittal_pelvic_tilt",
+      "views": [],
+      "reason": "not_measurable",
+      "note": "Needs ASIS/PSIS landmarks a 17-keypoint model does not mark (S27). Never computed."
+    }
+  ],
+  "advanced": {
+    "shoulder_tilt": {
+      "label": {
+        "en": "Shoulder line angle",
+        "ko": "어깨선 각도"
+      },
+      "limitation": {
+        "en": "Estimated keypoints, not bony landmarks.",
+        "ko": "추정한 관절 위치이며 뼈 위치가 아니에요."
+      }
+    },
+    "pelvic_obliquity": {
+      "label": {
+        "en": "Estimated hip-joint line angle",
+        "ko": "추정 고관절선 각도"
+      },
+      "limitation": {
+        "en": "Hip keypoints are estimated joint centres, not pelvic bones; not validated without markers.",
+        "ko": "고관절 위치는 추정한 관절 중심이며 골반뼈가 아니에요. 마커 없이 검증되지 않았어요."
+      }
+    },
+    "head_lateral_tilt": {
+      "label": {
+        "en": "Ear line angle",
+        "ko": "귀선 각도"
+      },
+      "limitation": {
+        "en": "Often hidden by hair.",
+        "ko": "머리카락에 가려지는 경우가 많아요."
+      }
+    },
+    "trunk_lean_lateral": {
+      "label": {
+        "en": "Side-to-side trunk angle",
+        "ko": "몸통 좌우 기울기"
+      },
+      "limitation": {
+        "en": "Depends on hip keypoints and camera level.",
+        "ko": "고관절 위치와 카메라 수평에 따라 달라져요."
+      }
+    },
+    "forward_head": {
+      "label": {
+        "en": "Ear-to-shoulder offset (side view)",
+        "ko": "귀-어깨 간격 (옆모습)"
+      },
+      "limitation": {
+        "en": "Not a craniovertebral angle; direction convention under review.",
+        "ko": "두개척추각이 아니에요. 방향 기준을 검토 중이에요."
+      }
+    }
+  },
+  "focus": {
+    "shoulder_mobility": {
+      "text": {
+        "en": "Your goal leads. If you choose a SEDENS Personalized Session, it can include one gentle shoulder-mobility exercise for variety.",
+        "ko": "선택하신 목표가 우선이에요. SEDENS 맞춤 세션을 선택하면 부드러운 어깨 가동 운동이 하나 포함될 수 있어요."
+      },
+      "why": {
+        "en": "A shoulder-line difference was visible in both your front and back photos. It isn't something an exercise is meant to fix.",
+        "ko": "앞모습과 뒷모습 사진 모두에서 어깨선 차이가 보였어요. 운동으로 고쳐야 하는 것이라는 뜻은 아니에요."
+      }
+    },
+    "general": {
+      "text": {
+        "en": "General movement. The goal and session you choose next decide what you do.",
+        "ko": "일반적인 움직임이에요. 다음에 고르는 목표와 세션에 따라 운동이 정해져요."
+      },
+      "why": {
+        "en": "Nothing in today's scan changes your session.",
+        "ko": "오늘 스캔 결과로 세션이 바뀌지는 않아요."
+      }
+    },
+    "heading": {
+      "en": "Today's exercise focus",
+      "ko": "오늘의 운동 포커스"
+    },
+    "why_heading": {
+      "en": "Why",
+      "ko": "이유"
+    }
+  }
+}

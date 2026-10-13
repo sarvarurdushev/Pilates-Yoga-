@@ -120,6 +120,12 @@ POLICIES: dict[str, Policy] = {
     "s_readiness_checks": Policy(True, "readiness checks with the questionnaire version that decided them", json=()),
     "s_readiness_answers": Policy(True, "readiness answers up to the deciding one",
                                   scope="check_id IN (SELECT id FROM s_readiness_checks WHERE org_id=?)", json=()),
+    "s_room_scans": Policy(True, "room scan summaries shown to customers; photos are never archived", json=()),
+    "s_room_scan_views": Policy(True, "which scan views were captured and their quality (photos left out)",
+                                scope="scan_id IN (SELECT id FROM s_room_scans WHERE org_id=?)", drop=("image_key",),
+                                json=()),
+    "s_room_scan_observations": Policy(True, "which feedback rule each scan observation passed or failed",
+                                       scope="scan_id IN (SELECT id FROM s_room_scans WHERE org_id=?)", json=()),
     "s_demo_layers": Policy(False, "which demonstration content this server seeded"),
     "s_demo_activity": Policy(False, "when this server's demonstrations were created and last used"),
     "s_schema": Policy(False, "this server's migration ledger"),
@@ -668,6 +674,10 @@ def restore_row(ctx: RestoreContext, table, original, mapping):
     elif table == "s_room_journeys":
         if row["state"] != "ended":
             row.update(state="ended", ended_at=now(), end_reason="restored")
+    elif table == "s_room_scans":
+        if row["state"] in ("capturing", "processing"):
+            row.update(state="abandoned", completed_at=now())
+        row["images_retained"] = 0  # photos are not in archives
     elif table == "s_crm_settings":
         if row["provider"] == "demo" and not ctx.demo:
             row.update(provider="none", config="{}")

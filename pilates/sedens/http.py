@@ -24,7 +24,7 @@ import time
 from urllib.parse import parse_qs, urlparse
 
 from . import (analytics, capabilities, consent, course_http, course_media, creators, crm, demo, demo_marketplace,
-               journey, library, onboarding, rooms)
+               journey, library, onboarding, rooms, scans)
 from ..platform import http as platform_http
 from ..platform.repository import Refused
 from .util import Denied, environment
@@ -220,6 +220,7 @@ def _room_end(r):
     with r.sedens.batch(), r.sedens.db() as db:
         journey.close(db, ctx.room_session_id, "visit_ended")
     rooms.end(r.sedens, ctx, "customer_ended")
+    scans.purge_abandoned(r.sedens)
     r.cookie(rooms.ROOM_COOKIE, "", "/sedens/", 0)
     return {"ended": True}
 
@@ -261,7 +262,20 @@ def _journey_action(r):
         result = action(r.sedens, db, ctx, row, r.body)
         row, notice = result if isinstance(result, tuple) else (result, None)
         view = journey.view(r.sedens, db, ctx, row, locale)
+    if name in ("scan/again", "scan/skip", "scan/begin"):
+        scans.purge_abandoned(r.sedens)
     return {"journey": view, "notice": _notice(notice, locale)}
+
+
+def _scan_image(r):
+    """One scan photo (raw JPEG or PNG body), only while that view is on screen."""
+    _limit(r.h, "upload")
+    ctx = r.room()
+    try:
+        length = int(r.h.headers.get("Content-Length", "0"))
+    except ValueError:
+        length = 0
+    return scans.upload_image(r.sedens, ctx, r.query.get("view"), r.h.rfile, length)
 
 
 def _room_library(r):
@@ -563,7 +577,7 @@ ROUTES = {
     ("POST", "review/creators/decide"): _review_decide,
 }
 ROUTES.update(course_http.ROUTES)
-STREAMS = dict(course_http.STREAMS)
+STREAMS = {**course_http.STREAMS, ("POST", "room/scan/image"): _scan_image}
 
 
 def dispatch(h, method, route):
