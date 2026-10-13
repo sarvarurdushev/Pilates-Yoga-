@@ -31,6 +31,7 @@ here. Anything **not** on this list that differs from upstream is a bug.
 | `src/pointerTap.js` | tap-versus-gesture, ported from Human Atlas under MIT |
 | `scripts/build_groups.py` | closes the FMA hierarchy over this atlas's own ids |
 | `test/pointer.test.mjs` | the gestures that used to select a muscle by accident |
+| `src/sedens/anatomy-room-bridge.js` | the SEDENS room player's bridge: shows a workout step's structures by name (highlight or isolate, a layer, the language), restores the whole body, and reports a tapped structure; it hides the professional panels and never plays motion clips or paints activation. Inert unless the URL has `room=1` |
 
 **Upstream files this repository edits:**
 
@@ -38,6 +39,7 @@ here. Anything **not** on this list that differs from upstream is a bug.
 |---|---|
 | `index.html` | one `<script type="module">` for the session layer; CSS for the search box and group chips |
 | `src/main.js` | load the group table; `setGroup` / `flyToGroup`; picking through `PointerTap` |
+| `anatomy.html` | one `<script type="module">` that loads `src/sedens/anatomy-room-bridge.js` (it does nothing without `?room=1`) |
 | `src/ui.js` | Explore rebuilt around a search over every structure, and the groups |
 | `src/bodies.js` | the group asset, and the corrected BodyParts3D licence |
 | `src/content/strings.js` | the strings the above needs, en + ko |
