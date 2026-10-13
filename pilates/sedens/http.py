@@ -24,7 +24,7 @@ import time
 from urllib.parse import parse_qs, urlparse
 
 from . import (analytics, capabilities, consent, course_http, course_media, creators, crm, demo, demo_marketplace,
-               library, onboarding, rooms)
+               journey, library, onboarding, rooms)
 from ..platform import http as platform_http
 from ..platform.repository import Refused
 from .util import Denied, environment
@@ -193,6 +193,11 @@ def _enter(r):
     ctx = result["context"]
     seconds = max(60, int((rooms.parse(ctx.expires_at) - rooms.utcnow()).total_seconds()))
     r.cookie(rooms.ROOM_COOKIE, result["token"], "/sedens/", seconds)
+    decision = result["decision"] or {}
+    booking = decision.get("booking") if isinstance(decision, dict) else None
+    with r.sedens.batch(), r.sedens.db() as db:
+        # The booking shown on the welcome screen survives a refresh with the journey.
+        journey.ensure(db, ctx, booking=booking if booking and booking.get("exists") else None)
     return {"session": rooms.describe(r.sedens, ctx), "decision": result["decision"]}
 
 
@@ -212,9 +217,51 @@ def _room_session(r):
 
 def _room_end(r):
     ctx = r.room()
+    with r.sedens.batch(), r.sedens.db() as db:
+        journey.close(db, ctx.room_session_id, "visit_ended")
     rooms.end(r.sedens, ctx, "customer_ended")
     r.cookie(rooms.ROOM_COOKIE, "", "/sedens/", 0)
     return {"ended": True}
+
+
+def _lang(value) -> str:
+    return value if value in ("en", "ko") else "ko"
+
+
+def _notice(notice, locale):
+    if not notice:
+        return None
+    text = None
+    return {**notice, "text": text}
+
+
+def _room_journey(r):
+    """The room screen's current step. Authorization first, outside any
+    transaction (so an expiry is written), then the journey inside one."""
+    ctx = r.room()
+    with r.sedens.batch(), r.sedens.db() as db:
+        journey.require_live(db, ctx)
+        row = journey.ensure(db, ctx)
+        return {"journey": journey.view(r.sedens, db, ctx, row, _lang(r.query.get("lang")))}
+
+
+def _journey_action(r):
+    name = r.action.removeprefix("room/journey/")
+    if name == "end":
+        _room_end(r)
+        return {"ended": True}
+    action = journey.ACTIONS.get(name)
+    if action is None:
+        raise Denied("This SEDENS route is not available.", 404, "not_found")
+    ctx = r.room()
+    locale = _lang(r.body.get("lang"))
+    with r.sedens.batch(), r.sedens.db() as db:
+        journey.require_live(db, ctx)
+        row = journey.ensure(db, ctx)
+        result = action(r.sedens, db, ctx, row, r.body)
+        row, notice = result if isinstance(result, tuple) else (result, None)
+        view = journey.view(r.sedens, db, ctx, row, locale)
+    return {"journey": view, "notice": _notice(notice, locale)}
 
 
 def _room_library(r):
@@ -486,6 +533,7 @@ ROUTES = {
     ("POST", "room/event"): _room_event,
     ("GET", "room/consents"): _room_consents,
     ("POST", "room/consent"): _room_consent,
+    ("GET", "room/journey"): _room_journey,
     # demonstration
     ("POST", "demo/enter"): _demo_enter,
     ("POST", "demo/room-device"): _demo_room_device,
@@ -515,6 +563,7 @@ ROUTES = {
     ("POST", "review/creators/decide"): _review_decide,
 }
 ROUTES.update(course_http.ROUTES)
+STREAMS = dict(course_http.STREAMS)
 
 
 def dispatch(h, method, route):
@@ -526,7 +575,7 @@ def dispatch(h, method, route):
     query = {k: v[0] for k, v in parse_qs(route.query).items()}
     request = Request(h, sedens, method, action, query)
     try:
-        stream = course_http.STREAMS.get((method, action))
+        stream = STREAMS.get((method, action))
         if stream is not None:
             # These read the body or write the response themselves.
             if method == "POST":
@@ -536,6 +585,8 @@ def dispatch(h, method, route):
                 _respond(h, result, 200, request.set_cookies)
             return
         handler = ROUTES.get((method, action))
+        if handler is None and method == "POST" and action.startswith("room/journey/"):
+            handler = _journey_action
         if handler is None:
             raise Denied("This SEDENS route is not available.", 404, "not_found")
         if method == "POST":

@@ -116,6 +116,10 @@ POLICIES: dict[str, Policy] = {
                                 scope="enrollment_id IN (SELECT id FROM s_enrollments WHERE org_id=?)", json=()),
     "s_course_sales": Policy(True, "creators' pauses of new sales (applies only while the paused version is published)",
                              scope=f"course_id IN ({_COURSES})", json=()),
+    "s_room_journeys": Policy(True, "what each room visit went through; restored ended", json=()),
+    "s_readiness_checks": Policy(True, "readiness checks with the questionnaire version that decided them", json=()),
+    "s_readiness_answers": Policy(True, "readiness answers up to the deciding one",
+                                  scope="check_id IN (SELECT id FROM s_readiness_checks WHERE org_id=?)", json=()),
     "s_demo_layers": Policy(False, "which demonstration content this server seeded"),
     "s_demo_activity": Policy(False, "when this server's demonstrations were created and last used"),
     "s_schema": Policy(False, "this server's migration ledger"),
@@ -661,6 +665,9 @@ def restore_row(ctx: RestoreContext, table, original, mapping):
         if row["state"] == "active":
             row.update(state="ended", ended_at=now(), end_reason="restored")
             ctx.summary["room_sessions_closed"] += 1
+    elif table == "s_room_journeys":
+        if row["state"] != "ended":
+            row.update(state="ended", ended_at=now(), end_reason="restored")
     elif table == "s_crm_settings":
         if row["provider"] == "demo" and not ctx.demo:
             row.update(provider="none", config="{}")

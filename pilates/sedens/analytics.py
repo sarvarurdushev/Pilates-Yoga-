@@ -21,20 +21,28 @@ SERVER_EVENTS = frozenset({
     "device_paired", "device_revoked",
     "room_entry_denied", "room_entered", "room_session_started", "room_session_ended",
     "consent_recorded",
-    # Reserved for Phase 3+ server actions; listed so the schema is stable.
-    "scan_started", "scan_completed", "scan_retake",
-    "recommendation_shown", "recommendation_accepted",
-    "workout_started", "session_completed", "session_abandoned",
-    "course_viewed", "course_enrolled_demo",
+    # The room journey (brief §47), recorded by the server action they describe.
+    "readiness_started", "readiness_completed", "readiness_blocked",
+    "scan_started", "scan_view_completed", "scan_retake", "scan_completed",
+    "session_choice", "recommendation_shown", "recommendation_accepted",
+    "workout_started", "exercise_started", "exercise_completed", "exercise_skipped",
+    "workout_paused", "workout_resumed", "safety_stop", "workout_completed",
+    "session_feedback_submitted", "session_abandoned",
+    # Reserved names kept so the schema stays stable.
+    "session_completed", "course_viewed", "course_enrolled_demo",
 })
-# May be sent by an authorized room screen (POST /sedens/room/event).
+# May be sent by an authorized room screen (POST /sedens/room/event). They are
+# stored with source='client' and never change any state; what happened in the
+# room (steps finished, scans, stops) is only ever read from server events.
 CLIENT_EVENTS = frozenset({
-    "room_screen_viewed", "exercise_started", "exercise_skipped",
-    "anatomy_opened", "structure_isolated",
+    "room_screen_viewed", "scan_result_viewed", "exercise_started", "exercise_skipped",
+    "anatomy_opened", "structure_isolated", "narration_toggled", "music_changed",
 })
 EVENTS = SERVER_EVENTS | CLIENT_EVENTS
 
 _KEY = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
+# Text values are short codes (letters, digits and _ . : -), never sentences.
+_CODE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$")
 _PERSONAL = re.compile(r"(email|phone|name|address|password|token|credential|pin|answer|note|comment|text|birth|born)", re.I)
 MAX_PROPS = 16
 MAX_VALUE = 120
@@ -58,7 +66,7 @@ def clean_props(props) -> dict:
                 raise Denied("Event numbers must be finite.", 400, "invalid_event")
             clean[key] = value
         elif isinstance(value, str):
-            if len(value) > MAX_VALUE:
+            if len(value) > MAX_VALUE or (value and not _CODE.match(value)):
                 raise Denied("Event text values must be short codes.", 400, "invalid_event")
             clean[key] = value
         else:
