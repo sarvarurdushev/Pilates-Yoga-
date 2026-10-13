@@ -1,4 +1,4 @@
-# SEDENS security model (Phases 1–2)
+# SEDENS security model (Phases 1–3)
 
 Scope: what is enforced on the server in Phase 1, how, and what is not built yet. Everything here is checked in `pilates/sedens/*` and tested in `tests/test_sedens_*.py`. The page never decides access; it only shows what the server returned.
 
@@ -101,8 +101,8 @@ Every `/sedens/` POST requires `X-Sedens-Request: 1` and, when the browser sends
 
 ## 6. Consent and analytics
 
-- `s_consents` is append-only; the latest row per (person, kind) is current. Kinds: `scan_capture`, `scan_image_retention`, `product_analytics`. A decision is accepted only for the current text version, with an explicit true/false. Phase 1 records decisions; enforcement in the scan flow starts in Phase 3.
-- `s_events` stays in SQLite. Names come from a fixed list; room screens may send only screen events (`room_screen_viewed`, `exercise_started`, `exercise_skipped`, `anatomy_opened`, `structure_isolated`). Properties are at most 16 flat short values; keys that look personal (`email`, `name`, `note`, `pin`, `answer`, …) are refused. `user_id` is stored only when the person granted `product_analytics`; otherwise only the room session links the event.
+- `s_consents` is append-only; the latest row per (person, kind) is current. Kinds: `scan_capture`, `scan_image_retention`, `product_analytics`. A decision is accepted only for the current text version, with an explicit true/false. Since Phase 3 the scan flow enforces them: no camera scan starts without a current `scan_capture` decision (`consent_required`), photos are kept only with a current `scan_image_retention` decision, and a decision made on an older text version is asked again (texts `2026-10-v2`).
+- `s_events` stays in SQLite. Names come from a fixed list; room screens may send only screen events (`room_screen_viewed`, `scan_result_viewed`, `exercise_started`, `exercise_skipped`, `anatomy_opened`, `structure_isolated`, `narration_toggled`, `music_changed`), stored with `source='client'`; they never change any state, and what happened in the room is read only from server events. Properties are at most 16 flat short values; keys that look personal (`email`, `name`, `note`, `pin`, `answer`, …) are refused, and since Phase 3 text values must be short codes (`^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$`), so no sentence or free text can be stored. `user_id` is stored only when the person granted `product_analytics`; otherwise only the room session links the event.
 
 ## 7. Data lifecycle
 
@@ -120,7 +120,7 @@ Every `s_*` foreign key cascades or nulls (never RESTRICT), and every `SET NULL`
 - No cross-organization identity: a coach who also coaches members in a second facility still needs a separate account there (the platform allows one organization per email). Affiliations cover content distribution only.
 - Room access codes need the customer to sign in on their own phone first; a printed or CRM-issued QR code is the alternative for customers without a phone.
 - Room codes trust the platform sign-in on the customer's phone. The coaching workspace lets an administrator (any account in the organization) or a coach (their assigned customers) set a customer's password, and the platform audits that only as a profile save. Staff who did so could sign in as the customer, ask for a room code and record consents in their name. This is pre-existing platform behaviour; customer-set passwords (a reset link instead of a staff-chosen password) are planned with customer accounts.
-- Inactivity is measured by room requests. The scan and workout phases must keep a session alive from real activity in the room (for example, the camera seeing a person), never from a background timer.
+- Inactivity is measured by room requests. Phase 3 keeps this rule: a room request made because the workout advanced (a step finished, by a tap or by automatic next) counts as activity, but no background timer does. After three automatic advances with no touch at all the player pauses and asks whether the customer is still there; a paused workout then idles out after `SEDENS_ROOM_IDLE_MINUTES` like any screen (`docs/SEDENS_SESSION_PLAYER.md`).
 - Booking rules (`require_booking`, early-entry grace) apply only to a provider that can see bookings (`checks_bookings`: today the demonstration CRM). A facility without a CRM cannot switch them on (`booking_rules_need_crm`); its customers assigned to a location may enter that location's rooms at any time. Using the platform's own reservations as a booking source would be a future adapter.
 - The Phase 1 room library is the platform's existing exercise catalog, which the coaching workspace and its public demonstration already show. The room gate protects SEDENS room routes, not the catalog text.
 - A fully seeded demonstration organization cannot be deleted as a whole because of pre-existing platform `ON DELETE RESTRICT` program links. This predates SEDENS and is unchanged.
@@ -177,4 +177,17 @@ Each was attempted in `tests/test_sedens_phase2_security.py`; the HTTP and brows
 - Videos are checked by their container header only, not decoded.
 - Upload and import limits, like every rate limit, are per process and in memory.
 - No refunds, entitlement revocation or enrollment migration routes exist yet.
+
+## 10. Phase 3: the room journey
+
+The flow and its contract are in [SEDENS_ROOM_FLOW.md](SEDENS_ROOM_FLOW.md). The security-relevant points:
+
+- **Authorization is unchanged and comes first.** Every journey route (`GET room/journey`, `POST room/journey/<action>`, `POST room/scan/image`) calls `rooms.authorize` *outside* any transaction (so an expiry or idle end is written and the room cookie cleared), then works inside `sedens.batch()` and re-checks there that the room session is still the active one for this customer (`journey.require_live`), closing the gap between the check and the write.
+- **The server owns the state.** `s_room_journeys` holds one state per room session; only transitions in `journey.TRANSITIONS` are applied, with a conditional update on (state, revision); a stale screen gets `409 journey_changed`. The client never supplies a workout, scan, plan, student or organization id that the server trusts: every action reads them from the room session.
+- **Gates.** Every scan, plan and workout action requires this visit's readiness check to have ended `ready` (`readiness_required`); the scan requires current capture consent (`consent_required`); a course plays only when `access.can_play_in_room` says so at the start, from the customer's enrolled version (`access.effective_version`), and its media through the existing `media_access` room check.
+- **Idempotent writes.** A step is completed or skipped once (conditional update on its state); completing it again, a second tap or a replayed request writes no second Passport event; session feedback is accepted once per workout (`feedback_recorded`); `POST room/course/complete` only confirms a session this visit played to the end (`play_first`).
+- **Scan photos.** Uploaded only while that view is on screen and only for a real analysis (never in the demonstration precomputed scan), checked by their bytes (JPEG or PNG, at most 8 MB), stored outside `web/` under the media root (`scans/<org>/<scan>/`, folders `0700`, files `0600`), never served over HTTP, deleted after the analysis (or when a scan is abandoned) unless the customer agreed to keep them, and never in an organization backup.
+- **What the room screen receives.** The journey view carries what the screen shows and the ids it must send back (a recommendation id, course and session ids, step positions); no student, organization or analysis ids, image keys, file paths, rule thresholds or internal evaluation records. Advanced scan values carry no confidence values.
+- **A safety stop is final for the visit.** "I don't feel well" ends the workout as incomplete; the room does not offer another session in that visit.
+- **Backups.** The new tables have explicit policies; restored journeys are ended (`restored`), open scans and workouts are restored as abandoned, and photos are never archived.
 

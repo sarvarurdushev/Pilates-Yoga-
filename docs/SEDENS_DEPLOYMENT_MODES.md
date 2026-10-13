@@ -29,7 +29,7 @@ The legacy `/capabilities`, `/evidence/capabilities` and `/platform/me` response
 | Intended host | Render free (0.1 CPU, 512 MB, no disk) | the facility's room computer, or a developer machine | future |
 | Storage reported persistent | **never** | yes, unless the database is under `/tmp`, or on a hosting platform outside its persistent disk (Render `/var/data`, Hugging Face `/data`) | — |
 | Real server-side analysis | `limited` (works, slow: about 30 s per photo measured on Render free) | `available` | — |
-| Precomputed demonstration analysis | allowed (Phase 3/7) | allowed for demonstration orgs | — |
+| Room scan | **DEMO PRECOMPUTED ANALYSIS** by default (fictional values, no photo leaves the browser); optional **EXPERIMENTAL REAL ANALYSIS** of the four photos (about two minutes) | real analysis of the room camera's photos (`room_capture`) | — |
 | Local camera | browser only | yes | — |
 | Demonstration workspaces, simulated room screens | always | on unless `SEDENS_DEMO=0` | — |
 | Paid services | none | none | — |
@@ -41,12 +41,14 @@ The legacy `/capabilities`, `/evidence/capabilities` and `/platform/me` response
 
 - Must not pretend storage is persistent: `storage.persistent` is always `false` with the reason "Free demonstration hosting: records and uploads can be erased on any restart or redeploy." The SEDENS home and room screens show this.
 - Uses no paid API, storage, model service or analytics. Everything runs in the one Python process with SQLite and the local filesystem.
-- May use precomputed demonstration analysis (to be added with the room scan in Phase 3/7), always labelled DEMO.
+- The room scan defaults to a precomputed demonstration result labelled DEMO PRECOMPUTED ANALYSIS, so an investor never waits; the visitor may instead run the real pipeline on their four photos, warned that it takes about two minutes and labelled EXPERIMENTAL REAL ANALYSIS. The two are never mixed or compared (Phase 3).
 - The existing Render service (`srv-daf50ov40ujc739kfh4g`, branch `claude/multi-person-pilates-analysis-w28tt0`) is **not changed** by this branch. When the room journey is ready for external testing, a second free Render service will deploy this branch; switching the existing service is not planned.
 
 ## local_room
 
-- Uses the existing real analysis pipeline (RTMO + optional MediaPipe) and local camera/media exactly as `python -m pilates web` does today.
+- Uses the existing real analysis pipeline (RTMO + optional MediaPipe) and local camera/media exactly as `python -m pilates web` does today. The room scan uses it for real captures (`room_capture`); nothing is precomputed.
+- The room camera needs a secure context: serve the room screen over `https://` or open it as `http://localhost` on the room computer itself (browsers refuse `getUserMedia` on plain HTTP from another machine).
+- The workout plays from local files only (course media, repository illustrations, the anatomy viewer); losing the internet does not stop a session.
 - Real room screens pair through the facility console (`docs/SEDENS_SECURITY_MODEL.md`).
 - For durable records, place the database on persistent disk (not `/tmp`). Back up with the organization archive, which carries the SEDENS records and course files (`docs/SEDENS_BACKUP_RESTORE.md`).
 - Free-host behaviour, limits and what Phase 2 stores: `docs/SEDENS_FREE_DEPLOYMENT.md`.

@@ -37,6 +37,8 @@ Everything lives next to the database file, so on the free host everything is in
 | Uploaded course files | `<database>.sedens-media/objects/<org>/…`, folders `0700`, files `0600`, never under `web/` |
 | Files being received | `<database>.sedens-media/incoming/` (removed on failure) |
 | Course imports being received | a temporary file, removed after the import |
+| Room journeys, readiness checks, scan summaries, plans, workouts, effort and discomfort reports (Phase 3) | the SQLite database (migrations 0015–0018) |
+| Room scan photos (real analysis only) | `<database>.sedens-media/scans/<org>/<scan>/`, folders `0700`, files `0600`; deleted when the analysis finishes or the scan is abandoned, unless the customer agreed to keep them |
 
 ## 4. Limits on the free host
 
@@ -50,6 +52,12 @@ The free host keeps every upload small, and the limits are enforced on the serve
 | Course import (as sent and as unpacked) | 60 MB | 400 MB |
 
 Shared by both modes: at most two uploads or imports received at once (`uploads_busy`, 429); at most 12 uploads or imports per minute per address, 10 demonstration entries per minute per address (`rate_limited`, 429). Files are streamed to disk in 64 KB blocks, never held whole in memory. Videos are not transcoded (that would not fit in 0.1 CPU).
+
+### The room scan on the free host (Phase 3)
+
+- The default scan is the **DEMO PRECOMPUTED ANALYSIS**: the camera guidance runs in the browser, no photo is uploaded and the result appears at once.
+- The optional **EXPERIMENTAL REAL ANALYSIS** uploads four photos (JPEG or PNG, at most 8 MB each, 12 uploads per minute per address) and runs the existing pipeline once per photo, one scan at a time on the server. Measured on Render free in Phase 1 at about 30 s per photo, so about two minutes for a scan; the screen says so before the customer chooses it, shows a waiting screen, and lets them skip to choosing a session.
+- The workout itself needs no server computation: steps, narration (the browser's own voice, captions always), music (generated in the browser) and the anatomy viewer are all local files or browser features.
 
 ## 5. Demonstrations on the free host
 

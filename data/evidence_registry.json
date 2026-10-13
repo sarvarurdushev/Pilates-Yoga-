@@ -1,0 +1,1999 @@
+{
+ "version": "2026-10-13",
+ "note": "Every source a SEDENS customer-facing rule cites (readiness questions, scan feedback rules, recommendation rules, session feedback copy). Quotes were copied from fetched pages; 'verification' says whether a second, independent agent re-fetched the page and found the quote. Sources marked NOT RETRIEVED are listed so nobody relies on them. Explained in docs/SEDENS_FEEDBACK_EVIDENCE.md.",
+ "sources": {
+  "ACSM-2009": {
+   "area": "session",
+   "title": "ACSM Position Stand: Progression models in resistance training for healthy adults",
+   "publisher": "American College of Sports Medicine (MSSE)",
+   "year": "2009",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A19204579%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+   "quotes": [
+    {
+     "text": "moderate contraction velocity (1-2 s CON; 1-2 s ECC) ... For local muscular endurance training, it is recommended that light to moderate loads (40-60% of 1 RM) be performed for high repetitions (>15) using short rest periods (<90 s).",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A19204579%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+     "research_id": "ACSM-2009"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_recommendation_rules.v1.json"
+   ]
+  },
+  "ACSM-2011": {
+   "area": "session",
+   "title": "ACSM Position Stand: Quantity and quality of exercise for developing and maintaining cardiorespiratory, musculoskeletal, and neuromotor fitness in apparently healthy adults (Garber et al., MSSE 43(7)) - abstract",
+   "publisher": "American College of Sports Medicine",
+   "year": "2011",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID:21694556%20AND%20SRC:MED&resultType=core&format=json",
+   "quotes": [
+    {
+     "text": "completing a series of flexibility exercises for each the major muscle-tendon groups (a total of 60 s per exercise) on ≥2 d·wk is recommended.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID:21694556%20AND%20SRC:MED&resultType=core&format=json",
+     "research_id": "ACSM-2011"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "ACSM-2011-FT": {
+   "area": "session",
+   "title": "ACSM Position Stand 2011 (Garber et al.) - full text (flexibility table, warm-up/cool-down minutes)",
+   "publisher": "American College of Sports Medicine / Wolters Kluwer",
+   "year": "2011",
+   "url": "https://journals.lww.com/acsm-msse/fulltext/2011/07000/quantity_and_quality_of_exercise_for_developing.26.aspx",
+   "quotes": [
+    {
+     "text": "NOT RETRIEVED (HTTP 402 paywall). Hold-duration and warm-up/cool-down minute values from this document are not relied on.",
+     "url": "https://journals.lww.com/acsm-msse/fulltext/2011/07000/quantity_and_quality_of_exercise_for_developing.26.aspx",
+     "research_id": "ACSM-2011-FT"
+    }
+   ],
+   "fetched": false,
+   "verification": "NOT RETRIEVED: not relied on"
+  },
+  "ACSM-2011b": {
+   "area": "session",
+   "title": "ACSM Position Stand 2011 (Garber et al.) - abstract, progression/safety sentence",
+   "publisher": "American College of Sports Medicine",
+   "year": "2011",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID:21694556%20AND%20SRC:MED&resultType=core&format=json",
+   "quotes": [
+    {
+     "text": "Educating adults about and screening for signs and symptoms of CHD and gradual progression of exercise intensity and volume may reduce the risks of exercise.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID:21694556%20AND%20SRC:MED&resultType=core&format=json",
+     "research_id": "ACSM-2011b"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "ACSM-2026-BW": {
+   "area": "session",
+   "title": "ACSM Position Stand 2026, Resistance Training Prescription (body-weight evidence gap)",
+   "publisher": "American College of Sports Medicine, PMC12965823",
+   "year": "2026",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC12965823/fullTextXML",
+   "quotes": [
+    {
+     "text": "Body weight-supported RT was a portion of some reviews, but was not studied as a stand-alone intervention except in the case of the Nordic hamstring curl.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC12965823/fullTextXML",
+     "research_id": "ACSM-2026-BW"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "ACSM-2026-EFFORT": {
+   "area": "session",
+   "title": "ACSM Position Stand 2026, Resistance Training Prescription (effort targets)",
+   "publisher": "American College of Sports Medicine, PMC12965823",
+   "year": "2026",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC12965823/fullTextXML",
+   "quotes": [
+    {
+     "text": "While training to failure is not obligatory for optimizing results, there is insufficient evidence to quantify exact RIR and perceived exertion targets",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC12965823/fullTextXML",
+     "research_id": "ACSM-2026-EFFORT"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "ACSM-2026-PROG": {
+   "area": "session",
+   "title": "ACSM Position Stand 2026, Resistance Training Prescription (progression)",
+   "publisher": "American College of Sports Medicine, PMC12965823",
+   "year": "2026",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12965823",
+   "quotes": [
+    {
+     "text": "progression is not necessary to achieve beneficial outcomes, and overload, or more accurately, increasing the stimulus in some manner, is likely a requirement only for those seeking continued longer term progress.",
+     "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12965823",
+     "research_id": "ACSM-2026-PROG"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_recommendation_rules.v1.json"
+   ]
+  },
+  "ACSM-2026-SETS": {
+   "area": "session",
+   "title": "ACSM Position Stand 2026, Resistance Training Prescription (sets, scope, individualization)",
+   "publisher": "American College of Sports Medicine, PMC12965823",
+   "year": "2026",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC12965823/fullTextXML",
+   "quotes": [
+    {
+     "text": "healthy adults are advised to complete at least two sets per exercise. ... RT programs would ideally be individualized to maximize adherence, enjoyment, safety, and effectiveness specific to training goals.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC12965823/fullTextXML",
+     "research_id": "ACSM-2026-SETS"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_recommendation_rules.v1.json"
+   ]
+  },
+  "ACSM-2026-TEMPO-REST": {
+   "area": "session",
+   "title": "ACSM Position Stand. Resistance Training Prescription for Muscle Function, Hypertrophy, and Physical Performance in Healthy Adults: An Overview of Reviews (Currier, Phillips et al., MSSE 58(4):851-872)",
+   "publisher": "American College of Sports Medicine, PMC12965823",
+   "year": "2026",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC12965823/fullTextXML",
+   "quotes": [
+    {
+     "text": "Strength was not affected by RT performed with contractions to muscle failure/fatigue, ... fast (<2 s) versus moderate-slow (>2 s) contractions, ... short (<1 min) versus long (>1 min) between-set rest intervals",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC12965823/fullTextXML",
+     "research_id": "ACSM-2026-TEMPO-REST"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_recommendation_rules.v1.json"
+   ]
+  },
+  "ACSM-BLOG-FAIL": {
+   "area": "session",
+   "title": "ACSM Certified Blog: Stretching and Flexibility Guidelines Update (2021)",
+   "publisher": "American College of Sports Medicine",
+   "year": "2021",
+   "url": "https://www.acsm.org/blog-detail/acsm-certified-blog/2021/03/18/stretching-and-flexibility-guidelines-update",
+   "quotes": [
+    {
+     "text": "NOT RETRIEVED (HTTP 404; mirror rebrandx.acsm.org also 404). Not relied on.",
+     "url": "https://www.acsm.org/blog-detail/acsm-certified-blog/2021/03/18/stretching-and-flexibility-guidelines-update",
+     "research_id": "ACSM-BLOG-FAIL"
+    }
+   ],
+   "fetched": false,
+   "verification": "NOT RETRIEVED: not relied on"
+  },
+  "ACSM-FITT-SEC": {
+   "area": "session",
+   "title": "New Insights into the Role of Exercise in Inhibiting mTOR Signaling in Triple-Negative Breast Cancer (table reproducing ACSM flexibility FITT) - SECONDARY",
+   "publisher": "Oxidative Medicine and Cellular Longevity (Hindawi), PMC6186337",
+   "year": "2018",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC6186337/fullTextXML",
+   "quotes": [
+    {
+     "text": "Stretch to the point of feeling tightness or slight discomfort. ... Hold a static stretch for at least 10–30 s (30–60 s may confer greater benefit). Accumulate a total of 60 s of stretching for each flexibility exercise",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC6186337/fullTextXML",
+     "research_id": "ACSM-FITT-SEC"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "ACSM-GETP12": {
+   "area": "session",
+   "title": "GETP 11-12 Crosswalk (changes from ACSM's Guidelines for Exercise Testing and Prescription 11th to 12th ed.)",
+   "publisher": "American College of Sports Medicine",
+   "year": "2025",
+   "url": "https://acsm.org/wp-content/uploads/2025/03/GETP11-12-crosswalk.pdf",
+   "quotes": [
+    {
+     "text": "FITT Flexibility Recommendations These have been modified and no longer suggest a total of 90 s of flexibility/joint",
+     "url": "https://acsm.org/wp-content/uploads/2025/03/GETP11-12-crosswalk.pdf",
+     "research_id": "ACSM-GETP12"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "AHA-FAIL": {
+   "area": "session",
+   "title": "Warning Signs of a Heart Attack",
+   "publisher": "American Heart Association",
+   "year": "",
+   "url": "https://www.heart.org/en/health-topics/heart-attack/warning-signs-of-a-heart-attack",
+   "quotes": [
+    {
+     "text": "NOT RETRIEVED (HTTP 403). Not relied on.",
+     "url": "https://www.heart.org/en/health-topics/heart-attack/warning-signs-of-a-heart-attack",
+     "research_id": "AHA-FAIL"
+    }
+   ],
+   "fetched": false,
+   "verification": "NOT RETRIEVED: not relied on"
+  },
+  "APTA-OMNI": {
+   "area": "session",
+   "title": "OMNI Exertion Scale (Test & Measures)",
+   "publisher": "American Physical Therapy Association",
+   "year": "2022",
+   "url": "https://www.apta.org/patient-care/evidence-based-practice-resources/test-measures/omni-exertion-scale",
+   "quotes": [
+    {
+     "text": "Reprinted, by permission, from Robertson RJ. Perceived Exertion for Practitioners",
+     "url": "https://www.apta.org/patient-care/evidence-based-practice-resources/test-measures/omni-exertion-scale",
+     "research_id": "APTA-OMNI"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "BEHM-2016": {
+   "area": "session",
+   "title": "Acute effects of muscle stretching on physical performance, range of motion, and injury incidence in healthy active individuals: a systematic review (Behm et al.)",
+   "publisher": "Applied Physiology, Nutrition, and Metabolism",
+   "year": "2016",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A26642915%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+   "quotes": [
+    {
+     "text": "SS and PNF stretching had no clear effect on all-cause or overuse injuries; no data are available for DS. All forms of training induced ROM improvements, typically lasting <30 min.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A26642915%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+     "research_id": "BEHM-2016"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "BOK-2022": {
+   "area": "session",
+   "title": "An Examination and Critique of Subjective Methods to Determine Exercise Intensity: The Talk Test, Feeling Scale, and Rating of Perceived Exertion",
+   "publisher": "Sports Medicine",
+   "year": "2022",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=TITLE%3A%22talk%20test%22%20AND%20TITLE%3A%22exercise%20intensity%22%20AND%20PUB_TYPE%3A%22review%22&resultType=core&format=json&pageSize=3",
+   "quotes": [
+    {
+     "text": "The TT and RPE appear to be valid measures of both the ventilatory threshold and the respiratory compensation threshold.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=TITLE%3A%22talk%20test%22%20AND%20TITLE%3A%22exercise%20intensity%22%20AND%20PUB_TYPE%3A%22review%22&resultType=core&format=json&pageSize=3",
+     "research_id": "BOK-2022"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "BORG-FAQ": {
+   "area": "session",
+   "title": "FAQ - BorgPerception",
+   "publisher": "BorgPerception AB",
+   "year": "2026",
+   "url": "https://borgperception.se/faq/",
+   "quotes": [
+    {
+     "text": "BorgPerception AB has copyright and trademark for the different authorized Borg Scales ... To be able to use a Borg scale you need to obtain a license and pay applicable fee.",
+     "url": "https://borgperception.se/faq/",
+     "research_id": "BORG-FAQ"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_session_feedback.v1.json"
+   ]
+  },
+  "BORG-FEES": {
+   "area": "session",
+   "title": "Information about fees - BorgPerception",
+   "publisher": "BorgPerception AB",
+   "year": "2026",
+   "url": "https://borgperception.se/information-about-fees/",
+   "quotes": [
+    {
+     "text": "Borg CR Scale® (CR10): \"Base license (including English and Swedish): €990\" ... IT vendors: \"Contact info@borgperception.se\"",
+     "url": "https://borgperception.se/information-about-fees/",
+     "research_id": "BORG-FEES"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "BORG-LICENSE": {
+   "area": "session",
+   "title": "Obtain a license - BorgPerception",
+   "publisher": "BorgPerception AB",
+   "year": "2026",
+   "url": "https://borgperception.se/obtain-a-license/",
+   "quotes": [
+    {
+     "text": "Commercial: \"Companies that use the scale for their commercial business.\" ... IT companies: \"This category is for 3rd party system providers that provides \"electronic\" integration.\"",
+     "url": "https://borgperception.se/obtain-a-license/",
+     "research_id": "BORG-LICENSE"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "CAMPOS-2016": {
+   "area": "session",
+   "title": "Effect of the Pilates method on physical conditioning of healthy subjects: a systematic review and meta-analysis",
+   "publisher": "Journal of Sports Medicine and Physical Fitness",
+   "year": "2016",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A26004043%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+   "quotes": [
+    {
+     "text": "Pilates improved abdominal muscular endurance when compared with no exercises ... however, there was no difference in flexibility (MD=4.97; 95% CI: -0.53, 10.47; P=0.08).",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A26004043%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+     "research_id": "CAMPOS-2016"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "CARLIN-2020": {
+   "area": "session",
+   "title": "Acute effects of mat Pilates session on heart rate and rating of perceived exertion",
+   "publisher": "Journal of Bodywork and Movement Therapies",
+   "year": "2020",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A32507133%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+   "quotes": [
+    {
+     "text": "Ten participants volunteered ... Half of the exercises achieved moderate intensity in HR with low estimated VO 2max during the whole MP session.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A32507133%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+     "research_id": "CARLIN-2020"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "CDC-HA": {
+   "area": "session",
+   "title": "About Heart Attack and Symptoms",
+   "publisher": "U.S. Centers for Disease Control and Prevention (CDC)",
+   "year": "2024",
+   "url": "https://www.cdc.gov/heart-disease/about/heart-attack.html",
+   "quotes": [
+    {
+     "text": "\"Chest pain or discomfort.\" \"Feeling weak, light-headed, or faint.\" ... \"Shortness of breath.\" ... \"If you notice the symptoms of a heart attack in yourself or someone else, call 9-1-1 immediately.\"",
+     "url": "https://www.cdc.gov/heart-disease/about/heart-attack.html",
+     "research_id": "CDC-HA"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_session_feedback.v1.json"
+   ]
+  },
+  "CDC-INT": {
+   "area": "session",
+   "title": "How to Measure Physical Activity Intensity",
+   "publisher": "U.S. Centers for Disease Control and Prevention (CDC)",
+   "year": "2025",
+   "url": "https://www.cdc.gov/physical-activity-basics/measuring/index.html",
+   "quotes": [
+    {
+     "text": "\"0 is the level of effort of sitting, and 10 is maximal effort.\" ... moderate is \"a level of effort of 5 or 6 on a scale of 0 to 10\" ... vigorous \"begins at a 7 or 8 on this scale.\"",
+     "url": "https://www.cdc.gov/physical-activity-basics/measuring/index.html",
+     "research_id": "CDC-INT"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_recommendation_rules.v1.json",
+    "sedens_session_feedback.v1.json"
+   ]
+  },
+  "CDC-TALK": {
+   "area": "session",
+   "title": "How to Measure Physical Activity Intensity (talk test section)",
+   "publisher": "U.S. Centers for Disease Control and Prevention (CDC)",
+   "year": "2025",
+   "url": "https://www.cdc.gov/physical-activity-basics/measuring/index.html",
+   "quotes": [
+    {
+     "text": "As a rule of thumb, a person doing moderate-intensity aerobic activity can talk, but not sing, during the activity. A person doing vigorous-intensity activity cannot say more than a few words without pausing for a breath.",
+     "url": "https://www.cdc.gov/physical-activity-basics/measuring/index.html",
+     "research_id": "CDC-TALK"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_recommendation_rules.v1.json",
+    "sedens_session_feedback.v1.json"
+   ]
+  },
+  "CHEN-2002": {
+   "area": "session",
+   "title": "Criterion-related validity of the Borg ratings of perceived exertion scale in healthy individuals: a meta-analysis",
+   "publisher": "Journal of Sports Sciences",
+   "year": "2002",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=TITLE%3A%22Criterion-related%20validity%20of%20the%20Borg%20ratings%20of%20perceived%20exertion%20scale%20in%20healthy%20individuals%22&resultType=core&format=json&pageSize=3",
+   "quotes": [
+    {
+     "text": "The weighted mean validity coefficients were 0.62 for heart rate ... These findings suggest that although Borg's RPE scale has been shown to be a valid measure of exercise intensity, its validity may not be as high as previously thought",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=TITLE%3A%22Criterion-related%20validity%20of%20the%20Borg%20ratings%20of%20perceived%20exertion%20scale%20in%20healthy%20individuals%22&resultType=core&format=json&pageSize=3",
+     "research_id": "CHEN-2002"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_session_feedback.v1.json"
+   ]
+  },
+  "CHEUNG-2003": {
+   "area": "session",
+   "title": "Delayed onset muscle soreness: treatment strategies and performance factors",
+   "publisher": "Sports Medicine",
+   "year": "2003",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A12617692%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+   "quotes": [
+    {
+     "text": "DOMS is also common when athletes are first introduced to certain types of activities ... Athletes who must train on a daily basis should be encouraged to reduce the intensity and duration of exercise for 1-2 days",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A12617692%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+     "research_id": "CHEUNG-2003"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_recommendation_rules.v1.json",
+    "sedens_session_feedback.v1.json"
+   ]
+  },
+  "CHRISTEN-2016": {
+   "area": "session",
+   "title": "Temporal Robustness of the Session Rating of Perceived Exertion",
+   "publisher": "International Journal of Sports Physiology and Performance",
+   "year": "2016",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=TITLE%3A%22Temporal%20Robustness%20of%20the%20Session%20Rating%20of%20Perceived%20Exertion%22&resultType=core&format=json&pageSize=3",
+   "quotes": [
+    {
+     "text": "No significant differences (P > .05) in sRPE were found based on postexercise sampling times, from 5 min to 24 h postexercise.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=TITLE%3A%22Temporal%20Robustness%20of%20the%20Session%20Rating%20of%20Perceived%20Exertion%22&resultType=core&format=json&pageSize=3",
+     "research_id": "CHRISTEN-2016"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_session_feedback.v1.json"
+   ]
+  },
+  "CRUZFERREIRA-2011": {
+   "area": "session",
+   "title": "A systematic review of the effects of Pilates method of exercise in healthy people",
+   "publisher": "Archives of Physical Medicine and Rehabilitation",
+   "year": "2011",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A22030232%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+   "quotes": [
+    {
+     "text": "PEDro scale values ranged from 3 to 7 (mean, 4.1), indicating a low level of scientific rigor. ... The PME appears to be effective in improving flexibility (strong evidence), dynamic balance (strong evidence), and muscular endurance (moderate evidence)",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A22030232%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+     "research_id": "CRUZFERREIRA-2011"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_recommendation_rules.v1.json"
+   ]
+  },
+  "DAY-2004": {
+   "area": "session",
+   "title": "Monitoring exercise intensity during resistance training using the session RPE scale",
+   "publisher": "Journal of Strength and Conditioning Research",
+   "year": "2004",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A15142026%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+   "quotes": [
+    {
+     "text": "RPE was measured following the completion of each set and 30 minutes postexercise (session RPE). ... The intraclass correlation coefficient for the session RPE was 0.88.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A15142026%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+     "research_id": "DAY-2004"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "FOSTER-2001": {
+   "area": "session",
+   "title": "A new approach to monitoring exercise training (Foster et al.)",
+   "publisher": "Journal of Strength and Conditioning Research",
+   "year": "2001",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A11708692%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+   "quotes": [
+    {
+     "text": "We conclude that the session RPE method is a valid method of quantitating exercise training during a wide variety of types of exercise.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A11708692%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+     "research_id": "FOSTER-2001"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "FRADKIN-2010": {
+   "area": "session",
+   "title": "Effects of warming-up on physical performance: a systematic review with meta-analysis (Fradkin et al.)",
+   "publisher": "Journal of Strength and Conditioning Research",
+   "year": "2010",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A19996770%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+   "quotes": [
+    {
+     "text": "Warm-up was shown to improve performance in 79% of the criterions examined. This analysis has shown that performance improvements can be demonstrated after completion of adequate warm-up activities, and there is little evidence to suggest that warming-up is detrimental",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A19996770%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+     "research_id": "FRADKIN-2010"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "HADDAD-2017": {
+   "area": "session",
+   "title": "Session-RPE Method for Training Load Monitoring: Validity, Ecological Usefulness, and Influencing Factors",
+   "publisher": "Frontiers in Neuroscience, PMC5673663",
+   "year": "2017",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC5673663/fullTextXML",
+   "quotes": [
+    {
+     "text": "36 studies have examined the validity and reliability of this proposed method using the modified CR-10. ... These studies confirmed the validity and good reliability and internal consistency of session-RPE method",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC5673663/fullTextXML",
+     "research_id": "HADDAD-2017"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "HADDAD-2017-ANCHORS": {
+   "area": "session",
+   "title": "Session-RPE Method review - origin of the session-RPE scale anchors",
+   "publisher": "Frontiers in Neuroscience, PMC5673663",
+   "year": "2017",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC5673663/fullTextXML",
+   "quotes": [
+    {
+     "text": "( 2001 ) have modified the verbal anchors used in the CR-10 scale (Borg, 1962 ) to reflect the American idiomatic English",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC5673663/fullTextXML",
+     "research_id": "HADDAD-2017-ANCHORS"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_session_feedback.v1.json"
+   ]
+  },
+  "KAMIOKA-2016": {
+   "area": "session",
+   "title": "Effectiveness of Pilates exercise: A quality evaluation and summary of systematic reviews based on randomized controlled trials",
+   "publisher": "Complementary Therapies in Medicine",
+   "year": "2016",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A27062942%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+   "quotes": [
+    {
+     "text": "Although no SR reported any adverse effect or harm by PE ... There was also evidence of improved flexibility and dynamic balance, and of enhanced muscular endurance in healthy people in the short term.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A27062942%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+     "research_id": "KAMIOKA-2016"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_recommendation_rules.v1.json"
+   ]
+  },
+  "KONRAD-2024": {
+   "area": "session",
+   "title": "Chronic effects of stretching on range of motion with consideration of potential moderating variables: a systematic review with meta-analysis (Konrad et al., J Sport Health Sci)",
+   "publisher": "Journal of Sport and Health Science (Elsevier), PMC10980866",
+   "year": "2024",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=DOI:10.1016/j.jshs.2023.06.002&resultType=core&format=json",
+   "quotes": [
+    {
+     "text": "stretch training can increase ROM with a moderate effect compared to the controls ... neither volume, intensity, nor frequency of stretching were found to play a significant role in ROM yields.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=DOI:10.1016/j.jshs.2023.06.002&resultType=core&format=json",
+     "research_id": "KONRAD-2024"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_recommendation_rules.v1.json"
+   ]
+  },
+  "KSEP-2015": {
+   "area": "session",
+   "title": "성인을 위한 신체활동 가이드라인 및 운동 강도에 대한 고찰 (Park, Kim, Kim; Exercise Science 24(2):99-107)",
+   "publisher": "Korean Society of Exercise Physiology (운동과학)",
+   "year": "2015",
+   "url": "https://www.ksep-es.org/upload/pdf/es-24-2-99.pdf",
+   "quotes": [
+    {
+     "text": "중강도와 고강도의 분류 기준은 1-10점의 자각강도를 활용하였고, 중강도를 “심장박동이 조금 빨라지는 또는 호흡이 약간 가쁜 상태(자각정도 4점 초반에서 6점 중반이하)”",
+     "url": "https://www.ksep-es.org/upload/pdf/es-24-2-99.pdf",
+     "research_id": "KSEP-2015"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "PAG-FLEX": {
+   "area": "session",
+   "title": "Physical Activity Guidelines for Americans, 2nd edition (Flexibility Activities)",
+   "publisher": "U.S. Department of Health and Human Services (ODPHP)",
+   "year": "2018",
+   "url": "https://odphp.health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf",
+   "quotes": [
+    {
+     "text": "flexibility activities are an appropriate part of a physical activity program, even though their health benefits are unknown and it is unclear whether they reduce risk of injury. Time spent doing flexibility activities by themselves does not count",
+     "url": "https://odphp.health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf",
+     "research_id": "PAG-FLEX"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "PAG-MS": {
+   "area": "session",
+   "title": "Physical Activity Guidelines for Americans, 2nd edition (Muscle-strengthening activity)",
+   "publisher": "U.S. Department of Health and Human Services (ODPHP)",
+   "year": "2018",
+   "url": "https://odphp.health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf",
+   "quotes": [
+    {
+     "text": "When resistance training is used to enhance muscle strength, one set of 8 to 12 repetitions of each exercise is effective, although 2 or 3 sets may be more effective.",
+     "url": "https://odphp.health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf",
+     "research_id": "PAG-MS"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_recommendation_rules.v1.json"
+   ]
+  },
+  "PAG-OVERUSE": {
+   "area": "session",
+   "title": "Physical Activity Guidelines for Americans, 2nd edition (Prior Experience)",
+   "publisher": "U.S. Department of Health and Human Services (ODPHP)",
+   "year": "2018",
+   "url": "https://odphp.health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf",
+   "quotes": [
+    {
+     "text": "Generally, if an overuse injury occurred in the past with a certain rate of progression, a person should increase activity more slowly the next time.",
+     "url": "https://odphp.health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf",
+     "research_id": "PAG-OVERUSE"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_recommendation_rules.v1.json",
+    "sedens_session_feedback.v1.json"
+   ]
+  },
+  "PAG-REL": {
+   "area": "session",
+   "title": "Physical Activity Guidelines for Americans, 2nd edition (Ch. 4, relative intensity)",
+   "publisher": "U.S. Department of Health and Human Services (ODPHP)",
+   "year": "2018",
+   "url": "https://odphp.health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf",
+   "quotes": [
+    {
+     "text": "Older or less fit adults may find that activities in Table 4-1 labeled as moderate intensity are experienced as vigorous intensity. These adults will gain health benefits from starting with activities that would be considered light intensity",
+     "url": "https://odphp.health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf",
+     "research_id": "PAG-REL"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_recommendation_rules.v1.json"
+   ]
+  },
+  "PAG-SAFE": {
+   "area": "session",
+   "title": "Physical Activity Guidelines for Americans, 2nd edition (Key Guidelines for Safe Physical Activity)",
+   "publisher": "U.S. Department of Health and Human Services (ODPHP)",
+   "year": "2018",
+   "url": "https://odphp.health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf",
+   "quotes": [
+    {
+     "text": "Inactive people should “start low and go slow” by starting with lower intensity activities and gradually increasing how often and how long activities are done.",
+     "url": "https://odphp.health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf",
+     "research_id": "PAG-SAFE"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_recommendation_rules.v1.json"
+   ]
+  },
+  "PAG-SYMPT": {
+   "area": "session",
+   "title": "Physical Activity Guidelines for Americans, 2nd edition (Advice From Health Care Providers)",
+   "publisher": "U.S. Department of Health and Human Services (ODPHP)",
+   "year": "2018",
+   "url": "https://odphp.health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf",
+   "quotes": [
+    {
+     "text": "People who develop new symptoms when increasing their levels of activity should consult a health care provider.",
+     "url": "https://odphp.health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf",
+     "research_id": "PAG-SYMPT"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_recommendation_rules.v1.json",
+    "sedens_session_feedback.v1.json"
+   ]
+  },
+  "PAG-WARM": {
+   "area": "session",
+   "title": "Physical Activity Guidelines for Americans, 2nd edition (Warm-Up and Cool-Down)",
+   "publisher": "U.S. Department of Health and Human Services (ODPHP)",
+   "year": "2018",
+   "url": "https://odphp.health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf",
+   "quotes": [
+    {
+     "text": "Commonly, the warm-up and cool-down involve doing an activity at a slower speed or lower intensity. ... A warm-up for muscle-strengthening activity commonly involves doing exercises with lighter weight.",
+     "url": "https://odphp.health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf",
+     "research_id": "PAG-WARM"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_recommendation_rules.v1.json"
+   ]
+  },
+  "PETRO-2025": {
+   "area": "session",
+   "title": "Validity of Rating of Perceived Exertion Scales in Relation to Movement Velocity and Exercise Intensity During Resistance-Exercise: A Systematic Review",
+   "publisher": "Sports Health, PMC11569527",
+   "year": "2025",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A38910451%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+   "quotes": [
+    {
+     "text": "Exercise professionals should consider familiarizing participants with RPE scales and factors that might influence the perception of exertion (eg, level of training, motivation, and environmental conditions).",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A38910451%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+     "research_id": "PETRO-2025"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "ROBERTSON-2003": {
+   "area": "session",
+   "title": "Concurrent validation of the OMNI perceived exertion scale for resistance exercise",
+   "publisher": "Medicine and Science in Sports and Exercise",
+   "year": "2003",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A12569225%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+   "quotes": [
+    {
+     "text": "Findings provided concurrent validation of the OMNI-RES to measure RPE for the active muscle and overall body in young recreationally trained female and male weight lifters",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A12569225%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+     "research_id": "ROBERTSON-2003"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "ROQUE-2024": {
+   "area": "session",
+   "title": "Are Pilates Exercises Effective in Improving Postural Misalignment? Systematic Review and Metanalysis",
+   "publisher": "Musculoskeletal Care",
+   "year": "2024",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A39562728%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+   "quotes": [
+    {
+     "text": "In adults, very low- to low-certainty evidence has indicated that Pilates improves postural alignment of the shoulder angle",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A39562728%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+     "research_id": "ROQUE-2024"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_recommendation_rules.v1.json"
+   ]
+  },
+  "S01": {
+   "area": "scan_feedback",
+   "title": "The Relationship Between Forward Head Posture and Neck Pain: a Systematic Review and Meta-Analysis",
+   "publisher": "Current Reviews in Musculoskeletal Medicine (Springer)",
+   "year": "2019",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A31773477&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "This systematic review found that age played an important role as a confounding factor in the relation between FHP and neck pain.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A31773477&resultType=core&format=json&pageSize=1",
+     "research_id": "S01"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S02": {
+   "area": "scan_feedback",
+   "title": "Is Neck Pain Related to Sagittal Head and Neck Posture?: A Systematic Review and Meta-analysis",
+   "publisher": "Indian Journal of Orthopaedics (Springer)",
+   "year": "2023",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A36825268&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "CVA differs for age, gender, and pain vs pain-free subjects, and correlates negatively with NP measures. Other surrogate measures (SHA, cranial and cervical angles, FHP) warrant further research.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A36825268&resultType=core&format=json&pageSize=1",
+     "research_id": "S02"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S03": {
+   "area": "scan_feedback",
+   "title": "Is Neck Posture Subgroup in Late Adolescence a Risk Factor for Persistent Neck Pain in Young Adults? A Prospective Study (Raine cohort, photo-measured posture)",
+   "publisher": "Physical Therapy (APTA / Oxford University Press)",
+   "year": "2021",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A33444448&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "sitting neck posture at 17 was not a risk factor for PNP at 22 years of age in males, whereas in females, more relaxed postures (slumped thorax/forward head and Intermediate postures) were protective of neck pain",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A33444448&resultType=core&format=json&pageSize=1",
+     "research_id": "S03"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S04": {
+   "area": "scan_feedback",
+   "title": "No consensus on causality of spine postures or physical exposure and low back pain: A systematic review of systematic reviews",
+   "publisher": "Journal of Biomechanics (Elsevier)",
+   "year": "2020",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A31451200&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "Despite the availability of many reviews, there is no consensus regarding causality of physical exposure to LBP. Association has been documented but does not provide a causal explanation for LBP.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A31451200&resultType=core&format=json&pageSize=1",
+     "research_id": "S04"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S05": {
+   "area": "scan_feedback",
+   "title": "Spinal curves and health: a systematic critical review of the epidemiological literature dealing with associations between sagittal spinal curves and health",
+   "publisher": "Journal of Manipulative and Physiological Therapeutics (Elsevier)",
+   "year": "2008",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A19028253&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "Evidence from epidemiological studies does not support an association between sagittal spinal curves and health including spinal pain.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A19028253&resultType=core&format=json&pageSize=1",
+     "research_id": "S05"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S06": {
+   "area": "scan_feedback",
+   "title": "Comparing lumbo-pelvic kinematics in people with and without back pain: a systematic review and meta-analysis",
+   "publisher": "BMC Musculoskeletal Disorders",
+   "year": "2014",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A25012528&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "people with LBP display: (i) no difference in lordosis angle (8 studies) ... (iv) no difference in standing pelvic tilt angle (3 studies)",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A25012528&resultType=core&format=json&pageSize=1",
+     "research_id": "S06"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S07": {
+   "area": "scan_feedback",
+   "title": "Is thoracic spine posture associated with shoulder pain, range of motion and function? A systematic review",
+   "publisher": "Manual Therapy (Elsevier)",
+   "year": "2016",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A27475532&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "There is a moderate level of evidence of no significant difference in thoracic kyphosis between groups with and without shoulder pain.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A27475532&resultType=core&format=json&pageSize=1",
+     "research_id": "S07"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S08": {
+   "area": "scan_feedback",
+   "title": "Is there a relationship between subacromial impingement syndrome and scapular orientation? A systematic review",
+   "publisher": "British Journal of Sports Medicine (BMJ)",
+   "year": "2014",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A24174615&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "deviation from a 'normal' scapular position may not be contributory to SIS but part of normal variations. Non-surgical treatment involving rehabilitation of the scapula to an idealised normal posture is currently not supported",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A24174615&resultType=core&format=json&pageSize=1",
+     "research_id": "S08"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_feedback_rules.v1.json"
+   ]
+  },
+  "S09": {
+   "area": "scan_feedback",
+   "title": "Is Shoulder Imbalance a Useful Parameter in the Screening of Idiopathic Scoliosis? A Preliminary Study",
+   "publisher": "Revista Brasileira de Ortopedia (Thieme)",
+   "year": "2023",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A37663184&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "The examiners had poor-to-slight interobserver concordance on shoulder asymmetry in the anterior and posterior view.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A37663184&resultType=core&format=json&pageSize=1",
+     "research_id": "S09"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_feedback_rules.v1.json"
+   ]
+  },
+  "S10": {
+   "area": "scan_feedback",
+   "title": "Assessment of the degree of pelvic tilt within a normal asymptomatic population",
+   "publisher": "Manual Therapy (Elsevier)",
+   "year": "2011",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A21658988&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "But the difference in angle for males between sides was less than the smallest detectable difference statistic found in the reliability study, so most likely to be due to measurement error.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A21658988&resultType=core&format=json&pageSize=1",
+     "research_id": "S10"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S11": {
+   "area": "scan_feedback",
+   "title": "\"Sit Up Straight\": Time to Re-evaluate (Viewpoint)",
+   "publisher": "Journal of Orthopaedic & Sports Physical Therapy",
+   "year": "2019",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A31366294&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "Despite the absence of strong evidence to support these common beliefs, a large posture industry has flourished, with many interventions and products claiming to \"correct\" posture and prevent pain.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A31366294&resultType=core&format=json&pageSize=1",
+     "research_id": "S11"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S12": {
+   "area": "scan_feedback",
+   "title": "Reliability and validity of clinical tests to assess posture, pain location, and cervical spine mobility in adults with neck pain and its associated disorders: Part 4 (CADRE systematic review)",
+   "publisher": "Musculoskeletal Science & Practice (Elsevier)",
+   "year": "2018",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A30455032&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "We found little evidence to support the reliability and validity of clinical tests to assess head posture, pain location and cervical mobility in adults with NAD grades I-III.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A30455032&resultType=core&format=json&pageSize=1",
+     "research_id": "S12"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S13": {
+   "area": "scan_feedback",
+   "title": "Electronic measures of movement impairment, repositioning, and posture in people with and without neck pain - a systematic review",
+   "publisher": "Systematic Reviews (BMC)",
+   "year": "2019",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A31455393&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "no conclusion regarding differences in conjunct motion, tracking a motion pattern, and measures of posture could be drawn.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A31455393&resultType=core&format=json&pageSize=1",
+     "research_id": "S13"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S14": {
+   "area": "scan_feedback",
+   "title": "Biomechanical Posture Analysis in Healthy Adults with Machine Learning: Applicability and Reliability (MediaPipe Pose, front/back/lateral photos, 1-week retest, Table 1)",
+   "publisher": "Sensors (MDPI)",
+   "year": "2024",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC11086111/fullTextXML",
+   "quotes": [
+    {
+     "text": "Shoulder line | 1.2 ± 0.7 | 1.2 ± 0.9 | 0.740 | −0.01 | 0.73 | 0.48 | 1.33",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC11086111/fullTextXML",
+     "research_id": "S14"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_feedback_rules.v1.json",
+    "sedens_recommendation_rules.v1.json"
+   ]
+  },
+  "S15": {
+   "area": "scan_feedback",
+   "title": "Photogrammetry-based smartphone applications for spinal posture assessment: a systematic review and meta-analysis",
+   "publisher": "Scientific Reports (Springer Nature)",
+   "year": "2025",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC12827935/fullTextXML",
+   "quotes": [
+    {
+     "text": "Notably, the absence of these precision metrics prevents the determination of the MCID, which is a significant barrier to applying these findings in everyday clinical practice.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC12827935/fullTextXML",
+     "research_id": "S15"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_feedback_rules.v1.json"
+   ]
+  },
+  "S16": {
+   "area": "scan_feedback",
+   "title": "A computer vision-based mobile tool for assessing human posture: A validation study (NLMeasurer, PoseNet)",
+   "publisher": "Computer Methods and Programs in Biomedicine (Elsevier)",
+   "year": "2022",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A34936945&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "The use of surface markers on specific anatomical landmarks (i.e., ears, iliac spines and ankles) can facilitate the digital identification of these landmarks and improve the reliability of the postural measurements performed with NLMeasurer.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A34936945&resultType=core&format=json&pageSize=1",
+     "research_id": "S16"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_feedback_rules.v1.json"
+   ]
+  },
+  "S17": {
+   "area": "scan_feedback",
+   "title": "Validity and Reliability of Standing Posture Measurements Using a Mobile Application (PostureScreen Mobile vs VICON)",
+   "publisher": "Journal of Manipulative and Physiological Therapeutics (Elsevier)",
+   "year": "2019",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A31000345&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "Compared with the VICON measurements, PSM assessments of head tilt, shoulder tilt and shift, and hip tilt and shift in the frontal plane were biased.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A31000345&resultType=core&format=json&pageSize=1",
+     "research_id": "S17"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S18": {
+   "area": "scan_feedback",
+   "title": "Inter- and intra-rater agreement of static posture analysis using a mobile application",
+   "publisher": "Journal of Physical Therapy Science",
+   "year": "2016",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A28174460&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "To maximize inter- and intra-rater agreement, postural screening using this mobile application should be conducted with subjects wearing minimal clothing.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A28174460&resultType=core&format=json&pageSize=1",
+     "research_id": "S18"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S19": {
+   "area": "scan_feedback",
+   "title": "Reliability of Image J. Software to Evaluate the Craniovertebral Angle in Participants with and without Neck Pain",
+   "publisher": "Archives of Bone and Joint Surgery",
+   "year": "2025",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A41509052&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "The Standard Error of Measurement (SEM) ranged from 0.92° to 1.02°, while the Minimal Detectable Change (MDC) values ranged from 2.56° to 2.84°.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A41509052&resultType=core&format=json&pageSize=1",
+     "research_id": "S19"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S20": {
+   "area": "scan_feedback",
+   "title": "Test-retest reliability of a photographic marker-based system for postural examination",
+   "publisher": "Technology and Health Care (IOS Press)",
+   "year": "2023",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A36970916&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "The BHOHB system revealed excellent reliability for all the angles (ICCs: 0.92-0.99, SEM: 0.78∘-3.33∘)",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A36970916&resultType=core&format=json&pageSize=1",
+     "research_id": "S20"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S21": {
+   "area": "scan_feedback",
+   "title": "Implications for the use of postural analysis as a clinical diagnostic tool: reliability of quantifying upright standing spinal postures from photographic images",
+   "publisher": "Journal of Manipulative and Physiological Therapeutics (Elsevier)",
+   "year": "2005",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A16096037&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "If the postural analysis approach is to be used to detect changes due to clinical treatment, such changes must be larger than the baseline repositioning errors seen in healthy subjects.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A16096037&resultType=core&format=json&pageSize=1",
+     "research_id": "S21"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S22": {
+   "area": "scan_feedback",
+   "title": "Validity and Reliability of an Artificial Intelligence-Based Posture Estimation Software for Measuring Cervical and Lower-Limb Alignment Versus Radiographic Imaging",
+   "publisher": "Diagnostics (MDPI)",
+   "year": "2025",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A40506912&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "FHP showed the strongest correlation with the craniovertebral angle (r = -0.712) and C2-7 sagittal vertical axis (r = 0.704).",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A40506912&resultType=core&format=json&pageSize=1",
+     "research_id": "S22"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S23": {
+   "area": "scan_feedback",
+   "title": "Evaluation of the Craniovertebral Angle in Standing versus Sitting Positions in Young Adults with and without Severe Forward Head Posture",
+   "publisher": "International Journal of Exercise Science",
+   "year": "2024",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A38665167&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "Study findings support standing as a standardized body position for CVA assessment in young adults without pathology.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A38665167&resultType=core&format=json&pageSize=1",
+     "research_id": "S23"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S24": {
+   "area": "scan_feedback",
+   "title": "Quantifying test-retest reliability using the intraclass correlation coefficient and the SEM",
+   "publisher": "Journal of Strength and Conditioning Research (NSCA)",
+   "year": "2005",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A15705040&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "the SEM and its variants can be used to construct confidence intervals for individual scores and to determine the minimal difference needed to be exhibited for one to be confident that a true change in performance of an individual has occurred.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A15705040&resultType=core&format=json&pageSize=1",
+     "research_id": "S24"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S25": {
+   "area": "scan_feedback",
+   "title": "Geometry-informed correction of projection bias in browser-based monocular squat assessment",
+   "publisher": "Frontiers in Sports and Active Living",
+   "year": "2026",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A42427911&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "Raw joint angles obtained from the MMC system revealed significant systematic underestimation (hip: -11.2°, knee: -10.6°), consistent with perspective-induced projection effects predicted by the pinhole camera model",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A42427911&resultType=core&format=json&pageSize=1",
+     "research_id": "S25"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S26": {
+   "area": "scan_feedback",
+   "title": "Influence of the Camera Viewing Angle on OpenPose Validity in Motion Analysis",
+   "publisher": "Sensors (MDPI)",
+   "year": "2025",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC11819822/fullTextXML",
+   "quotes": [
+    {
+     "text": "However, the analysis also revealed significant biases when comparing the joint angles inferred from the different viewing angles.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC11819822/fullTextXML",
+     "research_id": "S26"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S27": {
+   "area": "scan_feedback",
+   "title": "Model Card: BlazePose GHUM 3D (MediaPipe Pose)",
+   "publisher": "Google (MediaPipe)",
+   "year": "2021",
+   "url": "https://storage.googleapis.com/mediapipe-assets/Model%20Card%20BlazePose%20GHUM%203D.pdf",
+   "quotes": [
+    {
+     "text": "The model is not intended for human life-critical decisions. The primary intended application is entertainment.",
+     "url": "https://storage.googleapis.com/mediapipe-assets/Model%20Card%20BlazePose%20GHUM%203D.pdf",
+     "research_id": "S27"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_feedback_rules.v1.json"
+   ]
+  },
+  "S28": {
+   "area": "scan_feedback",
+   "title": "Assessment of monocular human pose estimation models for clinical movement analysis",
+   "publisher": "Scientific Reports (Springer Nature)",
+   "year": "2025",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A41193590&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "The mean per joint position error between markerless human pose estimators and marker-based optical motion capturing was found to be in the range of 72 to 122 mm in 2D within the image plane",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A41193590&resultType=core&format=json&pageSize=1",
+     "research_id": "S28"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S29": {
+   "area": "scan_feedback",
+   "title": "From RGB-D to RGB-Only: Reliability and Clinical Relevance of Markerless Skeletal Tracking for Postural Assessment in Parkinson's Disease",
+   "publisher": "Sensors (MDPI)",
+   "year": "2026",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A41755089&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "lower-complexity MP models achieved high congruence with KIN_3D for trunk and shoulder alignment (ρ > 0.75), while the lateral view significantly improved tracking of sagittal angles (ρ ≥ 0.72). Conversely, the high-complexity model introduced significant skeletal distortions.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A41755089&resultType=core&format=json&pageSize=1",
+     "research_id": "S29"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S30": {
+   "area": "scan_feedback",
+   "title": "Repeatability and minimal detectable change including clothing effects for smartphone-based 3D markerless motion capture (OpenCap)",
+   "publisher": "Journal of Biomechanics (Elsevier)",
+   "year": "2024",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A39163799&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "Although clothing had minimal effects, it is still recommended to maintain consistent clothing to minimize overall variability.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A39163799&resultType=core&format=json&pageSize=1",
+     "research_id": "S30"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S31": {
+   "area": "scan_feedback",
+   "title": "Clothing condition does not affect meaningful clinical interpretation in markerless motion capture",
+   "publisher": "Journal of Biomechanics (Elsevier)",
+   "year": "2022",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A35749889&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "Hip, knee, and ankle joint angle root-mean-square deviation values averaged 2.6° and were comparable to previously reported average inter-session variability for this markerless system (2.8°).",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A35749889&resultType=core&format=json&pageSize=1",
+     "research_id": "S31"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S32": {
+   "area": "scan_feedback",
+   "title": "Effectiveness of Therapeutic Exercise on Forward Head Posture: A Systematic Review and Meta-analysis",
+   "publisher": "Journal of Manipulative and Physiological Therapeutics (Elsevier)",
+   "year": "2018",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A30107937&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "The precise nature of the relationship between FHP and musculoskeletal pain, and improvements in both after therapeutic exercise, remains to be established.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A30107937&resultType=core&format=json&pageSize=1",
+     "research_id": "S32"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S33": {
+   "area": "scan_feedback",
+   "title": "Corrective exercises strongly improve posture but fail to produce consistent clinical or functional benefits in patients with upper crossed syndrome: a systematic review and meta-analysis of RCTs",
+   "publisher": "BMC Sports Science, Medicine and Rehabilitation",
+   "year": "2026",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A42210327&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "CE produces large, significant improvements in postural alignment in individuals with UCS. However, evidence for clinically meaningful benefits in pain, function, and muscle strength remains limited and inconsistent.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A42210327&resultType=core&format=json&pageSize=1",
+     "research_id": "S33"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S34": {
+   "area": "scan_feedback",
+   "title": "Are Pilates Exercises Effective in Improving Postural Misalignment? Systematic Review and Metanalysis",
+   "publisher": "Musculoskeletal Care (Wiley)",
+   "year": "2024",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A39562728&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "In adults, very low- to low-certainty evidence has indicated that Pilates improves postural alignment of the shoulder angle",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A39562728&resultType=core&format=json&pageSize=1",
+     "research_id": "S34"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S35": {
+   "area": "scan_feedback",
+   "title": "Exercise programs may be effective in preventing a new episode of neck pain: a systematic review and meta-analysis",
+   "publisher": "Journal of Physiotherapy (Elsevier)",
+   "year": "2018",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A29908853&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "found moderate-quality evidence that exercise reduces the risk of a new episode of neck pain (OR 0.32, 95% CI 0.12 to 0.86).",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A29908853&resultType=core&format=json&pageSize=1",
+     "research_id": "S35"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S36": {
+   "area": "scan_feedback",
+   "title": "Prevention of Low Back Pain: A Systematic Review and Meta-analysis",
+   "publisher": "JAMA Internal Medicine",
+   "year": "2016",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A26752509&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "The current evidence suggests that exercise alone or in combination with education is effective for preventing LBP.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A26752509&resultType=core&format=json&pageSize=1",
+     "research_id": "S36"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S37": {
+   "area": "scan_feedback",
+   "title": "ACSM Position Stand: Quantity and quality of exercise for developing and maintaining cardiorespiratory, musculoskeletal, and neuromotor fitness in apparently healthy adults",
+   "publisher": "Medicine & Science in Sports & Exercise (American College of Sports Medicine)",
+   "year": "2011",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A21694556&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "Crucial to maintaining joint range of movement, completing a series of flexibility exercises for each the major muscle-tendon groups (a total of 60 s per exercise) on ≥2 d·wk is recommended.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A21694556&resultType=core&format=json&pageSize=1",
+     "research_id": "S37"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S38": {
+   "area": "scan_feedback",
+   "title": "World Health Organization 2020 guidelines on physical activity and sedentary behaviour",
+   "publisher": "British Journal of Sports Medicine (BMJ) / WHO",
+   "year": "2020",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A33239350&resultType=core&format=json&pageSize=1",
+   "quotes": [
+    {
+     "text": "The guidelines recommend regular muscle-strengthening activity for all age groups.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A33239350&resultType=core&format=json&pageSize=1",
+     "research_id": "S38"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "S39": {
+   "area": "scan_feedback",
+   "title": "의료기기와 개인용 건강관리제품(웰니스) 판단기준 (공무원 지침서, 등록번호 지침서-0091-03, 등록일 2026-02-12, 의료기기정책과)",
+   "publisher": "식품의약품안전처 (Korean Ministry of Food and Drug Safety, MFDS)",
+   "year": "2026",
+   "url": "https://www.mfds.go.kr/brd/m_1059/down.do?brd_id=data0010&seq=15229&data_tp=A&file_seq=1",
+   "quotes": [
+    {
+     "text": "의료기기와 개인용 건강관리제품은 ‘사용목적’과 ‘위해도’에 따라 판단한다.",
+     "url": "https://www.mfds.go.kr/brd/m_1059/down.do?brd_id=data0010&seq=15229&data_tp=A&file_seq=1",
+     "research_id": "S39"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "SCHOENFELD-2015": {
+   "area": "session",
+   "title": "Effect of repetition duration during resistance training on muscle hypertrophy: a systematic review and meta-analysis",
+   "publisher": "Sports Medicine",
+   "year": "2015",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A25601394%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+   "quotes": [
+    {
+     "text": "hypertrophic outcomes are similar when training with repetition durations ranging from 0.5 to 8 s. ... training at volitionally very slow durations (>10s per repetition) is inferior from a hypertrophy standpoint",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A25601394%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+     "research_id": "SCHOENFELD-2015"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_recommendation_rules.v1.json"
+   ]
+  },
+  "SILVA-2022": {
+   "area": "session",
+   "title": "Is the Pilates method efficient to cause changes in the body composition of healthy individuals? A systematic review",
+   "publisher": "Journal of Bodywork and Movement Therapies",
+   "year": "2022",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A36180159%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+   "quotes": [
+    {
+     "text": "the influence of Pilates on the body composition of healthy individuals is still uncertain due to the controversial results and the scarcity of studies with this public.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A36180159%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+     "research_id": "SILVA-2022"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "VANHOOREN-2018": {
+   "area": "session",
+   "title": "Do We Need a Cool-Down After Exercise? A Narrative Review (Van Hooren & Peake, Sports Med)",
+   "publisher": "Sports Medicine (Springer), PMC5999142",
+   "year": "2018",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A29663142%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+   "quotes": [
+    {
+     "text": "Active cool-downs do not appear to prevent injuries ... active cool-downs are largely ineffective for improving most psychophysiological markers of post-exercise recovery, but may nevertheless offer some benefits compared with a passive cool-down.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A29663142%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+     "research_id": "VANHOOREN-2018"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "WELLS-2012": {
+   "area": "session",
+   "title": "Defining Pilates exercise: a systematic review",
+   "publisher": "Complementary Therapies in Medicine",
+   "year": "2012",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A22579438%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+   "quotes": [
+    {
+     "text": "Findings suggest that Pilates is a mind-body exercise that focuses on strength, core stability, flexibility, muscle control, posture and breathing. Exercises can be mat-based or involve use of specialised equipment.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A22579438%20AND%20SRC%3AMED&resultType=core&format=json&pageSize=3",
+     "research_id": "WELLS-2012"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "WHO-BAL": {
+   "area": "session",
+   "title": "World Health Organization 2020 guidelines on physical activity and sedentary behaviour (older adults)",
+   "publisher": "WHO Guideline Development Group / BMJ (PMC7719906)",
+   "year": "2020",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7719906/",
+   "quotes": [
+    {
+     "text": "older adults should do varied multicomponent physical activity that emphasises functional balance and strength training at moderate or greater intensity on 3 or more days a week, to enhance functional capacity and to prevent falls.",
+     "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7719906/",
+     "research_id": "WHO-BAL"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "WHO-MS": {
+   "area": "session",
+   "title": "World Health Organization 2020 guidelines on physical activity and sedentary behaviour (Bull et al., Br J Sports Med)",
+   "publisher": "WHO Guideline Development Group / BMJ (PMC7719906)",
+   "year": "2020",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC7719906/fullTextXML",
+   "quotes": [
+    {
+     "text": "Adults should also do muscle-strengthening activities at moderate or greater intensity that involve all major muscle groups on 2 or more days a week, as these provide additional health benefits.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC7719906/fullTextXML",
+     "research_id": "WHO-MS"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "used_by": [
+    "sedens_recommendation_rules.v1.json"
+   ]
+  },
+  "WHO-START": {
+   "area": "session",
+   "title": "World Health Organization 2020 guidelines on physical activity and sedentary behaviour (good practice statement)",
+   "publisher": "WHO Guideline Development Group / BMJ (PMC7719906)",
+   "year": "2020",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC7719906/fullTextXML",
+   "quotes": [
+    {
+     "text": "Some physical activity is better than none for those not currently meeting these recommendations, individuals should start with small amounts of physical activity and gradually increase frequency, intensity and duration over time.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC7719906/fullTextXML",
+     "research_id": "WHO-START"
+    }
+   ],
+   "fetched": true,
+   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+  },
+  "acog_804": {
+   "area": "readiness",
+   "title": "Physical Activity and Exercise During Pregnancy and the Postpartum Period, Committee Opinion No. 804 (reaffirmed 2023), Box 3",
+   "publisher": "American College of Obstetricians and Gynecologists",
+   "year": "2020",
+   "url": "https://www.acog.org/clinical/clinical-guidance/committee-opinion/articles/2020/04/physical-activity-and-exercise-during-pregnancy-and-the-postpartum-period",
+   "quotes": [
+    {
+     "text": "Box 3. Warning Signs to Discontinue Exercise While Pregnant: Vaginal bleeding; Abdominal pain; Regular painful contractions; Amniotic fluid leakage; Dyspnea before exertion; Dizziness; Headache; Chest pain; Muscle weakness affecting balance; Calf pain or swelling",
+     "url": "https://www.acog.org/clinical/clinical-guidance/committee-opinion/articles/2020/04/physical-activity-and-exercise-during-pregnancy-and-the-postpartum-period",
+     "research_id": "acog_co804_signs"
+    },
+    {
+     "text": "Women should be advised to remain well hydrated, avoid long periods of lying flat on their backs, and stop exercising if they have any of the warning signs listed in Box 3.",
+     "url": "https://www.acog.org/clinical/clinical-guidance/committee-opinion/articles/2020/04/physical-activity-and-exercise-during-pregnancy-and-the-postpartum-period",
+     "research_id": "acog_co804_supine"
+    },
+    {
+     "text": "Exercise routines may be resumed gradually after pregnancy as soon as medically safe, depending on the mode of delivery (vaginal or cesarean birth) and the presence or absence of medical or surgical complications.",
+     "url": "https://www.acog.org/clinical/clinical-guidance/committee-opinion/articles/2020/04/physical-activity-and-exercise-during-pregnancy-and-the-postpartum-period",
+     "research_id": "acog_co804_postpartum"
+    },
+    {
+     "text": "Obstetrician–gynecologists and other obstetric care providers should evaluate women with medical or obstetric complications carefully before making recommendations on physical activity participation during pregnancy.",
+     "url": "https://www.acog.org/clinical/clinical-guidance/committee-opinion/articles/2020/04/physical-activity-and-exercise-during-pregnancy-and-the-postpartum-period",
+     "research_id": "acog_co804_eval"
+    }
+   ],
+   "fetched": true,
+   "verification": "independently re-fetched; quote found verbatim",
+   "verification_notes": [
+    "Box 3 matches verbatim. The page shows 'Reaffirmed 2023'.",
+    "The Box 3 list is verbatim. The page shows 'Reaffirmed 2023'.",
+    "Verbatim, and it appears twice. It concerns complicated pregnancies, so it does not cover 'known conditions' generally as finding 17 implies."
+   ],
+   "used_by": [
+    "sedens_readiness.v1.json",
+    "sedens_readiness.v1_1.json"
+   ]
+  },
+  "cdc_chronic": {
+   "area": "readiness",
+   "title": "Physical Activity Guidelines: Chronic Health Conditions and Disabilities",
+   "publisher": "U.S. Centers for Disease Control and Prevention",
+   "year": "2025",
+   "url": "https://www.cdc.gov/physical-activity-basics/guidelines/chronic-health-conditions-and-disabilities.html",
+   "quotes": [
+    {
+     "text": "consult a health care professional or physical activity specialist about appropriate types and amounts of physical activity",
+     "url": "https://www.cdc.gov/physical-activity-basics/guidelines/chronic-health-conditions-and-disabilities.html",
+     "research_id": "cdc_chronic"
+    }
+   ],
+   "fetched": true,
+   "verification": "independently re-fetched; quote found verbatim",
+   "verification_notes": [
+    "Fetched with WebFetch after curl got 403. The text is verbatim under the heading 'Consulting a health care professional'. The page is dated Dec 4, 2025.",
+    "Verbatim (fetched with a curl user-agent; a browser user-agent gets 403)."
+   ],
+   "used_by": [
+    "sedens_readiness.v1.json",
+    "sedens_readiness.v1_1.json"
+   ]
+  },
+  "cdc_heart_attack": {
+   "area": "readiness",
+   "title": "About Heart Attack and Symptoms",
+   "publisher": "U.S. Centers for Disease Control and Prevention",
+   "year": "2024",
+   "url": "https://www.cdc.gov/heart-disease/about/heart-attack.html",
+   "quotes": [
+    {
+     "text": "Chest pain or discomfort. ... Feeling weak, light-headed, or faint. ... Shortness of breath. ... If you notice the symptoms of a heart attack in yourself or someone else, call 9-1-1 immediately.",
+     "url": "https://www.cdc.gov/heart-disease/about/heart-attack.html",
+     "research_id": "cdc_heartattack"
+    }
+   ],
+   "fetched": true,
+   "verification": "independently re-fetched; quote found verbatim",
+   "verification_notes": [
+    "Fetched with WebFetch. The bullets 'Chest pain or discomfort', 'Feeling weak, light-headed, or faint', 'Shortness of breath', jaw/neck/back and arm/shoulder pain are present, along with 'call 9-1-1 immediately'. The page is dated Oct 24, 2024.",
+    "Verbatim. The page is dated Oct 24, 2024 and lists the major symptoms, cold sweat, nausea and 'call 9-1-1 immediately'."
+   ],
+   "used_by": [
+    "sedens_readiness.v1.json",
+    "sedens_readiness.v1_1.json"
+   ]
+  },
+  "cdc_pregnancy": {
+   "area": "readiness",
+   "title": "Physical Activity Guidelines: Healthy Pregnant or Postpartum Women",
+   "publisher": "U.S. Centers for Disease Control and Prevention",
+   "year": "2025",
+   "url": "https://www.cdc.gov/physical-activity-basics/guidelines/healthy-pregnant-or-postpartum-women.html",
+   "quotes": [
+    {
+     "text": "After the first trimester, try to avoid activities that require lying flat on your back. ... Consult your doctor about whether or how to adjust your physical activity during and after your pregnancy.",
+     "url": "https://www.cdc.gov/physical-activity-basics/guidelines/healthy-pregnant-or-postpartum-women.html",
+     "research_id": "cdc_pregnant"
+    }
+   ],
+   "fetched": true,
+   "verification": "independently re-fetched; quote found verbatim",
+   "verification_notes": [
+    "Returns HTTP 403 to a browser user-agent and 200 to a curl user-agent. Both quote parts are verbatim (last published 2025-12-04). The page also says 'Physical activity is safe for healthy pregnant and postpartum women', which is consistent with R7's copy rule.",
+    "curl got HTTP 403, but WebFetch succeeded. Both sentences are verbatim. The page is dated Dec 4, 2025."
+   ],
+   "used_by": [
+    "sedens_readiness.v1.json",
+    "sedens_readiness.v1_1.json"
+   ]
+  },
+  "cdc_stroke": {
+   "area": "readiness",
+   "title": "Signs and Symptoms of Stroke",
+   "publisher": "U.S. Centers for Disease Control and Prevention",
+   "year": "2026",
+   "url": "https://www.cdc.gov/stroke/signs-symptoms/index.html",
+   "quotes": [
+    {
+     "text": "Sudden trouble walking, dizziness, loss of balance, or lack of coordination. ... Call 9-1-1 right away if you or someone else has any of these symptoms.",
+     "url": "https://www.cdc.gov/stroke/signs-symptoms/index.html",
+     "research_id": "cdc_stroke"
+    }
+   ],
+   "fetched": true,
+   "verification": "independently re-fetched; quote found verbatim",
+   "verification_notes": [
+    "Fetched with WebFetch. All five signs, including 'Sudden severe headache with no known cause' and 'Call 9-1-1 right away', are present. The page is dated May 19, 2026. CDC lists sudden dizziness and loss of balance as 911 signs. The design's 'I don't feel well' flow does not handle this consistently, because Step 2 'dizzy' routes to rest-and-wait.",
+    "Verbatim. CDC lists every sign as 'Sudden ...'. The R2 follow-up ('unsteady right now' leads to urgent_help) drops the 'sudden' qualifier."
+   ],
+   "used_by": [
+    "sedens_readiness.v1.json",
+    "sedens_readiness.v1_1.json"
+   ]
+  },
+  "cuh_surgery": {
+   "area": "readiness",
+   "title": "Advice following abdominal surgery (patient information, version 4)",
+   "publisher": "Cambridge University Hospitals NHS Foundation Trust",
+   "year": "2024",
+   "url": "https://www.cuh.nhs.uk/patient-information/advice-following-abdominal-surgery/",
+   "quotes": [
+    {
+     "text": "(obviously this may vary dependant on your operation and circumstances) ... stop them immediately and ask your physiotherapist for further advice.",
+     "url": "https://www.cuh.nhs.uk/patient-information/advice-following-abdominal-surgery/",
+     "research_id": "cuh_surgery"
+    }
+   ],
+   "fetched": true,
+   "verification": "independently re-fetched; quote found verbatim",
+   "verification_notes": [
+    "Both fragments are verbatim (Approved 16 Jul 2024, Version 4). The 'stop... ask your physiotherapist' line refers to the leaflet's own post-op exercises. CUH does give week-based timelines for abdominal surgery (walking at about 6 weeks, low-impact from 6 weeks, back to normal at about 12 weeks) with a variability caveat. 'No source gives a general day-count rule' is therefore imprecise. This is a single-hospital UK leaflet.",
+    "Both fragments are verbatim (version 4, approved 16 Jul 2024). The leaflet does give week-based timelines for abdominal surgery (walking 30-45 min by week 6, low-impact exercise from 6 weeks, around 12 weeks back to normal) with a variance caveat. It is a single-trust, procedure-specific leaflet."
+   ],
+   "used_by": [
+    "sedens_readiness.v1.json",
+    "sedens_readiness.v1_1.json"
+   ]
+  },
+  "kdca_2026": {
+   "area": "readiness",
+   "title": "보도참고자료: 갑작스러운 마비·언어장애·가슴통증... 뇌졸중·심근경색 조기 대응 중요 (2026.2.10)",
+   "publisher": "질병관리청 (Korea Disease Control and Prevention Agency)",
+   "year": "2026",
+   "url": "https://kdca.go.kr/bbs/kdca/42/305195/download.do",
+   "quotes": [
+    {
+     "text": "다음과 같은 증상이 나타날 경우에는 지체 없이 119에 연락하여 적절한 치료를 받아야 한다. ... 환자가 직접 운전하는 것은 위험해요. ... 증상이 그냥 지나갈 거라고 생각하지 마세요.",
+     "url": "https://kdca.go.kr/bbs/kdca/42/305195/download.do",
+     "research_id": "kdca_2026"
+    }
+   ],
+   "fetched": true,
+   "verification": "independently re-fetched; quote found verbatim",
+   "verification_notes": [
+    "The PDF (8 pages, 2026-02-10) contains all three quotes and 'don't wait for family' (가족이 올 때까지 기다리지 마세요). The exact URL had one transient connection reset and then returned 200. KDCA's heart-attack list does not include faintness or light-headedness; sudden dizziness or loss of balance appears only under stroke.",
+    "curl got a connection reset, so the file was retrieved through WebFetch. It is a Hancom PDF press reference dated 2026.2.10, and all three Korean quotes are verbatim. It includes '가족이 올 때까지 기다리지 마세요' (don't wait for family to arrive). The stroke list includes '갑자기 어지럽거나 몸의 중심을 잡기 힘들다' (sudden dizziness or trouble keeping balance) and the heart-attack list includes '갑자기 숨이 많이 찬다' (sudden severe breathlessness). The download endpoint is flaky."
+   ],
+   "used_by": [
+    "sedens_readiness.v1.json",
+    "sedens_readiness.v1_1.json"
+   ]
+  },
+  "nhlbi_heart_attack": {
+   "area": "readiness",
+   "title": "Heart Attack - Symptoms",
+   "publisher": "U.S. National Heart, Lung, and Blood Institute (NIH)",
+   "year": "2022",
+   "url": "https://www.nhlbi.nih.gov/health/heart-attack/symptoms",
+   "quotes": [
+    {
+     "text": "Call 9-1-1 for emergency medical care, even if you are not sure that you’re having a heart attack. ... Do not drive to the hospital or let someone else drive you.",
+     "url": "https://www.nhlbi.nih.gov/health/heart-attack/symptoms",
+     "research_id": "nhlbi_heartattack"
+    }
+   ],
+   "fetched": true,
+   "verification": "independently re-fetched; quote found verbatim",
+   "verification_notes": [
+    "Both quotes are verbatim, and it lists sweating, nausea, light-headedness and rapid or irregular heartbeat. These are heart-attack symptoms, not exercise stop criteria, so finding 16 calling them 'recognised in-session warning signs to stop' is a repackaging.",
+    "Both sentences are verbatim. The symptom list also includes sweating for no reason, nausea, and rapid or irregular heartbeat. The page was last updated March 24, 2022."
+   ],
+   "used_by": [
+    "sedens_readiness.v1.json",
+    "sedens_readiness.v1_1.json"
+   ]
+  },
+  "nia_2025": {
+   "area": "readiness",
+   "title": "Exercise and Physical Activity for Older Adults: Staying Active as You Age (NIH Pub. No. 25-AG-8135) - Safety Tips for Aerobic Activity",
+   "publisher": "U.S. National Institute on Aging (NIH)",
+   "year": "2025",
+   "url": "https://order.nia.nih.gov/sites/default/files/2025-04/exercise-and-older-adults-nia_0.pdf",
+   "quotes": [
+    {
+     "text": "Listen to your body. Aerobic activities should not cause dizziness, chest pain or pressure, or nausea.",
+     "url": "https://order.nia.nih.gov/sites/default/files/2025-04/exercise-and-older-adults-nia_0.pdf",
+     "research_id": "nia2025_safety"
+    },
+    {
+     "text": "If you have pain, swelling, or inflammation in a specific area, you may need to focus on another area or rest for a day or two. Talk with a doctor about what exercises and activities might be right for you.",
+     "url": "https://order.nia.nih.gov/sites/default/files/2025-04/exercise-and-older-adults-nia_0.pdf",
+     "research_id": "nia2025_pain"
+    },
+    {
+     "text": "Older adults who do not have an existing injury or chronic condition, and who plan to gradually increase their amounts of physical activity, generally do not need to talk with a doctor before becoming physically active.",
+     "url": "https://order.nia.nih.gov/sites/default/files/2025-04/exercise-and-older-adults-nia_0.pdf",
+     "research_id": "nia2025_injury"
+    }
+   ],
+   "fetched": true,
+   "verification": "independently re-fetched; quote found verbatim",
+   "verification_notes": [
+    "The PDF has HTTP 200 and shows NIH Publication No. 25-AG-8135, March 2025. The quote is verbatim. NIA lists only dizziness, chest pain or pressure, and nausea. The other 'stop' signs in finding 16 come from heart-attack symptom pages.",
+    "The quote is verbatim and supports finding 11 and the R5 rationale. However, the 'Decision' item cites it as support for 'no modified outcome', and the source says the opposite. NIA endorses self-directed modification ('focus on another area or rest for a day or two') and says 'Most people living with chronic pain can exercise safely'. do_not_start for R5 is a conservative product choice, not NIA guidance.",
+    "Verbatim. It advises self-managed modification ('focus on another area or rest'), which cuts against the Decision item's claim that no source endorses self-modification. It is still valid support for R5's conservative choice and for finding 11."
+   ],
+   "used_by": [
+    "sedens_readiness.v1.json",
+    "sedens_readiness.v1_1.json"
+   ]
+  },
+  "pag_2018": {
+   "area": "readiness",
+   "title": "Physical Activity Guidelines for Americans, 2nd edition - Key Guidelines for Safe Physical Activity",
+   "publisher": "U.S. Department of Health and Human Services (ODPHP)",
+   "year": "2018",
+   "url": "https://odphp.health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf",
+   "quotes": [
+    {
+     "text": "Be under the care of a health care provider if they have chronic conditions or symptoms. People with chronic conditions and symptoms can consult a health care professional or physical activity specialist",
+     "url": "https://odphp.health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf",
+     "research_id": "pag2018_safe"
+    },
+    {
+     "text": "People without diagnosed chronic conditions (such as diabetes, heart disease, or osteoarthritis) and who do not have symptoms (such as chest pain or pressure, dizziness, or joint pain) most likely do not need to consult",
+     "url": "https://odphp.health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf",
+     "research_id": "pag2018_symptoms"
+    },
+    {
+     "text": "No evidence is available to indicate that people who consult with their health care provider receive more benefits and suffer fewer adverse events than people who do not.",
+     "url": "https://odphp.health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf",
+     "research_id": "pag2018_noevidence"
+    },
+    {
+     "text": "Inactive people should “start low and go slow” by starting with lower intensity activities and gradually increasing how often and how long activities are done.",
+     "url": "https://odphp.health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf",
+     "research_id": "pag2018_startlow"
+    },
+    {
+     "text": "Women who are pregnant should be under the care of a health care provider who can monitor the progress of the pregnancy.",
+     "url": "https://odphp.health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf",
+     "research_id": "pag2018_pregnancy"
+    }
+   ],
+   "fetched": true,
+   "verification": "independently re-fetched; quote found verbatim",
+   "verification_notes": [
+    "The PDF has HTTP 200 and a matching size. The text is verbatim (pages 10 and 88). 'Can consult' is permissive. 'Sensible choices about when, where, and how to be active' is also present, which supports R8 only weakly, as the result admits.",
+    "Verbatim (PDF pp. 10 and 88), together with 'making sensible choices about when, where, and how to be active'. The consult language is permissive ('can consult'), so it does not support finding 17's claim that guidelines route known conditions to professionals.",
+    "Verbatim (p. 92)."
+   ],
+   "used_by": [
+    "sedens_readiness.v1.json",
+    "sedens_readiness.v1_1.json",
+    "sedens_recommendation_rules.v1.json"
+   ]
+  },
+  "riebe2015": {
+   "area": "readiness",
+   "title": "Updating ACSM's Recommendations for Exercise Preparticipation Health Screening (Riebe et al., Med Sci Sports Exerc 47(11):2473-2479), abstract record",
+   "publisher": "American College of Sports Medicine / Medicine & Science in Sports & Exercise (via Europe PMC)",
+   "year": "2015",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID:26473759%20AND%20SRC:MED&resultType=core&format=json",
+   "quotes": [
+    {
+     "text": "exercise-related cardiovascular events are often preceded by warning signs/symptoms; and the cardiovascular risks associated with exercise lessen as individuals become more physically active/fit",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID:26473759%20AND%20SRC:MED&resultType=core&format=json",
+     "research_id": "riebe2015"
+    },
+    {
+     "text": "three factors: 1) the individual's current level of physical activity, 2) presence of signs or symptoms and/or known cardiovascular, metabolic, or renal disease, and 3) desired exercise intensity",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID:26473759%20AND%20SRC:MED&resultType=core&format=json",
+     "research_id": "riebe2015_model"
+    }
+   ],
+   "fetched": true,
+   "verification": "independently re-fetched; quote found verbatim",
+   "verification_notes": [
+    "Europe PMC abstract (PMID 26473759) contains the quote verbatim. It supports the facts in finding 1. It does not support finding 1's conclusion that the screen should rest on 'current symptoms rather than risk-factor profiling'. Riebe drops risk-factor profiling but keeps known CV/metabolic/renal disease and current activity level as screening factors. It is a roundtable consensus ('evidence-informed'), so 'strong' overstates it.",
+    "Europe PMC record for PMID 26473759 returned. The quote is verbatim in the abstract. It supports 'often preceded by warning signs' and 'risk lessens as people become more active'. Two caveats. (1) This is a scientific roundtable model that is 'evidence-informed', not strong outcome evidence, and Whitfield 2017 says the algorithm still needs validation. (2) The same abstract keeps known cardiovascular, metabolic or renal disease as a factor, so 'a screen built on current symptoms' leaves out half of factor 2.",
+    "The three-factor quote is in the abstract verbatim. SEDENS leaves out factor 1 (activity level) and the known-disease half of factor 2. Any statement that the screen follows the ACSM model needs that caveat."
+   ],
+   "used_by": [
+    "sedens_readiness.v1.json",
+    "sedens_readiness.v1_1.json",
+    "sedens_recommendation_rules.v1.json"
+   ]
+  },
+  "thompson_2007": {
+   "area": "readiness",
+   "title": "Exercise and acute cardiovascular events: placing the risks into perspective. AHA Scientific Statement (Thompson et al., Circulation), abstract",
+   "publisher": "American Heart Association (via Europe PMC)",
+   "year": "2007",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=DOI%3A%2210.1161%2FCIRCULATIONAHA.107.181485%22&resultType=core&format=json",
+   "quotes": [
+    {
+     "text": "Other strategies, such as screening patients before participation in exercise, ... promptly evaluating possible prodromal symptoms, training fitness personnel for emergencies, ... appear prudent but have not been systematically evaluated.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=DOI%3A%2210.1161%2FCIRCULATIONAHA.107.181485%22&resultType=core&format=json",
+     "research_id": "thompson2007"
+    }
+   ],
+   "fetched": true,
+   "verification": "independently re-fetched; quote found verbatim",
+   "verification_notes": [
+    "Abstract verbatim (with ellipses). It also says 'No strategies have been adequately studied'. It does not say events are 'often preceded by warning signs', although finding 1 cites it for that alongside Riebe. Only Riebe says it.",
+    "The abstract quote is verbatim, and the abstract also says 'No strategies have been adequately studied'. The statement dates from 2007, so 'no strategy has been shown' should be dated rather than presented as current 'strong' evidence. The abstract also says events 'generally occur in individuals with structural cardiac disease', which argues for a known-disease item."
+   ],
+   "used_by": [
+    "sedens_readiness.v1.json",
+    "sedens_readiness.v1_1.json"
+   ]
+  },
+  "whitfield2017": {
+   "area": "readiness",
+   "title": "Applying the ACSM Preparticipation Screening Algorithm to U.S. Adults: NHANES 2001-2004 (Whitfield, Riebe, Magal, Liguori), Methods",
+   "publisher": "Medicine & Science in Sports & Exercise (PMC7059860)",
+   "year": "2017",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7059860/",
+   "quotes": [
+    {
+     "text": "recommended to begin light to moderate intensity physical exercise without clearance",
+     "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7059860/",
+     "research_id": "whitfield2017_light"
+    },
+    {
+     "text": "are recommended to seek medical clearance before beginning exercise of any intensity",
+     "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7059860/",
+     "research_id": "whitfield2017_clearance"
+    },
+    {
+     "text": "On the basis of the ACSM algorithm, 2.6% of adults would be referred only before beginning vigorous exercise and 54.2% of respondents would be referred before beginning any exercise.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=PMCID:PMC7059860&resultType=core&format=json",
+     "research_id": "whitfield2017_referral"
+    }
+   ],
+   "fetched": true,
+   "verification": "independently re-fetched; quote found verbatim",
+   "verification_notes": [
+    "Abstract verbatim: 2.6% and 54.2% of US adults aged 40+, NHANES 2001-2004. The abstract also warns that 'additional validation is needed to determine whether the algorithm correctly identifies those at risk', and the result leaves that out.",
+    "PMC7059860: the quote is in the Figure 1 legend in Methods (reproduced from Riebe 2015). The full sentence covers only people 'not currently exercising' who are asymptomatic 'with no history of the specified diseases'. SEDENS never asks about disease history, so its 'ready' path is not this group, contrary to finding 17 and the Decision item.",
+    "The PMC page served reCAPTCHA to curl, so the full text was verified through NCBI E-utilities efetch for PMC7059860. The quote is verbatim and supports finding 3. The same Methods paragraph refutes finding 17 and the 'Decision' item. It says that among people who are currently exercising, 'Asymptomatic respondents with a positive history of the specified diseases are encouraged to continue light to moderate intensity exercise without clearance'. So the no-clearance light-to-moderate allowance is NOT limited to people without symptoms or known disease."
+   ],
+   "used_by": [
+    "sedens_readiness.v1.json",
+    "sedens_readiness.v1_1.json"
+   ]
+  },
+  "who_2020": {
+   "area": "readiness",
+   "title": "World Health Organization 2020 guidelines on physical activity and sedentary behaviour (Bull et al., Br J Sports Med 54:1451-1462)",
+   "publisher": "World Health Organization / BMJ (PMC7719906, Europe PMC full text)",
+   "year": "2020",
+   "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC7719906/fullTextXML",
+   "quotes": [
+    {
+     "text": "Pre-exercise medical clearance is generally unnecessary for individuals without contraindications prior to beginning light-intensity or moderate-intensity physical activity not exceeding the demands of brisk walking or everyday living.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC7719906/fullTextXML",
+     "research_id": "who2020_clearance"
+    },
+    {
+     "text": "Those who develop new symptoms when increasing their levels of activity should consult a healthcare provider.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC7719906/fullTextXML",
+     "research_id": "who2020_newsymptoms"
+    },
+    {
+     "text": "Adults with chronic conditions may wish to consult with a physical activity specialist or healthcare professional for advice on the types and amounts of activity appropriate for their individual needs",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC7719906/fullTextXML",
+     "research_id": "who2020_chronic"
+    },
+    {
+     "text": "Pregnant women should be informed by their healthcare provider of the danger signs for when to stop, or limit physical activity and to consult a qualified healthcare provider immediately if they occur.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC7719906/fullTextXML",
+     "research_id": "who2020_pregnancy_signs"
+    },
+    {
+     "text": "Avoid activities in supine position after the first trimester of pregnancy; ... Return to physical activity gradually after delivery and in consultation with a healthcare provider in the case of delivery by caesarean section.",
+     "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC7719906/fullTextXML",
+     "research_id": "who2020_supine_postpartum"
+    }
+   ],
+   "fetched": true,
+   "verification": "independently re-fetched; quote found verbatim",
+   "verification_notes": [
+    "Both parts are verbatim. ACOG gives a different cutoff (supine concern after 20 weeks, 'avoid long periods'). The result merges the two cutoffs acceptably.",
+    "Both sentences are verbatim. WHO ties provider consultation after birth specifically to caesarean delivery. Requiring professional clearance after every birth (R7) is therefore stricter than WHO.",
+    "Verbatim in the Europe PMC XML, in the Table 4 'Additional explanatory and practical notes' row, which covers all population groups. A separate WHO section is more permissive: inactive people without contraindications can increase 'levels and intensity' without clearance. The 'brisk walking' limit is therefore the conservative reading, not WHO's only position."
+   ],
+   "used_by": [
+    "sedens_readiness.v1.json",
+    "sedens_readiness.v1_1.json",
+    "sedens_recommendation_rules.v1.json"
+   ]
+  }
+ }
+}
