@@ -227,6 +227,9 @@ def _run_job(sedens, scan_id):
                 scan = dict(db.execute("SELECT * FROM s_room_scans WHERE id=?", (scan_id,)).fetchone())
                 _complete(sedens, db, scan, {}, measurement_version="", model="", error=type(exc).__name__)
                 _finish_journey(db, scan)
+            # "The photos are deleted as soon as the analysis is finished" holds for a failed one too.
+            if not scan["images_retained"]:
+                shutil.rmtree(_folder(sedens, scan), ignore_errors=True)
 
 
 def measurements_from_report(report) -> dict:
