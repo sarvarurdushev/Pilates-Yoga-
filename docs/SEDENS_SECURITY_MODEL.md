@@ -191,3 +191,29 @@ The flow and its contract are in [SEDENS_ROOM_FLOW.md](SEDENS_ROOM_FLOW.md). The
 - **A safety stop is final for the visit.** "I don't feel well" ends the workout as incomplete; the room does not offer another session in that visit.
 - **Backups.** The new tables have explicit policies; restored journeys are ended (`restored`), open scans and workouts are restored as abandoned, and photos are never archived.
 
+
+### 10.1 Phase 3 attack review (brief §56)
+
+Each attack was tried for real, mostly over HTTP against a running server with the
+cookies a room screen, a customer's phone or a stranger would hold
+(`tests/test_sedens_phase3_security.py`), and again in the browser journey
+(`web/test/sedens-room-journey.browser.mjs`, part D). None succeeded; no server change
+was needed. The tests stay as regression checks.
+
+| # | Attack | What was tried | Result |
+|---|---|---|---|
+| 1 | Readiness bypass | every scan, plan, course and workout action straight after entry; a forged `expect`; an answer carrying its own `outcome` | `409 invalid_transition` / `readiness_required`; the verdict is computed by the server only |
+| 2 | Consent bypass | `scan/begin` without consent; consent with an out-of-date text version; a photo with no scan running | `409 consent_required`, `409 stale_consent_text`, `409 invalid_transition`; no scan row |
+| 3 | Scan without an active room | `scan/begin` and a photo upload from the customer's phone, and from the screen after the visit ended | `403` / `401`; no scan row |
+| 4 | Plan without readiness | `plan/request` at entry; a journey pushed to the choice screen in the database; another visit's ready check | `409`, `readiness_required`; no recommendation |
+| 5 | Player without entitlement | `course/start` for a paid course the customer has not bought; `workout/start` with nothing prepared | `403 purchase_required`; no enrollment, no workout |
+| 6 | Playback after room expiration | a step, the journey and the course picture after the room session's `expires_at` passed | `401`/`403`, picture `404`; the step stays unfinished, no Passport event |
+| 7 | Another facility's course | facility B's room starting facility A's course and reading its picture; A's customer entering at B | `403`/`404`; picture `404`; entry refused |
+| 8 | Course version substitution | `course/start` with forged `version`/`course_version` and a session only version 2 has | `404 unknown_item`; the enrolled version 1 plays |
+| 9 | Duplicate completion | the same step twice; `room/course/complete` three times | one Passport event per step, one progress row, one `workout_completed` |
+| 10 | Cross-user Passport write | forged `student_id`, `user_id`, `training_session_id` and `workout_id` on steps and feedback | ignored: rows go to this visit's customer only; the other customer's feedback is unchanged |
+| 11 | Scan result for another user | the next customer in the same room after a real scan | nothing of the earlier scan in their view; no comparison with it |
+| 12 | Customer technical-data leakage | the scan result view searched for ids, image keys, file paths, model names, thresholds and raw metrics | none present |
+| 13 | Raw media URL bypass | the course picture from an anonymous client, the customer's phone, another facility's room and an ended room; guessed scan photo addresses | all `404` (or `405`); only a live, entitled room reads it |
+| 14 | Session resume hijack | the room cookie on another paired screen, on a phone, with no device cookie, and replayed after the visit ended | `401`/`403`; the real screen is unaffected |
+| 15 | Forged analytics changing state | server-only events (`workout_completed`, `safety_stop`, `exercise_completed`, …) posted by the screen; the screen's own events with positions | `400 server_event`; the screen's events are recorded and change no state |
