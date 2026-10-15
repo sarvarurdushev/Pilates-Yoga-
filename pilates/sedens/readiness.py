@@ -24,9 +24,13 @@ from pathlib import Path
 from .util import Denied, now, uid
 
 DATA = Path(__file__).resolve().parents[2] / "data"
-CURRENT = "sedens-readiness-1.0.0"
+CURRENT = "sedens-readiness-1.1.0"
 OUTCOMES = ("ready", "do_not_start", "urgent_help")
-FILES = {"sedens-readiness-1.0.0": "sedens_readiness.v1.json"}
+FILES = {"sedens-readiness-1.0.0": "sedens_readiness.v1.json",
+         "sedens-readiness-1.1.0": "sedens_readiness.v1_1.json"}
+# A follow-up answer may let the check carry on to the next question (1.1.0:
+# "Has your care team told you general exercise like this is fine?").
+CONTINUE = "continue"
 
 
 @lru_cache(maxsize=None)
@@ -105,7 +109,12 @@ def answer(db, check, item_id, value, follow_up=None) -> dict:
             raise Denied("Choose Yes or No.", 400, "invalid")
         db.execute("UPDATE s_readiness_answers SET follow_up=? WHERE check_id=? AND item_id=?",
                    (int(follow_up), check["id"], item_id))
-        return _decide(db, check, item["follow_up_yes"] if follow_up else item["on_yes"], item_id)
+        chosen = item["follow_up_yes"] if follow_up else item["on_yes"]
+        if chosen == CONTINUE:
+            if len(answers) == len(q["items"]):
+                return _decide(db, check, "ready", None)
+            return {"outcome": None}
+        return _decide(db, check, chosen, item_id)
     if not isinstance(value, bool):
         raise Denied("Choose Yes or No.", 400, "invalid")
     db.execute("INSERT INTO s_readiness_answers(check_id,item_id,position,answer,answered_at) VALUES (?,?,?,?,?)",

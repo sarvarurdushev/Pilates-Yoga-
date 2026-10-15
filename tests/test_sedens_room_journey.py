@@ -898,3 +898,67 @@ def test_the_scan_offers_only_this_hosts_sources(world, demo_world):
     hosted.act("scan/begin")  # the default on the free host is the precomputed demonstration
     with sedens.db() as db:
         assert scans.current(db, hosted.ctx)["source"] == "demo_precomputed"
+
+
+# == readiness 1.1.0 (after the independent citation check) =====================================
+
+
+def test_a_known_condition_continues_only_with_the_care_team_s_go_ahead(world):
+    """1.1.0 asks about a treated heart, kidney or blood-sugar condition. Yes asks whether
+    the customer's doctor or care team said general exercise like this is fine: Yes
+    carries on to the next question, No stops the check (ACSM: clearance for people
+    with known disease who are not already active)."""
+    assert readiness.CURRENT == "sedens-readiness-1.1.0"
+    item = next(i for i in QUESTIONNAIRE["items"] if i["id"] == "known_condition")
+    assert (item["on_yes"], item["follow_up_yes"]) == ("do_not_start", CONTINUE)
+    index = ITEMS.index("known_condition")
+
+    room = visit(world)
+    room.act("readiness/start")
+    for earlier in ITEMS[:index]:
+        room.act("readiness/answer", item=earlier, answer=False)
+    room.act("readiness/answer", item="known_condition", answer=True)
+    assert room.j["readiness"]["next"]["follow_up"] is True
+    room.act("readiness/answer", item="known_condition", follow_up=True)
+    # The check goes on to the next question, then all-No is ready.
+    assert room.j["state"] == "readiness" and room.j["readiness"]["next"]["item"] == ITEMS[index + 1]
+    for later in ITEMS[index + 1:]:
+        room.act("readiness/answer", item=later, answer=False)
+    assert room.j["state"] == "scan_intro"
+    with room.sedens.db() as db:
+        check = readiness.latest(db, room.ctx.room_session_id)
+        assert (check["outcome"], check["triggered_item"]) == ("ready", None)
+        stored = dict(((r[0], (r[1], r[2])) for r in db.execute(
+            "SELECT item_id, answer, follow_up FROM s_readiness_answers WHERE check_id=?", (check["id"],))))
+        assert stored["known_condition"] == (1, 1) and len(stored) == len(ITEMS)
+
+
+def test_readiness_1_1_says_to_call_119_at_once_and_lists_loss_of_balance():
+    q = readiness.questionnaire()
+    for lang in ("en", "ko"):
+        action = q["stop_card"]["action"][lang]
+        assert "119" in action
+        assert "doesn't settle" not in action and "가라앉지 않거나" not in action
+    assert any("balance" in s for s in readiness.unwell_copy("en")["urgent_signs"])
+    assert any("균형" in s for s in readiness.unwell_copy("ko")["urgent_signs"])
+    # Symptom items send the customer to a doctor soon, before exercising again.
+    for item_id in ("chest_discomfort", "unusual_heartbeat", "faint_or_dizzy", "unusual_breathlessness"):
+        item = next(i for i in q["items"] if i["id"] == item_id)
+        assert "soon" in item["next_action"]["en"] and item["follow_up_yes"] == "urgent_help"
+
+
+def test_a_1_0_0_check_keeps_its_version_and_outcome(world):
+    room = visit(world)
+    room.act("readiness/start")
+    with room.sedens.batch(), room.sedens.db() as db:
+        check = readiness.latest(db, room.ctx.room_session_id)
+        db.execute("UPDATE s_readiness_checks SET questionnaire_version='sedens-readiness-1.0.0' WHERE id=?",
+                   (check["id"],))
+    old_items = [i["id"] for i in readiness.questionnaire("sedens-readiness-1.0.0")["items"]]
+    assert "known_condition" not in old_items and len(old_items) == 8
+    for item_id in old_items:
+        room.act("readiness/answer", item=item_id, answer=False)
+    assert room.j["state"] == "scan_intro"
+    with room.sedens.db() as db:
+        check = readiness.latest(db, room.ctx.room_session_id)
+        assert (check["questionnaire_version"], check["outcome"]) == ("sedens-readiness-1.0.0", "ready")
