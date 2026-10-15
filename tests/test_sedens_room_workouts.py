@@ -13,11 +13,12 @@ from __future__ import annotations
 
 from datetime import timedelta
 import io
+import json
 
 import pytest
 
 from pilates import assessment
-from pilates.sedens import course_review, courses, http as sedens_http, readiness, scans, workouts
+from pilates.sedens import course_review, courses, http as sedens_http, readiness, scans, standard, workouts
 from pilates.sedens.util import decode, iso, utcnow
 from course_support import (build_guided, coach_creator, facility_setting, professor_studio, publish,
                             sedens_staff, submit, approve)
@@ -700,6 +701,28 @@ def test_course_variants_only_where_the_creator_authored_them(course_world):
     v.act("workout/step", position=1, outcome="completed")
     assert passport_completed(v, row["training_session_id"]) == [imprint, BY_ID["std-breathing"]["catalog_key"]]
     assert main["id"] == steps[0]["content"]["ref"]
+
+
+def test_a_course_step_shows_the_library_instructions_and_the_creators_own_cue_once(course_world):
+    sedens, reviewer, fac, coach, device = course_world
+    view = guided_course(sedens, reviewer, fac, coach, sessions=1, easier="std-imprint-release")
+    cid = view["course"]["id"]
+    authored = view["modules"][0]["sessions"][0]["steps"][0]
+    v = course_visit(sedens, fac, device)
+    v.act("course/start", course_id=cid)
+    step = v.view["workout"]["steps"][0]
+    content, entry = step["content"], BY_ID["std-pelvic-curl"]
+    # How to do it comes from the SEDENS Standard exercise the creator picked ...
+    assert content["setup"] == entry["setup"]["en"]
+    assert content["instructions"] == [x["en"] for x in entry["steps"]]
+    assert content["breath"] == entry["breath"]["en"] and content["stop_if"] == entry["stop_if"]["en"]
+    # ... and what the creator wrote stays theirs, shown once, not as the setup too.
+    assert content["cue"] == authored["customer_cue"] and content["setup"] != content["cue"]
+    assert step["variants"]["easier"]["setup"] == BY_ID["std-imprint-release"]["setup"]["en"]
+    # The instructions are frozen with the workout, so a resumed page shows the same text.
+    plan = json.loads(workout_row(v)["plan"])
+    assert plan["steps"][0]["library"]["ref"] == "std-pelvic-curl"
+    assert plan["steps"][0]["library"]["standard_version"] == standard.document()["version"]
 
 
 def test_discomfort_after_a_course_session_keeps_the_next_standard_plan_light(course_world):

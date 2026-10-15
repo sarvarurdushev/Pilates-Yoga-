@@ -171,7 +171,8 @@ def choose_course(sedens, db, ctx, journey_row, data):
         key = (s.get("exercise") or {}).get("catalog_key") or (s.get("exercise") or {}).get("ref") or ""
         steps.append({"position": i, "ref": s["id"], "phase": s.get("phase") or "main", "seconds": seconds,
                       "exercise_ref": key})
-        frozen_steps.append({**s, "variants": variants.get(s["id"], {}), "planned_seconds": seconds})
+        frozen_steps.append({**s, "library": _library_text(s), "planned_seconds": seconds,
+                             "variants": {k: {**v, "library": _library_text(v)} for k, v in variants.get(s["id"], {}).items()}})
     snapshot = marketplace._snapshot(db, course["id"], played["version"])
     frozen = {"kind": "course", "course_id": course["id"], "version": played["version"], "session_id": session_id,
               "course_title": snapshot.get("course", {}).get("title") or course["title"],
@@ -553,15 +554,30 @@ def _media(summary, media_id, locale) -> dict | None:
             "original_creator": s.get("original_creator"), "identifiable_person": s.get("identifiable_person")}
 
 
+def _library_text(step) -> dict | None:
+    """How to do the SEDENS Standard exercise a course step points at, frozen into the
+    workout when the session starts. Only the library's own instructions: everything the
+    creator wrote (cue, narration, dose, media, anatomy) comes from the enrolled version."""
+    ex = step.get("exercise") or {}
+    entry = standard.get(ex.get("ref")) if ex.get("source") == "standard" else None
+    if entry is None:
+        return None
+    return {"ref": entry["id"], "standard_version": standard.document().get("version"),
+            "setup": entry.get("setup"), "steps": entry.get("steps") or [], "breath": entry.get("breath"),
+            "stop_if": entry.get("stop_if")}
+
+
 def _course_step(s, locale) -> dict:
     ex = s.get("exercise") or {}
+    lib = s.get("library") or {}
     title = s.get("title") or _t(ex.get("title") or {}, locale) or ""
-    spoken = _lines(s.get("narration") or s.get("customer_cue") or "")
+    steps = [_t(x, locale) for x in lib.get("steps") or []]
     return {
         "source": "course", "ref": s["id"], "catalog_key": ex.get("catalog_key"),
-        "title": title, "setup": spoken[0] if spoken else "",
-        "instructions": _lines(s.get("narration") or ""), "cue": s.get("customer_cue") or "",
-        "breath": "", "stop_if": "", "narration": _lines(s.get("narration") or s.get("customer_cue") or ""),
+        "title": title, "setup": _t(lib.get("setup"), locale) or "",
+        "instructions": steps or _lines(s.get("narration") or ""), "cue": s.get("customer_cue") or "",
+        "breath": _t(lib.get("breath"), locale) or "", "stop_if": _t(lib.get("stop_if"), locale) or "",
+        "narration": _lines(s.get("narration") or s.get("customer_cue") or ""),
         "dose": {"mode": "hold" if s.get("hold_seconds") and not s.get("reps") else "reps", "sets": s.get("sets") or 1,
                  "reps": s.get("reps") or 0, "hold_seconds": s.get("hold_seconds") or 0,
                  "work_seconds": s.get("work_seconds") or 0, "rest_seconds": s.get("rest_seconds") or 0,
