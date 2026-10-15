@@ -1,5 +1,5 @@
 {
- "version": "2026-10-13",
+ "version": "2026-10-15",
  "note": "Every source a SEDENS customer-facing rule cites (readiness questions, scan feedback rules, recommendation rules, session feedback copy). Quotes were copied from fetched pages; 'verification' says whether a second, independent agent re-fetched the page and found the quote. Sources marked NOT RETRIEVED are listed so nobody relies on them. Explained in docs/SEDENS_FEEDBACK_EVIDENCE.md.",
  "sources": {
   "ACSM-2009": {
@@ -16,7 +16,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_recommendation_rules.v1.json"
    ]
@@ -115,7 +115,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_recommendation_rules.v1.json"
    ]
@@ -134,7 +134,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim; both parts of the elided quote found",
    "used_by": [
     "sedens_recommendation_rules.v1.json"
    ]
@@ -153,7 +153,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_recommendation_rules.v1.json"
    ]
@@ -284,7 +284,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim; both parts of the elided quote found",
    "used_by": [
     "sedens_session_feedback.v1.json"
    ]
@@ -367,7 +367,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15) with a browser-like fetch (the site refuses scripted requests); quote found verbatim",
    "used_by": [
     "sedens_session_feedback.v1.json"
    ]
@@ -386,7 +386,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15) with a browser-like fetch (the site refuses scripted requests); quote found verbatim",
    "used_by": [
     "sedens_recommendation_rules.v1.json",
     "sedens_session_feedback.v1.json"
@@ -406,7 +406,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15) with a browser-like fetch (the site refuses scripted requests); quote found verbatim",
    "used_by": [
     "sedens_recommendation_rules.v1.json",
     "sedens_session_feedback.v1.json"
@@ -426,7 +426,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_session_feedback.v1.json"
    ]
@@ -445,7 +445,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_recommendation_rules.v1.json",
     "sedens_session_feedback.v1.json"
@@ -465,7 +465,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_session_feedback.v1.json"
    ]
@@ -484,7 +484,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_recommendation_rules.v1.json"
    ]
@@ -567,7 +567,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_session_feedback.v1.json"
    ]
@@ -586,7 +586,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_recommendation_rules.v1.json"
    ]
@@ -605,7 +605,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_recommendation_rules.v1.json"
    ]
@@ -656,7 +656,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_recommendation_rules.v1.json"
    ]
@@ -675,7 +675,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_recommendation_rules.v1.json",
     "sedens_session_feedback.v1.json"
@@ -695,7 +695,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim; the PDF's text layer splits one word ('intensit y')",
    "used_by": [
     "sedens_recommendation_rules.v1.json"
    ]
@@ -714,7 +714,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_recommendation_rules.v1.json"
    ]
@@ -733,7 +733,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_recommendation_rules.v1.json",
     "sedens_session_feedback.v1.json"
@@ -753,7 +753,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_recommendation_rules.v1.json"
    ]
@@ -804,7 +804,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_recommendation_rules.v1.json"
    ]
@@ -929,13 +929,13 @@
    "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A24174615&resultType=core&format=json&pageSize=1",
    "quotes": [
     {
-     "text": "deviation from a 'normal' scapular position may not be contributory to SIS but part of normal variations. Non-surgical treatment involving rehabilitation of the scapula to an idealised normal posture is currently not supported",
+     "text": "deviation from a 'normal' scapular position may not be contributory to SIS but part of normal variations. ... Non-surgical treatment involving rehabilitation of the scapula to an idealised normal posture is currently not supported",
      "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A24174615&resultType=core&format=json&pageSize=1",
      "research_id": "S08"
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim; the quote now marks the sentence it skips with '...'",
    "used_by": [
     "sedens_feedback_rules.v1.json"
    ]
@@ -954,7 +954,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_feedback_rules.v1.json"
    ]
@@ -1037,7 +1037,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim; a table row (the | marks separate the table's cells)",
    "used_by": [
     "sedens_feedback_rules.v1.json",
     "sedens_recommendation_rules.v1.json"
@@ -1057,7 +1057,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_feedback_rules.v1.json"
    ]
@@ -1076,7 +1076,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_feedback_rules.v1.json"
    ]
@@ -1255,7 +1255,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim; the PDF's text layer drops a ligature ('enteainment')",
    "used_by": [
     "sedens_feedback_rules.v1.json"
    ]
@@ -1466,7 +1466,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_recommendation_rules.v1.json"
    ]
@@ -1549,7 +1549,7 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending",
+   "verification": "independently re-fetched (2026-10-15); quote found verbatim",
    "used_by": [
     "sedens_recommendation_rules.v1.json"
    ]

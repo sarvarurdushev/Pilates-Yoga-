@@ -238,7 +238,12 @@ design rule consistent with guidance, not a tested rule.
 ## 6. Verification status and open questions
 
 - **Readiness sources.** Re-fetched and checked by two independent agents. Every relied-on quote was found; the two not found (AHA, a full-text mirror) are not relied on.
-- **Scan feedback and session sources.** Quotes were copied from fetched text by the research agent. The independent re-check is recorded in `data/evidence_registry.json` (`verification`) as it completes.
+- **Scan feedback and session sources.** Quotes were copied from fetched text by the research agent. On 2026-10-15 every source that a shipped rule file cites (30 of them: the scan feedback rules, the recommendation rules and the session feedback copy) was re-fetched independently and its quote searched for in the fetched text. All 30 were found. Notes, all in `data/evidence_registry.json` (`verification`):
+  - two PDFs' text layers mangle a word (`intensit y`, `enteainment`); the words around them match;
+  - one quote is a table row, with `|` between the cells;
+  - the S08 quote skipped a sentence without saying so; it now marks the gap with `...`;
+  - the three CDC pages refuse scripted requests and were re-fetched the way a browser fetches them.
+- **Background sources** (59) that no rule file cites keep "independent re-check pending". Nothing in the product relies on them.
 
 Open questions:
 - SEDENS's own between-day repeatability on the room pipeline;
