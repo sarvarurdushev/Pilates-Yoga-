@@ -30,10 +30,15 @@ test("the room screen loads the room module", () => {
   assert.match(html, /id="room"/);
 });
 
-test("the anatomy viewer is untouched by SEDENS", () => {
+test("the anatomy viewer is untouched by SEDENS apart from the inert room bridge", () => {
   const html = read("anatomy.html");
-  assert.doesNotMatch(html, /sedens/i);
+  // Phase 3 embeds the viewer in the room screen through one script tag, which does
+  // nothing unless the URL has room=1 (web/VENDOR.md). Nothing else may mention SEDENS.
+  const bridge = /<!-- SEDENS room screen: inert unless \?room=1 \(web\/VENDOR\.md\)\. -->\n<script type="module" src="\.\/src\/sedens\/anatomy-room-bridge\.js"><\/script>\n/;
+  assert.match(html, bridge);
+  assert.doesNotMatch(html.replace(bridge, ""), /sedens/i);
   assert.match(html, /href="\/#home"/);
+  assert.match(read("src/sedens/anatomy-room-bridge.js"), /\.get\("room"\) === "1"\) start\(\);/);
 });
 
 test("the production build includes all three application pages", () => {
