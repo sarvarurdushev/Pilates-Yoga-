@@ -342,3 +342,35 @@ Implemented on `claude/sedens-ai-private-room-v1` and stopped here; Phase 3 wait
 - `SEDENS_FREE_DEPLOYMENT.md` and `SEDENS_FUTURE_INTEGRATIONS.md`, planned for phases 7 and 8, were written now because the brief asked for them; they describe the state after Phase 2.
 - Not built from §17: a creator's preview of a course **in a simulated room**. It needs the Phase 3 player; the session editor previews anatomy and the review page shows the exact snapshot.
 
+
+## 21. Phase 2.5 and Phase 3 status (operational controls; the AI Private Room journey)
+
+Implemented on `claude/sedens-ai-private-room-v1` and stopped here; Phase 4 waits for approval. Report: [SEDENS_PHASE_3_REPORT.md](SEDENS_PHASE_3_REPORT.md).
+
+**Phase 2.5:** a creator pauses new sales at once, outside review (`POST creator/course/sales`, migration `0013_course_sales.sql`); demonstrations nobody used for `SEDENS_DEMO_TTL_HOURS` are removed (`0014_demo_activity.sql`, `demo_cleanup.py`).
+
+**Migrations** (additive; no `p_*` table altered):
+
+| File | Tables |
+|---|---|
+| `0015_room_journey.sql` | `s_room_journeys`, `s_readiness_checks`, `s_readiness_answers` |
+| `0016_room_scans.sql` | `s_room_scans`, `s_room_scan_views`, `s_room_scan_observations` |
+| `0017_recommendations.sql` | `s_recommendations` |
+| `0018_room_workouts.sql` | `s_workouts`, `s_workout_steps`, `s_session_feedback` |
+
+**Modules:** `journey` (the server-owned state machine), `readiness`, `scans`, `feedback`, `plans` (the deterministic recommender), `workouts` (player state, course playback, Passport writes), `passport`; consent v2 texts; new analytics events.
+
+**Routes:** `GET room/journey`, `POST room/journey/<action>` (27 actions, listed in [SEDENS_ROOM_FLOW.md](SEDENS_ROOM_FLOW.md)), `POST room/scan/image`; `POST room/course/complete` now needs a course workout this visit played to the end.
+
+**Data:** readiness questionnaire 1.1.0 (`data/sedens_readiness.v1_1.json`; 1.0.0 kept for old checks), feedback rules `sedens-feedback-1.0.0`, recommendation rules `sedens-recommend-1.0.0`, session feedback copy, SEDENS Standard 1.0.0 (26 exercises, all unreviewed and labelled as demo content), the demonstration scan, and `data/evidence_registry.json`.
+
+**Pages:** the room screen is now the journey: welcome, readiness, the four-view scan and its result, the session choice and setup, the recommendation and "Why this session", the workout player with the embedded anatomy viewer, completion and feedback (`room.js`, `room-scan.js`, `room-player.js` and helpers).
+
+**Docs:** [SEDENS_ROOM_FLOW.md](SEDENS_ROOM_FLOW.md), [RECOMMENDATION_RULES.md](RECOMMENDATION_RULES.md), [SEDENS_FEEDBACK_EVIDENCE.md](SEDENS_FEEDBACK_EVIDENCE.md), [SEDENS_SESSION_PLAYER.md](SEDENS_SESSION_PLAYER.md), [SEDENS_VISION_IMPROVEMENT_PLAN.md](SEDENS_VISION_IMPROVEMENT_PLAN.md), and the Phase 3 sections of the security model, deployment modes and free deployment documents.
+
+**Differences from the original plan (§9–§12):**
+
+- The customer sees one observation only, the shoulder line, and only when the front and back photos agree on the side beyond a provisional 2.7°; side views never produce a customer observation, because the existing pipeline's side-view convention is inverted (see the vision plan). Nothing in the existing analysis pipeline was rewritten.
+- Live capture guidance uses simple camera heuristics, not MediaPipe (benchmark and reasons in the vision plan).
+- The readiness questionnaire was revised to 1.1.0 after an independent citation check (a known-condition item, an unusual-heartbeat item, "call 119 at once" instead of "if it doesn't settle", loss of balance among the urgent signs).
+- Course steps built on a SEDENS Standard exercise show that exercise's setup, steps, breathing and stop signs, frozen into the workout when it starts; everything the creator wrote comes from the enrolled version.

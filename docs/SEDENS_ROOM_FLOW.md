@@ -170,11 +170,15 @@ What actually happens:
 
 ## 6. Readiness
 
-`data/sedens_readiness.v1.json` (version `sedens-readiness-1.0.0`) holds the eight
-questions, their reasons, sources, behaviour and copy.
+`data/sedens_readiness.v1_1.json` (version `sedens-readiness-1.1.0`, asked of new
+checks) holds the ten questions, their reasons, sources, behaviour and copy. Version
+1.0.0 (`data/sedens_readiness.v1.json`, eight questions) stays for checks made with it.
 - The server asks them one at a time, in order.
-- The first Yes stops the check. A Yes to the follow-up of a symptom question gives "Please get help now" (119).
-- Only all-No is ready. There is no "modified intensity" outcome.
+- A Yes stops the check, with one exception: a Yes to "known condition" asks whether
+  their doctor or care team said general exercise like this is fine, and a Yes to that
+  follow-up lets the check carry on. A Yes to the follow-up of a symptom question
+  ("is it happening now?") gives "Please get help now" (119 or staff, at once).
+- Ready means no stopping answer. There is no "modified intensity" outcome.
 - The outcome is stored with the questionnaire version and never re-evaluated.
 - Every later step (scan, plan, workout) requires this visit's check to have ended `ready`.
 

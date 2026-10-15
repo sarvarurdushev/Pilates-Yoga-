@@ -95,7 +95,7 @@ An owner who decides to deploy should know:
 2. No environment variables are required. `SEDENS_MODE` may be left unset (Render sets `RENDER=true`).
 3. Everything resets on each restart: demonstrations, creator courses, uploads. Say so to anyone invited to try it.
 4. Only demonstrations can buy (simulated). A real facility or creator account on the free host can build and review courses but cannot sell them.
-5. The guided room player is not built yet (Phase 3): the room screen lists a facility's courses and a session's steps, and can mark a session done.
+5. The room runs the whole Phase 3 journey: readiness, the scan (demonstration by default), a SEDENS Personalized Session or a course, the player with its anatomy viewer, completion and feedback. The SEDENS Standard exercises are unreviewed demonstration content and say so on screen.
 
 ## 8. What would change with money
 
