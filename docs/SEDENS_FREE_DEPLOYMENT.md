@@ -59,6 +59,14 @@ Shared by both modes: at most two uploads or imports received at once (`uploads_
 - The optional **EXPERIMENTAL REAL ANALYSIS** uploads four photos (JPEG or PNG, at most 8 MB each, 12 uploads per minute per address) and runs the existing pipeline once per photo, one scan at a time on the server. Measured on Render free in Phase 1 at about 30 s per photo, so about two minutes for a scan; the screen says so before the customer chooses it, shows a waiting screen, and lets them skip to choosing a session.
 - The workout itself needs no server computation: steps, narration (the browser's own voice, captions always), music (generated in the browser) and the anatomy viewer are all local files or browser features.
 
+### Room timings (Phase 3)
+
+Measured locally in `demo_free` mode with `web/test/sedens-room-performance.browser.mjs` (software WebGL, no GPU; the free host itself was not measured because nothing was deployed). The full table is in `docs/SEDENS_PHASE_3_REPORT.md` §4.
+- The room screen loads in about 0.2 s (143 kB). The anatomy atlas is not loaded until the player opens: about 4 s and 5.5 MB from accepting a plan, then about 2.3 MB for the first exercise's structures while the plan is read.
+- A new visitor's demonstration entry takes several seconds while the server builds the fictional facility (slower on the free tier's CPU); it happens once per visitor.
+- The demonstration scan result is instant (precomputed, nothing uploaded).
+- In software WebGL the anatomy viewer's twice-a-second redraw makes step changes take up to about a second (about 70 ms without the viewer). Check this on the real room computer.
+
 ## 5. Demonstrations on the free host
 
 Each visitor who opens a demonstration gets their own isolated set of organizations (`demo-<key>`): the facility "SEDENS Demo Fitness Center" with its customers, coaches and simulated room screen, the coaching workspace's sample data, and the Phase 2 marketplace (three courses, a fictional coach, a fictional professor, a fictional reviewer; `docs/SEDENS_MARKETPLACE_MODEL.md` §11). Nothing one visitor does is visible to another.

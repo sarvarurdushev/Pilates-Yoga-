@@ -18,7 +18,11 @@ await ctx.addInitScript((k) => {
   sessionStorage.setItem("motion-demo-key", k);
   localStorage.setItem("sedens-lang", "en");
   window.__anatomyReady = 0;
-  window.addEventListener("message", (e) => { if (e.data?.type === "sedens-anatomy-ready") window.__anatomyReady = performance.now(); });
+  window.__anatomy = [];
+  window.addEventListener("message", (e) => {
+    if (e.data?.type === "sedens-anatomy-ready") window.__anatomyReady = performance.now();
+    if (String(e.data?.type || "").startsWith("sedens-anatomy")) window.__anatomy.push(e.data);
+  });
 }, randomBytes(16).toString("hex"));
 const page = await ctx.newPage();
 const cdp = await ctx.newCDPSession(page);
@@ -87,6 +91,11 @@ await measure("anatomy viewer ready (from accepting the plan)", async () => {
   await page.waitForFunction(() => window.__anatomyReady > 0, null, { timeout: 180000 });
 });
 rows[rows.length - 1].ms = Date.now() - accepted;
+// The viewer then loads the first exercise's structures while the customer reads the plan.
+await measure("first exercise's anatomy loaded (while the plan is read)", async () => {
+  await page.waitForFunction(() => window.__anatomy?.some?.((m) => m.type === "sedens-anatomy-state" && m.op === "show"), null, { timeout: 60000 })
+    .catch(() => page.waitForTimeout(6000));
+});
 await measure("first exercise shown (Start session)", async () => {
   await act(page.locator('.rp-controls [data-act="start"]'), "workout/start");
   await page.locator("[data-count]").filter({ hasText: /Exercise 1 of/ }).waitFor();
