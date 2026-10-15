@@ -21,6 +21,11 @@ async function context(viewport = { width: 1280, height: 860 }) {
   return { ctx, page };
 }
 const shot = async (page, name) => shots && page.screenshot({ path: `${shots}/${name}.png`, fullPage: true });
+async function endVisit(page) {
+  await page.locator("[data-end-visit]").click();
+  await page.locator("[data-end-confirm]").click();
+  await page.getByText("Session ended. Thank you.").waitFor();
+}
 
 // 1. Home and legacy links
 const { page } = await context();
@@ -56,11 +61,13 @@ await room.page.getByRole("button", { name: /DEMO-1002/ }).click();
 await room.page.getByText("There is no booking for this room right now.").waitFor();
 await room.page.getByRole("button", { name: /DEMO-1001/ }).click();
 await room.page.getByRole("heading", { name: /Hello, Sarah/ }).waitFor();
-assert.match(await room.page.textContent("body"), /199 exercises are available in this room/);
+// Phase 3: the visit opens on the room journey's welcome, not on an exercise library.
+assert.match(await room.page.textContent("body"), /Today's visit/);
+assert.doesNotMatch(await room.page.textContent("body"), /exercises are available in this room/);
+await room.page.locator('[data-act="readiness/start"]').waitFor();
 await shot(room.page, "04-room-session");
-await room.page.getByRole("button", { name: "End session" }).click();
-await room.page.getByText("Session ended. Thank you.").waitFor();
-console.log("PASS simulated demo room: denied without booking, entered with booking, room-only library, ended");
+await endVisit(room.page);
+console.log("PASS simulated demo room: denied without booking, entered with booking, journey welcome, ended");
 
 // 2b. The customer's own phone issues a single-use room code; the shared screen never signs anyone in.
 const phone = await context({ width: 390, height: 844 });
@@ -77,8 +84,7 @@ await room.page.getByRole("button", { name: "Enter", exact: true }).click();
 await room.page.getByRole("heading", { name: /Hello, Sarah/ }).waitFor();
 const screenCookies = await room.ctx.cookies();
 assert.ok(!screenCookies.some((c) => c.name === "motion_session"), "the shared screen must hold no account sign-in");
-await room.page.getByRole("button", { name: "End session" }).click();
-await room.page.getByText("Session ended. Thank you.").waitFor();
+await endVisit(room.page);
 await room.page.fill("[name=credential]", roomCode);
 await room.page.getByRole("button", { name: "Enter", exact: true }).click();
 await room.page.getByText("This room code is not valid. Ask for a new code on your phone.").waitFor();
