@@ -223,7 +223,7 @@ def build(inputs: dict, library: list[dict], r: dict | None = None) -> dict:
         budget = target * span["split"][phase]
         for e in cands:
             trial = dict(phases)
-            trial[phase] = phases[phase] + [(e, e["dose"].get("sets") or 1)]
+            trial[phase] = phases[phase] + [(e, min(e["dose"].get("sets") or 1, max_sets))]
             if sum(s["seconds"] for s in _timeline(trial, r, rest) if s["phase"] == phase) <= budget + slack:
                 phases = trial
                 used.add(e["id"])
@@ -235,7 +235,7 @@ def build(inputs: dict, library: list[dict], r: dict | None = None) -> dict:
         fired.append("SCAN_SHOULDER_LINE_VARIETY_V1")
     for e in candidates("main", used):
         trial = dict(phases)
-        trial["main"] = phases["main"] + [(e, e["dose"].get("sets") or 1)]
+        trial["main"] = phases["main"] + [(e, min(e["dose"].get("sets") or 1, max_sets))]
         if _total(trial, r, rest) <= target + slack:
             phases = trial
             used.add(e["id"])
@@ -318,7 +318,8 @@ def history(db, student_id, *, exclude_room_session=None) -> dict:
             out["hard_step_down"] = True
     if last["kind"] == "standard":
         plan = decode(last["plan"], {})
-        out["last_plan"] = [s["exercise_id"] for s in plan.get("steps", [])]
+        # Workouts store each step's library id as "ref" (workouts.create_standard).
+        out["last_plan"] = [s.get("ref") or s.get("exercise_id") for s in plan.get("steps", [])]
     return out
 
 
@@ -369,7 +370,7 @@ def request(sedens, db, ctx, journey_row, data):
     goal = _choice(data.get("goal"), GOALS, "goal")
     intensity = _choice(data.get("intensity"), INTENSITIES, "effort level")
     duration = data.get("duration")
-    if isinstance(duration, bool) or duration not in DURATIONS:
+    if isinstance(duration, bool) or not isinstance(duration, int) or duration not in DURATIONS:
         raise Denied("Choose 30 or 60 minutes.", 400, "invalid")
     from . import readiness
 
@@ -429,7 +430,8 @@ def accept(sedens, db, ctx, journey_row, data):
     rec = current(db, ctx)
     if rec is None or rec["state"] != "shown":
         raise Denied("Ask for a new plan.", 409, "invalid_transition")
-    if data.get("recommendation") and data["recommendation"] != rec["id"]:
+    # The screen names the plan it showed; a missing or stale id never accepts another plan.
+    if data.get("recommendation") != rec["id"]:
         raise Denied("The plan on the screen changed. Showing the current plan.", 409, "journey_changed")
     db.execute("UPDATE s_recommendations SET state='accepted', decided_at=? WHERE id=? AND state='shown'",
                (now(), rec["id"]))
