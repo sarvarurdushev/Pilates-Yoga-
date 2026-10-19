@@ -20,19 +20,19 @@ The same run then drives the Korean room (welcome, readiness, choice, plan, play
 | | Python | Frontend (`npm test`) |
 |---|---|---|
 | After Phase 2 | 2,969 passed, 1 skipped | 538 passed |
-| **After Phase 3** | **3,255 passed, 1 skipped** (286 more) | **597 passed** (59 more) |
+| **After Phase 3** | **3,256 passed, 1 skipped** (287 more) | **597 passed** (59 more) |
 
-The full Python run took 17 minutes 27 seconds on `be695c7`; the commits after it change only documents and the performance script. The one skip is pre-existing (`tests/test_groups.py` needs the BodyParts3D tables, which are not in the repository).
+The final full Python run took 29 minutes 18 seconds on `787cd20`, the last commit that changes code or tests (the commits after it change only this report). The one skip is pre-existing (`tests/test_groups.py` needs the BodyParts3D tables, which are not in the repository).
 
 New test files: `test_sedens_room_journey.py` (50), `test_sedens_room_scan.py` (45), `test_sedens_room_plans.py` (79), `test_sedens_room_workouts.py` (31), `test_sedens_phase3_security.py` (14, the 15 attacks), `test_sedens_sales.py` (4), `test_sedens_demo_cleanup.py` (8); `test_sedens_standard.py` grew to 41. Frontend: `sedens-room-journey`, `sedens-room-scan`, `sedens-room-anatomy`, `sedens-room-narration` and `sedens-room-player` (now part of `npm test`).
 
 | Check | Result |
 |---|---|
 | Production build (`npx vite build`) | built; the only warning is the anatomy viewer's bundle size, unchanged by Phase 3 |
-| New room journey in a browser (A–D, Korean, phone) | passed, 0 page errors |
-| Phase 1 room authorization journey (`sedens-room.browser.mjs`, updated for the journey welcome and "End visit") | passed, 0 page errors |
-| Phase 2 marketplace journey (`sedens-courses.browser.mjs`) | passed |
-| Existing workspace regressions | `platform-demo-auth`, `platform-feedback-markers`, `platform-historical-source`, `platform-routing`, `platform-summary`, `program-finding-atlas` and `program-recording` passed on the final code; `program-media-acceptance` stopped at its missing video fixture (`/home/user/validation/tree-demo.mp4`, outside the repository, as in Phase 2) |
+| New room journey in a browser (A–D, Korean, phone) | passed on the final code, 0 page errors |
+| Phase 1 room authorization journey (`sedens-room.browser.mjs`, updated for the journey welcome and "End visit") | passed on the final code, 0 page errors |
+| Phase 2 marketplace journey (`sedens-courses.browser.mjs`) | passed on the final code |
+| Existing workspace regressions (run before the fact-check fixes, which change only the room's scan wording, the room player and documents; the workspace loads none of them) | `platform-demo-auth`, `platform-feedback-markers`, `platform-historical-source`, `platform-routing`, `platform-summary`, `program-finding-atlas` and `program-recording` passed on the final code; `program-media-acceptance` stopped at its missing video fixture (`/home/user/validation/tree-demo.mp4`, outside the repository, as in Phase 2) |
 
 ## 3. What was built
 
@@ -109,6 +109,10 @@ On `demo_free`: the demonstration scan is precomputed and labelled (no photo lea
 ## 7. Screenshots reviewed (brief §58)
 
 Captured by the browser journey and reviewed by eye: welcome, readiness, scan introduction and consent, scan guidance, scan result (full page and as seen on screen), session choice, setup, recommendation, "Why this session", player ready, player, anatomy expanded and isolated, transition, completion, feedback saved, coach course, professor course; in Korean: welcome, readiness, scan introduction, choice, recommendation, player, "I don't feel well", completion; on a phone: player and anatomy. Fixed from the review: the paused card stayed after resuming; the anatomy full screen sat under the paused card; stretched gaps between the stage and the controls; a course step showed the creator's cue three times; "Rules sedens-recommend-1.0.0" (now "Plan rules version 1.0.0 · Exercise library version 1.0.0"); the Korean player and plan used different names for warm-up and cool-down; the Korean "I don't feel well" button did not match the name the safety card tells people to press; the unwell dialog did not say "call 119 or alert staff" next to the urgent signs; on a phone the exercise name sat below the long instruction card. Found by the report's fact-check and fixed: "I don't feel well" was hidden while the anatomy view was full screen; the withheld shoulder-line note blamed unsteady photos even when the front and back views disagreed.
+
+## 7a. Fact-check of this report
+
+Every factual claim in this report (about 280) was checked against the code, data and tests by independent readers. Each claimed error was then re-checked before correcting it: 12 by a second reader trying to prove the report right, and 11 by hand against the code (their second readers had hit a usage limit). 23 statements were confirmed inexact and are corrected above; two of them were product problems, now fixed and tested ("I don't feel well" hidden during full-screen anatomy; the withheld shoulder-line note blaming unsteady photos when the front and back views disagreed). Three other findings became new checks in the browser journey (the professor's course absent before the purchase; English labels on every Korean screen; the phone width on every screen of the visit).
 
 ## 8. Remaining scientific limitations
 
