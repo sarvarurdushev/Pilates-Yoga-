@@ -100,6 +100,17 @@ async function readiness(page) {
     await act(page, page.locator('[data-answer="no"]'), "readiness/answer");
   assert.equal(await journeyState(page), "scan_intro");
 }
+/** Turn camera consent on (only if it is off: a customer's consent carries over between visits). */
+async function agreeToCapture(page) {
+  const capture = page.locator('[data-consent="scan_capture"]');
+  await capture.waitFor();
+  if ((await capture.getAttribute("aria-checked")) !== "true") {
+    const saved = page.waitForResponse((r) => r.url().includes("/sedens/room/consent") && r.request().method() === "POST");
+    await capture.click();
+    await saved;
+  }
+  await page.locator('[data-consent="scan_capture"][aria-checked="true"]').waitFor();
+}
 async function skipScan(page) {
   await act(page, page.locator("[data-skip]"), "scan/skip");
   assert.equal(await journeyState(page), "session_choice");
@@ -140,8 +151,7 @@ await page.locator('#rj-main[data-owner="scan"]').waitFor();
 await shot(page, "p3-03-scan-intro");
 const startScan = page.locator('[data-start="demo_precomputed"]');
 assert.ok(await startScan.count(), "the free demonstration host offers the demonstration scan (run the server with SEDENS_MODE=demo_free)");
-await page.locator('[data-consent="scan_capture"]').click();
-await page.locator('[data-consent="scan_capture"][aria-checked="true"]').waitFor();
+await agreeToCapture(page);
 await act(page, startScan, "scan/begin");
 for (let view = 0; view < 4; view += 1) {
   await page.locator('[data-cam="take"]').click();
@@ -195,6 +205,7 @@ await shot(page, "p3-11-player");
 await page.locator('.rp-controls [data-act="anatomy"]').click();
 await page.locator(".rp-anatomy.is-expanded").waitFor();
 await page.locator('.rp[data-mode="paused"]').waitFor();
+assert.ok(await page.locator('.rp-anatomy.is-expanded [data-act="unwell"]').isVisible(), "I don't feel well stays reachable in full-screen anatomy");
 await page.locator('[data-view="lateral"]').click();
 await anatomyShown(page, () => window.__anatomy.some((m) => m.type === "sedens-anatomy-state" && m.op === "view"), "the view turns");
 await page.locator('[data-view="anterior"]').click();
@@ -422,8 +433,7 @@ await noOverflow(sp, "readiness question");
 while ((await journeyState(sp)) === "readiness") await act(sp, sp.locator('[data-answer="no"]'), "readiness/answer");
 await sp.locator('#rj-main[data-owner="scan"]').waitFor();
 await noOverflow(sp, "scan intro");
-await sp.locator('[data-consent="scan_capture"]').click();
-await sp.locator('[data-consent="scan_capture"][aria-checked="true"]').waitFor();
+await agreeToCapture(sp); // already agreed in part A: consent is kept per customer
 await act(sp, sp.locator('[data-start="demo_precomputed"]'), "scan/begin");
 for (let view = 0; view < 4; view += 1) {
   await sp.locator('[data-cam="take"]').waitFor();

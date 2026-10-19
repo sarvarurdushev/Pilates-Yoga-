@@ -102,6 +102,7 @@ class Player {
         <button data-skeleton>${esc(t("rp.anatomy_skeleton"))}</button>
         <button data-whole>${esc(t("rp.anatomy_whole"))}</button>
         <button class="sd-primary" data-anatomy-return>${esc(t("rp.anatomy_return"))}</button>
+        <button class="rp-unwell" data-act="unwell" data-anatomy-unwell>${esc(t("rp.unwell"))}</button>
       </div>
       <p class="rp-anatomy-hint" data-anatomy-hint hidden>${esc(t("rp.anatomy_tap"))}</p>
       <p class="rp-anatomy-cue" data-anatomy-cue></p>
@@ -209,6 +210,7 @@ class Player {
     tools.querySelector("[data-skeleton]").textContent = t("rp.anatomy_skeleton");
     tools.querySelector("[data-whole]").textContent = t("rp.anatomy_whole");
     tools.querySelector("[data-anatomy-return]").textContent = t("rp.anatomy_return");
+    tools.querySelector("[data-anatomy-unwell]").textContent = t("rp.unwell");
     tools.querySelector('[data-zoom="1.25"]').setAttribute("aria-label", t("rp.zoom_in"));
     tools.querySelector('[data-zoom="0.8"]').setAttribute("aria-label", t("rp.zoom_out"));
   }

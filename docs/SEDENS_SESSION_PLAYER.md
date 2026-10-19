@@ -126,7 +126,7 @@ The buttons appear only when the step has an approved option:
 
 **Expanded anatomy.**
 - Tapping the panel restyles the same iframe to full screen. It is never moved, because that would reload it.
-- The customer can rotate, tap a muscle to isolate it, show the skeleton, show the whole body, and return.
+- The customer can rotate, tap a muscle to isolate it, show the skeleton, show the whole body, and return. "I don't feel well" is in this toolbar too.
 - By default the workout pauses while anatomy is expanded (`reason: anatomy`) and resumes on return.
 
 **Two rendering caveats.**
@@ -135,7 +135,7 @@ The buttons appear only when the step has an approved option:
 
 ## 8. "I don't feel well"
 
-The button is always reachable during training. It asks first about urgent signs (from
+The button is always reachable during training, including on the ready screen and while the anatomy view is full screen. It asks first about urgent signs (from
 the readiness file): chest pain or pressure, severe breathlessness, feeling about to
 faint, sudden loss of balance or stroke signs.
 
