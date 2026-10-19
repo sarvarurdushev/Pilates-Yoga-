@@ -1,5 +1,5 @@
 {
- "version": "2026-10-15",
+ "version": "2026-10-19",
  "note": "Every source a SEDENS customer-facing rule cites (readiness questions, scan feedback rules, recommendation rules, session feedback copy). Quotes were copied from fetched pages; 'verification' says whether a second, independent agent re-fetched the page and found the quote. Sources marked NOT RETRIEVED are listed so nobody relies on them. Explained in docs/SEDENS_FEEDBACK_EVIDENCE.md.",
  "sources": {
   "ACSM-2009": {
@@ -887,7 +887,10 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+   "verification": "independently re-fetched (2026-10-19); quote found verbatim",
+   "used_by": [
+    "sedens_feedback_rules.v1.json"
+   ]
   },
   "S06": {
    "area": "scan_feedback",
@@ -1095,7 +1098,10 @@
     }
    ],
    "fetched": true,
-   "verification": "quote copied from fetched text by the research agent; independent re-check pending"
+   "verification": "independently re-fetched (2026-10-19); quote found verbatim",
+   "used_by": [
+    "sedens_feedback_rules.v1.json"
+   ]
   },
   "S18": {
    "area": "scan_feedback",

@@ -243,7 +243,8 @@ design rule consistent with guidance, not a tested rule.
   - one quote is a table row, with `|` between the cells;
   - the S08 quote skipped a sentence without saying so; it now marks the gap with `...`;
   - the three CDC pages refuse scripted requests and were re-fetched the way a browser fetches them.
-- **Background sources** (59) that no rule file cites keep "independent re-check pending". Nothing in the product relies on them.
+  - On 2026-10-19, S05 and S17 were re-checked the same way and found: they are not in a rule's `sources` list, but the feedback rules file names them in the notes that explain why two metrics are withheld.
+- **Background sources** (57) that no rule file cites or names keep "independent re-check pending". Nothing in the product relies on them.
 
 Open questions:
 - SEDENS's own between-day repeatability on the room pipeline;
