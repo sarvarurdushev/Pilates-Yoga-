@@ -91,8 +91,11 @@ def interpret(measurements, *, locale="ko", previous=None, version=CURRENT) -> d
             out["notes"].append({"id": rule["id"], "heading": _t(rule["heading"], locale),
                                  "text": _t(rule["below_threshold"], locale)})
         elif overall != "retake":
+            # Say why: front and back pointing different ways is not an unclear photo.
+            key = "withheld_disagree" if evaluated["reason"] == "views_disagree" and "withheld_disagree" in rule \
+                else "withheld"
             out["notes"].append({"id": rule["id"], "heading": _t(rule["heading"], locale),
-                                 "text": _t(rule["withheld"], locale)})
+                                 "text": _t(rule[key], locale)})
     out["comparison"] = compare(measurements, previous, locale, version)
     out["advanced"] = advanced(measurements, locale, version)
     # D and E of the result: a focus line and why, never a correction (brief §13).

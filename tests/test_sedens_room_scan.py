@@ -674,7 +674,7 @@ def test_the_shoulder_line_is_shown_only_when_front_and_back_agree_beyond_the_th
             assert out["notes"] == [] and out["focus_hint"] == "shoulder_mobility"
             assert out["focus"]["text"] == RULES["focus"]["shoulder_mobility"]["text"][lang]
         else:
-            note = SHOULDER["below_threshold" if outcome == "below_threshold" else "withheld"][lang]
+            note = SHOULDER["below_threshold" if outcome == "below_threshold" else "withheld_disagree"][lang]
             assert out["observations"] == []
             assert out["notes"] == [{"id": "shoulder_line", "heading": heading, "text": note}]
             assert out["focus_hint"] is None
@@ -716,6 +716,17 @@ def test_an_unusable_shoulder_value_in_a_clear_view_is_withheld():
         assert out["views"]["front"]["quality"] == "clear"
         assert (out["evaluated"][0]["outcome"], out["evaluated"][0]["reason"]) == ("withheld", "metric_unavailable")
         assert out["observations"] == [] and out["notes"][0]["text"] == SHOULDER["withheld"]["en"]
+
+
+def test_the_withheld_note_says_why_and_never_blames_a_steady_photo():
+    disagree = feedback.interpret(measured(mview(4.0), mview(-4.0)), locale="en")
+    unclear = feedback.interpret(measured(mview(-5.0, confidence=0.3), mview(-5.0)), locale="en")
+    assert disagree["notes"][0]["text"] == SHOULDER["withheld_disagree"]["en"]
+    assert "didn't agree" in disagree["notes"][0]["text"]
+    assert unclear["notes"][0]["text"] == SHOULDER["withheld"]["en"]
+    for lang in ("en", "ko"):
+        for key in ("withheld", "withheld_disagree"):
+            assert "steady" not in SHOULDER[key][lang] and "안정적" not in SHOULDER[key][lang]
 
 
 def test_front_and_back_both_unclear_ask_for_a_retake_and_describe_nothing():

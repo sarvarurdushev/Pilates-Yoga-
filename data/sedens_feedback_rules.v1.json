@@ -1,6 +1,9 @@
 {
   "version": "sedens-feedback-1.0.0",
-  "reviewed_at": "2026-10-12",
+  "reviewed_at": "2026-10-19",
+  "wording_changes": [
+    "2026-10-19, before any customer saw this version: the withheld note no longer says the photos 'weren't steady enough' (it was also shown when the views disagree or a value was unusable); views that disagree beyond the threshold now say so ('withheld_disagree'). No threshold or rule changed. Each scan stores the exact text it showed."
+  ],
   "status": "provisional",
   "protocol": "sedens_room_scan_v1",
   "note": "Every observation passes: measurement -> quality gate -> evidence rule -> customer wording. Thresholds here are internal technical thresholds meaning 'our measurement can distinguish this from measurement noise'. They are not clinical thresholds and say nothing about what is normal. All are provisional until SEDENS measures its own repeatability (docs/SEDENS_VISION_IMPROVEMENT_PLAN.md).",
@@ -113,8 +116,12 @@
         "ko": "어깨선에서 카메라의 일반적인 측정 오차보다 큰 차이는 보이지 않았어요."
       },
       "withheld": {
-        "en": "We didn't describe your shoulder line today because the photos weren't steady enough.",
-        "ko": "오늘은 사진이 충분히 안정적이지 않아 어깨선은 설명하지 않았어요."
+        "en": "We didn't describe your shoulder line today because the camera couldn't see both shoulders clearly enough in your front and back photos.",
+        "ko": "오늘은 앞모습과 뒷모습 사진에서 양쪽 어깨가 충분히 선명하게 보이지 않아 어깨선은 설명하지 않았어요."
+      },
+      "withheld_disagree": {
+        "en": "We didn't describe your shoulder line today because your front and back photos didn't agree. Standing the same way for both photos helps.",
+        "ko": "오늘은 앞모습과 뒷모습 사진의 결과가 서로 맞지 않아 어깨선은 설명하지 않았어요. 두 사진 모두 같은 자세로 서 주시면 도움이 돼요."
       },
       "limitation": {
         "en": "Measured from estimated keypoints in two still photos. Camera angle and how you stand change it.",
