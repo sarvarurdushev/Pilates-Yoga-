@@ -194,11 +194,13 @@ The flow and its contract are in [SEDENS_ROOM_FLOW.md](SEDENS_ROOM_FLOW.md). The
 
 ### 10.1 Phase 3 attack review (brief §56)
 
-Each attack was tried for real, mostly over HTTP against a running server with the
-cookies a room screen, a customer's phone or a stranger would hold
-(`tests/test_sedens_phase3_security.py`), and again in the browser journey
-(`web/test/sedens-room-journey.browser.mjs`, part D). None succeeded; no server change
-was needed. The tests stay as regression checks.
+Each attack was tried for real (`tests/test_sedens_phase3_security.py`): 13 over HTTP
+against a running server with the cookies a room screen, a customer's phone or a
+stranger would hold, and the two about scan results (11, 12) through the server's own
+handlers in-process. The browser journey (`web/test/sedens-room-journey.browser.mjs`,
+part D) tries six of them again: a phone launch, a course without the purchase, another
+facility's room, an ended room session, and a disabled or suspended course. None
+succeeded; no server change was needed. The tests stay as regression checks.
 
 | # | Attack | What was tried | Result |
 |---|---|---|---|

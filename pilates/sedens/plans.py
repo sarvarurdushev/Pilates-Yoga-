@@ -459,7 +459,7 @@ def current(db, ctx) -> dict | None:
 
 
 def rationale(inputs, result, r) -> list[dict]:
-    """2-4 reasons, as rule ids with parameters (rendered in either language later).
+    """3-4 reasons (goal, effort, then one or two more), as rule ids with parameters (rendered in either language later).
     Safety-related history first, then the scan, then the last session."""
     reasons = [{"rule": "GOAL_PHASE_CATEGORIES", "params": {"goal": inputs["goal"]}},
                {"rule": "INTENSITY_EFFORT", "params": {"intensity": inputs["intensity"]}}]

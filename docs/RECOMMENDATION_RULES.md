@@ -13,7 +13,7 @@ status **provisional**). The library is `data/sedens_standard/exercises.v1.json`
   - the ids of the rules that fired;
   - the rules version and the library version;
   - the plan as a list of `(exercise, phase, sets, seconds)`;
-  - the 2–4 reasons shown under "Why this session";
+  - the 3–4 reasons shown under "Why this session" (always the goal and the effort, then one or two more; the time budget when nothing else applies);
   - whether it was accepted, declined or replaced.
 - **SEDENS Standard only.** It never touches a creator's or facility's course. A course always plays from its exact enrolled version (`pilates/sedens/workouts.py`).
 - **Not a prescription.** It assembles general-fitness sessions from audited content. It does not treat, correct or diagnose anything.

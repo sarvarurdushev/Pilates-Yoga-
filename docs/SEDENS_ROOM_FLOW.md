@@ -141,7 +141,7 @@ null), `scan_skipped` and `views`. Then, by state:
 - `recommendation`:
   - `{id, goal, intensity, duration_minutes, estimated_minutes, shorter, shorter_text, phase_minutes {warm_up, main, cool_down}}`;
   - `steps [{exercise_id, phase, sets, minutes, title, position, scan_rule, review}]`;
-  - `reasons [2–4 strings]`, plus `rules_version`, `library_version`, `label` and `content_label`.
+  - `reasons [3–4 strings]`, plus `rules_version`, `library_version`, `label` and `content_label`.
 - `workout` (ready_to_train, exercise, exercise_paused, session_complete):
   - `{id, kind, state, current_index, position_ms, auto_next, planned_minutes, anatomy_label, title, subtitle}`, plus `content_label` (Standard) or `course_version` (course).
   - Each of `steps [...]` is `{position, phase, state, variant, planned_seconds, content, variants {easier?, harder?}}`.

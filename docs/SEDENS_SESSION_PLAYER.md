@@ -50,7 +50,7 @@ shows it and asks for changes.
 - **Last step.** Completion moves the journey to `session_complete`.
 - **A pause during the countdown** (the customer's, or the automatic pause when anatomy opens) cancels it. On Continue the clock sees the work is already done and starts the countdown, or the Done prompt, again from the beginning.
 
-**Presence check.** After three automatic advances with no touch or key at all, the player pauses (`workout/pause reason: presence`) and asks whether the customer is still there. A workout is never kept alive by a timer. A paused room idles out after `SEDENS_ROOM_IDLE_MINUTES`, like any room screen. Each step the workout advances is a real room request, so an active workout is not idled out.
+**Presence check.** With no touch or key at all, the player advances automatically twice; at the end of the third "Get ready" countdown it pauses instead (`workout/pause reason: presence`) and asks whether the customer is still there. Continue finishes that step and carries on. A workout is never kept alive by a timer. A paused room idles out after `SEDENS_ROOM_IDLE_MINUTES`, like any room screen. Each step the workout advances is a real room request, so an active workout is not idled out.
 
 ## 3. Resume and idempotency
 
