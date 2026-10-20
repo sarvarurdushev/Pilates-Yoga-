@@ -211,9 +211,10 @@ The default plan is data, not code; a SEDENS administrator can assign another pl
 
 **Billable session** (precise): one `s_room_sessions` row of the organization, `origin='room'`, whose
 `started_at` falls in the month (facility timezone, `s_org_profiles.timezone`), containing at least one
-`s_workouts` row with `state='completed'`, `end_reason='completed'`, `origin='room'`. It counts once per
+`s_workouts` row with `state='completed'`, `end_reason='completed'`, `origin='room'` and at least one
+`s_workout_steps` row in state `completed` (the same rule as a completed visit, §3.1). It counts once per
 room session, however many workouts were completed in it. Therefore:
-- abandoned or stopped-only visits are not billable;
+- abandoned or stopped-only visits are not billable, nor is a workout whose every step was skipped;
 - a retry or a repeated completion request cannot add a session (one state transition per workout,
   one count per room session);
 - a second workout in the same visit does not add a second session;
