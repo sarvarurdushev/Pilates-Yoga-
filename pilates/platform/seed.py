@@ -721,7 +721,7 @@ def _seed(repo, org):
 def simulation(client, visit, kind):
     """Six transparent scenarios measured by the same geometry as real captures."""
     import numpy as np
-    from ..assessment import assess_person, analyse_series, SIGNALS
+    from ..assessment import assess_person, analyse_series, SIGNALS, VERSION
     from ..types import Detection
     from ..studio import summarize, movement_summary
 
@@ -762,6 +762,8 @@ def simulation(client, visit, kind):
         """
         points = template.copy()
         if view == "side_left":
+            # Built facing +x (forward is +x), then turned to the camera by
+            # `on_camera`: a left-side photograph faces image-left.
             points[:, 0] = 500
             points[[2, 4, 6, 8, 10, 12, 14, 16], 0] = 490
             points[:5, 0] += 25
@@ -779,7 +781,23 @@ def simulation(client, visit, kind):
             points[:13, 0] += 8 * trend
         return points
 
-    base = standing_points(camera)
+    def on_camera(points, view):
+        """The simulated body as the camera sees it.
+
+        A side view is simulated facing +x so "forward" reads the same in
+        every scenario, and mirrored about x = 500 for ``side_left``: the
+        person's left side nearest the camera means facing image-left
+        (measurement version 2.1). Before 2.1 the skeleton was left facing +x,
+        which is a right side, and the inverted side-view convention hid it.
+        """
+        if view != "side_left":
+            return points
+        mirrored = points.copy()
+        mirrored[:, 0] = 1000 - mirrored[:, 0]
+        return mirrored
+
+    model = standing_points(camera)
+    base = on_camera(model, camera)
     scores = np.full(17, 0.97)
 
     def pose(points):
@@ -807,6 +825,7 @@ def simulation(client, visit, kind):
 
     person = assess(base, "standing", camera)
     raw = {
+        "version": VERSION,
         "width": 1000,
         "height": 960,
         "people": [person],
@@ -821,7 +840,7 @@ def simulation(client, visit, kind):
         series = {key: [] for key in SIGNALS}
         for t in times:
             phase = (1 - math.cos(t * math.pi / 2)) / 2
-            points = base.copy()
+            points = model.copy()
             if scenario in (0, 4):
                 amplitude = (90 + min(visit, 19) * 2.4 + 2.5 * math.sin(visit * 1.4)) if scenario == 0 else (65 + min(visit, 19) * 2.7 + 2 * math.sin(visit * 1.4))
                 for shoulder, elbow, wrist, sign in [(5, 7, 9, 1), (6, 8, 10, -1)]:
@@ -858,6 +877,7 @@ def simulation(client, visit, kind):
                 points[:13, 0] += sway
                 points[13] = points[11] + np.array([55, 145])
                 points[15] = points[13] + np.array([-35, 150])
+            points = on_camera(points, camera)
             frame = assess(points, "pose", camera)
             byid = {m["id"]: m.get("value") for m in frame["metrics"]}
             for key in SIGNALS:
@@ -909,8 +929,10 @@ def simulation(client, visit, kind):
     # These are the featured scenario IDs (several clients share scenario 2).
     if kind == "posture" and visit == 10 and scenario in (0, 2, 3, 4):
         alternate = "front" if camera == "side_left" else "side_left"
-        alternate_person = assess(standing_points(alternate), "standing", alternate)
+        alternate_person = assess(on_camera(standing_points(alternate), alternate),
+                                  "standing", alternate)
         views.append({"view": alternate, "report": {
+            "version": VERSION,
             "width": 1000,
             "height": 960,
             "people": [alternate_person],

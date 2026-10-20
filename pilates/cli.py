@@ -731,7 +731,10 @@ def cmd_intake(args: argparse.Namespace) -> int:
                 views=",".join(v.value for v in assessment.supplied),
                 score=score["value"], band=score["band"],
                 coverage=score["coverage"], checks=score["checks"],
-                readings={n: r.to_dict()
+                # The version rides on each reading, as in api.photo_intake;
+                # a row without one is read back as 2.0.
+                readings={n: {**r.to_dict(),
+                              "measurement_version": assessment.measurement_version}
                           for n, r in assessment.readings.items()},
                 landmarks={p.view.value: {
                     "keypoints": p.detection.keypoints.round(2).tolist(),
@@ -3026,7 +3029,7 @@ def main(argv: list[str] | None = None) -> int:
     ik_.add_argument("--left", default=None,
                      help="the left side photograph (left shoulder to camera)")
     ik_.add_argument("--right", default=None,
-                     help="the right side photograph")
+                     help="the right side photograph (right shoulder to camera)")
     ik_.add_argument("--back", default=None, help="the back photograph")
     ik_.add_argument("--name", default="", help="whose assessment this is")
     ik_.add_argument("--date", default="",

@@ -24,7 +24,9 @@ def source_digest():
         ROOT / "kinematics.py",
         *[
             ROOT.parent / (name + ".py")
-            for name in ("assessment", "geometry", "studio", "validation")
+            # alignment.py holds the side-view convention and the measurement
+            # version; a change there must invalidate the precomputed files.
+            for name in ("alignment", "assessment", "geometry", "studio", "validation")
         ],
     ]:
         digest.update(path.read_bytes())

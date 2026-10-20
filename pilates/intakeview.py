@@ -294,6 +294,10 @@ def _callouts(assessment: PhotoAssessment, photo: Photo, scale: float,
     photograph carrying a forward-head callout would be claiming a measurement
     it did not make, and a reader has no way to know the number came from
     another picture.
+
+    A held-back quantity is not drawn at all. A graded chip on the body is a
+    judgement, and those quantities are not judged yet -- see
+    :attr:`pilates.intake.PhotoAssessment.held_back`.
     """
     left_x, top_y, width, height = box
     mid_x = left_x + _body_centre(photo.detection, threshold) * scale
@@ -301,6 +305,8 @@ def _callouts(assessment: PhotoAssessment, photo: Photo, scale: float,
 
     for name in ik.MEASURED_BY:
         if photo.view not in ik.MEASURED_BY.get(name, ()):
+            continue
+        if name in assessment.held_back:
             continue
         reading = assessment.readings.get(name)
         if reading is None or not reading.measured or name not in ANCHORS:
@@ -771,9 +777,16 @@ def _findings_column(report: dict, x: float, top: float, w: float,
     parts.append(_heading(say("measured", lang), x, y))
     y += 22.0
     if not findings:
-        for line in _fit(say("all_clear", lang), w, 11.0):
+        # "Every measurement is in range" only when that is what the empty
+        # list means. Over doubtful photographs, or over side photographs
+        # whose measurements are held back, the report's own note says why
+        # the list is empty, and it is printed in the neutral ink.
+        held = (report.get("findings_note_ko") if lang == "ko"
+                else report.get("findings_note")) or ""
+        for line in _fit(held or say("all_clear", lang), w, 11.0):
             parts.append(f'<text x="{x:.0f}" y="{y:.1f}" font-size="11" '
-                         f'fill="{INK["ok"]}">{_e(line)}</text>')
+                         f'fill="{INK["refused"] if held else INK["ok"]}">'
+                         f'{_e(line)}</text>')
             y += 14
     for finding in findings:
         ink = SEVERITY_INK[finding["severity"]]

@@ -92,6 +92,9 @@ def test_legacy_value_recovers_exact_metric_context_from_saved_payload():
         "confidence": 0.93,
         "confidence_basis": "saved_metric",
         "reason": "",
+        # The saved report records no measurement version, so it is read as
+        # the legacy 2.0 it was made under; the value itself is not touched.
+        "measurement_version": "2.0-evidence",
     }
     assert progress_evidence(progress_row(source), source) == expected
     assert (

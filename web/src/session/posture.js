@@ -824,6 +824,8 @@ function historyHtml(state, lang) {
       <div class="ss-past">${listed}</div></div>
     ${trend.length > 1 ? `<div><h2>${esc(say('trend', lang))}</h2>
       ${spark(trend, bandInk(trend[trend.length - 1].band))}</div>` : ''}
+    ${state.history?.trend_note ? `<p class="ss-why">${esc(lang === 'ko'
+      ? state.history.trend_note_ko : state.history.trend_note)}</p>` : ''}
   </div>`;
 }
 
@@ -1108,12 +1110,23 @@ export function measurementsHtml(report, lang) {
      explains itself explained itself in the wrong language. */
   const whyNot = new Map((report.refused_detail ?? []).map(
     (e) => [e.metric, lang === 'ko' ? e.reason_ko : e.reason]));
+  /* Side-view quantities the report keeps as technical data and does not
+     grade yet. Drawn like a refusal -- name, dash, the reason -- because a
+     number on a shaded band is a judgement, and these are not judged. */
+  const held = new Map((report.technical ?? []).map(
+    (e) => [e.metric, lang === 'ko' ? e.note_ko : e.note]));
 
   const rows = names.map((metric) => {
     const reading = readings[metric];
     const grade = severity.get(metric) ?? 'within_band';
     const ink = reading.value == null ? INK.none : (INK[grade] ?? INK.within_band);
     const label = nameOf(report, metric, lang);
+    if (held.has(metric)) {
+      return `<tr><th>${esc(label)}</th>
+        <td class="ss-mval" style="color:${INK.none}">—</td>
+        <td class="ss-mtrack" colspan="2"><span class="ss-mwhy">${
+          esc(held.get(metric))}</span></td></tr>`;
+    }
     if (reading.value == null) {
       return `<tr><th>${esc(label)}</th>
         <td class="ss-mval" style="color:${INK.none}">—</td>
@@ -1391,6 +1404,9 @@ function changeHtml(state, lang) {
       <span style="font-size:11px;font-weight:400;color:var(--dim2)">
       ${change.before_score == null ? '' : `${Math.round(change.before_score)} → ${Math.round(change.after_score)}`}
       </span></div>`}
+    ${change.refused ? `<p style="margin:12px 0 0;font-size:11px;
+      color:var(--dim2);line-height:1.7">${esc(lang === 'ko'
+        ? change.refused_ko : change.refused)}</p>` : ''}
     <div class="ss-chg">${rows}</div>
     ${refused.length ? `<p style="margin:12px 0 0;font-size:10.5px;
       color:var(--dim2);line-height:1.7">${esc(say('notCompared', lang))}:
@@ -1622,10 +1638,11 @@ function marksFor(report, view, lang) {
   const readings = report.assessment.readings ?? {};
   const bySeverity = new Map(
     (report.findings ?? []).map((f) => [f.metric, f]));
+  const held = new Set((report.technical ?? []).map((e) => e.metric));
   const out = [];
   for (const [metric, joints] of Object.entries(ANCHOR)) {
     const reading = readings[metric];
-    if (!reading || reading.value == null) continue;
+    if (!reading || reading.value == null || held.has(metric)) continue;
     if (!reading.sources.includes(view)) continue;
     const at = anchorOf(land, joints);
     if (!at) continue;

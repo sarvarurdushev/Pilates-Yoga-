@@ -61,7 +61,20 @@ def standing(*, facing: str = "front", shoulder_tilt: float = 0.0,
 
 def side_on(*, facing_image_left: bool = True, ear_ahead: float = 0.0,
             cx: float = 300.0) -> Detection:
-    """A body seen from one side, its shoulder span collapsed to nearly nothing."""
+    """A body seen from one side, its shoulder span collapsed to nearly nothing.
+
+    Labelled anatomically, the way a COCO model labels a real profile: the ear
+    on the side nearest the camera is found and the far one is not. Facing
+    image-left puts the person's *left* side nearest the camera (image x
+    right, y down, the viewer looking along -z: a person's right hand points
+    along forward x up, which facing -x is away from the lens). RTMO says the
+    same on the demo four-view photograph: facing image-left it scores the
+    left ear 0.994 and the right 0.002 (``tests/data/camera_integrity_rtmo.json``).
+
+    Until measurement version 2.1 this fixture put the *right* ear nearest when
+    facing image-left, which is what let the inverted side-view convention
+    pass its own tests.
+    """
     k = np.zeros((kp.NUM_KEYPOINTS, 2), np.float32)
     s = np.ones(kp.NUM_KEYPOINTS, np.float32)
     d = -1.0 if facing_image_left else 1.0
@@ -73,12 +86,26 @@ def side_on(*, facing_image_left: bool = True, ear_ahead: float = 0.0,
     k[kp.R_SHOULDER] = (cx + 3, 200)          # a few pixels of visible offset
     k[kp.R_HIP] = (cx + 3, 400)
     k[kp.NOSE] = (cx + d * 30, 155)
-    # facing image-left shows the camera the person's right side
-    near, far = (kp.R_EAR, kp.L_EAR) if facing_image_left else (kp.L_EAR, kp.R_EAR)
+    # facing image-left shows the camera the person's left side
+    near, far = (kp.L_EAR, kp.R_EAR) if facing_image_left else (kp.R_EAR, kp.L_EAR)
     k[near] = (cx + d * ear_ahead, 150)
     s[far] = 0.05
     s[np.all(k == 0, axis=1)] = 0
     return Detection(k, s)
+
+
+def side_of(view: al.View, **kw) -> Detection:
+    """A profile showing the camera the side ``view`` names.
+
+    The left side is nearest the camera when the person faces image-left, the
+    right side when they face image-right -- see :func:`side_on`. Tests that
+    need a correctly labelled side photograph build it from the side, so the
+    pairing of label and picture comes from the geometry, not from whatever
+    the module under test happens to believe.
+    """
+    if not view.is_sagittal:
+        raise ValueError(f"{view} is not a side view")
+    return side_on(facing_image_left=view is al.View.SIDE_LEFT, **kw)
 
 
 class TestViewEstimation:
@@ -89,9 +116,14 @@ class TestViewEstimation:
         assert al.estimate_view(standing(facing="rear")).view is al.View.REAR
 
     @pytest.mark.parametrize("image_left,expected",
-                             [(True, al.View.SIDE_RIGHT), (False, al.View.SIDE_LEFT)])
+                             [(True, al.View.SIDE_LEFT), (False, al.View.SIDE_RIGHT)])
     def test_a_side_on_body_names_the_side_the_camera_can_see(self, image_left, expected):
-        """Facing image-left presents the person's right side to the lens."""
+        """Facing image-left presents the person's left side to the lens.
+
+        Version 2.0 pinned the opposite here. The label is checked against the
+        geometry in :func:`side_on` and against RTMO's own ear labels on a real
+        photograph in ``tests/test_camera_integrity.py``, not against the code.
+        """
         assert al.estimate_view(side_on(facing_image_left=image_left)).view is expected
 
     def test_a_body_turned_part_way_is_refused_rather_than_guessed(self):
@@ -418,7 +450,7 @@ class TestThePlumbChain:
     first version of this module used two of them."""
 
     def test_a_side_photograph_measures_the_whole_chain(self):
-        out = al.assess(side_on(facing_image_left=False, ear_ahead=40.0),
+        out = al.assess(side_on(facing_image_left=True, ear_ahead=40.0),
                         view=al.View.SIDE_LEFT)
         for name in ("sagittal_ear_offset", "sagittal_shoulder_offset",
                      "sagittal_hip_offset", "sagittal_knee_offset"):
@@ -433,20 +465,22 @@ class TestThePlumbChain:
     def test_the_chains_do_not_cross_planes(self):
         """A sagittal shift is not measurable from the front and the reverse."""
         front = al.assess(built(False), view=al.View.FRONT).metrics
-        side = al.assess(side_on(facing_image_left=False),
+        side = al.assess(side_on(facing_image_left=True),
                          view=al.View.SIDE_LEFT).metrics
         assert not front["sagittal_ear_offset"].measured
         assert not side["lateral_head_shift"].measured
 
     def test_the_head_ahead_of_the_ankle_reads_forward_from_either_side(self):
-        for facing, view in ((False, al.View.SIDE_LEFT),
-                             (True, al.View.SIDE_RIGHT)):
+        """A left side faces image-left and a right side image-right; see
+        :func:`side_on`. Version 2.0 paired them the other way round."""
+        for facing, view in ((True, al.View.SIDE_LEFT),
+                             (False, al.View.SIDE_RIGHT)):
             det = side_on(facing_image_left=facing, ear_ahead=40.0)
             value = al.assess(det, view=view).metrics["sagittal_ear_offset"].value
             assert value > 0, view.value
 
     def test_no_ankle_means_no_vertical_to_measure_against(self):
-        det = side_on(facing_image_left=False, ear_ahead=40.0)
+        det = side_on(facing_image_left=True, ear_ahead=40.0)
         scores = det.scores.copy()
         scores[kp.L_ANKLE] = scores[kp.R_ANKLE] = 0.05
         blind = Detection(det.keypoints, scores)

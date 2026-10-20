@@ -149,7 +149,7 @@ pipeline and camera (protocol in the vision improvement plan). It stays
 | Measurement | Customer-facing? | Why |
 |---|---|---|
 | Shoulder line, front and back (`shoulder_tilt`) | **Yes**: one sentence, when the rule passes | best-matched repeatability (S14); front/back agreement cancels camera roll; neutral wording |
-| Head position, side views (`forward_head`) | **No** (Advanced only) | an ear-to-shoulder proxy, not CVA. Head MDCs are 2.5–6° (S15, S19). It needs a comparable earlier scan as reference, and the pipeline's side-view direction convention is under review |
+| Head position, side views (`forward_head`) | **No** (Advanced only) | an ear-to-shoulder proxy, not CVA. Head MDCs are 2.5–6° (S15, S19). It needs a comparable earlier scan as reference. The side-view convention was corrected in measurement version 2.1 ([camera integrity report](SEDENS_CAMERA_INTEGRITY_REPORT.md)), but no repeatability testing with the real pipeline and real captures exists, so it stays withheld (`awaiting_repeatability_evidence`) |
 | Hip line (`pelvic_obliquity`) | No (Advanced only) | repeatable, but no markerless validity (S15, S16, S17) |
 | Side-to-side trunk lean | No (Advanced only) | depends on hip keypoints and true vertical |
 | Ear line (`head_lateral_tilt`) | No (Advanced only) | ears are often hidden by hair |

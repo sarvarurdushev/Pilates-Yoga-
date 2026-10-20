@@ -145,8 +145,8 @@
         "left",
         "right"
       ],
-      "reason": "side_view_convention_under_review",
-      "note": "Head position needs a reference (only a comparable earlier scan is acceptable) and the pipeline's side-view direction convention is under review (docs/SEDENS_VISION_IMPROVEMENT_PLAN.md). Advanced only, labelled not CVA."
+      "reason": "awaiting_repeatability_evidence",
+      "note": "Head position needs a reference (only a comparable earlier scan is acceptable). The side-view convention was corrected in measurement version 2.1-sagittal-anatomical (docs/SEDENS_CAMERA_INTEGRITY_REPORT.md), but no repeatability testing with the real RTMO pipeline and real captures has been done, so the value stays withheld. Advanced only, labelled not CVA."
     },
     {
       "metric": "pelvic_obliquity",

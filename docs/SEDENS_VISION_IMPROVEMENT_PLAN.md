@@ -64,6 +64,9 @@ not rewrite the analysis pipeline). Phase 3 works around them; section 4 is the 
    view, `forward_head` comes out negative (−0.055, −0.063) on an image where the ear
    is clearly ahead of the shoulder, and the sagittal offsets are sign-inverted too.
    `tests/test_alignment.py` (`side_on`) pins the wrong convention, so the suite passes.
+   **Corrected in Phase 4** as measurement version `2.1-sagittal-anatomical`; stored 2.0
+   values are kept, labelled and never compared with 2.1 ones
+   ([SEDENS_CAMERA_INTEGRITY_REPORT.md](SEDENS_CAMERA_INTEGRITY_REPORT.md)).
 2. **A mirrored capture silently swaps left and right** (table above).
 3. **Workspace comparisons ignore the model and measurement version.** RTMO-s results
    on the free host and RTMO-m results locally would be treated as comparable.
@@ -121,7 +124,7 @@ pose model can be added later without changing the screen.
 
 ## 5. Improvement order (proposed, not started)
 
-1. **Fix the side-view convention** in `alignment.py` (`_facing`, `forward_head`, the
+1. **(Done in Phase 4, version 2.1.)** **Fix the side-view convention** in `alignment.py` (`_facing`, `forward_head`, the
    sagittal offsets and the view estimator), fix `tests/test_alignment.py`'s `side_on`
    fixture, and rebuild the precomputed workspace demo (`demo_scenarios --build`), whose
    digest covers these files. Then re-verify on photos with known orientation before any

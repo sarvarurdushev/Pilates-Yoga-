@@ -151,10 +151,18 @@ def _record(
 def selected_progress_measurements(report, detail):
     """Return source metadata, including refusals, for unambiguous selected people.
 
+    Each record carries the ``measurement_version`` of the view report it
+    came from. A report saved before versions were recorded reads as 2.0
+    (:func:`pilates.alignment.version_of`); its stored values are not changed,
+    only labelled, so a progress series never joins a 2.0 side view to a 2.1
+    one -- their signs differ by construction.
+
     A person ID is local to its capture. Selecting it never establishes identity
     across captures. Ambiguous views, people, and duplicate metrics stay absent
     or unsupported so a legacy index cannot make them appear authoritative.
     """
+    from ..alignment import version_of
+
     if not isinstance(report, dict) or not isinstance(detail, dict):
         return {}
     kind = report.get("kind")
@@ -265,7 +273,9 @@ def selected_progress_measurements(report, detail):
                     )
                     if count is not None:
                         values[-1]["confidence_sample_count"] = count
+        version = version_of(payload)
         for value in values:
+            value["measurement_version"] = version
             key = camera + ":" + value["metric_id"]
             if key in measurements:
                 measurements[key]["supported"] = False

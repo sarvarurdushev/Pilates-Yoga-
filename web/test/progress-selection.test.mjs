@@ -243,3 +243,25 @@ test("legacy frame-score recovery identifies its complete contributing sample co
   delete client.progress[0].evidence.confidence_sample_count;
   assert.deepEqual(comparableProgressSeries(client),[]);
 });
+
+test("a progress series never joins two measurement versions; evidence without one is legacy 2.0", () => {
+  // 2.1 reversed the sign of every side-view value, so a 2.0 side reading and
+  // a 2.1 one are different quantities that happen to share a name.
+  const at = (day) => `2026-09-${String(day).padStart(2, "0")}T09:00:00Z`;
+  const analyses = ["a1", "a2", "a3", "a4"].map((id) =>
+    ({id, kind:"posture", protocol:"Standing posture", demo:false}));
+  const row = (analysis_id, day, value, evidence = {}) =>
+    ({analysis_id, recorded_at:at(day), metric:"side_left:forward_head", value, unit:"ratio", evidence});
+  const client = withSavedProgressEvidence({id:"client", analyses, progress:[
+    row("a1", 1, -0.05),
+    row("a2", 2, -0.04, {measurement_version:"2.0-evidence"}),
+    row("a3", 3, 0.05, {measurement_version:"2.1-sagittal-anatomical"}),
+    row("a4", 4, 0.06, {measurement_version:"2.1-sagittal-anatomical"}),
+  ]});
+  const groups = comparableProgressSeries(client);
+  assert.equal(groups.length, 2);
+  const byVersion = Object.fromEntries(groups.map((group) => [group.measurement_version, group]));
+  assert.deepEqual(byVersion["2.1-sagittal-anatomical"].rows.map((r) => r.analysis_id), ["a3", "a4"]);
+  assert.deepEqual(byVersion["2.0-evidence"].rows.map((r) => r.analysis_id), ["a1", "a2"]);
+  assert.equal(byVersion["2.1-sagittal-anatomical"].previous.value, 0.05);
+});

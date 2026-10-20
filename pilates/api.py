@@ -1354,7 +1354,11 @@ def photo_intake(store, viewer: Viewer | None, payload: dict) -> dict:
             band=out["score"]["band"],
             coverage=out["score"]["coverage"],
             checks=out["score"]["checks"],
-            readings={n: r.to_dict() for n, r in assessment.readings.items()},
+            # The measurement version rides on each reading: the table has no
+            # column for it, and a row without one is read back as 2.0.
+            readings={n: {**r.to_dict(),
+                          "measurement_version": assessment.measurement_version}
+                      for n, r in assessment.readings.items()},
             landmarks=out["landmarks"],
             doubts=assessment.doubts,
             warnings=assessment.warnings)
@@ -1631,7 +1635,18 @@ def assessment_history(store, viewer: Viewer | None, username: str) -> dict:
         guard_subject(store, viewer, who)
     else:
         who = _need(viewer).username
+    from . import alignment as al
+
     rows = store.assessments(who)
+    for row in rows:
+        row["measurement_version"] = (row.get("measurement_version")
+                                      or al.LEGACY_MEASUREMENT_VERSION)
+    scored = [row for row in reversed(rows) if row["score"] is not None]
+    # One line per measurement version, and only the newest is drawn. A 2.0
+    # score and a 2.1 score are sums over different things, so joining them
+    # would draw a step that is the software changing, not the body.
+    current = scored[-1]["measurement_version"] if scored else ""
+    earlier = sum(1 for row in scored if row["measurement_version"] != current)
     return {
         "username": who,
         "assessments": rows,
@@ -1639,8 +1654,18 @@ def assessment_history(store, viewer: Viewer | None, username: str) -> dict:
         # rather than plotted as zero: a chart with a cliff in it where there
         # was no measurement is a chart that invents a collapse.
         "trend": [{"id": row["id"], "on": row["taken_on"],
-                   "score": row["score"], "band": row["band"]}
-                  for row in reversed(rows) if row["score"] is not None],
+                   "score": row["score"], "band": row["band"],
+                   "measurement_version": row["measurement_version"]}
+                  for row in scored if row["measurement_version"] == current],
+        "trend_version": current,
+        "trend_left_out": earlier,
+        "trend_note": ("" if not earlier else
+                       f"{earlier} earlier score{'s were' if earlier > 1 else ' was'} "
+                       "measured under an older version and "
+                       f"{'are' if earlier > 1 else 'is'} not on this line"),
+        "trend_note_ko": ("" if not earlier else
+                          f"이전 버전으로 측정한 점수 {earlier}개는 이 그래프에 "
+                          "포함하지 않았습니다"),
     }
 
 
@@ -1657,10 +1682,18 @@ def _rebuild_assessment(row: dict, *, with_landmarks: bool = False):
     from . import alignment as al
     from . import intake as ik
 
+    readings = row.get("readings") or {}
+    # Filed before measurement versions existed means 2.0, whose side-view
+    # values carry the inverted sign. Kept as filed and labelled, never
+    # rewritten; `ik.compare` refuses to set it against a newer visit.
+    version = next((al.version_of(r) for r in readings.values()
+                    if isinstance(r, dict) and r.get("measurement_version")),
+                   al.LEGACY_MEASUREMENT_VERSION)
     out = ik.PhotoAssessment(
         person_id=row["username"], taken_on=row["taken_on"],
-        warnings=list(row["warnings"]), doubts=list(row["doubts"]))
-    for name, stored in (row.get("readings") or {}).items():
+        warnings=list(row["warnings"]), doubts=list(row["doubts"]),
+        measurement_version=version)
+    for name, stored in readings.items():
         metric = al.Metric(
             name, stored.get("value"), stored.get("unit", "deg"),
             al.Availability(stored.get("availability", "unavailable")),
@@ -1785,6 +1818,16 @@ def assessment_change(store, viewer: Viewer | None, payload: dict) -> dict:
     out["before_id"], out["after_id"] = rows[0]["id"], rows[1]["id"]
     out["before_on"], out["after_on"] = rows[0]["taken_on"], rows[1]["taken_on"]
     out["before_score"], out["after_score"] = rows[0]["score"], rows[1]["score"]
+    out["refused"], out["refused_ko"] = "", ""
+    if before.measurement_version != after.measurement_version:
+        # The filed scores are left off as well as the change: two numbers
+        # side by side read as a change whether or not one is printed.
+        out["before_score"] = out["after_score"] = None
+        out["refused"] = ("These two visits were measured with different "
+                          "versions of the measurement, so they are not "
+                          "compared.")
+        out["refused_ko"] = ("두 방문은 서로 다른 측정 버전으로 측정되어 비교하지 "
+                             "않습니다.")
     out["names"] = {name: {"en": gd.metric_name(name),
                            "ko": gd.metric_name(name, "ko")}
                     for name in out["changes"]}

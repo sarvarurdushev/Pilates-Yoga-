@@ -5,11 +5,11 @@ import copy
 import threading
 import numpy as np
 import pytest
-from pilates import assessment as ev, pose3d
+from pilates import alignment as al, assessment as ev, pose3d
 from pilates.types import Detection
 from pilates.serve import serve, WEB
 from pilates.store import Store
-from test_alignment import standing, side_on
+from test_alignment import standing, side_of
 from test_api import Client
 from test_intake_api import png
 
@@ -45,7 +45,8 @@ def test_nominal_geometry_does_not_override_distant_model_resolution():
 
 
 def test_side_has_no_frontal_symmetry_score():
-    p = assessed(side_on(), view="side_right")
+    # A right-side photograph faces image-right (test_alignment.side_on).
+    p = assessed(side_of(al.View.SIDE_RIGHT), view="side_right")
     assert p["suitable"]
     assert next(m for m in p["metrics"] if m["id"] == "shoulder_tilt")["value"] is None
     assert p["score"]["value"] is None

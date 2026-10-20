@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from pilates import alignment as al  # noqa: E402
 from pilates import intake as ik  # noqa: E402
 from pilates.alignment import View  # noqa: E402
-from test_alignment import side_on, standing  # noqa: E402
+from test_alignment import side_of, side_on, standing  # noqa: E402
 
 FRAME = (1080, 1440)
 
@@ -35,10 +35,8 @@ def four(**kw) -> list[ik.Photo]:
     ahead = kw.pop("ear_ahead", 0.0)
     return [
         photo(View.FRONT, standing(shoulder_tilt=tilt, hip_tilt=hip, cx=540)),
-        photo(View.SIDE_LEFT, side_on(facing_image_left=False,
-                                      ear_ahead=ahead, cx=540)),
-        photo(View.SIDE_RIGHT, side_on(facing_image_left=True,
-                                       ear_ahead=ahead, cx=540)),
+        photo(View.SIDE_LEFT, side_of(View.SIDE_LEFT, ear_ahead=ahead, cx=540)),
+        photo(View.SIDE_RIGHT, side_of(View.SIDE_RIGHT, ear_ahead=ahead, cx=540)),
         photo(View.REAR, standing(facing="rear", shoulder_tilt=tilt,
                                   hip_tilt=hip, cx=540)),
     ]
@@ -169,8 +167,16 @@ class TestWhatIsStillRefused:
 
     def test_a_full_set_expects_the_union_of_both_planes(self):
         out = ik.assess_photos(four())
+        out.held_back = frozenset()
         assert "forward_head" in out.expected
         assert "shoulder_tilt" in out.expected
+
+    def test_a_held_back_quantity_is_neither_credit_nor_a_gap(self):
+        """The side metrics are measured and not scored until their
+        repeatability is established; the denominator leaves them out too."""
+        out = ik.assess_photos(four())
+        assert not set(out.expected) & al.AWAITING_REPEATABILITY
+        assert out.readings["forward_head"].measured
 
 
 class TestAPhotographThatCannotBeUsed:
@@ -228,8 +234,8 @@ def swapped() -> list[ik.Photo]:
     fine, and the only thing wrong is which slot each one went into.
     """
     photos = four()
-    photos[1] = photo(View.SIDE_LEFT, side_on(facing_image_left=True, cx=540))
-    photos[2] = photo(View.SIDE_RIGHT, side_on(facing_image_left=False, cx=540))
+    photos[1] = photo(View.SIDE_LEFT, side_of(View.SIDE_RIGHT, cx=540))
+    photos[2] = photo(View.SIDE_RIGHT, side_of(View.SIDE_LEFT, cx=540))
     return photos
 
 
@@ -284,8 +290,7 @@ class TestOfferingTheFix:
         """Exchanging it would take the neighbour, which nothing is wrong
         with, and put it in the wrong slot."""
         photos = four()
-        photos[1] = photo(View.SIDE_LEFT, side_on(facing_image_left=True,
-                                                  cx=540))
+        photos[1] = photo(View.SIDE_LEFT, side_of(View.SIDE_RIGHT, cx=540))
         out = ik.assess_photos(photos)
         assert len(out.mismatches) == 1
         assert out.swapped_pair is None
@@ -295,7 +300,7 @@ class TestOfferingTheFix:
         """Nothing to exchange it with, and the slot it belongs in is empty."""
         out = ik.assess_photos([photo(View.FRONT, standing(cx=540)),
                                 photo(View.SIDE_LEFT,
-                                      side_on(facing_image_left=True, cx=540))])
+                                      side_of(View.SIDE_RIGHT, cx=540))])
         assert out.swapped_pair is None
         assert out.mislabelled == (View.SIDE_LEFT, View.SIDE_RIGHT)
         fix = out.fix()
@@ -340,11 +345,25 @@ class TestTheScore:
                                         hip_tilt=10.0)).score().value
         assert crooked < level
 
-    def test_one_photograph_withholds_the_headline(self):
-        """Too few checks to put a number on."""
-        out = ik.assess_photos([photo(View.SIDE_LEFT, side_on(cx=540))])
+    def test_a_side_photograph_showing_the_other_side_withholds_the_headline(self):
+        """Every sagittal sign depends on which side is nearest the camera.
+
+        This test used to read "one photograph withholds the headline: too few
+        checks". It passed only because the 2.0 fixture showed the opposite
+        side to its label, so the mismatch withheld the score. A correctly
+        labelled side photograph supplies six sagittal checks, which the
+        scoring rule (five checks) accepts; that consequence is recorded in
+        ``docs/SEDENS_CAMERA_INTEGRITY_REPORT.md``. What is still true, and is
+        what this pins, is that a side photograph whose visible side disagrees
+        with its label is never scored or measured.
+        """
+        out = ik.assess_photos([photo(View.SIDE_LEFT,
+                                      side_of(View.SIDE_RIGHT, ear_ahead=30.0,
+                                              cx=540))])
         assert out.score().value is None
         assert out.score().withheld_reason
+        assert not out.readings["forward_head"].measured
+        assert "nearest the camera" in out.readings["forward_head"].metric.reason
 
     def test_the_payload_carries_the_refusals_as_well_as_the_numbers(self):
         out = ik.assess_photos(four()).to_dict()
@@ -440,7 +459,7 @@ class TestTheLimbCheckAndTheCameraAngle:
         is occluded and placed by a model that is guessing at it. Flagging
         that would withhold the score on both side photographs of every set a
         studio ever takes."""
-        det = side_on(facing_image_left=False, cx=540)
+        det = side_of(View.SIDE_LEFT, cx=540)
         points = det.keypoints.copy()
         points[al.kp.L_KNEE] = (points[al.kp.L_KNEE][0], 470)
         out = ik.assess_photos([ik.Photo(View.SIDE_LEFT,

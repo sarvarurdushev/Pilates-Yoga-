@@ -29,7 +29,7 @@ from pilates import alignment as al  # noqa: E402
 from pilates import guidance as gd  # noqa: E402
 from pilates import intake as ik  # noqa: E402
 from pilates.alignment import View  # noqa: E402
-from test_alignment import side_on, standing  # noqa: E402
+from test_alignment import side_of, side_on, standing  # noqa: E402
 from test_intake import four, photo  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -38,6 +38,17 @@ ALIGNMENT = ROOT / "pilates" / "alignment.py"
 
 def report_for(**kw) -> dict:
     return gd.report(ik.assess_photos(four(**kw)))
+
+
+def ungated(assessment: ik.PhotoAssessment) -> ik.PhotoAssessment:
+    """The same assessment with nothing held back.
+
+    The side-view metrics are kept out of every graded statement until their
+    repeatability is established (``al.AWAITING_REPEATABILITY``). The code that
+    will grade them then is still here and still tested, through this.
+    """
+    assessment.held_back = frozenset()
+    return assessment
 
 
 class TestDirection:
@@ -239,7 +250,8 @@ class TestTheProgramme:
     def test_every_finding_gets_an_exercise_before_any_gets_a_second(self):
         """Depth-first fills the session from the worst finding and never
         reaches the third."""
-        out = report_for(shoulder_tilt=14.0, hip_tilt=10.0, ear_ahead=60.0)
+        out = gd.report(ungated(ik.assess_photos(
+            four(shoulder_tilt=14.0, hip_tilt=10.0, ear_ahead=60.0))))
         assert len(out["findings"]) >= 3
         covered = {name for entry in out["programme"][:3]
                    for name in entry["for"]}
@@ -313,21 +325,27 @@ def test_a_measurement_is_formatted_once_for_every_reader(name, value, unit,
 def chained(ear=0.0, shoulder=0.0, hip=0.0, knee=0.0) -> ik.PhotoAssessment:
     """A body seen from its left, with each link pushed forward or back.
 
-    ``side_on`` faces image right here, so a positive offset is forward. The
-    near ear is the left one; moving the right one moves a landmark the model
-    could not see anyway.
+    Seen from its left, a body faces image-left (``test_alignment.side_on``),
+    so forward is -x and each positive amount is applied along it. The near
+    ear is the left one; moving the right one would move a landmark the model
+    could not see anyway. Until measurement version 2.1 this fixture faced
+    image-right, which is a right side, and matched the inverted convention.
     """
-    det = side_on(facing_image_left=False, cx=300.0)
+    det = side_of(View.SIDE_LEFT, cx=300.0)
+    forward = View.SIDE_LEFT.facing
     points = det.keypoints.copy()
     for joint, amount in ((al.kp.L_EAR, ear),
                           (al.kp.L_SHOULDER, shoulder),
                           (al.kp.R_SHOULDER, shoulder),
                           (al.kp.L_HIP, hip), (al.kp.R_HIP, hip),
                           (al.kp.L_KNEE, knee), (al.kp.R_KNEE, knee)):
-        points[joint] = (points[joint][0] + amount, points[joint][1])
-    return ik.assess_photos([ik.Photo(View.SIDE_LEFT,
-                                      al.Detection(points, det.scores),
-                                      1080, 1440)])
+        points[joint] = (points[joint][0] + forward * amount, points[joint][1])
+    # Ungated: these tests read the chain as it will be read once the links
+    # have repeatability evidence. That they are held back until then is
+    # pinned in TestHeldBackSideMetrics.
+    return ungated(ik.assess_photos([ik.Photo(View.SIDE_LEFT,
+                                              al.Detection(points, det.scores),
+                                              1080, 1440)]))
 
 
 class TestReadingTheChain:
@@ -441,10 +459,14 @@ class TestTheRegionalBreakdown:
             assert region["weakest_name"], region["region"]
 
     def test_a_region_with_nothing_measured_is_left_out_not_scored_zero(self):
-        out = gd.report(ik.assess_photos(
-            [photo(View.SIDE_LEFT, side_on(cx=540))]))["regions"]
+        out = gd.report(ungated(ik.assess_photos(
+            [photo(View.SIDE_LEFT, side_of(View.SIDE_LEFT, cx=540))])))["regions"]
         assert "shoulders" in {r["region"] for r in out}
         assert all(r["checks"] > 0 for r in out)
+        # With the side metrics held back, a side photograph alone scores no
+        # region at all rather than a region of zero.
+        assert gd.report(ik.assess_photos(
+            [photo(View.SIDE_LEFT, side_of(View.SIDE_LEFT, cx=540))]))["regions"] == []
 
     def test_priorities_carry_enough_to_be_shown(self):
         out = gd.report(ik.assess_photos(
@@ -577,3 +599,41 @@ class TestWhereToLook:
         assert len(named) > 30
         for muscle in sorted(named):
             assert f"'{muscle}'" in atlas, f"{muscle} is not in the atlas"
+
+
+class TestHeldBackSideMetrics:
+    """Measured, kept, and not graded for the student until repeatability
+    evidence exists. See ``al.AWAITING_REPEATABILITY``."""
+
+    def test_a_far_forward_head_is_not_a_finding_a_priority_or_a_plan(self):
+        out = report_for(ear_ahead=60.0)
+        named = {f["metric"] for f in out["findings"]}
+        assert not named & al.AWAITING_REPEATABILITY
+        assert not {p["metric"] for p in out["priorities"]} & al.AWAITING_REPEATABILITY
+        assert not {n for e in out["programme"] for n in e["for"]} & al.AWAITING_REPEATABILITY
+        assert not set(out["unremarkable"]) & al.AWAITING_REPEATABILITY
+
+    def test_they_are_listed_as_technical_with_a_reason_in_both_languages(self):
+        out = report_for(ear_ahead=60.0)
+        technical = {e["metric"]: e for e in out["technical"]}
+        assert set(technical) == al.AWAITING_REPEATABILITY
+        for entry in technical.values():
+            assert entry["reason"] == "awaiting_repeatability_evidence"
+            assert entry["note"] and entry["note_ko"] and entry["name_ko"]
+        # still in the readings, as technical data
+        assert out["assessment"]["readings"]["forward_head"]["value"] > 0
+
+    def test_the_chain_is_not_read_out(self):
+        assessment = chained(ear=60, shoulder=50, hip=45)
+        assessment.held_back = al.AWAITING_REPEATABILITY
+        assert gd.pattern(assessment) == {}
+
+    def test_side_photographs_alone_do_not_say_everything_is_in_range(self):
+        out = gd.report(ik.assess_photos(
+            [photo(View.SIDE_LEFT, side_of(View.SIDE_LEFT, cx=540)),
+             photo(View.SIDE_RIGHT, side_of(View.SIDE_RIGHT, cx=540))]))
+        assert out["score"]["value"] is None
+        assert "not scored yet" in out["score"]["withheld_reason"]
+        assert out["score"]["withheld_reason_ko"] == ik.HELD_BACK_SCORE_KO
+        assert out["findings"] == [] and out["unremarkable_detail"] == []
+        assert "not graded" in out["findings_note"] and out["findings_note_ko"]

@@ -45,6 +45,28 @@ from pathlib import Path
 from .archive import PoseStream, decode, encode
 from .identity import CONFIRMED, Link, Signature
 
+
+def _filed_version(readings: str | None) -> str:
+    """The measurement version a filed assessment's readings carry, or "".
+
+    The assessments table has no column for it; each reading carries it since
+    version 2.1 (see :func:`pilates.api.photo_intake`). "" means filed before
+    that, which a reader takes as :data:`pilates.alignment.LEGACY_MEASUREMENT_VERSION`.
+    """
+    try:
+        parsed = json.loads(readings or "{}")
+    except ValueError:
+        return ""
+    if not isinstance(parsed, dict):
+        return ""
+    for reading in parsed.values():
+        if isinstance(reading, dict):
+            value = reading.get("measurement_version")
+            if isinstance(value, str) and value:
+                return value
+    return ""
+
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS people (
     username     TEXT PRIMARY KEY,
@@ -1070,8 +1092,8 @@ class Store:
         """
         rows = self.db.execute(
             "SELECT id, username, by, taken_on, made_at, views, score, band, "
-            "coverage, checks, doubts FROM assessments WHERE username = ? "
-            "ORDER BY taken_on DESC, id DESC LIMIT ?",
+            "coverage, checks, doubts, readings FROM assessments "
+            "WHERE username = ? ORDER BY taken_on DESC, id DESC LIMIT ?",
             (username, int(limit)))
         return [{"id": row["id"], "username": row["username"],
                  "by": row["by"], "taken_on": row["taken_on"],
@@ -1079,7 +1101,10 @@ class Store:
                  "views": [v for v in (row["views"] or "").split(",") if v],
                  "score": row["score"], "band": row["band"],
                  "coverage": row["coverage"], "checks": row["checks"],
-                 "doubts": json.loads(row["doubts"] or "[]")}
+                 "doubts": json.loads(row["doubts"] or "[]"),
+                 # Read off the readings, which carry it; "" for a row filed
+                 # before versions were recorded. The readings stay behind.
+                 "measurement_version": _filed_version(row["readings"])}
                 for row in rows]
 
     def assessment(self, assessment_id: int) -> dict | None:

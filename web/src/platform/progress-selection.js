@@ -1,3 +1,5 @@
+import { LEGACY_MEASUREMENT_VERSION } from "./comparison.js";
+
 // Choose a featured measurement only when its recorded signal describes the
 // selected body area. Keep every raw measurement available in source reports.
 const signal = (metric) => String(metric || "").split(":").slice(1).join(":") || String(metric || "");
@@ -53,6 +55,13 @@ export function preferredProgressMetric(names, rows, regionIds = []) {
   return [...informative].sort((a, b) => score(b) - score(a))[0] || "";
 }
 
+// A row whose evidence predates measurement versions is version 2.0. Series
+// never join two versions: 2.1 reversed the sign of every side-view value.
+export function evidenceMeasurementVersion(evidence) {
+  const value = evidence?.measurement_version;
+  return typeof value === "string" && value.trim() ? value : LEGACY_MEASUREMENT_VERSION;
+}
+
 // The API resolves each compact index row against the archived selected person.
 // Confidence is saved per metric/signal or recovered from its archived frame scores, never guessed.
 // Person IDs remain capture-local and never assert identity across visits.
@@ -95,15 +104,17 @@ export function comparableProgressSeries(client, includeMetric = () => true) {
     const source = sources.get(row.analysis_id);
     if (!supportedProgressEvidence(row, source, client.id) || !includeMetric(row.metric)) continue;
     const evidence = row.evidence;
+    const version = evidenceMeasurementVersion(evidence);
     const key = [source.demo ? "demo" : "capture", source.kind, source.protocol,
-      row.metric, row.unit, evidence.status, evidence.person_id].join("\u001f");
+      row.metric, row.unit, evidence.status, evidence.person_id, version].join("\u001f");
     const observation = [row.analysis_id, key].join("\u001f");
     if (indexed.has(observation)) continue;
     indexed.add(observation);
     if (!groups.has(key)) groups.set(key, {
       metric: row.metric, unit: row.unit, protocol: source.protocol,
       kind: source.kind, demo: Boolean(source.demo), status: evidence.status,
-      person_id: evidence.person_id, person_scope: evidence.person_scope, rows: [],
+      person_id: evidence.person_id, person_scope: evidence.person_scope,
+      measurement_version: version, rows: [],
     });
     groups.get(key).rows.push(row);
   }

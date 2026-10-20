@@ -1234,10 +1234,14 @@ def findings(assessment: PhotoAssessment, *,
     months wants to see a two-degree difference before it becomes a six-degree
     one -- and they must never be presented at the same weight as the rest,
     which is what :func:`severity` is for.
+
+    A held-back quantity is never a finding, however far out it reads -- see
+    :attr:`pilates.intake.PhotoAssessment.held_back`. That also keeps it out of
+    the priorities, the programme and the habits, which are all drawn from here.
     """
     out: list[Finding] = []
     for name, reading in assessment.readings.items():
-        if not reading.measured:
+        if not reading.measured or name in assessment.held_back:
             continue
         grade = severity(reading)
         if grade is WITHIN or (grade == WATCH and not include_watch):
@@ -1661,12 +1665,17 @@ def pattern(assessment: PhotoAssessment) -> dict:
     the chain to work from.
 
     Returns an empty dict when the sagittal photographs are missing, because
-    there is no chain to read.
+    there is no chain to read -- and while the links are held back as
+    technical data (:data:`pilates.alignment.AWAITING_REPEATABILITY`), because
+    a sentence about the shape of a body is the most persuasive thing on the
+    page and the links under it have not been shown to repeat.
     """
     links = ("sagittal_ear_offset", "sagittal_shoulder_offset",
              "sagittal_hip_offset", "sagittal_knee_offset")
     values: dict[str, float] = {}
     for name in links:
+        if name in assessment.held_back:
+            continue
         reading = assessment.readings.get(name)
         if reading is not None and reading.measured:
             values[name] = float(reading.value)
@@ -1878,7 +1887,9 @@ def _findings_note(assessment: PhotoAssessment,
     unusable photograph, one sentence further down the page.
 
     So the honest question is not "were there doubts" but "was anything
-    actually measured", asked first.
+    actually measured", asked first. Measured here means measured *and shown*:
+    a set of side photographs alone measures only held-back quantities, and an
+    empty findings list over them is not "everything is in range" either.
     """
     if not assessment.supplied:
         return ("nothing was measured: none of the photographs could be used. "
@@ -1894,6 +1905,14 @@ def _findings_note(assessment: PhotoAssessment,
                 "are retaken: what they measured may not be this body",
                 "위 사진을 다시 촬영할 때까지 측정 결과를 판단하지 않습니다. "
                 "측정 대상이 이 회원이 아닐 수 있습니다")
+    if not any(r.measured for n, r in assessment.readings.items()
+               if n not in assessment.held_back):
+        return ("the side photographs were measured, but those measurements "
+                "are kept as technical notes for now and not graded. A front "
+                "or back photograph gives the checks this report can show",
+                "측면 사진은 측정했지만, 그 결과는 아직 평가하지 않고 기술 자료로만 "
+                "보관합니다. 정면 또는 후면 사진이 있으면 이 보고서에서 보여 드릴 수 "
+                "있는 항목을 측정할 수 있습니다")
     return ("", "")
 
 
@@ -1906,6 +1925,8 @@ def _withheld_ko(score) -> str:
     rule it states -- too few checks, or too little of the body visible -- is
     the part that has to survive, and that is read from the score itself.
     """
+    if score.blocked == ik.HELD_BACK_SCORE:
+        return ik.HELD_BACK_SCORE_KO
     if score.checks < scoring.MIN_CHECKS:
         return (f"측정된 항목이 {score.checks}개뿐입니다. 이 정도로는 한 항목만 "
                 f"달라져도 점수가 크게 흔들립니다")
@@ -2008,9 +2029,21 @@ def report(assessment: PhotoAssessment) -> dict:
                                  "name": metric_name(n),
                                  "name_ko": metric_name(n, "ko")}
                                 for n, r in assessment.readings.items()
-                                if r.measured and severity(r) is WITHIN],
+                                if r.measured and severity(r) is WITHIN
+                                and n not in assessment.held_back],
         "unremarkable": [n for n, r in assessment.readings.items()
-                         if r.measured and severity(r) is WITHIN],
+                         if r.measured and severity(r) is WITHIN
+                         and n not in assessment.held_back],
+        # Measured and kept, not graded: neither a finding nor "in range".
+        # A screen shows the name and this note, not the number on a band.
+        "technical": [{"metric": n,
+                       "name": metric_name(n),
+                       "name_ko": metric_name(n, "ko"),
+                       "reason": al.AWAITING_REPEATABILITY_REASON,
+                       "note": ik.HELD_BACK_REASON,
+                       "note_ko": ik.HELD_BACK_REASON_KO}
+                      for n, r in assessment.readings.items()
+                      if r.measured and n in assessment.held_back],
         "warnings": list(assessment.warnings),
         "doubts": list(assessment.doubts),
         # Carried up to the top level because it is the only item in this

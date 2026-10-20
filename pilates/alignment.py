@@ -121,6 +121,95 @@ MIN_STANCE_OVER_HIPS = 0.33
 #: the frame.
 MAX_LIMB_ASYMMETRY = 0.45
 
+#: Which version of these measurements a stored value belongs to.
+#:
+#: **Why there is a 2.1.** Up to 2.0 a side photograph was labelled by the
+#: direction the person faced, the wrong way round: someone facing image-left
+#: shows the camera their *left* side, and the module called that ``side_right``.
+#: Every sagittal sign was built on the same mistake. On an estimated view that
+#: made forward head read the hidden far ear, so it was never measured; on a
+#: declared view (the way studios and SEDENS take side photographs) it made
+#: ``forward_head``, ``trunk_lean_sagittal`` and every ``sagittal_*_offset``
+#: come out with the opposite sign. ``docs/SEDENS_CAMERA_INTEGRITY_REPORT.md``
+#: has the evidence. Frontal metrics did not change.
+#:
+#: A stored value keeps the version it was measured under. A value with no
+#: version recorded predates versioning and is read as
+#: :data:`LEGACY_MEASUREMENT_VERSION`. Values from two versions are never
+#: compared -- there is no compatibility table, and inventing one would be
+#: claiming that the old side-view numbers mean something they do not.
+MEASUREMENT_VERSION = "2.1-sagittal-anatomical"
+LEGACY_MEASUREMENT_VERSION = "2.0-evidence"
+
+#: The conventions :data:`MEASUREMENT_VERSION` measures under, written into
+#: every report so a reader does not have to know which version meant what.
+#:
+#: * ``side_view: near_side`` -- ``side_left`` is the photograph in which the
+#:   person's left side is nearest the camera (they face image-left in an
+#:   unmirrored picture), ``side_right`` the reverse.
+#: * ``sagittal_sign: anterior_positive`` -- every sagittal value is positive
+#:   when the part sits in front: the ear ahead of the shoulder, the trunk
+#:   leaning forward, a landmark ahead of the ankle.
+CONVENTIONS = {"side_view": "near_side", "sagittal_sign": "anterior_positive"}
+
+#: What a 2.0 record measured under, said plainly rather than left blank. A
+#: 2.0 side photograph was named after the way the person faced, the opposite
+#: of :data:`CONVENTIONS`, and a declared 2.0 side view carries the opposite
+#: sagittal sign. ``docs/SEDENS_CAMERA_INTEGRITY_REPORT.md`` has the detail.
+LEGACY_CONVENTIONS = {"side_view": "facing_label_inverted",
+                      "sagittal_sign": "see_camera_integrity_report"}
+
+
+def conventions_for(version: str) -> dict | None:
+    """The conventions a record of this measurement version was made under.
+
+    A rebuilt 2.0 record must not claim the 2.1 conventions: its side-view
+    values do not follow them. Unknown versions get None rather than a guess.
+    """
+    if version == MEASUREMENT_VERSION:
+        return dict(CONVENTIONS)
+    if version == LEGACY_MEASUREMENT_VERSION:
+        return dict(LEGACY_CONVENTIONS)
+    return None
+
+
+#: Side-view quantities that are measured but not yet put in front of a
+#: student. The 2.1 correction made them come out with the right sign; that is
+#: geometry, not evidence that they repeat from one photograph to the next with
+#: the real pipeline and real captures, which nobody has tested yet. So they
+#: stay technical data -- kept in the readings and the stored record, left out
+#: of the score, the findings, the chain sentence and every graded callout --
+#: until that evidence exists. SEDENS withholds ``forward_head`` for the same
+#: reason (``awaiting_repeatability_evidence`` in
+#: ``data/sedens_feedback_rules.v1.json``).
+AWAITING_REPEATABILITY = frozenset({
+    "forward_head", "trunk_lean_sagittal", "sagittal_ear_offset",
+    "sagittal_shoulder_offset", "sagittal_hip_offset", "sagittal_knee_offset"})
+#: The reason attached wherever one of those is held back.
+AWAITING_REPEATABILITY_REASON = "awaiting_repeatability_evidence"
+
+
+def version_of(record: dict | None) -> str:
+    """The measurement version a stored report or assessment was made under.
+
+    A record without one was written before versions were recorded, which
+    means 2.0 -- the version whose side views are inverted. Reading it as
+    anything newer would be the silent change of meaning this exists to stop.
+    """
+    if isinstance(record, dict):
+        for key in ("measurement_version", "version"):
+            value = record.get(key)
+            if isinstance(value, str) and value.strip():
+                return value
+    return LEGACY_MEASUREMENT_VERSION
+
+
+#: How sure the landmarks have to be about which side is nearest the camera
+#: before they are allowed to contradict the side the caller declared. Matches
+#: the confidence :func:`pilates.assessment.assess_person` already requires
+#: before the image may overrule a declared camera plane.
+SIDE_CHECK_CONFIDENCE = 0.7
+
 
 #: What counts as unremarkable, per metric. In one table because two places
 #: needed it -- the metric functions and :func:`pilates.api.posture_comparison`,
@@ -175,7 +264,10 @@ class View(str, Enum):
 
     FRONT = "front"
     REAR = "rear"
-    SIDE_LEFT = "side_left"      # the person's left side is toward the camera
+    #: The person's left side is nearest the camera, so in an unmirrored
+    #: picture they face image-left.
+    SIDE_LEFT = "side_left"
+    #: The person's right side is nearest the camera; they face image-right.
     SIDE_RIGHT = "side_right"
     THREE_QUARTER = "three_quarter"
     UNKNOWN = "unknown"
@@ -189,6 +281,23 @@ class View(str, Enum):
     def is_sagittal(self) -> bool:
         """Either side: the sagittal plane faces the lens."""
         return self in (View.SIDE_LEFT, View.SIDE_RIGHT)
+
+    @property
+    def facing(self) -> float:
+        """The facing sign phi of a side view: +1 faces image-right, -1 image-left.
+
+        The geometry, once. Image x runs right, y down, and the viewer looks
+        along -z. A person's right hand points along ``forward x up``; facing
+        +x that is +z, toward the camera. So a person facing image-right shows
+        the camera their right side, and facing image-left their left. RTMO
+        agrees on the repository's own demo photographs: in the profile facing
+        image-right it finds the right ear (0.99) and not the left (0.001).
+
+        Only true of an unmirrored picture. A mirrored picture of a left side
+        is, landmark for landmark, an unmirrored picture of a right side; see
+        ``docs/SEDENS_CAMERA_INTEGRITY_REPORT.md``. Zero for any other view.
+        """
+        return {View.SIDE_RIGHT: 1.0, View.SIDE_LEFT: -1.0}.get(self, 0.0)
 
 
 @dataclass(frozen=True)
@@ -279,7 +388,10 @@ def estimate_view(det: Detection, threshold: float = THRESHOLD) -> ViewEstimate:
       collapse toward zero. This separates frontal from sagittal and is the
       only cue that does not depend on a single joint being found.
     * **Which way the nose sits from the shoulder midline** decides left from
-      right once the pose is sagittal.
+      right once the pose is sagittal: the side nearest the camera is the side
+      the person faces toward (see :attr:`View.facing`). Without a nose, the
+      one ear the model found names that side by its label. Before version
+      2.1 this cue was read the wrong way round.
     * **The sign of the shoulder pair in image x** decides front from rear.
       A COCO model labels left and right *anatomically*, so seen from behind
       the person's left shoulder appears on the right of the picture and the
@@ -318,26 +430,80 @@ def estimate_view(det: Detection, threshold: float = THRESHOLD) -> ViewEstimate:
         return ViewEstimate(view, round(confidence, 3), round(aspect, 3),
                             note="shoulder span is frontal")
     if aspect <= 0.22:
-        # Sagittal. The nose leads the way the person faces; without it, the
-        # ear that survived does the same job, since the far ear is occluded.
-        lead = None
-        if det.scores[kp.NOSE] >= threshold:
-            lead = float(det.keypoints[kp.NOSE][0] - shoulders[0])
-        elif det.scores[kp.L_EAR] >= threshold and det.scores[kp.R_EAR] < threshold:
-            lead = float(det.keypoints[kp.L_EAR][0] - shoulders[0])
-        elif det.scores[kp.R_EAR] >= threshold and det.scores[kp.L_EAR] < threshold:
-            lead = float(det.keypoints[kp.R_EAR][0] - shoulders[0])
-        if lead is None:
+        # Sagittal. The side nearest the camera is the side the person faces
+        # toward in the picture -- facing image-right shows the right side,
+        # see `View.facing` -- so the facing sign phi decides it. The nose
+        # gives phi directly; without the nose, the ear the model could see is
+        # the near one, and its anatomical label names the side outright.
+        ear = near_side_ear(det, threshold)
+        lead = (float(det.keypoints[kp.NOSE][0] - shoulders[0])
+                if det.scores[kp.NOSE] >= threshold else 0.0)
+        if lead:
+            view = View.SIDE_RIGHT if lead > 0 else View.SIDE_LEFT
+            confidence = min(1.0, 0.5 + 0.5 * min(1.0, abs(lead) / max(1e-6, 0.25 * torso)))
+            note = "shoulder span has collapsed"
+            if ear is not None and ear is not view:
+                # The nose and the visible ear name different sides. One of
+                # the two landmarks is wrong, and nothing here says which, so
+                # the estimate is kept but too weak to overrule anybody.
+                confidence = min(confidence, 0.5)
+                note = "the nose and the visible ear disagree about which side is nearest"
+        elif ear is not None:
+            view = ear
+            near, far = ((kp.L_EAR, kp.R_EAR) if ear is View.SIDE_LEFT
+                         else (kp.R_EAR, kp.L_EAR))
+            margin = float(det.scores[near] - det.scores[far])
+            confidence = min(1.0, 0.5 + margin)
+            note = "shoulder span has collapsed; side read from the visible ear"
+        else:
             return ViewEstimate(View.UNKNOWN, 0.2, round(aspect, 3),
                                 note="side-on but the head could not be located")
-        # facing image-left means the camera sees the person's right side
-        view = View.SIDE_RIGHT if lead < 0 else View.SIDE_LEFT
-        confidence = min(1.0, 0.5 + 0.5 * min(1.0, abs(lead) / max(1e-6, 0.25 * torso)))
-        return ViewEstimate(view, round(confidence, 3), round(aspect, 3),
-                            note="shoulder span has collapsed")
+        return ViewEstimate(view, round(confidence, 3), round(aspect, 3), note=note)
     return ViewEstimate(View.THREE_QUARTER, 0.5, round(aspect, 3),
                         note=f"turned part-way ({aspect:.2f} of torso); neither "
                              "plane faces the lens")
+
+
+def near_side_ear(det: Detection, threshold: float = THRESHOLD) -> View | None:
+    """The side view the visible ear points to, or None when it cannot say.
+
+    Side-on, the far ear is behind the head. A COCO model labels ears
+    anatomically, so when exactly one ear is found its label names the side
+    nearest the camera: on the demo profile facing image-right RTMO scores the
+    right ear 0.99 and the left 0.001. Both found, or neither, is no answer.
+    """
+    left = det.scores[kp.L_EAR] >= threshold
+    right = det.scores[kp.R_EAR] >= threshold
+    if left == right:
+        return None
+    return View.SIDE_LEFT if left else View.SIDE_RIGHT
+
+
+def side_contradiction(det: Detection, declared: View,
+                       threshold: float = THRESHOLD) -> str:
+    """Why the landmarks disagree with a declared side view, or "".
+
+    A declared view is trusted for measurement because a studio knows where its
+    camera is. But the sign of every sagittal value depends on it, so a side
+    photograph labelled with the wrong side -- or mirrored on the way in --
+    would come out with every sign reversed and nothing looking wrong. This is
+    the check that says so. It only speaks when the estimate is confident
+    (:data:`SIDE_CHECK_CONFIDENCE`), because a guess that argues with a person
+    who was in the room is noise.
+    """
+    if not declared.is_sagittal:
+        return ""
+    seen = estimate_view(det, threshold)
+    if (not seen.view.is_sagittal or seen.view is declared
+            or seen.confidence < SIDE_CHECK_CONFIDENCE):
+        return ""
+    labelled = "left" if declared is View.SIDE_LEFT else "right"
+    nearest = "right" if labelled == "left" else "left"
+    return (f"the photograph was labelled as the {labelled} side, but the "
+            f"person's {nearest} side is nearest the camera; check the camera "
+            f"plane, which shoulder faced the camera, and that the picture was "
+            f"not mirrored. Side-view values are withheld because their sign "
+            f"depends on it")
 
 
 # ------------------------------------------------------------------- metrics
@@ -592,6 +758,10 @@ def forward_head(det: Detection, view: View, threshold: float = THRESHOLD) -> Me
     centimetres because converting to a distance needs a scale this camera does
     not have -- see :func:`pilates.biomechanics.metres_per_pixel`, which needs
     the student's height typed in before it will answer.
+
+    ``phi * (x_ear - x_shoulder) / |y_shoulder - y_hip|`` on the side nearest
+    the camera, with phi the view's facing sign: positive is the ear in front
+    of the shoulder, whichever side was photographed.
     """
     name = "forward_head"
     if not view.is_sagittal:
@@ -604,9 +774,9 @@ def forward_head(det: Detection, view: View, threshold: float = THRESHOLD) -> Me
     torso = float(abs(det.keypoints[shoulder][1] - det.keypoints[hip][1]))
     if torso <= 0:
         return _unavailable(name, "ratio", "the torso has no height on screen")
-    ahead = float(det.keypoints[ear][0] - det.keypoints[shoulder][0])
-    if view is View.SIDE_RIGHT:
-        ahead = -ahead                      # facing image-left; forward is -x
+    # Forward is +x facing image-right (the right side) and -x facing
+    # image-left (the left side). Until 2.1 this was the other way round.
+    ahead = view.facing * float(det.keypoints[ear][0] - det.keypoints[shoulder][0])
     return Metric(name, _zero(round(ahead / torso, 3)), "ratio", Availability.AVAILABLE,
                   _joint_confidence(det, ear, shoulder, hip), normal=NORMAL_BANDS[name])
 
@@ -647,6 +817,10 @@ def trunk_lean(det: Detection, view: View, threshold: float = THRESHOLD) -> Metr
     from the side. Both are the same measurement in the plane that happens to
     face the camera, which is why they share a name and differ only in what the
     sign means -- stated in the returned metric rather than assumed.
+
+    Lateral: positive leans toward the person's left. Sagittal:
+    ``phi * atan2(x_shoulders - x_hips, y_hips - y_shoulders)``, positive
+    leaning forward.
     """
     name = "trunk_lean_lateral" if view.is_frontal else "trunk_lean_sagittal"
     if view is View.UNKNOWN:
@@ -655,7 +829,9 @@ def trunk_lean(det: Detection, view: View, threshold: float = THRESHOLD) -> Metr
         return _unavailable(name, "deg", "the shoulders or hips were not found")
     value = _vertical_lean(det, _mid(det, kp.L_SHOULDER, kp.R_SHOULDER),
                            _mid(det, kp.L_HIP, kp.R_HIP))
-    if view in (View.REAR, View.SIDE_RIGHT):
+    if view.is_sagittal:
+        value *= view.facing
+    elif view is View.REAR:
         value = -value
     return Metric(name, _zero(round(value, 2)), "deg", Availability.AVAILABLE,
                   _joint_confidence(det, *kp.TRUNK), normal=NORMAL_BANDS[name])
@@ -817,9 +993,11 @@ def _facing(det: Detection, view: View, threshold: float) -> float:
 
     Read from the view rather than from the landmarks, because the view is
     told by the studio and a landmark-based guess would disagree with it on
-    exactly the photographs where it matters.
+    exactly the photographs where it matters. When the landmarks clearly
+    disagree, :func:`assess` refuses the view rather than measuring backwards;
+    see :func:`side_contradiction`.
     """
-    return -1.0 if view is View.SIDE_RIGHT else 1.0
+    return view.facing or 1.0
 
 
 def _chain_offset(det: Detection, pair: tuple[int, int], origin: float,
@@ -856,6 +1034,9 @@ def plumb_chain(det: Detection, view: View,
     body height is the number a teacher can convert in their head -- three per
     cent is about four centimetres on a person of average height -- and it
     does not change with how far away the camera stood.
+
+    Sagittally each link is ``phi * (x_link - x_ankles) / span``, positive in
+    front of the ankle; laterally positive is toward the person's left.
 
     **The chain is the point, not the individual numbers.** A head four
     centimetres forward of a shoulder that is itself four centimetres forward
@@ -973,6 +1154,15 @@ class PostureAssessment:
     #: nothing or flatter it -- see :func:`pilates.intake.PhotoAssessment.expected`.
     #: None means "ask the table", which is the case for every single frame.
     expected_override: tuple[str, ...] | None = None
+    #: The version of the measurements this holds. Current for anything just
+    #: measured; whatever was stored for anything rebuilt from a record, so
+    #: :func:`compare` can refuse to set a 2.0 side view against a 2.1 one.
+    measurement_version: str = MEASUREMENT_VERSION
+    #: Metrics measured but kept out of the score, for a caller that shows the
+    #: score to a student -- see :data:`AWAITING_REPEATABILITY`. Empty here by
+    #: default, so the workspace and the CLI score exactly as before; the
+    #: photograph intake passes its own set.
+    held_back: frozenset[str] = frozenset()
 
     @property
     def reliable(self) -> bool:
@@ -986,6 +1176,8 @@ class PostureAssessment:
         """One region of the body as a scoring component."""
         comp = Component(region)
         for name in REGIONS.get(region, ()):
+            if name in self.held_back:
+                continue
             metric = self.metrics.get(name)
             if metric is None or not metric.measured:
                 continue
@@ -999,9 +1191,9 @@ class PostureAssessment:
     @property
     def expected(self) -> tuple[str, ...]:
         """The metrics this view could have provided. See :data:`VIEW_METRICS`."""
-        if self.expected_override is not None:
-            return self.expected_override
-        return VIEW_METRICS.get(self.view.view, ())
+        found = (self.expected_override if self.expected_override is not None
+                 else VIEW_METRICS.get(self.view.view, ()))
+        return tuple(n for n in found if n not in self.held_back)
 
     def score(self) -> Score:
         """The alignment score, on the same machinery as every other score here.
@@ -1045,6 +1237,8 @@ class PostureAssessment:
             "attention": [m.name for m in self.attention()],
             "warnings": list(self.warnings),
             "reliable": self.reliable,
+            "measurement_version": self.measurement_version,
+            "conventions": conventions_for(self.measurement_version),
         }
 
 
@@ -1113,6 +1307,12 @@ def assess(det: Detection, *, view: View | None = None, person_id: str = "",
                 f"{MIN_BODY_FRACTION:.0%} a one-degree tilt is under a pixel")
     if estimate.view in (View.UNKNOWN, View.THREE_QUARTER):
         warnings.append(f"view not established: {estimate.note}")
+    if view is not None:
+        # The caller's side is trusted for measurement, not blindly: every
+        # sagittal sign hangs on it. See :func:`side_contradiction`.
+        contradiction = side_contradiction(det, view, threshold)
+        if contradiction:
+            warnings.append(contradiction)
     if det.confidence < 0.35:
         warnings.append(f"mean joint confidence {det.confidence:.2f} is too low to build on")
     # Confidence is not correctness. See :func:`implausible`, which exists
@@ -1216,6 +1416,7 @@ def aggregate(assessments: list[PostureAssessment], *,
         metrics=merged, warnings=warnings,
         person_id=agreed[0].person_id,
         body_fraction=agreed[0].body_fraction,
+        measurement_version=agreed[0].measurement_version,
     )
 
 
@@ -1276,6 +1477,10 @@ class Comparison:
 
     @property
     def score_change(self) -> float | None:
+        # Two headline scores from different measurement versions are two
+        # different sums, not one sum that moved -- refused like every metric.
+        if self.before.measurement_version != self.after.measurement_version:
+            return None
         a, b = self.before.score().value, self.after.score().value
         return None if a is None or b is None else round(b - a, 1)
 
@@ -1289,6 +1494,10 @@ class Comparison:
             "after": self.after.to_dict(),
             "score_change": self.score_change,
             "same_view": self.before.view.view is self.after.view.view,
+            "same_measurement_version": (self.before.measurement_version
+                                         == self.after.measurement_version),
+            "measurement_versions": [self.before.measurement_version,
+                                     self.after.measurement_version],
             "comparable_metrics": self.comparable_count,
             "changes": {
                 n: {"before": c.before, "after": c.after, "unit": c.unit,
@@ -1311,8 +1520,13 @@ def compare(before: PostureAssessment, after: PostureAssessment) -> Comparison:
     * **Different views are not compared at all.** Shoulder tilt from the front
       and shoulder tilt from the rear differ in sign by construction, and a
       camera moved between visits would otherwise read as a transformation.
+    * **Different measurement versions are not compared at all.** A 2.0 side
+      view and a 2.1 side view disagree in sign by construction; see
+      :data:`MEASUREMENT_VERSION`. There is no compatibility table, so the
+      frontal values are refused too rather than half-trusted.
     """
     same_view = before.view.view is after.view.view
+    versions = (before.measurement_version, after.measurement_version)
     changes: dict[str, MetricChange] = {}
     for name in _ALL_METRIC_NAMES:
         a, b = before.metrics.get(name), after.metrics.get(name)
@@ -1322,6 +1536,11 @@ def compare(before: PostureAssessment, after: PostureAssessment) -> Comparison:
             changes[name] = MetricChange(name, a.value if a else None,
                                          b.value if b else None, unit, False,
                                          f"not measured in {missing} assessment")
+        elif versions[0] != versions[1]:
+            changes[name] = MetricChange(name, a.value, b.value, unit, False,
+                                         f"measured under different measurement "
+                                         f"versions ({versions[0]} then "
+                                         f"{versions[1]})")
         elif not same_view:
             changes[name] = MetricChange(name, a.value, b.value, unit, False,
                                          f"assessed from different views "

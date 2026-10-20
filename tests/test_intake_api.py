@@ -28,7 +28,7 @@ from pilates import alignment as al  # noqa: E402
 from pilates import api  # noqa: E402
 from pilates import photos as ph  # noqa: E402
 from pilates.alignment import View  # noqa: E402
-from test_alignment import side_on, standing  # noqa: E402
+from test_alignment import side_of, side_on, standing  # noqa: E402
 from test_api import Client, studio  # noqa: E402,F401  (studio is a fixture)
 
 WIDTH, HEIGHT = 1080, 1440
@@ -60,10 +60,8 @@ BODIES = {
     View.FRONT: lambda: standing(shoulder_tilt=9.0, hip_tilt=5.0, cx=540),
     View.REAR: lambda: standing(facing="rear", shoulder_tilt=8.0,
                                 hip_tilt=4.0, cx=540),
-    View.SIDE_LEFT: lambda: side_on(facing_image_left=False, ear_ahead=44.0,
-                                    cx=540),
-    View.SIDE_RIGHT: lambda: side_on(facing_image_left=True, ear_ahead=40.0,
-                                     cx=540),
+    View.SIDE_LEFT: lambda: side_of(View.SIDE_LEFT, ear_ahead=44.0, cx=540),
+    View.SIDE_RIGHT: lambda: side_of(View.SIDE_RIGHT, ear_ahead=40.0, cx=540),
 }
 
 
@@ -454,8 +452,8 @@ class TestWhatIsKept:
 class TestComparingTwoVisits:
     def one(self, client, stubbed, day, tilt):
         stubbed([standing(shoulder_tilt=tilt, cx=540),
-                 side_on(facing_image_left=False, ear_ahead=40.0, cx=540),
-                 side_on(facing_image_left=True, ear_ahead=40.0, cx=540),
+                 side_of(View.SIDE_LEFT, ear_ahead=40.0, cx=540),
+                 side_of(View.SIDE_RIGHT, ear_ahead=40.0, cx=540),
                  standing(facing="rear", shoulder_tilt=tilt, cx=540)])
         _, out = client.post("/intake", {"photos": shots(*ALL_FOUR),
                                          "taken_on": day})
@@ -496,6 +494,53 @@ class TestComparingTwoVisits:
                              {"before": first, "after": only["assessment_id"]})
         assert out["changes"]["shoulder_tilt"]["comparable"]
         assert not out["changes"]["forward_head"]["comparable"]
+
+    @staticmethod
+    def file_as_legacy(db, assessment_id):
+        """Strip the version off a filed visit, as a 2.0 filing has none."""
+        import json
+        import sqlite3
+
+        with sqlite3.connect(db) as conn:
+            (raw,) = conn.execute("SELECT readings FROM assessments WHERE id = ?",
+                                  (assessment_id,)).fetchone()
+            readings = {n: {k: v for k, v in r.items() if k != "measurement_version"}
+                        for n, r in json.loads(raw).items()}
+            conn.execute("UPDATE assessments SET readings = ? WHERE id = ?",
+                         (json.dumps(readings), assessment_id))
+
+    def test_two_versions_show_no_score_change_and_say_why(self, coach, stubbed):
+        """Every metric is refused across versions; two filed scores side by
+        side would read as a change anyway, so they are left off too."""
+        client, _, db = coach
+        first = self.one(client, stubbed, "2026-01-10", 11.0)
+        second = self.one(client, stubbed, "2026-06-10", 4.0)
+        self.file_as_legacy(db, first)
+        _, out = client.post("/assessment/compare",
+                             {"before": first, "after": second})
+        assert out["comparable_metrics"] == 0
+        assert out["score_change"] is None
+        assert out["before_score"] is None and out["after_score"] is None
+        assert "different versions" in out["refused"] and out["refused_ko"]
+        _, same = client.post("/assessment/compare",
+                              {"before": second, "after": second})
+        assert same["refused"] == "" and same["after_score"] is not None
+
+    def test_the_trend_does_not_join_scores_from_two_versions(self, coach, stubbed):
+        client, _, db = coach
+        first = self.one(client, stubbed, "2026-01-10", 11.0)
+        self.one(client, stubbed, "2026-03-10", 6.0)
+        self.one(client, stubbed, "2026-06-10", 4.0)
+        self.file_as_legacy(db, first)
+        _, history = client.get("/assessments")
+        assert [p["on"] for p in history["trend"]] == ["2026-03-10", "2026-06-10"]
+        assert {p["measurement_version"] for p in history["trend"]} == {
+            al.MEASUREMENT_VERSION}
+        assert history["trend_left_out"] == 1
+        assert history["trend_note"] and history["trend_note_ko"]
+        versions = {a["taken_on"]: a["measurement_version"]
+                    for a in history["assessments"]}
+        assert versions["2026-01-10"] == al.LEGACY_MEASUREMENT_VERSION
 
     @pytest.mark.parametrize("payload", [
         {}, {"before": 1}, {"after": 1}, {"before": "x", "after": "y"}])

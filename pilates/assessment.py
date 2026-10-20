@@ -17,7 +17,13 @@ from . import alignment as al, geometry as geo, movement as mv, pose3d
 from .validation import validate_body, suppress_fragments
 from .types import Detection
 
-VERSION = "2.0-evidence"
+# The measurement version every report carries. 2.1 corrected the side-view
+# convention (see pilates.alignment.MEASUREMENT_VERSION, where it is defined
+# next to the geometry it names). A stored 2.0 report keeps "2.0-evidence";
+# reports are never rewritten, and `compare` refuses to set two versions side
+# by side.
+VERSION = al.MEASUREMENT_VERSION  # "2.1-sagittal-anatomical"
+CONVENTIONS = al.CONVENTIONS
 _ANALYSIS_LOCK = threading.Lock()
 
 
@@ -361,6 +367,7 @@ def photo(payload, backend=None):
         people.append(p)
     return {
         "version": VERSION,
+        "conventions": dict(CONVENTIONS),
         "kind": "photo",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "width": w,
@@ -815,6 +822,7 @@ def video(
         )
     return {
         "version": VERSION,
+        "conventions": dict(CONVENTIONS),
         "kind": "video",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "width": w if index else 0,
@@ -902,7 +910,9 @@ def compare(store, before_id, after_id, before_person, after_person):
         why.append("Name the subject in both assessments before comparing.")
     if a["report"]["kind"] != b["report"]["kind"]:
         why.append("Assessment types differ.")
-    if a["report"]["version"] != b["report"]["version"]:
+    # A report saved before versions existed is 2.0 (al.version_of). Version
+    # 2.1 changed the sign of every side-view value, so the two never compare.
+    if al.version_of(a["report"]) != al.version_of(b["report"]):
         why.append("Measurement versions differ.")
     pa = next(
         (p for p in a["report"]["people"] if p["person_id"] == str(before_person)), None

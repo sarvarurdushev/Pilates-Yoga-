@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  comparableMeasurements, findComparableVisits, matchingPriorSummaries,
-  nearestComparableMeasurement, selectedComparablePerson,
+  LEGACY_MEASUREMENT_VERSION, comparableMeasurements, findComparableVisits, matchingPriorSummaries,
+  measurementVersion, nearestComparableMeasurement, selectedComparablePerson,
 } from "../src/platform/comparison.js";
 
 const metric = (value, status = "measured", unit = "deg", confidence = 0.92) =>
@@ -91,4 +91,34 @@ test("nearest matching metric may be older than another otherwise valid comparis
   const visits = await findComparableVisits(current, now, "front", [older, recent], async (item) => details.get(item.id));
   assert.equal(nearestComparableMeasurement(visits, "shoulder_tilt").visit.analysis.id, "recent");
   assert.equal(nearestComparableMeasurement(visits, "pelvic_obliquity").visit.analysis.id, "older");
+});
+
+test("captures from different measurement versions are never compared; no version reads as legacy 2.0", async () => {
+  // Version 2.1 corrected the side-view convention, which reversed the sign of
+  // every side-view value. A report saved before versions existed is 2.0.
+  assert.equal(measurementVersion({}), LEGACY_MEASUREMENT_VERSION);
+  assert.equal(measurementVersion(null), "2.0-evidence");
+  assert.equal(measurementVersion({ version: "2.1-sagittal-anatomical" }), "2.1-sagittal-anatomical");
+  const sideMetric = { id: "forward_head", name: "Forward head", value: 0.06, status: "estimated", unit: "ratio", confidence: 0.9 };
+  const withVersion = (item, version, value) => ({
+    ...item, detail: {},
+    result: { views: [{ view: "side_left", report: { ...(version ? { version } : {}), people: [person("1", [{ ...sideMetric, value }])] } }] },
+  });
+  const now = withVersion(current, "2.1-sagittal-anatomical", 0.06);
+  const legacy = summary("legacy-no-version", "2026-09-10T12:00:00Z");
+  const old = summary("old-2-0", "2026-09-12T12:00:00Z");
+  const same = summary("same-2-1", "2026-09-14T12:00:00Z");
+  const details = new Map([
+    [legacy.id, withVersion(legacy, null, -0.05)],
+    [old.id, withVersion(old, "2.0-evidence", -0.04)],
+    [same.id, withVersion(same, "2.1-sagittal-anatomical", 0.05)],
+  ]);
+  const visits = await findComparableVisits(now, now.result.views[0].report.people[0], "side_left",
+    [legacy, old, same], async (item) => details.get(item.id));
+  assert.deepEqual(visits.map((visit) => visit.analysis.id), ["same-2-1"]);
+  // Two legacy captures remain comparable with each other, under their own version.
+  const then = withVersion(summary("legacy-now", "2026-09-20T12:00:00Z"), null, -0.06);
+  const legacyVisits = await findComparableVisits(then, then.result.views[0].report.people[0], "side_left",
+    [legacy, old, same], async (item) => details.get(item.id));
+  assert.deepEqual(legacyVisits.map((visit) => visit.analysis.id), ["old-2-0", "legacy-no-version"]);
 });

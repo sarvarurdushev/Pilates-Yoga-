@@ -45,9 +45,13 @@ export function cameraPurpose(view, protocol = "") {
 }
 
 export function cameraGuide(view, protocol = "") {
+  /* A plan seen from above, the front camera at the bottom, so the person
+     faces down the page and their own left side is on page-right. side_left
+     is the camera at their left side (measurement 2.1, "near_side"). The
+     45° view names no side and keeps its place. */
   const positions = {
     front: [80, 79], rear: [80, 11], back: [80, 11],
-    side_left: [15, 45], side_right: [145, 45], three_quarter: [139, 74],
+    side_left: [145, 45], side_right: [15, 45], three_quarter: [139, 74],
   };
   const [cx, cy] = positions[view] || positions.front;
   return `<figure class="camera-guide" aria-label="Camera position: ${esc(cameraLabels[view] || view)}"><svg viewBox="0 0 160 90" role="img" aria-label="Camera facing the person from the ${esc(cameraLabels[view] || view)}"><circle cx="80" cy="45" r="19" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="80" cy="37" r="5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M70 54q10-12 20 0M80 10v14M80 66v14M45 45h16M99 45h16" fill="none" stroke="currentColor" stroke-width="2"/><path d="M${cx} ${cy}l${cx < 80 ? -5 : 5} -4v8z" fill="currentColor"/><circle cx="${cx}" cy="${cy}" r="7" fill="none" stroke="currentColor" stroke-width="2"/></svg><figcaption><strong>${esc(cameraLabels[view] || String(view).replaceAll("_", " "))}</strong><span>${esc(cameraPurpose(view, protocol))}</span></figcaption></figure>`;

@@ -343,6 +343,18 @@ class PhotoAssessment:
     #: Not defaulted to today: a set photographed last week and uploaded now
     #: would silently become today's assessment.
     taken_on: str = ""
+    #: The measurement version the readings were made under. Current for a set
+    #: just measured; for a filed set, whatever was filed with it -- 2.0 when
+    #: nothing was, because filing predates the version. See
+    #: :data:`pilates.alignment.MEASUREMENT_VERSION`.
+    measurement_version: str = al.MEASUREMENT_VERSION
+    #: Quantities measured and kept, but not yet shown to the student as a
+    #: score, a finding or a judgement: the side-view metrics, until their
+    #: repeatability is established. See
+    #: :data:`pilates.alignment.AWAITING_REPEATABILITY`. One switch, on the
+    #: assessment, so every reader of the report -- the screen, the printed
+    #: page, the CLI, a comparison of two visits -- holds back the same things.
+    held_back: frozenset[str] = al.AWAITING_REPEATABILITY
 
     # ------------------------------------------------------------- coverage
 
@@ -364,10 +376,16 @@ class PhotoAssessment:
         in the module would charge it for forward head, which no frontal
         photograph can see; scoring the full four out of only what one of them
         sees would flatter it.
+
+        A held-back quantity is not counted either way: it is not part of the
+        score, so it is neither credit nor a gap. A set of side photographs
+        alone therefore has nothing to score, and says so.
         """
         seen: list[str] = []
         for view in self.supplied:
             for name in al.VIEW_METRICS[view]:
+                if name in self.held_back:
+                    continue
                 if name not in seen:
                     seen.append(name)
         return tuple(seen)
@@ -471,6 +489,8 @@ class PhotoAssessment:
     def component(self, region: str) -> Component:
         comp = Component(region)
         for name in al.REGIONS.get(region, ()):
+            if name in self.held_back:
+                continue
             reading = self.readings.get(name)
             if reading is None or not reading.measured:
                 continue
@@ -508,11 +528,18 @@ class PhotoAssessment:
             # framed itself would come out doubled in both.
             score.blocked = (f"{first}{more}. Retake that photograph and the "
                              f"measurements will stand on their own")
+        elif not self.expected and any(
+                r.measured for n, r in self.readings.items()
+                if n in self.held_back):
+            # Side photographs alone: measured, and nothing in them is scored
+            # yet. "Only 0 checks could be made" would be true and baffling.
+            score.blocked = HELD_BACK_SCORE
         return score
 
     def attention(self) -> list[Reading]:
         """What to look at, worst first."""
-        notable = [r for r in self.readings.values() if r.measured and r.notable]
+        notable = [r for r in self.readings.values()
+                   if r.measured and r.notable and r.name not in self.held_back]
         return sorted(notable, key=lambda r: -(r.deviation or 0.0))
 
     def refusals(self) -> list[Reading]:
@@ -551,6 +578,11 @@ class PhotoAssessment:
             # The one warning in this payload with a button attached.
             "fix": self.fix(),
             "reliable": self.reliable,
+            "measurement_version": self.measurement_version,
+            "conventions": al.conventions_for(self.measurement_version),
+            # Measured, kept, and not graded for the student yet.
+            "technical_only": sorted(n for n in self.held_back
+                                     if n in self.readings),
             "photos": {v.value: {"title": p.title, "width": p.width,
                                  "height": p.height, "label": p.label,
                                  "usable": p.usable, "problem": p.problem,
@@ -560,6 +592,19 @@ class PhotoAssessment:
                                  if v in self.per_view else None}
                        for v, p in self.photos.items()},
         }
+
+
+#: Why a held-back quantity is not graded or compared, in plain words. The
+#: machine-readable reason is :data:`pilates.alignment.AWAITING_REPEATABILITY_REASON`.
+HELD_BACK_REASON = ("held back as technical data until it is shown to give the "
+                    "same answer from one photograph to the next")
+HELD_BACK_REASON_KO = ("사진마다 같은 결과가 나오는지 확인될 때까지 기술 자료로만 "
+                       "보관합니다")
+#: Why a set of side photographs alone has no score.
+HELD_BACK_SCORE = ("side photographs are not scored yet; a front or back "
+                   "photograph is needed for a score")
+HELD_BACK_SCORE_KO = ("측면 사진은 아직 점수에 반영하지 않습니다. 점수를 내려면 정면 "
+                      "또는 후면 사진이 필요합니다")
 
 
 #: How sure the view estimator has to be before it is allowed to contradict
@@ -682,8 +727,17 @@ def assess_photos(photos: list[Photo], *, person_id: str = "",
             # it was handed -- too small, too unsure, or not a body -- so every
             # one of them is a doubt rather than a gap.
             out.warnings.append(f"{photo.title}: {warning}")
-            out.doubts.append(f"{photo.title}: {warning}")
         mismatch = _view_mismatch(photo)
+        for warning in assessment.warnings:
+            # The side check in the measurement layer and the mismatch below
+            # are the same finding about the same photograph. The mismatch is
+            # the one written for a reader, in both languages and with a fix,
+            # so when it speaks the technical sentence stays a warning only;
+            # otherwise a swapped pair would list four doubts for two problems.
+            if mismatch is not None and al.side_contradiction(
+                    photo.detection, photo.view, threshold) == warning:
+                continue
+            out.doubts.append(f"{photo.title}: {warning}")
         if mismatch is not None:
             out.mismatches.append(mismatch)
             out.warnings.append(mismatch.text())
@@ -737,8 +791,19 @@ def compare(before: PhotoAssessment, after: PhotoAssessment) -> al.Comparison:
     from either visit, and already declines to report a percentage change
     against a value near zero -- three refusals that would each have to be
     rewritten here, and would each eventually be written slightly differently.
+
+    One refusal is added: a held-back quantity is not compared. "Toward" or
+    "away from" neutral is a judgement shown to the student, and it rests on
+    the same repeatability nobody has measured yet.
     """
-    return al.compare(_as_single(before), _as_single(after))
+    comparison = al.compare(_as_single(before), _as_single(after))
+    held = before.held_back | after.held_back
+    for name, change in list(comparison.changes.items()):
+        if name in held and change.comparable:
+            comparison.changes[name] = al.MetricChange(
+                name, change.before, change.after, change.unit, False,
+                HELD_BACK_REASON)
+    return comparison
 
 
 def _as_single(intake: PhotoAssessment) -> PostureAssessment:
@@ -767,4 +832,10 @@ def _as_single(intake: PhotoAssessment) -> PostureAssessment:
         # The score asks what could have been measured. For a photograph set
         # that is the union of the views supplied, which is why the alignment
         # layer takes an override rather than always consulting its own table.
-        expected_override=intake.expected)
+        expected_override=intake.expected,
+        # Carried so two visits measured under different versions are refused
+        # by the alignment layer's own rule rather than compared silently.
+        measurement_version=intake.measurement_version,
+        # The same quantities stay out of the comparison's score as out of
+        # the headline, so a change in score is a change in what was shown.
+        held_back=intake.held_back)

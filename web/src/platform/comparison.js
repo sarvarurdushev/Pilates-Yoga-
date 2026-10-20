@@ -1,6 +1,23 @@
 // Comparisons only describe repeated observations from the same capture protocol.
 // This module deliberately works from persisted evidence, not the order of a list.
 const SUPPORTED_STATUSES = new Set(["measured", "estimated", "available"]);
+// A report saved before measurement versions were recorded is version 2.0.
+// Version 2.1 corrected the side-view convention, so every side-view value
+// changed sign; reports from different versions are never compared.
+export const LEGACY_MEASUREMENT_VERSION = "2.0-evidence";
+
+export function measurementVersion(report) {
+  for (const key of ["measurement_version", "version"]) {
+    const value = report?.[key];
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return LEGACY_MEASUREMENT_VERSION;
+}
+
+function viewVersion(analysis, cameraView) {
+  const view = analysis?.result?.views?.find((entry) => entry.view === cameraView);
+  return measurementVersion(view?.report);
+}
 
 function captureTime(analysis) {
   const time = Date.parse(analysis?.created_at || "");
@@ -67,6 +84,7 @@ export function comparableMeasurements(currentPerson, priorPerson, kind) {
 
 export async function findComparableVisits(current, currentPerson, cameraView, summaries, load) {
   if (!currentPerson?.suitable) return [];
+  const version = viewVersion(current, cameraView);
   const candidates = matchingPriorSummaries(current, summaries);
   const matches = [];
   // Bound concurrent record fetches on small hosted instances. Promise.all
@@ -81,7 +99,7 @@ export async function findComparableVisits(current, currentPerson, cameraView, s
           analysis.demo !== current.demo ||
           captureTime(analysis) !== captureTime(summary)) return null;
       const selected = selectedComparablePerson(analysis, cameraView);
-      if (!selected) return null;
+      if (!selected || measurementVersion(selected.view?.report) !== version) return null;
       const metrics = comparableMeasurements(currentPerson, selected.person, current.kind);
       return metrics.length ? { analysis, view: selected.view, person: selected.person, metrics } : null;
     }));

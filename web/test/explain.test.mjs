@@ -10,6 +10,15 @@ test('camera guide identifies the actual capture view and only supported use', (
   assert.match(cameraPurpose('front', 'Shoulder flexion'), /left and right arm paths/);
 });
 
+test('camera guide puts each side camera at that side of the person', () => {
+  /* Plan view, front camera at the bottom: the person faces down the page,
+     so their left side -- and the side_left camera -- is on page-right. */
+  const cameraX = (view) => Number(cameraGuide(view).match(/<circle cx="([\d.]+)" cy="[\d.]+" r="7"/)[1]);
+  assert.ok(cameraX('side_left') > 80);
+  assert.ok(cameraX('side_right') < 80);
+  assert.equal(cameraX('front'), 80);
+});
+
 test('measurement explanations avoid medical thresholds and do not claim improvement', () => {
   const shoulder = metricCopy({id:'shoulder_tilt'});
   assert.match(shoulder.definition, /shoulder landmarks/);
