@@ -258,7 +258,8 @@ def _room_course_complete(r):
     room = r.room()
     with r.sedens.db() as db:
         played = db.execute("SELECT 1 FROM s_workouts WHERE room_session_id=? AND kind='course' AND course_id=? "
-                            "AND course_session_id=? AND state='completed'",
+                            "AND course_session_id=? AND state='completed' "
+                            "AND EXISTS (SELECT 1 FROM s_workout_steps st WHERE st.workout_id=s_workouts.id AND st.state='completed')",
                             (room.room_session_id, r.body.get("course_id"), r.body.get("session_id"))).fetchone()
         if played is None:
             raise Denied("Play this session in the room to complete it.", 409, "play_first")

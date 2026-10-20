@@ -307,6 +307,56 @@ def test_repeating_a_course_completion_adds_no_progress_and_does_not_complete_tw
     assert [a["id"] for a in read(w, passport.achievements)["items"] if a["id"].startswith("course")] == ["course_completed"]
 
 
+def test_a_course_session_with_every_step_skipped_does_not_move_the_course(world):
+    w = world
+    view = guided_course(w.sedens, w.reviewer, w.a, w.coach, "Skip Course", sessions=2)
+    cid = view["course"]["id"]
+    first, second = (s["id"] for s in view["modules"][0]["sessions"])
+    v = course_visit(w.sedens, w.a, w.device)
+    v.act("course/start", course_id=cid)
+    v.act("workout/start")
+    finish(v, skip={0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
+    assert v.state == "session_complete"
+    assert one(w, "SELECT state FROM s_workouts WHERE room_session_id=?", v.ctx.room_session_id)["state"] == "completed"
+    assert progress_rows(v, cid) == []
+    v.leave()
+    [program] = read(w, passport.programs)["items"]
+    assert program["sessions"]["done"] == 0 and program["next_session"]["session_id"] == first and program["history"] == []
+    assert [a["id"] for a in read(w, passport.achievements)["items"] if a["id"].startswith("first_course")] == []
+    # Next time, one performed step is enough: the progress is written once, a retry changes nothing.
+    v = course_visit(w.sedens, w.a, w.device)
+    v.act("course/start", course_id=cid)
+    v.act("workout/start")
+    finish(v, skip={1})
+    [done] = progress_rows(v, cid)
+    assert done["item_id"] == first
+    with w.sedens.db() as db:
+        marketplace.complete_room_session(w.sedens, db, v.ctx, cid, first)
+    assert progress_rows(v, cid) == [done]
+    v.leave()
+    [program] = read(w, passport.programs)["items"]
+    assert program["sessions"]["done"] == 1 and program["next_session"]["session_id"] == second
+    assert [a["id"] for a in read(w, passport.achievements)["items"] if a["id"].startswith("first_course")] == \
+        ["first_course_session"]
+
+
+def test_the_course_completed_origin_comes_from_the_workouts_that_completed_it(world):
+    w = world
+    view = guided_course(w.sedens, w.reviewer, w.a, w.coach, "Origin Course", sessions=1)
+    cid = view["course"]["id"]
+    v = course_visit(w.sedens, w.a, w.device)
+    v.act("course/start", course_id=cid)
+    v.act("workout/start")
+    finish(v)
+    v.leave()
+    got = {a["id"]: a["origin"] for a in read(w, passport.achievements)["items"]}
+    assert got["course_completed"] == "room" and got["first_course_session"] == "room"
+    with w.sedens.db() as db:
+        db.execute("UPDATE s_workouts SET origin='demo_seed' WHERE course_id=?", (cid,))
+    got = {a["id"]: a["origin"] for a in read(w, passport.achievements)["items"]}
+    assert got["course_completed"] == "demo_seed" and got["first_course_session"] == "demo_seed"
+
+
 # == refresh =====================================================================================
 
 
@@ -457,8 +507,8 @@ def test_seeded_demonstration_history_is_not_room_activity(world):
     items = read(w, passport.history, None, 50)["items"]
     assert sorted(i["origin"] for i in items) == ["demo_seed", "room"]
     # The seed wrote no analytics events of its own: only the real visit did.
-    assert rows(w, "SELECT count(*) AS n FROM s_events WHERE room_session_id=?", real.ctx.room_session_id)[0]["n"] > 0
-    assert rows(w, "SELECT count(*) AS n FROM s_events")[0]["n"] >= events_before
+    real_events = rows(w, "SELECT count(*) AS n FROM s_events WHERE room_session_id=?", real.ctx.room_session_id)[0]["n"]
+    assert rows(w, "SELECT count(*) AS n FROM s_events")[0]["n"] == events_before + real_events
     assert not rows(w, "SELECT 1 FROM s_events e JOIN s_room_sessions s ON s.id=e.room_session_id WHERE s.origin='demo_seed'")
     # The seeded scan is never compared with the demonstration scan of the real visit.
     pair_ = read(w, passport.scans)["items"]

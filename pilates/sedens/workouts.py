@@ -380,14 +380,16 @@ def _finish(sedens, db, ctx, journey_row, w, outcome, *, reason="completed", cat
     db.execute("UPDATE s_workouts SET state=?, ended_at=?, end_reason=?, safety_category=?, segment_started_at=NULL "
                "WHERE id=? AND state IN ('ready','active','paused')",
                ("completed" if outcome == "completed" else "stopped", stamp, reason, category, w["id"]))
-    if outcome == "completed" and w["kind"] == "course":
+    done = db.execute("SELECT state, count(*) FROM s_workout_steps WHERE workout_id=? GROUP BY state",
+                      (w["id"],)).fetchall()
+    counts = {r[0]: r[1] for r in done}
+    # A step the customer skipped was not performed: a course session in which every step
+    # was skipped ends as a stored fact but does not move the course forward.
+    if outcome == "completed" and w["kind"] == "course" and counts.get("completed", 0) > 0:
         enrolled = access.enrollment(db, ctx.student_id, w["course_id"])
         if enrolled is not None:
             marketplace._complete(db, enrolled, "session", w["course_session_id"],
                                   marketplace._snapshot(db, w["course_id"], w["course_version"]))
-    done = db.execute("SELECT state, count(*) FROM s_workout_steps WHERE workout_id=? GROUP BY state",
-                      (w["id"],)).fetchall()
-    counts = {r[0]: r[1] for r in done}
     if outcome == "completed":
         _event(db, ctx, "workout_completed", kind=w["kind"], completed=counts.get("completed", 0),
                skipped=counts.get("skipped", 0))

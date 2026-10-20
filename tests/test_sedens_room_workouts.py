@@ -929,3 +929,24 @@ def test_readiness_is_required_before_any_workout_action(world):
     with sedens.db() as db:
         assert readiness.latest(db, v.ctx.room_session_id) is None
     assert v.all("SELECT * FROM s_workouts WHERE room_session_id=?", v.ctx.room_session_id) == []
+
+
+def test_over_http_a_session_with_every_step_skipped_cannot_be_confirmed_as_course_progress(http_course):
+    sedens, fac, device, base, view = http_course
+    cid = view["course"]["id"]
+    first_session = view["modules"][0]["sessions"][0]["id"]
+    screen = Screen(base, device)
+    assert screen.enter(room_code(sedens, fac["customer_token"]))["state"] == "identified"
+    screen.act("readiness/start")
+    while screen.j["state"] == "readiness":
+        ask = screen.j["readiness"]["next"]
+        screen.act("readiness/answer", item=ask["item"], **({"follow_up": False} if ask["follow_up"] else
+                                                             {"answer": False}))
+    screen.act("scan/skip")
+    screen.act("course/start", course_id=cid)
+    screen.act("workout/start")
+    for position in (0, 1, 2):
+        screen.act("workout/step", position=position, outcome="skipped")
+    complete = {"course_id": cid, "session_id": first_session}
+    status, body = screen.post("/sedens/room/course/complete", complete)
+    assert (status, body["code"]) == (409, "play_first")
