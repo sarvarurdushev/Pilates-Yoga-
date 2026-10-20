@@ -5,14 +5,14 @@
 :root {
   --rj-radius: 20px;
   --rj-surface-raised: #1a1e24;
-  --rj-accent-soft: #1b2733;
-  --rj-accent-line: #3a4b5c;
+  --rj-accent-soft: var(--sd-accent-soft);
+  --rj-accent-line: var(--sd-accent-line);
   --rj-urgent-bg: #2a1715;
   --rj-urgent-text: #ffe1dc;
   --rj-stopped-bg: #221d10;
-  --rj-phase-warm: #5f7f9c;
-  --rj-phase-main: #9fc0dd;
-  --rj-phase-cool: #3f5568;
+  --rj-phase-warm: #4a8f88;
+  --rj-phase-main: var(--sd-accent);
+  --rj-phase-cool: #2f6a64;
 }
 
 /* Shell */
@@ -129,7 +129,7 @@
 /* session choice */
 .rj-hero {
   border-radius: 24px; padding: clamp(24px, 3.4vw, 48px); display: flex; flex-direction: column; gap: 12px;
-  background: linear-gradient(135deg, #1c2631 0%, #15181d 70%); border: 1px solid var(--rj-accent-line);
+  background: linear-gradient(135deg, #16282a 0%, #15181d 70%); border: 1px solid var(--rj-accent-line);
 }
 .rj-hero p { margin: 0; }
 .rj-hero .rj-actions { margin-top: 10px; }

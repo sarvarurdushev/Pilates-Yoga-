@@ -32,7 +32,13 @@ def summary(db, student_id) -> dict:
                         (student_id,)).fetchone()
     room = db.execute("SELECT count(*) FROM s_workouts WHERE student_id=? AND state='completed'",
                       (student_id,)).fetchone()[0] if _has(db, "s_workouts") else 0
-    return {"visits": visits[0], "last_visit": visits[1], "room_sessions_completed": room}
+    # The Passport's own definition of a visit: a room visit in which an exercise was performed. The room
+    # welcome shows this, so it agrees with the Passport; "visits" also counts coach-recorded sessions.
+    done = db.execute("SELECT count(*), max(s.started_at) FROM s_room_sessions s WHERE s.student_id=? AND EXISTS "
+                      f"(SELECT 1 FROM s_workouts w WHERE w.room_session_id=s.id AND w.student_id=s.student_id AND {PERFORMED})",
+                      (student_id,)).fetchone() if _has(db, "s_workouts") else (0, None)
+    return {"visits": visits[0], "last_visit": visits[1], "room_sessions_completed": room,
+            "completed_visits": done[0], "last_completed_visit": done[1]}
 
 
 def _has(db, table) -> bool:
@@ -339,7 +345,7 @@ def workout(sedens, db, actor, locale, workout_id) -> dict:
             "effort": _effort(given, locale), "discomfort": given["discomfort"],
             "discomfort_urgent": None if given["discomfort_urgent"] is None else bool(given["discomfort_urgent"]),
             "regions": decode(given["discomfort_regions"], []), "when": given["discomfort_when"],
-            "level": given["discomfort_strength"],
+            "discomfort_level": given["discomfort_strength"],
             "still_present": None if given["discomfort_still"] is None else bool(given["discomfort_still"]),
             "note": given["note"], "submitted_at": given["submitted_at"]}
     scan = None
@@ -526,6 +532,8 @@ def achievements(sedens, db, actor, locale) -> dict:
                           "fact": FACTS["visits"][locale].format(n=n)})
     session = db.execute("SELECT p.completed_at, p.item_id, e.course_id FROM s_course_progress p JOIN s_enrollments e "
                          "ON e.id=p.enrollment_id WHERE e.user_id=? AND e.org_id=? AND p.item_kind='session' "
+                         "AND EXISTS (SELECT 1 FROM s_workouts w WHERE w.student_id=e.user_id AND w.org_id=e.org_id "
+                         f"AND w.course_id=e.course_id AND w.course_session_id=p.item_id AND {PERFORMED}) "
                          "ORDER BY p.completed_at, p.rowid LIMIT 1", (me["user_id"], me["org_id"])).fetchone()
     if session:
         played = db.execute("SELECT origin FROM s_workouts WHERE student_id=? AND org_id=? AND course_id=? "
@@ -535,7 +543,11 @@ def achievements(sedens, db, actor, locale) -> dict:
                       "origin": played["origin"] if played else "room", "fact": FACTS["first_course_session"][locale]})
     for e in db.execute("SELECT e.*, c.title FROM s_enrollments e JOIN s_courses c ON c.id=e.course_id WHERE e.user_id=? "
                         "AND e.org_id=? AND e.completed_at IS NOT NULL ORDER BY e.completed_at", (me["user_id"], me["org_id"])):
-        found.append({"id": "course_completed", "course_id": e["course_id"], "date": e["completed_at"], "origin": "room",
+        played = db.execute("SELECT w.origin FROM s_workouts w WHERE w.student_id=? AND w.org_id=? AND w.course_id=? "
+                            f"AND {PERFORMED} ORDER BY w.ended_at DESC, w.rowid DESC LIMIT 1",
+                            (me["user_id"], me["org_id"], e["course_id"])).fetchone()
+        found.append({"id": "course_completed", "course_id": e["course_id"], "date": e["completed_at"],
+                      "origin": played["origin"] if played else "room",
                       "fact": FACTS["course_completed"][locale].format(title=e["title"])})
     run = _four_in_a_row(visits, tz)
     if run:

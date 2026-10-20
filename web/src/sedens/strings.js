@@ -8,6 +8,8 @@ import { ROOM_COURSES } from "./strings-room-courses.js";
 import { ROOM_JOURNEY } from "./strings-room-journey.js";
 import { ROOM_SCAN } from "./strings-room-scan.js";
 import { ROOM_PLAYER } from "./strings-room-player.js";
+import { USAGE } from "./strings-usage.js";
+import { PASSPORT } from "./strings-passport.js";
 
 export const STRINGS = {
   en: {
@@ -24,7 +26,7 @@ export const STRINGS = {
     "home.enter_hint": "Opens the room screen. A room must be paired by your facility.",
     "home.cards": "SEDENS for everyone in the facility",
     "home.passport": "Fitness Passport",
-    "home.passport_body": "Your visits, sessions and progress in one place. Arrives in a later phase.",
+    "home.passport_body": "Your visits, workouts, scans and courses in one place, on your phone.",
     "home.creator": "Creator Studio",
     "home.creator_body": "Coaches and professors build guided room training and professional courses, then submit them for SEDENS review.",
     "home.facility": "Facility console",
@@ -209,7 +211,7 @@ export const STRINGS = {
     "home.enter_hint": "룸 화면을 엽니다. 룸은 시설에서 페어링해야 합니다.",
     "home.cards": "시설의 모든 분을 위한 SEDENS",
     "home.passport": "피트니스 패스포트",
-    "home.passport_body": "방문, 세션, 진행 기록을 한곳에서 봅니다. 이후 단계에서 제공됩니다.",
+    "home.passport_body": "방문, 운동, 스캔, 코스 기록을 휴대폰에서 한곳에 모아 봐요.",
     "home.creator": "크리에이터 스튜디오",
     "home.creator_body": "코치와 교수가 룸 가이드 트레이닝과 전문 코스를 만들고 SEDENS 검토를 요청합니다.",
     "home.facility": "시설 콘솔",
@@ -383,7 +385,7 @@ export const STRINGS = {
 };
 
 // Each Phase 2 and Phase 3 area keeps its copy in its own file; a key defined twice is a mistake.
-for (const part of [STUDIO, MARKET, ROOM_COURSES, ROOM_JOURNEY, ROOM_SCAN, ROOM_PLAYER]) {
+for (const part of [STUDIO, MARKET, ROOM_COURSES, ROOM_JOURNEY, ROOM_SCAN, ROOM_PLAYER, PASSPORT, USAGE]) {
   for (const language of ["en", "ko"]) {
     for (const [key, value] of Object.entries(part[language])) {
       if (key in STRINGS[language]) throw new Error(`Duplicate SEDENS string: ${language}.${key}`);

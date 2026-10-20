@@ -317,7 +317,8 @@ with a small, unremarkable difference. Every item is labelled "Demo data". No im
 `web/src/sedens/passport.js` (+ `passport.css`, `strings-passport.js` en/ko), routes in `app.js`:
 `#/passport`, `#/passport/history`, `#/passport/workout/:id`, `#/passport/scans`,
 `#/passport/programs`, `#/passport/achievements`, `#/passport/preferences`, `#/passport/privacy`.
-Phone-first single column with a bottom section bar; graphite/silver/teal tokens shared with
+Phone-first single column with a section bar (built as a sticky bar at the top that scrolls sideways, with a fade at
+its right edge; seven sections do not fit a bottom bar at 360 px, a recorded deviation); graphite/silver/teal tokens shared with
 `sedens.css`; keyboard, screen reader and touch support; no engineering measurements on the overview.
 Facility usage: `#/facility/usage` in the facility console. Account setup: `#/account/setup`.
 

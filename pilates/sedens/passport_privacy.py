@@ -122,6 +122,10 @@ def delete_photos(sedens, db, actor, locale) -> dict:
         db.execute("UPDATE s_room_scan_views SET image_key=NULL WHERE scan_id=?", (scan_id,))
         db.execute("UPDATE s_room_scans SET images_retained=0 WHERE id=? AND student_id=? AND org_id=?",
                    (scan_id, me["user_id"], me["org_id"]))
+    # Leftover image files of this customer's own scans marked as retained without a key.
+    for scan in db.execute("SELECT * FROM s_room_scans WHERE student_id=? AND org_id=? AND images_retained=1 "
+                           "AND state NOT IN ('capturing','processing')", (me["user_id"], me["org_id"])).fetchall():
+        shutil.rmtree(scans._folder(sedens, dict(scan)), ignore_errors=True)
     # A scan marked as retained whose files were already gone is no longer retained either.
     db.execute("UPDATE s_room_scans SET images_retained=0 WHERE student_id=? AND org_id=? AND images_retained=1 "
                "AND state NOT IN ('capturing','processing')", (me["user_id"], me["org_id"]))
@@ -182,7 +186,8 @@ def export(sedens, db, actor) -> dict:
         steps.setdefault(r["workout_id"], []).append({k: r[k] for k in (
             "position", "phase", "step_ref", "exercise_ref", "variant", "state", "planned_seconds", "started_at",
             "finished_at")})
-    feedback = {r["workout_id"]: {k: r[k] for k in r.keys() if k not in ("workout_id", "org_id", "student_id")}
+    feedback = {r["workout_id"]: {("discomfort_level" if k == "discomfort_strength" else k): r[k] for k in r.keys()
+                                  if k not in ("workout_id", "org_id", "student_id")}
                 for r in db.execute("SELECT * FROM s_session_feedback WHERE student_id=? AND org_id=?", (uid_, org))}
     workouts = []
     for w in db.execute("SELECT * FROM s_workouts WHERE student_id=? AND org_id=? ORDER BY created_at, rowid", (uid_, org)):
@@ -204,7 +209,7 @@ def export(sedens, db, actor) -> dict:
     enrollments = []
     for e in db.execute("SELECT * FROM s_enrollments WHERE user_id=? AND org_id=? ORDER BY enrolled_at", (uid_, org)):
         course = db.execute("SELECT * FROM s_courses WHERE id=?", (e["course_id"],)).fetchone()
-        entitlement = passport._entitlement(db, me, e)
+        entitlement, _state = passport._entitlement(sedens, db, me, e, course) if course is not None else (None, "none")
         enrollments.append({
             "course_id": e["course_id"], "title": (marketplace._snapshot(db, e["course_id"], e["version"]).get("course") or {})
             .get("title") or (course["title"] if course else None),

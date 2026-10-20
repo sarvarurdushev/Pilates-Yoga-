@@ -1,4 +1,4 @@
-/* SEDENS identity: graphite and black, white type, one restrained blue-silver accent.
+/* SEDENS identity: graphite and black, silver type, one restrained teal-silver accent.
    Large type and large targets so the room screen works on a TV or touch display. */
 :root {
   --sd-bg: #0b0c0e;
@@ -7,8 +7,13 @@
   --sd-line: #2b2f37;
   --sd-text: #f3f5f7;
   --sd-muted: #9aa3ad;
-  --sd-accent: #9fc0dd;
-  --sd-accent-strong: #c9d8e6;
+  /* Teal-silver accent. Contrast (WCAG 2.1) on --sd-bg / --sd-surface / --sd-surface-2: accent 8.7 / 8.0 / 7.3,
+     accent-strong 12.7 / 11.6 / 10.6 (text needs 4.5), control line 4.1 / 3.8 / 3.5 (UI components need 3). --sd-accent-line is only 2.0-2.5 and is
+     decoration: never the only boundary of an interactive control. */
+  --sd-accent: #5dbdb1;
+  --sd-accent-strong: #b4d7d3;
+  --sd-accent-soft: #12201f;
+  --sd-accent-line: #2f5a56;
   --sd-warn: #e6c27a;
   --sd-danger: #f0a39b;
   --sd-radius: 14px;
@@ -134,7 +139,7 @@ body.sd-room-body { font-size: clamp(18px, 1.4vw, 24px); }
 }
 
 /* Phase 2: Creator Studio, review, catalog */
-:root { --sd-control-line: #59616d; }
+:root { --sd-control-line: #6b7480; }
 .sd-field input, .sd-field select, .sd-field textarea { border-color: var(--sd-control-line); }
 .sd-wide { max-width: none; }
 .sd-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
@@ -146,7 +151,7 @@ body.sd-room-body { font-size: clamp(18px, 1.4vw, 24px); }
 .sd-chip button { min-height: 28px; padding: 0 8px; border: none; background: transparent; }
 .sd-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 .sd-badge.ok { color: #a8d8b0; border-color: #2f5a3a; }
-.sd-badge.info { color: var(--sd-accent-strong); border-color: #3a4b5c; }
+.sd-badge.info { color: var(--sd-accent-strong); border-color: var(--sd-accent-line); }
 .sd-badge.danger { color: var(--sd-danger); border-color: #5c3530; }
 .sd-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 20px; border-bottom: 1px solid var(--sd-line); }
 .sd-tabs a, .sd-tabs button {
@@ -182,3 +187,25 @@ body.sd-room-body { font-size: clamp(18px, 1.4vw, 24px); }
 .sd-room-figure { margin: 12px 0; max-width: 560px; }
 .sd-room-figure figcaption { font-size: 0.85rem; margin-top: 6px; }
 .sd-room-courses h2 { margin-top: 0; }
+
+/* Facility usage (facility-usage.js): month picker, metric tiles, bars and the fee simulation. */
+.sd-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.sd-monthnav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0 8px; max-width: 460px; }
+.sd-month { font-size: 1.2rem; text-align: center; flex: 1; }
+.sd-monthnav [aria-disabled="true"] { opacity: 0.4; cursor: default; }
+.sd-tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin: 0 0 12px; }
+.sd-tile { border: 1px solid var(--sd-line); border-radius: 12px; padding: 14px 16px; background: var(--sd-bg); }
+.sd-tile-main { border-color: var(--sd-accent-line); background: var(--sd-accent-soft); }
+.sd-tile dt { color: var(--sd-muted); font-size: 0.9rem; }
+.sd-tile dd { margin: 4px 0 0; font-size: 1.8rem; font-weight: 650; }
+.sd-tile dd.sd-tile-hint { font-size: 0.8rem; font-weight: 400; margin-top: 2px; }
+.sd-bars { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 10px; }
+.sd-bars li { display: grid; grid-template-columns: minmax(110px, 1fr) 2fr minmax(70px, auto); gap: 12px; align-items: center; }
+.sd-bar { height: 10px; border-radius: 999px; background: var(--sd-surface-2); overflow: hidden; }
+.sd-bar > span { display: block; height: 100%; background: var(--sd-accent); }
+.sd-bar-count { text-align: right; }
+.sd-sim { border-style: dashed; border-color: var(--sd-warn); }
+.sd-sim-banner { margin: 0 0 12px; color: var(--sd-warn); }
+.sd-sim-table td { text-align: right; white-space: nowrap; }
+.sd-sim-total th, .sd-sim-total td { font-weight: 700; color: var(--sd-text); }
+@media (max-width: 520px) { .sd-bars li { grid-template-columns: 1fr auto; } .sd-bar { grid-column: 1 / -1; order: 3; } }

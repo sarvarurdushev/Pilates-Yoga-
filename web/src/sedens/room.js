@@ -623,8 +623,11 @@ function welcomeScreen(j) {
   const when = w.booking?.starts_at && w.booking?.ends_at
     ? t("rj.booking", { start: time(w.booking.starts_at), end: time(w.booking.ends_at) })
     : s.expires_at ? t("rj.open_until", { time: time(s.expires_at) }) : "";
-  const passport = p.visits > 0
-    ? p.last_visit ? t("rj.passport_visits", { count: p.visits, date: date(p.last_visit) }) : t("rj.passport_count", { count: p.visits })
+  // The Passport's own count of completed visits when the server gives it, so both screens agree.
+  const visits = p.completed_visits ?? p.visits;
+  const lastVisit = p.completed_visits !== undefined ? p.last_completed_visit : p.last_visit;
+  const passport = visits > 0
+    ? lastVisit ? t("rj.passport_visits", { count: visits, date: date(lastVisit) }) : t("rj.passport_count", { count: visits })
     : t("rj.passport_first");
   const courses = Array.isArray(w.courses) ? w.courses : [];
   const followed = courses.filter((c) => c.enrolled && c.progress);

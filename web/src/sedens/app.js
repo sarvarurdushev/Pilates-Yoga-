@@ -5,6 +5,7 @@ import { sedens, platform, withDemo, ApiError } from "./api.js";
 import { t, lang } from "./i18n.js";
 import { $, esc, header, bindHeader, footer, formData, time, focusTitle, problem } from "./ui.js";
 import { compile, match } from "./router.js";
+import { PASSPORT_ROUTES, PASSPORT_MODULES } from "./passport-routes.js";
 
 // seq: each render() takes a number; a view whose number is no longer current
 // stops writing, so a slow response never overwrites the page the user moved to.
@@ -29,6 +30,7 @@ async function loadMe() {
 const ROUTES = compile([
   ["facility", "facility"],
   ["facility/courses", "facility_courses"],
+  ["facility/usage", "facility_usage"],
   ["creator", "creator"],
   ["creator/courses/new", "course_new"],
   ["creator/courses/:course", "course_edit"],
@@ -40,6 +42,7 @@ const ROUTES = compile([
   ["courses/:course", "course_detail"],
   ["my", "my_courses"],
   ["account", "account"],
+  ...PASSPORT_ROUTES,
 ]);
 const MODULES = {
   creator: ["./studio.js", "studioHome"],
@@ -50,9 +53,11 @@ const MODULES = {
   review: ["./review.js", "reviewHome"],
   review_course: ["./review.js", "reviewCourse"],
   facility_courses: ["./catalog.js", "facilityCourses"],
+  facility_usage: ["./facility-usage.js", "facilityUsage"],
   catalog: ["./catalog.js", "catalog"],
   course_detail: ["./catalog.js", "courseDetail"],
   my_courses: ["./catalog.js", "myCourses"],
+  ...PASSPORT_MODULES,
 };
 
 function route() {
@@ -109,7 +114,7 @@ function homeView() {
     me?.role === "student" && me.organization.kind === "facility"
       ? `<section class="sd-panel"><h2>${esc(t("home.code_title"))}</h2><p class="sd-muted">${esc(t("home.code_body"))}</p><div id="room-code"></div><button class="sd-primary" id="get-code">${esc(t("home.code_get"))}</button></section>`
       : "";
-  page(`<section class="sd-hero"><p class="sd-eyebrow">${esc(t("brand.product"))}</p><h1>${esc(t("home.title"))}</h1><p class="sd-lead">${esc(t("home.lead"))}</p><a class="sd-primary sd-large" href="/room.html">${esc(t("home.enter"))}</a><p class="sd-muted">${esc(t("home.enter_hint"))}</p></section>${roomCode}${signin}<h2 class="sd-section-title">${esc(t("home.cards"))}</h2><section class="sd-grid">${card(t("home.courses"), t("home.courses_body"), "#/courses")}${me ? card(t("home.my_courses"), t("home.my_courses_body"), "#/my") : ""}${card(t("home.passport"), t("home.passport_body"), "#/passport", true)}${card(t("home.creator"), t("home.creator_body"), "#/creator")}${card(t("home.facility"), t("home.facility_body"), "#/facility")}${me?.capabilities?.includes("sedens_reviewer") ? card(t("home.review"), t("home.review_body"), "#/review") : ""}${card(t("home.workspace"), t("home.workspace_body"), "/workspace.html")}</section>`);
+  page(`<section class="sd-hero"><p class="sd-eyebrow">${esc(t("brand.product"))}</p><h1>${esc(t("home.title"))}</h1><p class="sd-lead">${esc(t("home.lead"))}</p><a class="sd-primary sd-large" href="/room.html">${esc(t("home.enter"))}</a><p class="sd-muted">${esc(t("home.enter_hint"))}</p></section>${roomCode}${signin}<h2 class="sd-section-title">${esc(t("home.cards"))}</h2><section class="sd-grid">${card(t("home.courses"), t("home.courses_body"), "#/courses")}${me ? card(t("home.my_courses"), t("home.my_courses_body"), "#/my") : ""}${card(t("home.passport"), t("home.passport_body"), "#/passport")}${card(t("home.creator"), t("home.creator_body"), "#/creator")}${card(t("home.facility"), t("home.facility_body"), "#/facility")}${me?.capabilities?.includes("sedens_reviewer") ? card(t("home.review"), t("home.review_body"), "#/review") : ""}${card(t("home.workspace"), t("home.workspace_body"), "/workspace.html")}</section>`);
   $("#get-code")?.addEventListener("click", async () => {
     try {
       const issued = await sedens("access-code", {});
@@ -175,7 +180,7 @@ async function facilityView() {
     return;
   }
   const seq = state.seq;
-  page(`${backLink()}<h1>${esc(t("facility.title"))}</h1><p class="sd-muted">${esc(state.me.organization.display_name)}</p><p><a class="sd-button" href="#/facility/courses">${esc(t("facility.courses_link"))}</a></p><div id="facility-body">${notice(t("common.loading"))}</div>`);
+  page(`${backLink()}<h1>${esc(t("facility.title"))}</h1><p class="sd-muted">${esc(state.me.organization.display_name)}</p><p><a class="sd-button" href="#/facility/courses">${esc(t("facility.courses_link"))}</a> <a class="sd-button" href="#/facility/usage">${esc(t("usage.nav"))}</a></p><p class="sd-muted">${esc(t("usage.nav_hint"))}</p><div id="facility-body">${notice(t("common.loading"))}</div>`);
   const [roomsData, crm, people, affiliations] = await Promise.all([
     sedens("facility/rooms"),
     sedens("facility/crm"),

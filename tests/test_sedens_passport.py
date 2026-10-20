@@ -35,6 +35,18 @@ class World:
     pass
 
 
+def values(node):
+    """Every string VALUE (never a key) of a JSON document: what a customer can read."""
+    if isinstance(node, str):
+        yield node
+    elif isinstance(node, dict):
+        for item in node.values():
+            yield from values(item)
+    elif isinstance(node, (list, tuple)):
+        for item in node:
+            yield from values(item)
+
+
 def when(days_ago, minutes=0):
     return iso(utcnow() - timedelta(days=days_ago) + timedelta(minutes=minutes))
 
@@ -871,14 +883,22 @@ def test_no_response_uses_scores_calories_or_medical_wording(world):
         for path in ("overview", "history", "scans", "scans/compare", "programs", "achievements", "preferences", "privacy",
                      f"workout?id={world.ids['w1']}", f"workout?id={world.ids['w2']}", f"workout?id={world.ids['w5']}"):
             sep = "&" if "?" in path else "?"
-            text = json.dumps(ok(world, f"{path}{sep}lang={lang}"), ensure_ascii=False).lower()
+            data = ok(world, f"{path}{sep}lang={lang}")
+            text = "\n".join(values(data)).lower()
             for word in FORBIDDEN:
                 assert word not in text, (lang, path, word)
             # No health scores or percentages either.
-            assert not re.search(r'"[a-z_]*(score|grade|rating)[a-z_]*"', text), (lang, path)
-    export = json.dumps(json.loads(call(world, world.a["customer_token"], "export", raw=True)[1]), ensure_ascii=False).lower()
-    for word in ("calorie", "improve", "injur", "fitness age"):
-        assert word not in export, word
+            assert not re.search(r'"[a-z_]*(score|grade|rating)[a-z_]*"', json.dumps(data).lower()), (lang, path)
+    export = json.loads(call(world, world.a["customer_token"], "export", raw=True)[1])
+    # The exported scan summary carries the one fixed disclaimer ("not about pain, injury or your health").
+    meaning = {feedback.rules()["meaning"][lang] for lang in ("en", "ko")}
+    text = "\n".join(v for v in values(export) if v not in meaning).lower()
+    for word in FORBIDDEN:
+        assert word not in text, word
+    shown = [w for w in export["workouts"] if w["feedback"]]
+    assert all("discomfort_strength" not in w["feedback"] and "discomfort_level" in w["feedback"] for w in shown)
+    detail = ok(world, f"workout?id={world.ids['w2']}")["workout"]["feedback"]
+    assert detail["discomfort_level"] == "mild" and "level" not in detail
 
 
 # == backup ====================================================================================
@@ -919,3 +939,20 @@ def test_passport_records_survive_a_facility_backup_and_restore(tmp_path):
     with sedens.db() as db:
         overview = passport.overview(sedens, db, restored, "en")
     assert overview["totals"]["completed_visits"] == 3 and overview["totals"]["demo_seed"]["visits"] == 1
+    # The room welcome uses the same count of completed visits as the Passport.
+    with sedens.db() as db:
+        shown = passport.summary(db, customer)
+    assert shown["completed_visits"] == overview["totals"]["completed_visits"]
+
+
+def test_deleting_photos_also_removes_leftover_files_of_a_scan_marked_retained_without_keys(world):
+    mine = world.ids["scan1"]
+    with world.sedens.db() as db:
+        db.execute("UPDATE s_room_scan_views SET image_key=NULL WHERE scan_id=?", (mine,))
+    folder = scans._folder(world.sedens, {"org_id": world.org, "id": mine})
+    (folder / "stray.png").write_bytes(PNG)
+    assert folder.exists()
+    ok(world, "privacy/photos/delete", method="POST", body={})
+    assert not folder.exists()
+    assert len(photo_files(world, world.other_scan)) == 4
+    assert len(photo_files(world, world.twin_scan, world.b["org_id"])) == 4
