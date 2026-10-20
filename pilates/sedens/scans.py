@@ -25,7 +25,7 @@ import shutil
 import threading
 import time
 
-from . import analytics, consent, feedback, journey, media_store
+from . import analytics, consent, feedback, journey, media_store, scan_history
 from .util import Denied, decode, encode, now, uid
 
 log = logging.getLogger("sedens.scans")
@@ -311,19 +311,30 @@ def _finish_journey(db, scan):
 
 
 def _previous(db, scan) -> dict | None:
-    """The last comparable scan: same customer, protocol, rules version, source class
-    (demo never compared with real) and a clear result."""
-    source_class = ("demo_precomputed",) if scan["source"] == "demo_precomputed" else ("experimental_real", "room_capture")
-    marks = ",".join("?" * len(source_class))
-    row = db.execute(f"SELECT summary FROM s_room_scans WHERE student_id=? AND id<>? AND protocol=? AND state='complete' "
-                     f"AND reliability='clear' AND feedback_rules_version=? AND source IN ({marks}) "
-                     f"ORDER BY completed_at DESC LIMIT 1",
-                     (scan["student_id"], scan["id"], scan["protocol"], feedback.CURRENT, *source_class)).fetchone()
-    return decode(row[0], {}).get("measurements") if row else None
+    """The measurements of the last scan this one may be compared with: exactly the rules
+    of :mod:`scan_history`, so the room screen and the Passport never disagree. The scan
+    being completed may carry its own ``reliability`` and ``summary`` (with the evaluated
+    rules); without them it is taken as clear with the shoulder line evaluated, so only
+    what identifies it is judged. The earlier scan must be complete, clear and have had
+    its shoulder line evaluated (not withheld)."""
+    probe = {**scan, "state": "complete", "reliability": scan.get("reliability") or "clear",
+             "summary": scan.get("summary") or {"evaluated": [{"rule_id": scan_history.OBSERVATION,
+                                                               "outcome": "shown"}]},
+             "feedback_rules_version": scan.get("feedback_rules_version") or feedback.CURRENT}
+    rows = db.execute("SELECT * FROM s_room_scans WHERE student_id=? AND id<>? AND protocol=? AND state='complete' "
+                      "ORDER BY completed_at DESC, rowid DESC", (scan["student_id"], scan["id"], scan["protocol"]))
+    for row in rows:
+        row = dict(row)
+        if not scan_history.reasons(row, {"org_id": row["org_id"], **probe}):
+            return decode(row["summary"], {}).get("measurements")
+    return None
 
 
 def _complete(sedens, db, scan, measurements, *, measurement_version, model, error=""):
-    previous = _previous(db, scan)
+    # The scan's own quality and evaluated rules decide whether it can be compared at all.
+    own = feedback.interpret(measurements, locale="en")
+    previous = _previous(db, {**scan, "measurement_version": measurement_version, "model": model,
+                              "reliability": own["quality"], "summary": {"evaluated": own["evaluated"]}})
     rendered = {loc: feedback.interpret(measurements, locale=loc, previous=previous) for loc in ("en", "ko")}
     base = rendered["en"]
     label = LABELS[scan["source"]]

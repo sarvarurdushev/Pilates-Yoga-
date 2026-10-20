@@ -589,6 +589,9 @@ def test_a_real_scan_is_never_compared_with_the_demonstration(demo_world, monkey
         ("demo_precomputed", False), ("experimental_real", True), ("experimental_real", True)]
 
 
+EVALUATED = [{"rule_id": "shoulder_line", "outcome": "shown"}]
+
+
 def test_the_previous_scan_is_the_same_source_class_rules_version_and_a_clear_result(world):
     room = visit(world)
     sedens, fac, _ = world
@@ -613,7 +616,8 @@ def test_the_previous_scan_is_the_same_source_class_rules_version_and_a_clear_re
             db.execute("INSERT INTO s_room_scans(id,org_id,student_id,protocol,source,state,reliability,"
                        "feedback_rules_version,summary,started_at,completed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                        (uid(), fac["org_id"], student, protocol, source, state, reliability, version,
-                        encode({"measurements": {"marker": marker}}), completed, completed))
+                        encode({"measurements": {"marker": marker}, "evaluated": EVALUATED}), completed,
+                        completed))
         for source, expected in (("room_capture", "real-match"), ("experimental_real", "real-match"),
                                  ("demo_precomputed", "demo-match")):
             current = {"id": uid(), "student_id": fac["customer_id"], "protocol": scans.PROTOCOL, "source": source}

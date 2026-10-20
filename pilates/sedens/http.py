@@ -24,7 +24,7 @@ import time
 from urllib.parse import parse_qs, urlparse
 
 from . import (analytics, capabilities, consent, course_http, course_media, creators, crm, demo, demo_marketplace,
-               journey, library, onboarding, plans, rooms, scans, workouts)
+               journey, library, onboarding, passport_http, plans, rooms, scans, workouts)
 from ..platform import http as platform_http
 from ..platform.repository import Refused
 from .util import Denied, environment
@@ -577,7 +577,8 @@ ROUTES = {
     ("POST", "review/creators/decide"): _review_decide,
 }
 ROUTES.update(course_http.ROUTES)
-STREAMS = {**course_http.STREAMS, ("POST", "room/scan/image"): _scan_image}
+ROUTES.update(passport_http.ROUTES)
+STREAMS = {**course_http.STREAMS, **passport_http.STREAMS, ("POST", "room/scan/image"): _scan_image}
 
 
 def dispatch(h, method, route):

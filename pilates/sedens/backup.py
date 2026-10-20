@@ -131,6 +131,8 @@ POLICIES: dict[str, Policy] = {
     "s_workout_steps": Policy(True, "each workout step and whether it was completed or skipped",
                               scope="workout_id IN (SELECT id FROM s_workouts WHERE org_id=?)", json=()),
     "s_session_feedback": Policy(True, "customers' own effort and discomfort reports", json=()),
+    "s_passport_preferences": Policy(True, "customers' own Passport preferences", json=()),
+    "s_data_requests": Policy(True, "customers' Passport requests (such as erasure) and the facility's decision"),
     "s_demo_layers": Policy(False, "which demonstration content this server seeded"),
     "s_demo_activity": Policy(False, "when this server's demonstrations were created and last used"),
     "s_schema": Policy(False, "this server's migration ledger"),

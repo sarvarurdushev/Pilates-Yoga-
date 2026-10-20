@@ -126,7 +126,8 @@ Withdrawing optional image retention reuses the existing `POST consents` (channe
 ### 3.1 Definitions (no invented metrics)
 
 - **Completed visit**: an `s_room_sessions` row of the customer with at least one workout in state
-  `completed`.
+  `completed` in which at least one step was completed. A workout where every step was skipped keeps its
+  card but is not a completed visit and earns no first-workout or visit milestone.
 - **Workout card status**: `completed`, `stopped early` (`stopped`, including safety stops), or
   `not finished` (`abandoned` after it started). Drafts (`ready`, end reason `replaced`) never appear.
 - **Exercise time**: the sum of `s_workouts.active_seconds` (pauses excluded), shown in minutes.
