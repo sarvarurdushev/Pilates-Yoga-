@@ -136,6 +136,9 @@ POLICIES: dict[str, Policy] = {
     "s_demo_layers": Policy(False, "which demonstration content this server seeded"),
     "s_demo_activity": Policy(False, "when this server's demonstrations were created and last used"),
     "s_schema": Policy(False, "this server's migration ledger"),
+    "s_usage_price_plans": Policy(False, "SEDENS-global fee-simulation price plans (reference data of this server)"),
+    "s_org_usage_plans": Policy(False, "which price plan SEDENS assigned to this organization; assigned by SEDENS, "
+                                       "so a restore never brings or changes it"),
     "s_affiliation_ledger": Policy(False, "this server's record of affiliation decisions, which restores are checked against"),
     "s_room_device_pairings": Policy(False, "short-lived pairing codes and secrets"),
     "s_room_access_codes": Policy(False, "single-use room access codes"),
@@ -605,6 +608,19 @@ def _slug(ctx, wanted, fallback, own_id=None):
     return fallback()
 
 
+def _marked_restored(detail) -> str:
+    """The row's ``detail`` with ``restored`` set. The facility usage meter counts only activity
+    that happened on this server, so a screen or visit a restore brings back is never counted
+    (usage.restored). The server sets this, whatever the archive says."""
+    try:
+        value = json.loads(detail) if isinstance(detail, str) else detail
+    except ValueError:
+        value = None
+    value = dict(value) if isinstance(value, dict) else {}
+    value["restored"] = True
+    return encode(value)
+
+
 def restore_row(ctx: RestoreContext, table, original, mapping):
     """``None`` to leave the row out, or ``(row, external_columns, conflict)``.
 
@@ -670,11 +686,13 @@ def restore_row(ctx: RestoreContext, table, original, mapping):
         ctx.summary["affiliations_restored"] += 1
     elif table == "s_room_devices":
         row["token_hash"] = None
+        row["detail"] = _marked_restored(original.get("detail"))
         if row["status"] == "active":
             row.update(status="revoked", revoked_at=now(), revoked_by=None)
             ctx.summary["room_screens_to_pair_again"] += 1
     elif table == "s_room_sessions":
         row["token_hash"] = digest(token())  # a fresh credential nobody holds
+        row["detail"] = _marked_restored(original.get("detail"))
         if row["state"] == "active":
             row.update(state="ended", ended_at=now(), end_reason="restored")
             ctx.summary["room_sessions_closed"] += 1

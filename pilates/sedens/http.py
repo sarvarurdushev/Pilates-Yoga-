@@ -24,7 +24,7 @@ import time
 from urllib.parse import parse_qs, urlparse
 
 from . import (analytics, capabilities, consent, course_http, course_media, creators, crm, demo, demo_marketplace,
-               journey, library, onboarding, passport_http, plans, rooms, scans, workouts)
+               journey, library, onboarding, passport_http, plans, rooms, scans, usage_http, workouts)
 from ..platform import http as platform_http
 from ..platform.repository import Refused
 from .util import Denied, environment
@@ -578,6 +578,7 @@ ROUTES = {
 }
 ROUTES.update(course_http.ROUTES)
 ROUTES.update(passport_http.ROUTES)
+ROUTES.update(usage_http.ROUTES)
 STREAMS = {**course_http.STREAMS, **passport_http.STREAMS, ("POST", "room/scan/image"): _scan_image}
 
 
