@@ -44,6 +44,23 @@ export function stateKey(state) {
   return JSON.stringify([state.mode, state.layer, state.structures, state.focus]);
 }
 
+/** Every structure key a step mentions (exercise-level mapping first, then its authored
+ *  moments), without repeats: the list the customer can pick from in the expanded view. */
+export function stepStructures(content) {
+  const anatomy = (content && content.anatomy) || {};
+  const keys = (anatomy.structures || []).map((s) => s.key);
+  for (const m of anatomy.timeline || []) keys.push(...(m.structures || []));
+  return [...new Set(keys)];
+}
+
+/** What the expanded view does with a structure, per mode (pure, for tests): "highlight" tints it in
+ *  the whole body, "isolate" shows only it. */
+export function selectionMessage(keys, mode) {
+  const list = [].concat(keys).filter(Boolean);
+  const isolate = mode === "isolate";
+  return { op: "show", structures: list, focus: isolate ? list : list.slice(0, 1), mode: isolate ? "isolate" : "highlight", layer: "" };
+}
+
 /** The moments' boundaries in a step, for scheduling checks without polling every frame. */
 export function boundaries(content) {
   const out = new Set([0]);
@@ -57,7 +74,7 @@ export function boundaries(content) {
 /** The embedded viewer. `host` is the element that holds the iframe; expanding the
  *  panel restyles `host` (an iframe that is moved in the DOM reloads, so it never moves). */
 export class AnatomyPanel {
-  constructor(host, { lang = "ko", onReady, onSelect, onError } = {}) {
+  constructor(host, { lang = "ko", onReady, onSelect, onError, onNames } = {}) {
     this.host = host;
     this.lang = lang;
     this.ready = false;
@@ -67,6 +84,7 @@ export class AnatomyPanel {
     this.onReady = onReady;
     this.onSelect = onSelect;
     this.onError = onError;
+    this.onNames = onNames;
     this.frame = document.createElement("iframe");
     this.frame.className = "rp-anatomy-frame";
     this.frame.title = "Anatomy";
@@ -88,6 +106,8 @@ export class AnatomyPanel {
       this.onReady?.();
     } else if (data.type === "sedens-anatomy-selection" && data.key) {
       this.onSelect?.(data.key, data.name);
+    } else if (data.type === "sedens-anatomy-names" && data.names) {
+      this.onNames?.(data.names, data.missing || []);
     } else if (data.type === "sedens-anatomy-error") {
       this.onError?.(data.message);
     }
@@ -122,8 +142,13 @@ export class AnatomyPanel {
   }
 
   isolate(key) {
+    this.select(key, "isolate");
+  }
+
+  /** Select a structure (or a few) in a mode: "highlight" (tinted in the whole body) or "isolate" (only it). */
+  select(keys, mode) {
     this.lastKey = null;
-    this.post({ op: "show", structures: [key], focus: [key], mode: "isolate", layer: "" });
+    this.post(selectionMessage(keys, mode));
   }
 
   skeleton() {
@@ -136,7 +161,9 @@ export class AnatomyPanel {
     this.post({ op: "lang", lang });
   }
 
-  rotate(on) { this.post({ op: "rotate", on: !!on }); }
+  rotate(on, seconds) { this.post({ op: "rotate", on: !!on, ...(seconds ? { seconds } : {}) }); }
+  turn(degrees) { this.post({ op: "turn", degrees }); }
+  names(structures) { if (structures && structures.length) this.post({ op: "names", structures }); }
   view(name) { this.post({ op: "view", name }); }
   zoom(factor) { this.post({ op: "zoom", factor }); }
   fit() { this.post({ op: "fit" }); }

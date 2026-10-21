@@ -8,7 +8,7 @@
 // cancel) and redraws from what comes back. No camera runs here, and nothing here
 // judges how an exercise was done.
 import { esc } from "./ui.js";
-import { anatomyStateAt, AnatomyPanel } from "./room-anatomy.js";
+import { anatomyStateAt, AnatomyPanel, stepStructures } from "./room-anatomy.js";
 import { createNarrator } from "./room-narration.js";
 import { createMusic, MODES as MUSIC_MODES } from "./room-music.js";
 import { positionAt, workMs, afterWork, presenceTracker, TRANSITION_SECONDS } from "./room-player-clock.js";
@@ -37,6 +37,11 @@ class Player {
     this.countdown = 0;
     this.busy = false;
     this.expanded = false;
+    this.sel = null; // expanded anatomy: { mode, keys, skeleton }
+    this.names = {}; // structure key -> name in the viewer's language (drawn structures only)
+    this.asked = new Set(); // keys whose name has been asked for in this language
+    this.absent = new Set(); // keys this atlas does not draw (selecting one would show nothing)
+    this.stepState = null;
     this.lastSpoken = null;
     this.presence = presenceTracker();
     this.timer = null;
@@ -94,17 +99,31 @@ class Player {
       </div>
       <p class="rp-anatomy-status" data-anatomy-status role="status">${esc(t("rp.anatomy_loading"))}</p>
       <div class="rp-anatomy-tools" data-anatomy-tools hidden>
-        <button data-view="anterior">${esc(t("rp.anatomy_front"))}</button>
-        <button data-view="lateral">${esc(t("rp.anatomy_side"))}</button>
-        <button data-view="posterior">${esc(t("rp.anatomy_back"))}</button>
-        <button data-zoom="1.25" aria-label="${esc(t("rp.zoom_in"))}">+</button>
-        <button data-zoom="0.8" aria-label="${esc(t("rp.zoom_out"))}">−</button>
-        <button data-skeleton>${esc(t("rp.anatomy_skeleton"))}</button>
-        <button data-whole>${esc(t("rp.anatomy_whole"))}</button>
-        <button class="sd-primary" data-anatomy-return>${esc(t("rp.anatomy_return"))}</button>
-        <button class="rp-unwell" data-act="unwell" data-anatomy-unwell>${esc(t("rp.unwell"))}</button>
+        <div class="rp-tool-group" role="group" data-group="mode" aria-label="${esc(t("rp.anatomy_mode_group"))}">
+          <button data-mode="highlight" aria-pressed="true">${esc(t("rp.anatomy_mode_highlight"))}</button>
+          <button data-mode="isolate" aria-pressed="false">${esc(t("rp.anatomy_mode_isolate"))}</button>
+        </div>
+        <div class="rp-tool-group" role="group" data-group="picks" aria-label="${esc(t("rp.anatomy_picks"))}" data-anatomy-picks hidden></div>
+        <div class="rp-tool-group" role="group" data-group="move" aria-label="${esc(t("rp.anatomy_move_group"))}">
+          <button data-view="anterior">${esc(t("rp.anatomy_front"))}</button>
+          <button data-view="lateral">${esc(t("rp.anatomy_side"))}</button>
+          <button data-view="posterior">${esc(t("rp.anatomy_back"))}</button>
+          <button data-turn="-45">${esc(t("rp.anatomy_turn_left"))}</button>
+          <button data-turn="45">${esc(t("rp.anatomy_turn_right"))}</button>
+          <button data-zoom="1.25" aria-label="${esc(t("rp.zoom_in"))}">+</button>
+          <button data-zoom="0.8" aria-label="${esc(t("rp.zoom_out"))}">−</button>
+        </div>
+        <div class="rp-tool-group" role="group" data-group="body" aria-label="${esc(t("rp.anatomy_body_group"))}">
+          <button data-skeleton aria-pressed="false">${esc(t("rp.anatomy_skeleton"))}</button>
+          <button data-whole>${esc(t("rp.anatomy_whole"))}</button>
+        </div>
+        <div class="rp-tool-group" role="group" data-group="leave">
+          <button class="sd-primary" data-anatomy-return>${esc(t("rp.anatomy_return"))}</button>
+          <button class="rp-unwell" data-act="unwell" data-anatomy-unwell>${esc(t("rp.unwell"))}</button>
+        </div>
       </div>
       <p class="rp-anatomy-hint" data-anatomy-hint hidden>${esc(t("rp.anatomy_tap"))}</p>
+      <p class="rp-anatomy-selection" data-anatomy-selection role="status" aria-live="polite"></p>
       <p class="rp-anatomy-cue" data-anatomy-cue></p>
       <p class="rp-anatomy-label" data-anatomy-label></p>
     </div>
@@ -122,8 +141,10 @@ class Player {
       onReady: () => {
         this.$("[data-anatomy-status]").textContent = "";
         this.syncAnatomy(true);
+        this.requestNames();
       },
       onSelect: (key, name) => this.onStructure(key, name),
+      onNames: (names) => this.onNames(names),
       onError: () => {
         this.$("[data-anatomy-status]").textContent = this.t("rp.anatomy_failed");
       },
@@ -149,6 +170,9 @@ class Player {
       this.lang = lang;
       this.anatomy.setLang(lang);
       this.narrator.setLang(lang);
+      // The previous names stay until the viewer's reply replaces them, so the list does not blink out.
+      this.asked.clear();
+      this.requestNames();
       this.relabel();
     }
     if (j.state === "ready_to_train") {
@@ -208,11 +232,20 @@ class Player {
     tools.querySelector('[data-view="lateral"]').textContent = t("rp.anatomy_side");
     tools.querySelector('[data-view="posterior"]').textContent = t("rp.anatomy_back");
     tools.querySelector("[data-skeleton]").textContent = t("rp.anatomy_skeleton");
+    tools.querySelector('[data-mode="highlight"]').textContent = t("rp.anatomy_mode_highlight");
+    tools.querySelector('[data-mode="isolate"]').textContent = t("rp.anatomy_mode_isolate");
+    tools.querySelector('[data-turn="-45"]').textContent = t("rp.anatomy_turn_left");
+    tools.querySelector('[data-turn="45"]').textContent = t("rp.anatomy_turn_right");
+    tools.querySelector('[data-group="mode"]').setAttribute("aria-label", t("rp.anatomy_mode_group"));
+    tools.querySelector('[data-group="picks"]').setAttribute("aria-label", t("rp.anatomy_picks"));
+    tools.querySelector('[data-group="move"]').setAttribute("aria-label", t("rp.anatomy_move_group"));
+    tools.querySelector('[data-group="body"]').setAttribute("aria-label", t("rp.anatomy_body_group"));
     tools.querySelector("[data-whole]").textContent = t("rp.anatomy_whole");
     tools.querySelector("[data-anatomy-return]").textContent = t("rp.anatomy_return");
     tools.querySelector("[data-anatomy-unwell]").textContent = t("rp.unwell");
     tools.querySelector('[data-zoom="1.25"]').setAttribute("aria-label", t("rp.zoom_in"));
     tools.querySelector('[data-zoom="0.8"]').setAttribute("aria-label", t("rp.zoom_out"));
+    this.renderAnatomyTools();
   }
 
   renderReady() {
@@ -239,7 +272,12 @@ class Player {
     this.renderSettings();
     // Warm the viewer with the first exercise so the first step shows it at once.
     const first = w.steps[0];
-    if (first) this.anatomy.show(anatomyStateAt(first.content, 0));
+    if (first) {
+      this.stepState = anatomyStateAt(first.content, 0);
+      this.anatomy.show(this.stepState);
+      this.requestNames(first.content);
+      this.renderAnatomyTools();
+    }
     this.$("[data-anatomy-label]").textContent = w.anatomy_label || "";
   }
 
@@ -257,8 +295,15 @@ class Player {
     if (restart) {
       this.renderMedia();
       this.lastAnatomy = null;
-      this.syncAnatomy(true);
-      if (next) this.anatomy.preload((next.content.anatomy?.structures || []).map((s) => s.key));
+      this.requestNames();
+      if (this.expanded) {
+        // The step changed while the anatomy view is open: its structures, in the current mode.
+        this.initAnatomySelection(true);
+        this.applyAnatomySelection();
+      } else {
+        this.syncAnatomy(true);
+      }
+      if (next) this.anatomy.preload(stepStructures(next.content));
       this.$("[data-step-title]").focus({ preventScroll: true });
     } else {
       this.renderMedia(true);
@@ -377,6 +422,115 @@ class Player {
     if (force) this.anatomy.lastKey = null;
     this.anatomy.show(state);
     this.$("[data-anatomy-cue]").textContent = state.cue || "";
+    this.stepState = state;
+    this.renderAnatomyTools();
+  }
+
+  /** The step's anatomy at the moment on screen (the state the workout would show). */
+  currentAnatomyState() {
+    const content = this.anatomyContent();
+    if (!content) return null;
+    if (content !== this.content) return anatomyStateAt(content, 0);
+    const video = this.video();
+    return anatomyStateAt(content, video ? video.currentTime * 1000 : this.ms());
+  }
+
+  /** The step whose anatomy is on screen: the current one, or the first before the workout starts. */
+  anatomyContent() {
+    return this.content || (this.workout && this.workout.steps && this.workout.steps[0] && this.workout.steps[0].content) || null;
+  }
+
+  // -- anatomy selection: mode, structures, status ------------------------------------
+
+  nameOf(key) {
+    return this.names[key] || key;
+  }
+
+  requestNames(content = this.anatomyContent()) {
+    const keys = content ? stepStructures(content) : [];
+    const unasked = keys.filter((k) => !this.asked.has(k));
+    if (!unasked.length) return;
+    unasked.forEach((k) => this.asked.add(k));
+    this.anatomy.names(unasked);
+  }
+
+  onNames(names, missing = []) {
+    this.names = { ...this.names, ...names };
+    missing.forEach((k) => this.absent.add(k));
+    this.renderAnatomyTools();
+  }
+
+  drawable(keys) {
+    return keys.filter((k) => !this.absent.has(k));
+  }
+
+  /** The status line, the pressed states and the structure buttons follow this.sel (expanded)
+   *  or the step's own state (side panel). */
+  renderAnatomyTools() {
+    if (!this.root) return;
+    const t = this.t;
+    const line = this.$("[data-anatomy-selection]");
+    const sel = this.sel;
+    if (!this.expanded || !sel) {
+      const state = this.stepState;
+      const keys = state ? this.drawable(state.mode === "isolate" ? state.structures : state.focus) : [];
+      line.textContent = keys.length
+        ? t(state.mode === "isolate" ? "rp.anatomy_status_isolate" : "rp.anatomy_status_highlight", { name: keys.map((k) => this.nameOf(k)).join(", ") })
+        : "";
+      return;
+    }
+    for (const b of this.root.querySelectorAll("[data-mode]"))
+      b.setAttribute("aria-pressed", String(b.dataset.mode === sel.mode));
+    this.$("[data-skeleton]").setAttribute("aria-pressed", String(sel.skeleton));
+    const names = sel.keys.map((k) => this.nameOf(k)).join(", ");
+    let text;
+    if (sel.skeleton) text = t("rp.anatomy_status_skeleton");
+    else if (!sel.keys.length) text = t("rp.anatomy_status_whole");
+    else text = t(sel.mode === "isolate" ? "rp.anatomy_status_isolate" : "rp.anatomy_status_highlight", { name: names });
+    line.textContent = text;
+    // The structures of this exercise, as buttons; rebuilt only when the list changes.
+    const box = this.$("[data-anatomy-picks]");
+    // Only what this atlas draws is offered: a name it cannot find would select nothing.
+    const keys = stepStructures(this.anatomyContent()).filter((k) => this.names[k]);
+    const signature = keys.join("|");
+    if (box.dataset.sig !== signature) {
+      box.dataset.sig = signature;
+      box.innerHTML = keys.map((k) => `<button data-pick="${esc(k)}" aria-pressed="false"></button>`).join("");
+    }
+    box.hidden = !keys.length;
+    for (const b of box.querySelectorAll("[data-pick]")) {
+      b.textContent = this.names[b.dataset.pick] || b.dataset.pick;
+      b.setAttribute("aria-pressed", String(!sel.skeleton && sel.keys.includes(b.dataset.pick)));
+    }
+  }
+
+  /** Start (or restart, on a step change) the expanded selection from the step's own anatomy,
+   *  keeping the mode the customer chose. */
+  initAnatomySelection(keepMode) {
+    const state = this.currentAnatomyState() || { mode: "highlight", structures: [], focus: [] };
+    const mode = keepMode && this.sel ? this.sel.mode : state.mode;
+    const pool = this.drawable(state.focus.length ? state.focus : state.structures.slice(0, 1));
+    const keys = mode === "isolate" ? pool : pool.slice(0, 1);
+    this.sel = { mode, keys, skeleton: false };
+    this.requestNames();
+  }
+
+  /** Send the current selection to the viewer. */
+  applyAnatomySelection() {
+    const sel = this.sel;
+    if (!sel) return;
+    if (sel.skeleton) {
+      this.anatomy.skeleton();
+      this.anatomy.view("wholeBody");
+    }
+    else if (!sel.keys.length) this.anatomy.clear();
+    else this.anatomy.select(sel.keys, sel.mode);
+    this.renderAnatomyTools();
+  }
+
+  selectAnatomy(keys, { skeleton = false } = {}) {
+    this.sel = { ...(this.sel || { mode: "highlight" }), keys, skeleton };
+    this.applyAnatomySelection();
   }
 
   speakStep() {
@@ -566,11 +720,16 @@ class Player {
     if (button.matches("[data-anatomy-return]")) return this.toggleAnatomy(false);
     if (button.dataset.view) return this.anatomy.view(button.dataset.view);
     if (button.dataset.zoom) return this.anatomy.zoom(Number(button.dataset.zoom));
-    if (button.matches("[data-skeleton]")) return this.anatomy.skeleton();
+    if (button.dataset.turn) return this.anatomy.turn(Number(button.dataset.turn));
+    if (button.dataset.mode) return this.setAnatomyMode(button.dataset.mode);
+    if (button.dataset.pick) return this.selectAnatomy([button.dataset.pick]);
+    if (button.matches("[data-skeleton]")) {
+      if (!this.sel) this.initAnatomySelection(false);
+      return this.selectAnatomy(this.sel.keys, { skeleton: !this.sel.skeleton });
+    }
     if (button.matches("[data-whole]")) {
       this.$("[data-anatomy-cue]").textContent = "";
-      this.anatomy.clear();
-      return;
+      return this.selectAnatomy([]);
     }
     const act = button.dataset.act;
     switch (act) {
@@ -679,6 +838,8 @@ class Player {
     this.$("[data-anatomy-expand]").textContent = open ? this.t("rp.anatomy_return") : this.t("rp.anatomy_expand");
     if (open) {
       this.ctx.event?.("anatomy_opened", { position: this.step ? this.step.position : 0 });
+      this.initAnatomySelection(false);
+      this.renderAnatomyTools();
       // The workout pauses while anatomy is open (brief §32) and continues on return.
       if (this.root.dataset.mode === "exercise") {
         this.resumeAfterAnatomy = true;
@@ -686,19 +847,47 @@ class Player {
       }
       this.$("[data-anatomy-return]").focus({ preventScroll: true });
     } else {
+      this.sel = null;
       this.anatomy.view("anterior");
       this.syncAnatomy(true);
+      if (!this.content && this.stepState) {
+        // Plan screen (before Start): there is no running step, so show the first exercise again.
+        this.anatomy.lastKey = null;
+        this.anatomy.show(this.stepState);
+        this.renderAnatomyTools();
+      }
       if (this.resumeAfterAnatomy && this.root.dataset.mode === "paused") await this.resume();
       this.resumeAfterAnatomy = false;
       this.$("[data-anatomy-expand]").focus({ preventScroll: true });
     }
   }
 
+  /** The customer tapped a structure in the viewer. */
   onStructure(key, name) {
     if (!this.expanded) return;
-    this.anatomy.isolate(key);
-    this.$("[data-anatomy-cue]").textContent = this.t("rp.anatomy_isolated", { name: name || key });
-    this.ctx.event?.("structure_isolated", { source: "room" });
+    if (!this.sel) this.initAnatomySelection(false);
+    if (name) this.names = { ...(this.names || {}), [key]: name };
+    const wasSkeleton = this.sel.skeleton;
+    this.sel = { ...this.sel, keys: [key], skeleton: false };
+    // In "Highlight in the body" the viewer has already selected it. After skeleton-only, or in
+    // "Show only this", the viewer is told so the picture matches the mode.
+    if (wasSkeleton || this.sel.mode === "isolate") this.applyAnatomySelection();
+    else this.renderAnatomyTools();
+    this.$("[data-anatomy-cue]").textContent = "";
+    if (this.sel.mode === "isolate") this.ctx.event?.("structure_isolated", { source: "room" });
+  }
+
+  setAnatomyMode(mode) {
+    if (!this.sel) this.initAnatomySelection(false);
+    let keys = this.sel.keys;
+    // "Show only this" needs something to show: the step's main structure.
+    if (!keys.length) {
+      const state = this.currentAnatomyState();
+      keys = state ? this.drawable(state.focus.length ? state.focus : state.structures.slice(0, 1)).slice(0, 1) : [];
+    }
+    this.sel = { mode: mode === "isolate" ? "isolate" : "highlight", keys, skeleton: false };
+    this.applyAnatomySelection();
+    if (this.sel.mode === "isolate" && keys.length) this.ctx.event?.("structure_isolated", { source: "room" });
   }
 
   // -- dialogs -------------------------------------------------------------------------

@@ -40,6 +40,7 @@ import { Hud } from './hud.js';
 import { CellNote } from './cellNote.js';
 import { SectionStrip, SLICE_COUNT } from './sections.js';
 import { BrainPlate } from './brainPlate.js';
+import { roomMode, heartbeatMs, holdDrawing, pixelRatioFor } from './roomPerf.js';
 
 /* ------------------------------------------------------------------ app state */
 export const app = {
@@ -134,7 +135,15 @@ try {
   document.getElementById('viewbar').hidden = true;
   throw error;
 }
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+/* The room's embedded viewer (?room=1) runs in a lighter mode -- a slower idle heartbeat, no
+ * drawing while the page is hidden, a lower pixel-ratio cap (roomPerf.js). Decided once, here.
+ * The professional viewer never has room=1, so for it every value below is what it was. */
+const ROOM = roomMode(location.search);
+const wantedPixelRatio = (levelPixels) =>
+  pixelRatioFor(ROOM.room, devicePixelRatio, levelPixels, ROOM.room ? canvas.getBoundingClientRect().width : 0);
+/* Measurement only (room=1&perf=1): drawn frames and loop ticks, read from outside. */
+const ROOM_PERF = ROOM.perf ? (window.__sedensAnatomyPerf = { drawn: 0, frames: 0 }) : null;
+renderer.setPixelRatio(wantedPixelRatio(2));
 /* The section strip borrows this renderer: the sections are drawn from the same geometry
  * buffers the scene is drawing, so they have to come out of the context that owns them. */
 const sectionStrip = new SectionStrip(renderer);
@@ -3733,6 +3742,25 @@ export function setView(key, immediate = false) {
   nudgeIdle();
 }
 
+/**
+ * Walk the camera round the body by a fixed angle (degrees, positive = to the right).
+ *
+ * The room's step-rotation: a deliberate, finite camera move (one flight) instead of
+ * auto-rotation, which would keep the loop drawing for as long as it is on. The distance
+ * and height stay as they are; only the heading about the vertical axis through the target
+ * changes.
+ */
+const _turnUp = new THREE.Vector3(0, 1, 0);
+export function turnBy(degrees) {
+  FLIGHT_BY = 'turnBy';
+  const t = flight ? flight.toT.clone() : controls.target.clone();
+  const from = flight ? flight.toP.clone() : camera.position.clone();
+  const offset = from.sub(t).applyAxisAngle(_turnUp, -THREE.MathUtils.degToRad(Number(degrees) || 0));
+  flyToPose(t.clone().add(offset), t);
+  nudgeIdle();
+  invalidate();
+}
+
 const FLESH = 0.07;            // body heights, roughly half a thigh's thickness
 const FIT_MARGIN = 1.10;       // the viewbar and the layerbar float over the render
 
@@ -6147,6 +6175,8 @@ let frameCount = 0;
 let dirtyFrames = 4;
 let lastDrawn = 0;
 const SETTLE = 3;
+/** Idle heartbeat: 500 ms for the professional viewer, 2000 ms in the room (roomPerf.js). */
+const HEARTBEAT_MS = heartbeatMs(ROOM.room);
 /** Something changed; draw again. Cheap enough to call from anywhere. */
 export function invalidate(frames = SETTLE) {
   dirtyFrames = Math.max(dirtyFrames, frames);
@@ -6521,7 +6551,8 @@ function setQuality(level) {
   quality = QUALITY.indexOf(next);
   sinceStep = 0;
   recent.length = 0;
-  renderer.setPixelRatio(Math.min(devicePixelRatio, next.pixels));
+  renderer.setPixelRatio(wantedPixelRatio(next.pixels));
+  if (ROOM.room) composer?.setPixelRatio?.(renderer.getPixelRatio());
   const r = canvas.getBoundingClientRect();
   const w = Math.round(r.width), h = Math.round(r.height);
   if (next.bloom !== was.bloom && w && h) {
@@ -6553,9 +6584,17 @@ function resize() {
      * believing straight away rather than making it prove itself for a second. */
     if (softwareRenderer()) quality = 0;
     app.bloom = QUALITY[quality].bloom && !softwareRenderer();
-    renderer.setPixelRatio(Math.min(devicePixelRatio, QUALITY[quality].pixels));
+    renderer.setPixelRatio(wantedPixelRatio(QUALITY[quality].pixels));
     buildComposer(w, h, app.bloom);
   } else {
+    /* Room only: a panel that crosses the small-canvas width gets its pixel ratio re-capped. */
+    if (ROOM.room) {
+      const wanted = wantedPixelRatio(QUALITY[quality].pixels);
+      if (wanted !== renderer.getPixelRatio()) {
+        renderer.setPixelRatio(wanted);
+        composer.setPixelRatio?.(wanted);
+      }
+    }
     composer.setSize(w, h);
     bloomPass?.setSize(w * BLOOM_SCALE, h * BLOOM_SCALE);
   }
@@ -6666,11 +6705,16 @@ renderer.setAnimationLoop((now) => {
    * nothing. Twice a second against sixty is still ninety-seven per cent of the
    * work gone, and it buys the property that no missing `invalidate` can cost
    * more than half a second of staleness. */
-  if (now - lastDrawn > 500) dirtyFrames = Math.max(dirtyFrames, 1);
+  if (now - lastDrawn > HEARTBEAT_MS) dirtyFrames = Math.max(dirtyFrames, 1);
   phase.frames++;
+  if (ROOM_PERF) ROOM_PERF.frames++;
+  /* Room only: nothing is drawn while the page is hidden. The dirty frames are kept, and
+   * `visibilitychange` asks for eight more when the page comes back. */
+  if (holdDrawing(ROOM.room, document.visibilityState)) return;
   if (!dirtyFrames) return;
   dirtyFrames--;
   lastDrawn = now;
+  if (ROOM_PERF) ROOM_PERF.drawn++;
   root.updateMatrixWorld();
   fitFog();
   // after the bones have their world matrices for this frame and before anything is drawn

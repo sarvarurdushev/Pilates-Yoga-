@@ -12,6 +12,7 @@ shows it and asks for changes.
 | `web/src/sedens/room-player-clock.js` | pure timing: sets, sides, holds, rests, rep pacing, automatic next, presence check |
 | `web/src/sedens/room-anatomy.js` | pure anatomy timeline (`anatomyStateAt`) and the embedded viewer (`AnatomyPanel`) |
 | `web/src/sedens/anatomy-room-bridge.js` | runs inside `/anatomy.html?room=1` and drives the existing viewer |
+| `web/src/roomPerf.js` | pure decisions of the viewer's room-only performance mode (heartbeat, hidden page, pixel ratio) |
 | `web/src/sedens/room-narration.js` | narration: recorded audio, browser speech, captions always |
 | `web/src/sedens/room-music.js` | music: off, generated ambience, or the customer's own file |
 
@@ -100,7 +101,7 @@ The buttons appear only when the step has an approved option:
 - repeat and restart return to the start state;
 - a new step starts from its own state, so the previous step's structures never carry over.
 
-**When it is sent.** The player recomputes the state on play, pause, seek, video time updates, repeat, skip, previous and variant change. It sends a message only when the state changes, and preloads the next step's structures.
+**When it is sent.** The player recomputes the state on play, pause, seek, video time updates, repeat, skip, previous and variant change. It sends a message only when the state changes. When a step is shown it preloads the next step's structures (the `preload` op loads the atlas layers they live in; checked: the first `preload` of a deep-muscle structure fetched `muscles_deep.glb` once, and the `show` that followed fetched nothing). The bridge also skips a `show` whose structures, focus, mode and layer equal what is already drawn, while the live viewer state (isolation, selection, layers) still matches; it answers with `skipped: true` and asks for no frames.
 
 **Bridge protocol** (`anatomy-room-bridge.js`, same origin, from the parent window only):
 
@@ -108,7 +109,10 @@ The buttons appear only when the step has an approved option:
 |---|---|
 | `show {structures, focus, mode, layer}` | highlight: whole body, focus structure shown through it, camera unchanged. isolate: only those structures, framed |
 | `clear` | default whole body (skeleton and superficial muscles), nothing selected |
-| `lang`, `rotate`, `view`, `zoom`, `fit` | viewer settings (auto-rotation is off in the room) |
+| `lang`, `view`, `zoom`, `fit` | viewer settings |
+| `turn {degrees}` | one camera move round the body (the room uses 45 degrees, left or right); distance and height are kept |
+| `rotate {on, seconds}` | continuous turning, which keeps the viewer drawing, so it stops by itself after `seconds` (default 12, at most 30). The room's buttons use `turn`, not this |
+| `names {structures}` | the drawn structures' names in the viewer's language (`sedens-anatomy-names {names, missing}`); keys the atlas does not draw come back in `missing` and are not offered to the customer |
 | `preload {structures}` | load what those structures need without showing them |
 
 | Message out | When |
@@ -124,14 +128,55 @@ The buttons appear only when the step has an approved option:
 - It never calls the viewer's exercise mode or plays motion clips, because those paint per-role activation levels.
 - It hides the professional panels and the link out of the room. The iframe is sandboxed without top navigation.
 
+**The anatomy stays part of the workout.** The side panel always names what is shown for the exercise on screen ("Highlighted in the body: Diaphragm", or "Showing only: ..." for an authored isolate moment), from the same state the viewer is given. Nothing about the viewer is a separate screen: it is one iframe, its content follows the step and its authored timeline, and "Explore" only restyles it.
+
 **Expanded anatomy.**
-- Tapping the panel restyles the same iframe to full screen. It is never moved, because that would reload it.
-- The customer can rotate, tap a muscle to isolate it, show the skeleton, show the whole body, and return. "I don't feel well" is in this toolbar too.
-- By default the workout pauses while anatomy is expanded (`reason: anatomy`) and resumes on return.
+- "Explore" restyles the same iframe to full screen. It is never moved, because that would reload it.
+- **Two modes, shown as toggle buttons with `aria-pressed` (and a check mark):** "Highlight in the body" (the whole body stays and the structure is shown through it) and "Show only this" (only that structure). A status line (`role="status"`) says what is on screen: "Highlighted in the body: X", "Showing only: X", "Showing the skeleton only." or "Showing the whole body...".
+- **Selecting.** Tap a muscle on the model, or pick one from "In this exercise", a button list of the step's structures (names in the current language, only those the atlas draws). Picking another structure keeps the mode. In "Show only this" only the isolated structure can be tapped, so the list (or "Highlight in the body") is how to choose another.
+- **Moving the model.** Drag, Front/Side/Back, Turn left / Turn right (45 degree steps, each one camera move, so nothing keeps drawing afterwards), zoom + and -. The room does not use auto-rotation.
+- **What to show.** "Skeleton only" (toggle; the camera returns to the whole body), "Whole body" (nothing selected), and "Back to the workout".
+- **Synchronized with the step.** Opening starts from the step's own state (its mode and its focus structure). If the step changes while the view is open, the new step's structures are shown in the mode the customer chose and the list follows. Closing restores the step's state.
+- Everything is a real button, so it works with a keyboard, a mouse or touch; no hover is needed. English and Korean; "I don't feel well" is in the toolbar too. On a phone the model comes first and the buttons scroll below it.
+- By default the workout pauses while anatomy is expanded (`reason: anatomy`) and resumes on return. (While it is paused the server does not accept a step change, so the "step changes while open" path is only reached by a change that comes from outside the player; it is covered by the code path, not by the browser test.)
+- Events: `anatomy_opened`, and `structure_isolated` when a structure is shown on its own (the event names are a fixed list; no new ones were added).
 
 **Two rendering caveats.**
 - Chromium pauses rendering of an off-screen iframe. The panel is therefore kept on screen; to warm it up it is given its real size with opacity 0.
 - The viewer redraws only while something animates, so the bridge invalidates the frame after each operation.
+
+### Performance mode (room only)
+
+`web/src/main.js` reads `location.search` once (`web/src/roomPerf.js`). The room embeds `/anatomy.html?room=1&embed=1`; the professional viewer never has `room=1` (it loads `/anatomy.html?platform=1&embed=1` or no query), so for it nothing below applies. `test/sedens-anatomy-performance.test.mjs` pins that: without `room=1` the heartbeat is 500 ms, drawing is never held, and the pixel ratio is exactly `min(devicePixelRatio, level)`.
+
+| With `room=1` | Without (professional viewer, as before) |
+|---|---|
+| idle heartbeat 2000 ms | 500 ms |
+| no drawing while `document.visibilityState` is `hidden` (dirty frames are kept; `visibilitychange` already asks for eight on return). Only page visibility is used, never IntersectionObserver or display:none detection, because the room keeps the host on screen at opacity 0 to warm up | drawing unchanged |
+| pixel ratio capped at 1.25, and at 1 when the canvas is narrower than 480 CSS px (re-applied on resize and when the quality governor steps) | `min(devicePixelRatio, level)` |
+| a repeated `show` is skipped by the bridge | every `show` is applied |
+
+Not done: fewer settle frames (a change can land across two frames, so three stay), and no bloom change (still decided by the frame-time governor). With `room=1&perf=1` the page exposes `window.__sedensAnatomyPerf = {drawn, frames}` (frames the loop drew, and loop ticks); without `perf=1` nothing is exposed.
+
+**Measured before and after** with `web/test/sedens-anatomy-performance.browser.mjs` (same script on both builds). Method: drawn frame = an animation-frame callback in the anatomy iframe during which at least one WebGL draw call was issued (`requestAnimationFrame` and the draw calls are wrapped by an init script; the built-in counter was checked against it: 6/6, 11/11, 17/17 drawn frames over 8 s); long tasks from `PerformanceObserver("longtask")` in the room page. "Before" is a read-only `git worktree` of HEAD (the commit before this change), "after" the same commit with this change; same backend, `SEDENS_MODE=demo_free`, Chromium with software WebGL (SwiftShader), 1366x900, device pixel ratio 1. Six runs alternated before, after, before, after, before, after; medians of three runs each. Other agents were using the CPU of the container at the same time (load average 2.3 to 4.6), so the counts are what to compare, not milliseconds.
+
+| Window | Before | After |
+|---|---|---|
+| Idle, plan screen shown, 20 s: frames drawn | 41 (2.05 per second) | 10 (0.50 per second; later runs gave 12, 14 and 21: the window still contains the tail of loading and the quality governor settling, so only the idle-while-running row is stable) |
+| Idle, workout running, 20 s: frames drawn | 39 (1.94 per second) | 10 (0.50 per second) |
+| Idle 20 s: long tasks (count, total) | 41, 11.7 s | 10, 2.7 s |
+| One room change (`show` to other structures), 3.7 s window: frames drawn | 9 | 4 |
+| The same `show` again, 3.5 s window | 9 | 2 (skipped) |
+| "Show only this" (isolate, camera moves), 3.6 s window | 15 | 10 |
+| A real step change (Done), 4.1 s window | 10 | 6 |
+| Page hidden (simulated), 10 s: frames drawn | 19 | 0 |
+| Page hidden, 10 s: long tasks | 19, 4.3 s | 0 |
+| Back to visible, 3 s (the test now dispatches a bubbling `visibilitychange`, as a real browser does, so the resume request for eight frames is exercised; the count is bound by frame cost in software WebGL, about 0.3 s per frame plus the heartbeat) | 6 | 3 |
+| Professional viewer (no `room=1`), idle 10 s | 23 | 28 (the page draws continuously here; in software WebGL each frame takes longer than the 500 ms heartbeat, so the count is bound by frame cost and varies with load; the code path is unchanged) |
+
+What the numbers say. The idle cost is the heartbeat: four times fewer drawn frames, and the page's thread is busy 14 per cent of the time instead of 58 per cent in this software renderer. A room change itself still costs a few frames (about two beyond the heartbeat in both builds; the three settle frames are kept), so the change totals fall because the heartbeat share does, and a repeated `show` costs nothing. The hidden-page window is simulated (`document.visibilityState` is overridden in the iframe), because headless Chromium never hides a tab. Real browsers stop `requestAnimationFrame` in hidden tabs anyway, so this guard matters for embedders and kiosk shells that hide a window without pausing it. Pixel ratio: in this container the viewer starts on the software path at device pixel ratio 1, so the cap has no visible effect here (the quality governor settled at level 3 before and level 1 after, both at ratio 1; it climbs slower because there are fewer drawn frames to judge). The cap is covered by the unit test only.
+
+**Real hardware performance is unverified.** No GPU-equipped device was available. The figures above are counts of work in a software renderer; they show that the room asks for four times fewer idle frames, not how fast a frame is on the room computer's GPU. Check frame time, heat and the effect of the pixel-ratio cap on a high-density display on the real device (`web/test/sedens-anatomy-performance.browser.mjs` runs against any base URL).
 
 ## 8. "I don't feel well"
 

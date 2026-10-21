@@ -218,9 +218,13 @@ for (const [dx, dy] of [[0.5, 0.42], [0.5, 0.5], [0.48, 0.36], [0.53, 0.6], [0.4
   if (await page.evaluate(() => window.__anatomy.some((m) => m.type === "sedens-anatomy-selection"))) break;
 }
 await anatomyShown(page, () => window.__anatomy.some((m) => m.type === "sedens-anatomy-selection"), "a tap selects a muscle");
+// Phase 4: a tap selects in the mode the customer chose ("Highlight in the body" by default);
+// "Show only this" then isolates it.
+assert.match(await page.locator("[data-anatomy-selection]").innerText(), /^Highlighted in the body: /);
+await page.locator('[data-mode="isolate"]').click();
 await anatomyShown(page, () => window.__anatomy.some((m) => m.type === "sedens-anatomy-state" && m.isolated?.length),
-  "the tapped muscle is isolated");
-assert.match(await page.locator("[data-anatomy-cue]").innerText(), /^Showing /);
+  "the selected muscle is isolated");
+assert.match(await page.locator("[data-anatomy-selection]").innerText(), /^Showing only: /);
 await shot(page, "p3-12-anatomy-expanded", false);
 await page.locator("[data-anatomy-return]").click();
 await page.locator('.rp[data-mode="exercise"]').waitFor();

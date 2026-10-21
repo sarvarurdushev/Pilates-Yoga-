@@ -114,17 +114,23 @@
 .rp-anatomy-bar { order: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .rp-anatomy-title { font-size: 1em; margin: 0; }
 .rp-small { min-height: var(--sd-target); padding: 0 20px; font-size: 0.85em; }
-.rp-anatomy-tools { order: 1; display: flex; flex-wrap: wrap; gap: 10px; }
+.rp-anatomy-tools { order: 1; display: flex; flex-wrap: wrap; gap: 10px 22px; }
+.rp-tool-group { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .rp-anatomy-tools button { min-height: var(--sd-target); min-width: var(--sd-target); }
+/* The two modes, the skeleton button and the structure buttons show which one is on. */
+.rp-anatomy-tools button[aria-pressed="true"] { background: var(--sd-text); color: var(--sd-bg); border-color: var(--sd-text); }
+.rp-anatomy-tools button[aria-pressed="true"]::before { content: "✓ " / ""; }
 .rp-anatomy-hint { order: 2; color: var(--sd-muted); font-size: 0.85em; }
 .rp-anatomy-status { order: 3; color: var(--sd-muted); font-size: 0.85em; }
 .rp-anatomy-status:empty { display: none; }
 .rp-anatomy-frame {
   order: 4; width: 100%; height: var(--rp-anatomy-h); border: 0; border-radius: 14px; background: var(--rp-stage-bg); display: block;
 }
-.rp-anatomy-cue { order: 5; color: var(--sd-accent-strong); }
+.rp-anatomy-selection { order: 5; font-size: 0.9em; }
+.rp-anatomy-selection:empty { display: none; }
+.rp-anatomy-cue { order: 6; color: var(--sd-accent-strong); }
 .rp-anatomy-cue:empty { display: none; }
-.rp-anatomy-label { order: 6; color: var(--sd-muted); font-size: 0.75em; }
+.rp-anatomy-label { order: 7; color: var(--sd-muted); font-size: 0.75em; }
 .rp-anatomy.is-expanded {
   position: fixed; inset: 0; z-index: 1000; border-radius: 0; border: 0;
   background: var(--sd-bg); padding: clamp(12px, 2vw, 28px); gap: 12px;
@@ -132,6 +138,8 @@
 .rp-anatomy.is-expanded .rp-anatomy-title { font-size: clamp(1.3rem, 2vw, 1.8rem); }
 .rp-anatomy.is-expanded .rp-anatomy-frame { flex: 1 1 auto; height: auto; min-height: 0; }
 .rp-anatomy.is-expanded [data-anatomy-expand] { display: none; }
+/* Expanded: the status line sits above the model, where the customer is looking. */
+.rp-anatomy.is-expanded .rp-anatomy-selection { order: 3; font-size: 1.05em; font-weight: 600; }
 /* The sticky side column is its own stacking context: lift it so the full-screen view covers the stage overlay and controls. */
 .rp.rp-expanded .rp-side { z-index: 1000; }
 body:has(.rp-expanded) { overflow: hidden; }
@@ -210,6 +218,13 @@ body:has(.rp-expanded) { overflow: hidden; }
   .rp-overlay .rj-actions > button { width: 100%; }
   .rp-stage:has(.rp-overlay:not([hidden])) { min-height: 480px; }
   .rp-anatomy-tools button { flex: 1 1 auto; }
+  /* Expanded on a phone: the model first, with the status line above it; the tools below, scrolling. */
+  .rp-anatomy.is-expanded { overflow-y: auto; }
+  .rp-anatomy.is-expanded .rp-anatomy-selection { order: 1; }
+  .rp-anatomy.is-expanded .rp-anatomy-frame { order: 2; flex: 0 0 auto; height: 52vh; min-height: 260px; }
+  .rp-anatomy.is-expanded .rp-anatomy-tools { order: 3; }
+  .rp-anatomy.is-expanded .rp-anatomy-hint { order: 4; }
+  .rp-tool-group { gap: 8px; }
   .rp-steps-item { gap: 10px; }
 }
 /* Korean breaks between words, never inside one. */

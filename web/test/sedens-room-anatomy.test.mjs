@@ -3,8 +3,8 @@
 // and a new step never inherits the previous step's structures (brief §31).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { anatomyStateAt, stateKey, boundaries } from "../src/sedens/room-anatomy.js";
-import { keysToIds } from "../src/sedens/anatomy-room-bridge.js";
+import { anatomyStateAt, stateKey, boundaries, stepStructures, selectionMessage } from "../src/sedens/room-anatomy.js";
+import { keysToIds, showSignature } from "../src/sedens/anatomy-room-bridge.js";
 
 const step = {
   anatomy: {
@@ -75,4 +75,27 @@ test("the in-frame bridge resolves names to drawn ids and reports unknown names"
   const table = { "rectus abdominis": [10], deltoid: [21, 22, 23] };
   const lookup = (k) => table[k] || [];
   assert.deepEqual(keysToIds(["deltoid", "rectus abdominis", "deltoid", "nope"], lookup), { ids: [21, 22, 23, 10], missing: ["nope"] });
+});
+
+test("the structures a customer can pick are the step's, once each, mapping first then moments", () => {
+  assert.deepEqual(stepStructures(step), ["rectus abdominis", "transversus abdominis", "diaphragm"]);
+  assert.deepEqual(stepStructures(other), ["gluteus maximus"]);
+  assert.deepEqual(stepStructures(null), []);
+});
+
+test("highlight and isolate send different modes for the same structure", () => {
+  const h = selectionMessage("deltoid", "highlight");
+  const i = selectionMessage(["deltoid", "biceps brachii"], "isolate");
+  assert.deepEqual([h.mode, h.structures, h.focus, h.layer], ["highlight", ["deltoid"], ["deltoid"], ""]);
+  assert.deepEqual([i.mode, i.structures, i.focus], ["isolate", ["deltoid", "biceps brachii"], ["deltoid", "biceps brachii"]]);
+  assert.equal(selectionMessage("deltoid", "anything else").mode, "highlight");
+});
+
+test("a repeated show has the same signature; any change to structures, mode, layer or focus differs", () => {
+  const base = { structures: ["a", "b"], focus: ["a"], mode: "highlight", layer: "" };
+  assert.equal(showSignature(base), showSignature({ ...base }));
+  assert.equal(showSignature(base), showSignature({ ...base, layer: "not a layer" }), "an unknown layer is the default layer");
+  assert.equal(showSignature({ ...base, focus: [] }), showSignature({ ...base, focus: ["a", "b"] }), "no focus means all structures");
+  for (const change of [{ structures: ["a"] }, { focus: ["b"] }, { mode: "isolate" }, { layer: "skeleton" }])
+    assert.notEqual(showSignature(base), showSignature({ ...base, ...change }));
 });
