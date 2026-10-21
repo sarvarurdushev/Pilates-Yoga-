@@ -8,7 +8,8 @@ On top of the existing connected-platform demo seed (unchanged), this adds:
 * the simulated demo CRM with four fictional memberships covering an allowed
   entry, no booking, an inactive membership and a booking for another room;
 * a creator permission and unverified creator profile for the first coach;
-* the demonstration marketplace (:mod:`pilates.sedens.demo_marketplace`).
+* the demonstration marketplace (:mod:`pilates.sedens.demo_marketplace`);
+* the demonstration customer's labelled history (:mod:`pilates.sedens.demo_history`).
 
 The access codes below are public demonstration values, shown on the demo room
 screen. They are stored only as hashes and work only in demonstration orgs.
@@ -18,7 +19,7 @@ from __future__ import annotations
 
 import threading
 
-from . import capabilities, creators, crm, demo_marketplace
+from . import capabilities, creators, crm, demo_history, demo_marketplace
 from ..platform.repository import Actor
 from .util import Denied, digest, now
 
@@ -107,6 +108,8 @@ def ensure(sedens, org_id) -> dict:
                 })
         # Courses, a fictional creator studio and a demonstration reviewer (seeded once).
         demo_marketplace.ensure(sedens, org_id)
+        # The demonstration customer's six weeks of (labelled) history, after the courses it follows.
+        demo_history.ensure(sedens, org_id, customer_id=f"{org_id}-{MEMBERS[0][1]}", room_id=room)
         return {"org_id": org_id, "room_id": room, "facility": FACILITY_NAME, "seeded_at": now()}
 
 

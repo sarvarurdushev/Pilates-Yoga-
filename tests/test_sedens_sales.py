@@ -24,7 +24,9 @@ def world(tmp_path):
     for role in ("professor", "reviewer"):
         user_id, platform_role = demo_marketplace.actor_for(ORG, role)
         people[role] = sedens.repo.actor(sedens.repo.issue(user_id, platform_role))
-    buyer = sedens.repo.actor(sedens.repo.demo_login(KEY, "student"))
+    # The first demonstration customer already bought Mobility Foundations in their seeded history
+    # (demo_history), so a second member is the buyer here.
+    buyer = sedens.repo.actor(sedens.repo.demo_login(KEY, "student", f"{ORG}-student01"))
     with sedens.repo.db() as db:
         location = db.execute("SELECT location_id FROM p_student_locations WHERE student_id=?",
                               (buyer.user_id,)).fetchone()

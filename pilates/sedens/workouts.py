@@ -135,24 +135,11 @@ def _next_course_session(db, course, enrollment, snapshot) -> str | None:
     return found["next"]["session_id"] if found and found["next"] else None
 
 
-def choose_course(sedens, db, ctx, journey_row, data):
-    """session_choice → ready_to_train with one session of a guided course the
-    customer may play here, from the version they are enrolled in."""
-    journey.require_ready(db, ctx)
-    journey.require(journey_row, "session_choice")
-    course = courses.row(db, data.get("course_id"))
-    decision = access.can_play_in_room(sedens, db, ctx, course)
-    if not decision["ok"]:
-        raise Denied({"purchase_required": "Buy this course on your phone to play it here.",
-                      "not_enabled_here": "This course is not offered in this room."}
-                     .get(decision["reason"], "This course cannot be played here."), 403, decision["reason"])
-    enrolled = access.enrollment(db, ctx.student_id, course["id"])
-    number = access.effective_version(db, course, enrolled)
-    snapshot = marketplace._snapshot(db, course["id"], number)
-    session_id = data.get("session_id") or _next_course_session(db, course, enrolled, snapshot)
-    if not session_id:
-        raise Denied("You have finished every session of this course. Choose a session to repeat.", 409,
-                     "course_finished")
+def course_plan(sedens, db, ctx, course, session_id) -> dict:
+    """The frozen plan and step rows of one session of a guided course, from the version the
+    customer is enrolled in (enrolling them on first play). ``ctx`` needs ``org_id``,
+    ``location_id`` and ``student_id``. Shared by the room and by the demonstration persona's
+    seeded history, so a seeded course workout is exactly what the room would have written."""
     played = marketplace.room_session_plan(sedens, db, ctx, course["id"], session_id)  # enrolls on first play
     enrolled = access.enrollment(db, ctx.student_id, course["id"])
     session = played["session"]
@@ -178,10 +165,33 @@ def choose_course(sedens, db, ctx, journey_row, data):
               "course_title": snapshot.get("course", {}).get("title") or course["title"],
               "module_title": module.get("title", ""), "session_title": session.get("title", ""),
               "steps": frozen_steps}
-    _insert(db, ctx, kind="course", plan=frozen, planned=sum(s["seconds"] for s in steps),
-            course={"course_id": course["id"], "version": played["version"], "session_id": session_id,
-                    "enrollment_id": enrolled["id"] if enrolled else None}, steps=steps)
-    _event(db, ctx, "session_choice", choice="course", version=played["version"])
+    return {"frozen": frozen, "steps": steps, "planned": sum(s["seconds"] for s in steps),
+            "course": {"course_id": course["id"], "version": played["version"], "session_id": session_id,
+                       "enrollment_id": enrolled["id"] if enrolled else None}}
+
+
+def choose_course(sedens, db, ctx, journey_row, data):
+    """session_choice → ready_to_train with one session of a guided course the
+    customer may play here, from the version they are enrolled in."""
+    journey.require_ready(db, ctx)
+    journey.require(journey_row, "session_choice")
+    course = courses.row(db, data.get("course_id"))
+    decision = access.can_play_in_room(sedens, db, ctx, course)
+    if not decision["ok"]:
+        raise Denied({"purchase_required": "Buy this course on your phone to play it here.",
+                      "not_enabled_here": "This course is not offered in this room."}
+                     .get(decision["reason"], "This course cannot be played here."), 403, decision["reason"])
+    enrolled = access.enrollment(db, ctx.student_id, course["id"])
+    number = access.effective_version(db, course, enrolled)
+    snapshot = marketplace._snapshot(db, course["id"], number)
+    session_id = data.get("session_id") or _next_course_session(db, course, enrolled, snapshot)
+    if not session_id:
+        raise Denied("You have finished every session of this course. Choose a session to repeat.", 409,
+                     "course_finished")
+    plan = course_plan(sedens, db, ctx, course, session_id)  # enrolls on first play
+    _insert(db, ctx, kind="course", plan=plan["frozen"], planned=plan["planned"], course=plan["course"],
+            steps=plan["steps"])
+    _event(db, ctx, "session_choice", choice="course", version=plan["course"]["version"])
     return journey.move(db, journey_row, "ready_to_train", expect=data.get("expect"), path="course")
 
 

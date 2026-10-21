@@ -186,7 +186,8 @@ def test_investor_journey(web):
     ok(screen.call("POST", "/sedens/room/enter", {"method": "access_code", "credential": code}))
     rooms_courses = {c["title"]: c for c in ok(screen.call("GET", "/sedens/room/courses"))["items"]}
     assert rooms_courses["Hip Mobility Lab"]["playable"] and rooms_courses["Morning Mobility"]["playable"]
-    assert rooms_courses["Mobility Foundations"]["reason"] == "purchase_required"
+    # The demonstration customer bought Mobility Foundations in their seeded history (demo_history).
+    assert rooms_courses["Mobility Foundations"]["reason"] == "entitled"
     plan = ok(screen.call("POST", "/sedens/room/course/session", {"course_id": cid,
                                                                   "session_id": rooms_courses["Morning Mobility"]["outline"][0]["sessions"][0]["id"]}))
     assert plan["session"]["steps"][0]["image_media_id"] == picture["id"]

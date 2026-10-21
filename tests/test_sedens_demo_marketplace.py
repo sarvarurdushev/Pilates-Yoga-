@@ -70,7 +70,10 @@ def test_demonstrations_never_see_each_other(sedens):
 
 
 def test_a_demo_purchase_is_simulated_and_grants_the_course(sedens):
-    customer, other = student(sedens), student(sedens, OTHER)
+    # The first demonstration customer already bought it in their (labelled) seeded history, so a second
+    # member makes the purchase here (see test_sedens_demo_history.py for the first one's).
+    customer = sedens.repo.actor(sedens.repo.demo_login(KEY, "student", f"demo-{KEY}-student01"))
+    other = student(sedens, OTHER)
     with sedens.db() as db:
         mobility = next(c for c in marketplace.catalog(sedens, db, customer) if c["title"] == "Mobility Foundations")
         bought = marketplace.purchase(sedens, db, customer, mobility["id"])

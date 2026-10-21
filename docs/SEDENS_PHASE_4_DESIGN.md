@@ -312,6 +312,14 @@ the existing demo checkout) course sessions with pinned versions, steps with a f
 4–6, and two seeded demo scans (`source='demo_precomputed'`, same protocol and versions, both clear)
 with a small, unremarkable difference. Every item is labelled "Demo data". No improvement narrative.
 
+Decisions pinned by `tests/test_sedens_demo_history.py`: the seeded scans carry `measurement_version='demo'`
+(as the room's own demo scan does; made-up numbers are never attributed to the measurement code); the
+audit log keeps the true time of the seed (only enrollment, entitlement and purchase dates are moved);
+the customer's free-text feedback note stays empty. Known gap, on purpose: no camera consent, readiness
+check or recommendation row is seeded, because seeding a consent would skip the consent step the live
+demo is meant to show; a fresh demo therefore shows two stored scans with no consent record, and the
+first real visit asks for consent as usual.
+
 ## 9. Frontend (Parts 3, 16)
 
 `web/src/sedens/passport.js` (+ `passport.css`, `strings-passport.js` en/ko), routes in `app.js`:

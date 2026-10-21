@@ -335,6 +335,18 @@ def _complete(sedens, db, scan, measurements, *, measurement_version, model, err
     own = feedback.interpret(measurements, locale="en")
     previous = _previous(db, {**scan, "measurement_version": measurement_version, "model": model,
                               "reliability": own["quality"], "summary": {"evaluated": own["evaluated"]}})
+    base = store_result(db, scan, measurements, previous, measurement_version=measurement_version, model=model,
+                        error=error)
+    analytics.record(db, "scan_completed", org_id=scan["org_id"], user_id=scan["student_id"],
+                     room_session_id=scan["room_session_id"], demo=scan["org_id"].startswith("demo-"),
+                     props={"source": scan["source"], "quality": base["quality"],
+                            "observations": len(base["observations"]), "failed": bool(error)})
+
+
+def store_result(db, scan, measurements, previous, *, measurement_version, model, error="", completed_at=None) -> dict:
+    """Write a finished scan's customer summary (both languages, against ``previous`` measurements),
+    reliability, versions, observations and view qualities. Returns the English interpretation.
+    Also how the demonstration persona's seeded scans are stored, so they read exactly like a room's."""
     rendered = {loc: feedback.interpret(measurements, locale=loc, previous=previous) for loc in ("en", "ko")}
     base = rendered["en"]
     label = LABELS[scan["source"]]
@@ -347,7 +359,7 @@ def _complete(sedens, db, scan, measurements, *, measurement_version, model, err
     db.execute("UPDATE s_room_scans SET state=?, reliability=?, focus=?, summary=?, measurement_version=?, model=?, "
                "feedback_rules_version=?, completed_at=?, error=? WHERE id=?",
                ("failed" if error else "complete", base["quality"], base["focus_hint"], encode(stored),
-                measurement_version, model, feedback.CURRENT, now(), error, scan["id"]))
+                measurement_version, model, feedback.CURRENT, completed_at or now(), error, scan["id"]))
     for e in base["evaluated"]:
         db.execute("INSERT OR REPLACE INTO s_room_scan_observations(scan_id,rule_id,metric,value,unit,outcome,reason,"
                    "threshold) VALUES (?,?,?,?,?,?,?,?)",
@@ -356,10 +368,7 @@ def _complete(sedens, db, scan, measurements, *, measurement_version, model, err
     for view, part in base["views"].items():
         db.execute("UPDATE s_room_scan_views SET quality=? WHERE scan_id=? AND view=?",
                    (part["quality"], scan["id"], view))
-    analytics.record(db, "scan_completed", org_id=scan["org_id"], user_id=scan["student_id"],
-                     room_session_id=scan["room_session_id"], demo=scan["org_id"].startswith("demo-"),
-                     props={"source": scan["source"], "quality": base["quality"],
-                            "observations": len(base["observations"]), "failed": bool(error)})
+    return base
 
 
 def latest_complete(db, room_session_id) -> dict | None:
