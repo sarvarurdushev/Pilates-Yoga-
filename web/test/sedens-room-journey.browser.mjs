@@ -5,6 +5,13 @@
  * B. the coach's included course; C. the professor's course after a simulated purchase;
  * D. the access checks; then the Korean room and a phone-sized room.
  *
+ * Phase 4: DEMO-1001 (Sarah Kim) now has a seeded, labelled "Demo data" history and already follows
+ * all three programs. Part A and the Korean and phone-sized rooms still use her. The first-time checks
+ * of B, C and D (a course offered as "Included with your membership", the purchase of a paid course,
+ * the access refusals) need a customer who has not enrolled, so they use DEMO-1002, who has an active
+ * membership and no seeded history; the facility administrator books the room for her first, as a
+ * front desk would. The seeded customer's own "continue your program" choice is checked in B too.
+ *
  * The scan step needs the free demonstration host's scan options, so start the server with
  * SEDENS_MODE=demo_free. The camera is Chromium's fake device.
  * Usage: MOTION_BASE_URL=http://127.0.0.1:8145 CHROMIUM=/path/to/chrome \
@@ -258,6 +265,34 @@ await page.locator("[data-end-confirm]").click();
 await page.getByRole("button", { name: /DEMO-1001/ }).waitFor();
 await identify(page);
 assert.equal(await passportVisits(page), visitsBefore + 1, "the finished session is a new visit in the Passport");
+// The seeded customer already follows the programs: the choice offers her next session first.
+await readiness(page);
+await skipScan(page);
+assert.match(await text(page), /Continue your program/i);
+assert.ok(await page.locator("[data-course][data-session]").count(), "the next session of an enrolled program can be continued");
+await page.locator("[data-end-visit]").click();
+await page.locator("[data-end-confirm]").click();
+await page.getByRole("button", { name: /DEMO-1001/ }).waitFor();
+// A customer who has not enrolled yet: DEMO-1002 (active membership, no booking and no seeded history). The facility
+// administrator books the room for her.
+const admin = await open({ name: "admin" });
+await admin.page.goto(base + "/");
+await admin.page.locator('[data-demo="admin"]').click();
+await admin.page.waitForLoadState("networkidle");
+const where = await page.evaluate(async () => (await (await fetch("/sedens/room/device")).json()));
+const booking = await admin.page.evaluate(async ([student, device]) => {
+  const now = Date.now();
+  const response = await fetch("/platform/save", {
+    method: "POST", headers: { "Content-Type": "application/json", "X-Platform-Request": "1", "X-Sedens-Request": "1" },
+    body: JSON.stringify({ collection: "reservations", item: {
+      student_id: student, coach_id: student.replace(/-student01$/, "-coach0"), location_id: device.location.id, room_id: device.room.id,
+      starts_at: new Date(now - 10 * 60000).toISOString(), ends_at: new Date(now + 90 * 60000).toISOString(),
+      status: "reserved", session_type: "AI Private Room", detail: { demo: true } } }),
+  });
+  return { status: response.status, text: await response.text() };
+}, [`demo-${key}-student01`, where]);
+assert.equal(booking.status, 200, `the facility administrator can book the room for DEMO-1002: ${booking.text}`);
+await identify(page, /DEMO-1002/);
 await readiness(page);
 await skipScan(page);
 const views = (await journeyView(page)).choice.courses;
@@ -292,7 +327,12 @@ console.log("PASS B: the coach's included course plays its enrolled version with
 // ======================================================================================
 const phone = await open({ viewport: PHONE, name: "phone" });
 await phone.page.goto(base + "/");
-await phone.page.locator('[data-demo="student"]').click();
+// The phone belongs to the same customer as the room visit: DEMO-1002's account (the "student" button is DEMO-1001).
+const phoneIn = await phone.page.evaluate(async ([k, student]) => (await fetch("/sedens/demo/enter", {
+  method: "POST", headers: { "Content-Type": "application/json", "X-Sedens-Request": "1" },
+  body: JSON.stringify({ role: "student", key: k, user_id: student }) })).status, [key, `demo-${key}-student01`]);
+assert.equal(phoneIn, 200);
+await phone.page.reload();
 await phone.page.waitForLoadState("networkidle");
 const catalog = await phone.page.evaluate(async () => (await (await fetch("/sedens/courses/catalog")).json()));
 const mobility = (catalog.courses || catalog.items || catalog).find((c) => c.title === "Mobility Foundations");
@@ -338,10 +378,6 @@ console.log("PASS C: the purchased professor's course is offered only after the 
 // ======================================================================================
 // D. Access checks
 // ======================================================================================
-const admin = await open({ name: "admin" });
-await admin.page.goto(base + "/");
-await admin.page.locator('[data-demo="admin"]').click();
-await admin.page.waitForLoadState("networkidle");
 let changed = await post(admin.page, "facility/courses/setting", { course_id: core.course_id, enabled: false, included: false, featured: false });
 assert.equal(changed.status, 200);
 refused = await raw(page, "course/start", { expect: "session_choice", course_id: core.course_id });
@@ -371,7 +407,7 @@ assert.ok([403, 404].includes(refused.status), `another facility: ${refused.stat
 // A closed room session cannot start anything.
 await page.locator("[data-end-visit]").click();
 await page.locator("[data-end-confirm]").click();
-await page.getByRole("button", { name: /DEMO-1001/ }).waitFor();
+await page.getByRole("button", { name: /DEMO-1002/ }).waitFor();
 refused = await raw(page, "course/start", { expect: "session_choice", course_id: core.course_id });
 assert.ok([401, 403].includes(refused.status), `after the room session ended: ${refused.status}`);
 console.log("PASS D: no launch from a phone, another facility, an ended room session, a disabled or suspended course, or without the purchase");

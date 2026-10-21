@@ -125,6 +125,10 @@ await customer.page.goto(base + "/");
 await customer.page.locator("#signin [name=email]").fill(customerEmail);
 await customer.page.locator("#signin [name=password]").fill("seongsu morning walk");
 await customer.page.locator("#signin button").click();
+// Signed in. On a phone the name and "Sign out" sit behind the header's account button (Phase 4 header), so the
+// button is the sign that the sign-in worked; open it and "Sign out" is there.
+await customer.page.locator("[data-account]").waitFor();
+await customer.page.locator("[data-account]").click();
 await customer.page.locator("[data-signout]").waitFor();
 await customer.page.goto(base + "/#/passport/privacy");
 await customer.page.getByRole("heading", { name: "로그인 기록" }).waitFor();

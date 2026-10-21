@@ -210,15 +210,10 @@ await shot(page, "04-scans");
 
 // -- programs -------------------------------------------------------------------------------------
 await visit(page, "#/passport/programs", "Programs");
-assert.match(await bodyText(page), /You are not enrolled in a course yet/);
-// Enrol in the facility's included course through the catalogue API, then the card appears.
-const enrolled = await page.evaluate(async () => {
-  const headers = { "Content-Type": "application/json", "X-Sedens-Request": "1" };
-  const catalog = await (await fetch("/sedens/courses/catalog", { headers })).json();
-  const course = catalog.items.find((c) => c.title.startsWith("4-Week"));
-  return (await fetch("/sedens/courses/enroll", { method: "POST", headers, body: JSON.stringify({ course_id: course.id }) })).status;
-});
-assert.equal(enrolled, 200);
+// The demonstration customer follows the programs the Phase 4 persona was seeded with; if seeding broke, this fails.
+// (Enrolling is covered by the DEMO-1002 flow in sedens-room-journey.browser.mjs.)
+assert.ok(/of \d+ sessions done/.test(await bodyText(page)), "the seeded persona follows programs (no 'not enrolled' sentence)");
+assert.doesNotMatch(await bodyText(page), /You are not enrolled in a course yet/);
 await page.reload();
 await page.locator("main h1", { hasText: "Programs" }).waitFor();
 await page.locator(".pp-program").first().waitFor();
