@@ -24,6 +24,7 @@ A policy exists for **every** `s_*` table. Export refuses to run while any `s_*`
 | `s_crm_member_links` | this organization | CRM member reference to client | as is |
 | `s_consents` | this organization | every consent decision (append-only history) | as is, linked to the restored people |
 | `s_events` | this organization | local analytics events | as is (integer ids renumbered) |
+| `s_account_events` | this organization's customers | sign-in activity: links created, passwords chosen by the customer, refused staff changes, sessions ended (Phase 4) | as is, linked to the restored people; `actor_id` is kept only for people inside the archive. Restored passwords are empty (platform rule), so each restored customer needs a new sign-in link. |
 | `s_media_objects` | course files this organization owns | title, kind, size, the file itself (`sedens-media/` in the archive) | each file passes the upload checks again (byte sniffing, image re-encoding, PDF active-content refusal, size limits) and is stored under a new name; a refused or missing file refuses the whole restore. Repository illustrations are re-linked from the registry, never from the archive. |
 | `s_media_rights` | rights of those files | licence, original creator, source and licence links, restrictions, identifiable person, attestation | a SEDENS rights **approval** returns to review (`unreviewed`); a rejection stays. Reviewer names are left out. |
 | `s_verification_evidence` | evidence this organization's creators offered | description, link, document | as is |
@@ -39,6 +40,7 @@ A policy exists for **every** `s_*` table. Export refuses to run while any `s_*`
 | `s_room_devices.token_hash`, `s_room_sessions.token_hash` | live credentials; restored screens pair again, restored sessions are closed |
 | `s_room_device_pairings` (codes, secrets) | short-lived pairing credentials |
 | `s_room_access_codes` | single-use room codes |
+| `s_account_links` | one-time customer sign-in links: live credentials (Phase 4) |
 | `s_affiliation_ledger` | this server's record of affiliation decisions, which restores are checked against |
 | `s_demo_layers` | which demonstration content this server seeded |
 | `s_schema` | this server's migration ledger |

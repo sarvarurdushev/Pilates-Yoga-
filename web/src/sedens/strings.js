@@ -9,7 +9,9 @@ import { ROOM_JOURNEY } from "./strings-room-journey.js";
 import { ROOM_SCAN } from "./strings-room-scan.js";
 import { ROOM_PLAYER } from "./strings-room-player.js";
 import { USAGE } from "./strings-usage.js";
+import { REQUESTS } from "./strings-requests.js";
 import { PASSPORT } from "./strings-passport.js";
+import { ACCOUNT } from "./strings-account.js";
 
 export const STRINGS = {
   en: {
@@ -385,7 +387,7 @@ export const STRINGS = {
 };
 
 // Each Phase 2 and Phase 3 area keeps its copy in its own file; a key defined twice is a mistake.
-for (const part of [STUDIO, MARKET, ROOM_COURSES, ROOM_JOURNEY, ROOM_SCAN, ROOM_PLAYER, PASSPORT, USAGE]) {
+for (const part of [STUDIO, MARKET, ROOM_COURSES, ROOM_JOURNEY, ROOM_SCAN, ROOM_PLAYER, PASSPORT, USAGE, ACCOUNT, REQUESTS]) {
   for (const language of ["en", "ko"]) {
     for (const [key, value] of Object.entries(part[language])) {
       if (key in STRINGS[language]) throw new Error(`Duplicate SEDENS string: ${language}.${key}`);

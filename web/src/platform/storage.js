@@ -11,7 +11,7 @@ export function storage(root) {
     ) +
     card(
       "Restore a studio",
-      `<p>Restore into a new, empty studio. All relationships are rebuilt with new IDs. Your current administrator login remains active; set new passwords for restored accounts in Clients and Coaches.</p>${notice("Existing client data is never replaced. To recover after a storage reset, create a studio, then upload its saved archive here.")}<label class="file-button">Choose organization backup<input id="backup-file" type="file" accept=".zip,application/zip"></label><button id="restore" class="primary">Restore selected backup</button><p id="restore-status" role="status"></p>`,
+      `<p>Restore into a new, empty studio. All relationships are rebuilt with new IDs. Your current administrator login remains active; set new passwords for restored staff accounts in Coaches. Restored clients choose their own password from a sign-in link created in the SEDENS facility console.</p>${notice("Existing client data is never replaced. To recover after a storage reset, create a studio, then upload its saved archive here.")}<label class="file-button">Choose organization backup<input id="backup-file" type="file" accept=".zip,application/zip"></label><button id="restore" class="primary">Restore selected backup</button><p id="restore-status" role="status"></p>`,
     );
   root.querySelector("#restore").onclick = async () => {
     const file = root.querySelector("#backup-file").files[0],

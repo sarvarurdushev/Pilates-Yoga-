@@ -48,9 +48,21 @@ def unpack(row):
 
 
 class Refused(Exception):
-    def __init__(self, message, status=400):
+    def __init__(self, message, status=400, code=None):
         super().__init__(message)
         self.status = status
+        # Optional stable machine-readable code (SEDENS ``Denied`` sets its own).
+        self.code = code
+
+
+class CustomerAccountRefused(Refused):
+    """Staff tried to choose a customer's password or change a signed-up customer's
+    email (docs/SEDENS_SECURITY_MODEL.md section 11). ``event`` is what the customer
+    is shown under "Sign-in activity" once the refused transaction is rolled back."""
+
+    def __init__(self, message, code, user_id, event):
+        super().__init__(message, 409, code)
+        self.user_id, self.event = user_id, event
 
 
 @dataclass(frozen=True)
@@ -689,11 +701,12 @@ class Repository:
                 raise Refused("Only administrators can inspect users.", 403)
             result = []
             for identifier in ids:
-                u = unpack(
-                    db.execute(
-                        "SELECT * FROM p_users WHERE id=?", (identifier,)
-                    ).fetchone()
-                )
+                row = db.execute(
+                    "SELECT * FROM p_users WHERE id=?", (identifier,)
+                ).fetchone()
+                u = unpack(row)
+                # Whether the person can sign in yet; never the hash itself.
+                u["has_password"] = bool(row["password_hash"])
                 u["roles"] = [
                     r[0]
                     for r in db.execute(
@@ -1455,6 +1468,36 @@ class Repository:
         )
 
     def save_person(self, actor, item):
+        try:
+            return self._save_person(actor, item)
+        except CustomerAccountRefused as refused:
+            # The save was rolled back; the attempt is still shown to the customer.
+            if refused.user_id:
+                self._account_event(actor, refused.user_id, refused.event)
+            raise
+
+    def _account_event(self, actor, user_id, kind, db=None):
+        """One ``s_account_events`` row (a SEDENS table: skipped when SEDENS never
+        migrated this database). Repeats by the same person within a minute are one row."""
+        if db is None:
+            with self.db() as conn:
+                return self._account_event(actor, user_id, kind, conn)
+        if not db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='s_account_events'"
+        ).fetchone():
+            return
+        recent = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+        if db.execute(
+            "SELECT 1 FROM s_account_events WHERE user_id=? AND kind=? AND actor_id=? AND at>?",
+            (user_id, kind, actor.user_id, recent),
+        ).fetchone():
+            return
+        db.execute(
+            "INSERT INTO s_account_events(id,user_id,org_id,kind,actor_id,at) VALUES (?,?,?,?,?,?)",
+            (uid(), user_id, actor.org_id, kind, actor.user_id, now()),
+        )
+
+    def _save_person(self, actor, item):
         if actor.role == "student":
             raise Refused("Only coaches or administrators manage clients.", 403)
         identifier = item.get("id") or uid()
@@ -1505,10 +1548,45 @@ class Repository:
                     raise Refused(
                         "Keep at least one administrator in the organization."
                     )
+            old_roles = (
+                [r[0] for r in db.execute("SELECT role FROM p_roles WHERE user_id=?", (identifier,))]
+                if old
+                else []
+            )
+            # Customers choose their own password through a one-time sign-in link
+            # (pilates/sedens/accounts.py). An account that holds, or is given, the
+            # student role is a customer's even when it also holds a staff role,
+            # because a session can switch to any role its account holds.
+            if item.get("password") and ("student" in roles or "student" in old_roles):
+                raise CustomerAccountRefused(
+                    "Customers choose their own password. Create a sign-in link for them "
+                    "in the SEDENS facility console instead.",
+                    "customer_sets_password",
+                    identifier if old else None,
+                    "staff_password_refused",
+                )
+            if old and "student" in old_roles and old["password_hash"]:
+                # A customer who already signs in keeps the email they sign in with.
+                if "email" not in item:
+                    email = old["email"]
+                elif email != str(old["email"]).lower().strip():
+                    raise CustomerAccountRefused(
+                        "This customer already signs in with their email, so it cannot be changed here.",
+                        "customer_email_locked",
+                        identifier,
+                        "staff_email_refused",
+                    )
+            # Taking the customer role away and giving it back must not let staff choose
+            # the password in between (docs/SEDENS_SECURITY_MODEL.md section 11.3): when
+            # someone else's existing account gains the student role, any password it had
+            # is cleared and every sign-in ends, so the customer needs a link they can see.
+            gains_customer = bool(old) and "student" in roles and "student" not in old_roles
+            loses_customer = bool(old) and "student" in old_roles and "student" not in roles
+            someone_else = identifier != actor.user_id
             hashed = (
                 password_hash(item["password"])
                 if item.get("password")
-                else (old["password_hash"] if old else "")
+                else ("" if gains_customer and someone_else else old["password_hash"] if old else "")
             )
             if not actor.demo:
                 duplicate = db.execute(
@@ -1535,6 +1613,21 @@ class Repository:
             db.executemany(
                 "INSERT INTO p_roles VALUES (?,?)", [(identifier, r) for r in roles]
             )
+            if someone_else and (gains_customer or loses_customer):
+                # Gaining: every session ends (a session can switch to any role its
+                # account holds). Losing: the customer sessions end instead of waiting
+                # for the role to come back. Either way the customer is shown who did it.
+                db.execute(
+                    "DELETE FROM p_sessions WHERE user_id=?"
+                    + ("" if gains_customer else " AND role='student'"),
+                    (identifier,),
+                )
+                self._account_event(
+                    actor,
+                    identifier,
+                    "customer_role_added" if gains_customer else "customer_role_removed",
+                    db,
+                )
             if "student" in roles:
                 db.execute(
                     "INSERT INTO p_students(id,born,goal,height_cm,weight_kg) VALUES (?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET born=excluded.born,goal=excluded.goal,height_cm=excluded.height_cm,weight_kg=excluded.weight_kg",
@@ -1614,7 +1707,11 @@ class Repository:
                   OR NOT EXISTS (SELECT 1 FROM p_coach_locations cl WHERE cl.coach_id=p_reservations.coach_id AND cl.location_id=p_reservations.location_id))""",
                 (actor.org_id, now(), identifier, identifier),
             )
-            self.audit(db, actor, "save:user", identifier, {"roles": roles})
+            self.audit(db, actor, "save:user", identifier, {
+                "roles": roles,
+                "password_set": bool(item.get("password")),
+                "email_changed": bool(old) and email != old["email"],
+            })
         return {"id": identifier}
 
     def delete(self, actor, collection, identifier):

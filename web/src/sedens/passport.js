@@ -187,7 +187,11 @@ export const privacy = (ctx) =>
   open(ctx, {
     title: t("pp.priv_title"),
     active: "privacy",
-    load: () => get("passport/privacy"),
+    // Sign-in activity is its own route; the page still opens when only that part fails (null).
+    load: async () => {
+      const [data, activity] = await Promise.all([get("passport/privacy"), sedens("passport/account-activity").catch(() => null)]);
+      return { ...data, sign_in_activity: activity };
+    },
     draw: (data, { back }) => view.privacyPage(data, { back }),
     bind: (data) => bindPrivacy(ctx, data),
   });

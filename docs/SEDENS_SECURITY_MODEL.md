@@ -1,4 +1,4 @@
-# SEDENS security model (Phases 1–3)
+# SEDENS security model (Phases 1–4)
 
 Scope: what is enforced on the server in Phase 1, how, and what is not built yet. Everything here is checked in `pilates/sedens/*` and tested in `tests/test_sedens_*.py`. The page never decides access; it only shows what the server returned.
 
@@ -28,7 +28,7 @@ A self-declared creator type (`coach`, `professor`, `expert`) is descriptive met
 
 Demonstration and real organizations never grant into each other. Every grant and revocation writes `p_audit` (`sedens:capability:grant|revoke`).
 
-**The SEDENS organization's `admin` role is trusted like `sedens_admin`.** The coaching workspace lets any administrator manage every account of their organization (passwords, emails, roles); that is unchanged platform behaviour. So reviewers are `coach` accounts, which cannot manage staff, and the SEDENS `admin` role is given only to SEDENS platform administrators. Inside the SEDENS organization, granting or revoking `creator` and listing staff with their permissions (`GET /sedens/facility/people`) need `sedens_admin`; a plain administrator there gets `not_permitted`. The command-line bootstrap creates the first administrator with `sedens_admin` only.
+**The SEDENS organization's `admin` role is trusted like `sedens_admin`.** The coaching workspace lets any administrator manage every account of their organization (passwords, emails, roles); that is unchanged platform behaviour, except that since Phase 4 customers' passwords and signed-up customers' emails are no longer set by staff (§11). So reviewers are `coach` accounts, which cannot manage staff, and the SEDENS `admin` role is given only to SEDENS platform administrators. Inside the SEDENS organization, granting or revoking `creator` and listing staff with their permissions (`GET /sedens/facility/people`) need `sedens_admin`; a plain administrator there gets `not_permitted`. The command-line bootstrap creates the first administrator with `sedens_admin` only.
 
 ## 2. Organizations
 
@@ -59,7 +59,7 @@ Facility administrators see only the creator's public profile fields (display na
 | 4 | **Matching scope**: the session's device, room, location and organization equal the device's. | `room_scope_mismatch` (403) |
 | 1 | An **authenticated customer**: the session's customer was authenticated at entry (room access code or authenticating CRM credential) and is still an active user with the `student` role in that organization. For facilities without a CRM, the customer must also still be assigned to the room's location (otherwise the session is ended as `location_unassigned`). If any account is signed in on the screen, even the customer's own, the request is refused: such a sign-in would outlive the room session. | `customer_not_active`, `not_assigned_to_location`, `account_signed_in` |
 
-A customer's sign-in alone fails at (2). A paired screen without a room session fails at (3). Administrators and coaches cannot obtain a room code or start a room session with their own sign-in (`customer_required`) and cannot use a customer's session (`account_signed_in`); see §8 for staff who set a customer's password. Outside a room, `GET /sedens/library/preview` returns counts only.
+A customer's sign-in alone fails at (2). A paired screen without a room session fails at (3). Administrators and coaches cannot obtain a room code or start a room session with their own sign-in (`customer_required`) and cannot use a customer's session (`account_signed_in`); see §11 for how customers' passwords are set since Phase 4. Outside a room, `GET /sedens/library/preview` returns counts only.
 
 ### Opening a room session (`POST /sedens/room/enter`)
 
@@ -97,7 +97,7 @@ Room access codes are never cookies: they are typed by the customer and stored o
 
 All are `HttpOnly; SameSite=Strict`, plus `Secure` over HTTPS. Tokens are 32 random bytes (`secrets.token_urlsafe`); only SHA-256 hashes are stored. Expired or ended room sessions clear the `sedens_room` cookie in the response.
 
-Every `/sedens/` POST requires `X-Sedens-Request: 1` and, when the browser sends `Origin`, an origin matching `Host` (the same rule as `/platform/`). In-memory rate limits per visitor address: pairing start 10/min, room entry 20/min, room codes 10/min, demo 10/min, creator registration 5/min, pairing confirmation 20/min, affiliation requests and withdrawals 10/min, course file uploads and course imports 12/min (Phase 2; at most two received at once on the whole server). Behind a recognised hosting proxy (Render, Hugging Face Spaces) the visitor address is the right-most `X-Forwarded-For` hop (appended by the proxy), so one visitor cannot exhaust a limit for everyone; elsewhere the socket address is used and the header is ignored. Empty buckets are pruned. Error responses carry a stable `code` and never echo credentials.
+Every `/sedens/` POST requires `X-Sedens-Request: 1` and, when the browser sends `Origin`, an origin matching `Host` (the same rule as `/platform/`). In-memory rate limits per visitor address: pairing start 10/min, room entry 20/min, room codes 10/min, demo 10/min, creator registration 5/min, pairing confirmation 20/min, affiliation requests and withdrawals 10/min, course file uploads and course imports 12/min (Phase 2; at most two received at once on the whole server). Since Phase 4: choosing a password from a sign-in link 15/min (the same as `/platform/auth/login`), creating sign-in links 20/min. Behind a recognised hosting proxy (Render, Hugging Face Spaces) the visitor address is the right-most `X-Forwarded-For` hop (appended by the proxy), so one visitor cannot exhaust a limit for everyone; elsewhere the socket address is used and the header is ignored. Empty buckets are pruned. Error responses carry a stable `code` and never echo credentials.
 
 ## 6. Consent and analytics
 
@@ -119,7 +119,7 @@ Every `s_*` foreign key cascades or nulls (never RESTRICT), and every `SET NULL`
 - QR scanning uses typed or keyboard-wedge input; camera QR scanning is not built.
 - No cross-organization identity: a coach who also coaches members in a second facility still needs a separate account there (the platform allows one organization per email). Affiliations cover content distribution only.
 - Room access codes need the customer to sign in on their own phone first; a printed or CRM-issued QR code is the alternative for customers without a phone.
-- Room codes trust the platform sign-in on the customer's phone. The coaching workspace lets an administrator (any account in the organization) or a coach (their assigned customers) set a customer's password, and the platform audits that only as a profile save. Staff who did so could sign in as the customer, ask for a room code and record consents in their name. This is pre-existing platform behaviour; customer-set passwords (a reset link instead of a staff-chosen password) are planned with customer accounts.
+- Room codes trust the platform sign-in on the customer's phone. Until Phase 4 the coaching workspace let an administrator or a coach (their assigned customers) set a customer's password, so staff could sign in as the customer, ask for a room code and record consents in their name. **Phase 4 closed this:** customers choose their own password from a one-time link and staff can no longer set it or change a signed-up customer's email. What remains (an administrator who creates a link could use it; passwords set before Phase 4) is in section 11.
 - Inactivity is measured by room requests. Phase 3 keeps this rule: a room request made because the workout advanced (a step finished, by a tap or by automatic next) counts as activity, but no background timer does. After three automatic advances with no touch at all the player pauses and asks whether the customer is still there; a paused workout then idles out after `SEDENS_ROOM_IDLE_MINUTES` like any screen (`docs/SEDENS_SESSION_PLAYER.md`).
 - Booking rules (`require_booking`, early-entry grace) apply only to a provider that can see bookings (`checks_bookings`: today the demonstration CRM). A facility without a CRM cannot switch them on (`booking_rules_need_crm`); its customers assigned to a location may enter that location's rooms at any time. Using the platform's own reservations as a booking source would be a future adapter.
 - The Phase 1 room library is the platform's existing exercise catalog, which the coaching workspace and its public demonstration already show. The room gate protects SEDENS room routes, not the catalog text.
@@ -219,3 +219,220 @@ succeeded; no server change was needed. The tests stay as regression checks.
 | 13 | Raw media URL bypass | the course picture from an anonymous client, the customer's phone, another facility's room and an ended room; guessed scan photo addresses | all `404` (or `405`); only a live, entitled room reads it |
 | 14 | Session resume hijack | the room cookie on another paired screen, on a phone, with no device cookie, and replayed after the visit ended | `401`/`403`; the real screen is unaffected |
 | 15 | Forged analytics changing state | server-only events (`workout_completed`, `safety_stop`, `exercise_completed`, …) posted by the screen; the screen's own events with positions | `400 server_event`; the screen's events are recorded and change no state |
+
+## 11. Phase 4: customer accounts
+
+Customers, coaches, administrators and creators all sign in through the one shared platform login
+(`POST /platform/auth/login`, `Repository.login`, `p_users`/`p_sessions`). Until Phase 4 the only way a
+customer got a password was a member of staff typing one into the workspace person form
+(`POST /platform/people/save` → `Repository.save_person`), so staff could always sign in as a customer,
+open their Passport and record consent in their name. Phase 4 changes who chooses a customer's
+password, and nothing else about sign-in. This section records the compatibility analysis made
+*before* the change (11.1), what changed (11.2), how it is tested (11.3), and the migration proposal
+with the risk that remains (11.4).
+
+### 11.1 Compatibility analysis (written before the change)
+
+**Who calls `save_person` today, and with what.** Found by searching the repository for
+`save_person`, `people/save` and `password` (Python, JavaScript, browser tests, tools):
+
+| Caller | Sets a password? | Sets an email? | Effect of Phase 4 |
+|---|---|---|---|
+| `web/src/platform/forms.js` (workspace "Clients" and "Coaches" form) | Optional "Set password" field for every account | Yes, every save | The field is hidden for customer accounts, with a plain note on how customers get a sign-in link. Coach and administrator forms keep it. A save that still sends a password for a customer is refused (`409 customer_sets_password`). |
+| `pilates/platform/http.py` `people/save` | passes the body through | passes through | Error responses now also carry `code` when the refusal has one; `error` is unchanged. |
+| `tools/verify_hosted_platform.py` (hosted check) | No (creates a disposable client) | No | None. |
+| `tests/test_platform.py::test_real_sessions_and_role_conversion` | No | No (student → coach conversion) | None: the account has no password, so its email is not locked. |
+| `tests/test_capture_media_labels.py`, `tests/test_visit_record_links.py`, `tests/test_backup_verify.py`, `tests/test_progress_evidence.py` | No | No | None. |
+| `tests/test_sedens_backup.py` (three calls) | No | Yes, on creation | None: a new account has no password, so setting its first email is allowed. |
+| `tests/test_sedens_http.py::test_a_reviewer_cannot_take_over_sedens_accounts` | Yes, a coach tries to set an administrator's password | Yes | Still `403` (the role rule runs first and is unchanged). Kept as is. |
+| Platform demo seed (`pilates/platform/seed.py`), SEDENS demo layer (`pilates/sedens/demo.py`) | No: demo people are inserted directly, without passwords | — | None. Demonstration customers sign in through `demo_login`, which never checks a password. |
+| `Repository.create_org`, SEDENS onboarding (`register_creator_studio`, `bootstrap_sedens_org`) | Yes, the new owner's own password | Yes | None: these never touch customer accounts. |
+| Organization restore (`pilates/platform/backup.py`) | Clears every restored password (`password_hash=""`) | — | None. Restored customers now get a setup link instead of a staff-set password; the restore page wording says so. |
+| Test fixtures (`tests/sedens_support.py` `add_user`) | No: inserts users without passwords and signs them in with `repo.issue` | — | None. |
+| Browser journeys (`web/test/*.browser.mjs`) | Only `/platform/auth/register` (a new owner) | — | None. |
+
+No seed, onboarding step, demonstration or test sets a password or changes the email of an
+existing customer account. The older studio system (`accounts`, `auth_sessions`, `pilates/auth.py`,
+its recovery codes and `admin_reset`) is a separate table set that SEDENS does not use; it is not touched.
+
+**What changes for each kind of person.**
+
+- *Customers* (accounts holding the `student` role): staff can no longer choose or change their
+  password, and cannot change the email of a customer who already has a password. A facility
+  administrator creates a one-time sign-in link; the customer opens it and chooses a password
+  themselves. Every sign-in they had ends when they do. Their Passport shows "Sign-in activity".
+  A customer who already has a staff-set password keeps it and keeps signing in with it until they
+  use a reset link (no password is invalidated by the migration).
+- *Coaches*: they lose the ability to set a password or change the email of their assigned
+  customers who already sign in. Everything else in the person form (name, goal, locations, a new
+  customer's first email) is unchanged. They cannot create sign-in links (administrator only).
+- *Administrators*: unchanged for staff accounts (coaches and administrators without the `student`
+  role): they still set passwords and emails there. For customers they use "Create sign-in link" in
+  the SEDENS facility console.
+- *Demonstrations*: unchanged. Demonstration customers sign in from the demonstration page without a
+  password; sign-in links are not issued in a demonstration (`409 demo_no_password`).
+
+**Which accounts count as a customer's.** The brief names "accounts whose roles are exactly
+student". An account holding `student` *and* a staff role is refused too, because the platform lets
+an account switch to any role it holds (`POST /platform/auth/switch`): an administrator could otherwise
+add `coach` to a customer, set a password, sign in, switch to the customer role and open the Passport.
+Staff accounts without the `student` role are unchanged. A person who is both staff and customer gets
+their password from a sign-in link like any customer.
+
+**Compatibility risks, and how each is handled.**
+
+1. *A new customer has no way to sign in* (there was no invitation flow). Handled by the setup link
+   (72 hours), issued from the SEDENS facility console.
+2. *A customer who forgets their password* had only staff to ask. Handled by the reset link (30 minutes);
+   a customer-initiated reset needs a verified channel and is proposed in 11.4.
+3. *A script or integration that sends `password` for customers* now gets `409 customer_sets_password`
+   with a plain message instead of silently succeeding. None exists in this repository.
+4. *Saving a claimed customer's profile without an `email` field* used to reset the email to a
+   placeholder; for a customer who has a password the email is now kept when the field is absent, and a
+   different email is refused (`409 customer_email_locked`).
+5. *Existing staff-set passwords stay valid* until the customer resets. They are not revoked by the
+   migration, because that would lock every existing customer out at once with no notice. A facility
+   that wants to end them issues a reset link per customer (which ends all sessions when used).
+
+### 11.2 What Phase 4 changed
+
+- **`Repository.save_person`** (`pilates/platform/repository.py`) refuses a `password` for any account
+  that holds, or is being given, the `student` role: `409`, `code: customer_sets_password`. It refuses a
+  different email for an account that holds the `student` role and already has a password: `409`,
+  `code: customer_email_locked` (no `email` field keeps the current one). Both checks run inside the save
+  transaction; after the rollback the attempt is written to `s_account_events` (`staff_password_refused`,
+  `staff_email_refused`, at most one row per person and kind per minute) when the SEDENS tables exist.
+  The `save:user` audit row now also records `password_set` and `email_changed`. Everything else in
+  `save_person` (role rules, coach scope, the last-administrator rule) is unchanged and runs first.
+- **Role changes** (`save_person`, same transaction). When someone else's existing account *gains* the
+  `student` role, its password is cleared and every `p_sessions` row of that account is deleted (a session
+  can switch to any role its account holds), and `customer_role_added` is recorded: getting back in needs a
+  sign-in link, which the customer sees. When someone else's account *loses* the `student` role, its
+  customer sessions are deleted (they no longer wait for the role to come back) and
+  `customer_role_removed` is recorded. Without this, an administrator could remove the role, set a
+  password and email while the account was staff-only, give the role back and sign in as the customer
+  with nothing in their activity (found in review). An administrator who changes their own roles keeps
+  their own password and session.
+- **Account consent** (`GET`/`POST /sedens/consents`) is for customer sessions only (`passport.customer`,
+  `403 passport_customer_only` otherwise). Every consent text is a customer's, and a staff session of an
+  account that was temporarily staff-only could otherwise record a decision under the customer's id.
+  `Refused` takes an optional `code`, which `/platform/` and `/sedens/` error responses include.
+- **`GET /platform/me`** people entries carry `has_password` (a boolean, never the hash), so the
+  workspace form can explain a locked email.
+- **Migration `0021_customer_accounts.sql`**: `s_account_links` and `s_account_events` as in the design,
+  with two additions: `s_account_links.superseded_at` (a newer link ends an older unused one; kept apart
+  from `used_at` so the history says which happened) and `s_account_events.purpose` (setup or reset, for
+  `link_issued`), and one more event kind, `staff_email_refused`, so a refused email change is as visible
+  to the customer as a refused password.
+- **`pilates/sedens/accounts.py`, `accounts_http.py`** (routes):
+  - `GET /sedens/facility/customers`: a facility administrator's customers, whether each can sign in,
+    and the expiry of any open link (never the link).
+  - `POST /sedens/facility/people/link {user_id, purpose}`: administrator of a `facility` organization
+    only (`admin_required`, `facility_required`); the user must be an active customer of that same
+    organization (`customer_not_found` otherwise, so other organizations' ids are not confirmed);
+    `setup` only while the customer has no password (`already_set_up`); refused in a demonstration
+    (`demo_no_password`). 32 random bytes (`secrets.token_urlsafe(32)`), only the SHA-256 stored; setup
+    72 hours, reset 30 minutes; older unused links of that customer are superseded; `link_issued`
+    recorded; the link `/#/account/setup?token=...` is returned once. Rate limit 20 per minute per address.
+  - `POST /sedens/account/password {token, password}`: no session; the token is in the body only (the
+    page reads it from the part of the address after `#`, which browsers never send, and removes it from
+    the address bar). The platform's own rules and hash (`password_hash`: 10 to 1024 characters, PBKDF2
+    600 000) are checked first, so a rule error says nothing about the link. Then, in one `BEGIN
+    IMMEDIATE` transaction: the link is found by hash and must be unused, not superseded, unexpired, in a
+    non-demonstration organization and for a still-active customer; it is marked used with a conditional
+    update; other open links of that customer are superseded; the password is written; **every
+    `p_sessions` row of that user is deleted, their unused room access codes are cancelled and their live
+    room sessions end** (`revoked`, `password_changed`; room entry never checks `p_sessions`);
+    `password_set_by_customer` and `sessions_revoked` are recorded, plus a `p_audit` row. Unknown, used, superseded, expired and malformed links all get the same
+    `400 link_not_valid` and message. The response also clears this browser's `motion_session` cookie.
+    Rate limit 15 per minute per address, the same as `/platform/auth/login`.
+  - `GET /sedens/passport/account-activity`: the customer's own events, newest first (at most 50),
+    behind the same `passport.customer` guard as every Passport route (staff get
+    `403 passport_customer_only`). Each item says whether the customer or a member of staff (by name)
+    did it, except a password chosen through a link (`by: "link"`): whoever held the link chose it, so the
+    line says "A new password was chosen with a sign-in link" and asks the customer to get a reset link
+    if it was not them, instead of telling them they did it.
+- **Backups.** `s_account_links` is never archived (live credentials, like room codes); `s_account_events`
+  is per-organization history and is archived; `actor_id` joins the attribution columns that are emptied
+  for people outside the archive. Restored passwords are empty (unchanged platform rule), so restored
+  customers get a new setup link. Because the exporting administrator is restored as whoever restores, an
+  event of the exporter is restored without a name ("Someone at your facility") unless the same person
+  restores, so a customer is never told the restorer created a link they did not create.
+- **Pages.** The facility console has a "Customer sign-in" panel (create link, shown once with a copy
+  button and its expiry). `#/account/setup` lets the link holder choose a password twice, then says they
+  are signed out everywhere and asks them to sign in. The workspace person form hides the password field
+  whenever the client role is ticked (and for coaches always), explains the link, and shows a locked email
+  as read-only. The Passport privacy page shows "Sign-in activity". English and Korean
+  (`web/src/sedens/strings-account.js`); the coaching workspace is English-only as before.
+
+### 11.3 Tests
+
+`tests/test_sedens_customer_accounts.py` (27 tests, over HTTP against a running server unless noted):
+a coach of an assigned customer and an administrator cannot set a customer's password (repository and
+HTTP) and the attempt is shown to the customer; giving a customer a staff role does not open that path;
+removing the customer role, setting a password and email while the account is staff-only and giving the
+role back leaves no password and no session (the customer's own session ended at the removal, the staff
+session cannot switch to the customer role), refuses a consent in between, and shows both role changes
+to the customer; a staff member given the customer role loses their staff-set password and sessions,
+while an administrator changing their own roles does not;
+neither can change a signed-up customer's email, while profile saves keep working; staff password changes
+still work and a coach still cannot change a coach's; link issuance is for the customer's own facility
+administrator only (coach, customer, other facility's administrator, creator-studio administrator, coach
+with the creator permission and signed-out callers refused; staff accounts get no link); the token is 32
+random bytes stored only as its hash with the right expiry; single use; unknown, malformed, superseded and
+expired links get one identical answer; password rules leave the link usable; demonstration organizations
+get no links and a planted demonstration link is unusable, while demonstration sign-in still works; using a
+link ends every session of that customer (old cookies get `401`) and no one else's, and also their live
+room session and unused room code; activity is visible only to the customer and does not credit the
+customer with a link holder's password; the route is rate limited; a staff session cannot read or record
+account consent (`403`), with or without a customer's id; the Passport refuses staff; no login or room entry accepts
+phone digits (no phone column, login matches email only, `phone` methods unknown, a phone-like room code
+refused, a member number alone or with a phone-like PIN refused, the real PIN accepted); platform sign-in is
+still throttled per address; backup policies, and a real export and restore (no link hash in the archive,
+no links or passwords restored, activity restored without naming the restorer).
+`web/test/sedens-account.test.mjs` covers the page copy and
+that the token is only ever in a request body; `web/test/sedens-accounts.browser.mjs` is the browser journey.
+
+### 11.4 Migration proposal and the risk that remains
+
+**What is now true.** No member of staff can choose or change the password of an account while it holds
+the customer role, and an account that gains the customer role loses any password and session it had, so a
+password staff chose while it was staff-only never reaches the customer role. A customer's password is set
+only by whoever holds a one-time link that a facility administrator created, and using it ends every
+existing session, room session and unused room code, so access obtained earlier with a staff-set password
+stops working. Staff sessions cannot read or record account consent. The customer can see every link
+created for them and by whom, every password chosen with a link, every refused staff attempt, and every
+time their customer role was taken away or given back, and by whom.
+
+**What is not prevented (stated plainly).**
+
+- *An administrator who creates a link could open it themself* and so choose the customer's password.
+  Phase 4 makes this visible (the customer's sign-in activity names who created the link; the customer's
+  own sessions end, so they notice when they are signed out; `p_audit` records it) but cannot prevent it,
+  because the link is handed over by the facility and the server has no channel that only the customer
+  controls.
+- *Passwords set by staff before Phase 4 stay valid* until the customer uses a reset link. Staff who set
+  one still know it. The facility can end them by creating a reset link for each customer.
+- *While an administrator has taken the customer role away*, the account is a staff account: they can set
+  its password and change its email (the email lock applies only while it holds the customer role), sign in
+  with it and act with the staff role under that person's id. That session cannot open the Passport, record
+  consent or enter a room, and it ends when the customer role is given back, together with the password.
+  The customer sees "turned off customer access" and "turned on customer access" with the administrator's
+  name once they sign in again, but an email changed in between stays changed until the facility corrects
+  it; getting back in still needs a link, which is listed too. Each step is also in `p_audit`.
+- Rate limits are per process and per address (as in section 8); there is no per-account lockout.
+
+**Next steps, and what each needs.** None needs paid infrastructure in Phase 4; each needs something the
+free demonstration does not have.
+
+| Step | What it gives | What it needs |
+|---|---|---|
+| Verified customer e-mail | The link is sent to the customer's own inbox instead of through staff, so an administrator never sees it; a later email change needs a link sent to the old address. | An outgoing mail service (SMTP or a transactional mail provider) with a verified sender domain, bounce handling and per-recipient rate limits. `pilates/mail.py` exists for the older studio system and could be reused. |
+| Verified phone (SMS or KakaoTalk message) | The same, for customers who do not use e-mail; common in Korea. The phone number is a delivery channel only: digits of a phone number are never accepted as a credential. | An SMS or KakaoTalk business messaging provider (per-message cost), sender registration, consent for messaging, and storing phone numbers (new personal data with a retention rule). |
+| Customer-initiated reset ("Forgot password") | No staff involvement at all for a forgotten password. | One of the two channels above; a generic answer that never confirms whether an account exists. |
+| Passkeys (WebAuthn) | Phishing-resistant sign-in with no password to share or reuse. | A stable HTTPS origin (a fixed domain, not a changing free-host address), a credentials table, and a recovery path (one of the channels above). |
+| Per-account lockout | Slows a guessing attack spread over many addresses. | Persistent counters per account (a table, or shared storage when there is more than one process), with a lockout that the customer can lift through a verified channel so it cannot be used to lock someone out. |
+
+Until a verified channel exists, the facility's process should be: create the link only when the customer is
+present or has asked for it, give it to them directly, and ask the customer to check "Sign-in activity" in
+their Passport.

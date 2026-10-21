@@ -25,6 +25,7 @@ from urllib.parse import parse_qs, urlparse
 
 from . import (analytics, capabilities, consent, course_http, course_media, creators, crm, demo, demo_marketplace,
                journey, library, onboarding, passport_http, plans, rooms, scans, usage_http, workouts)
+from . import accounts_http, data_requests_http, passport
 from ..platform import http as platform_http
 from ..platform.repository import Refused
 from .util import Denied, environment
@@ -32,7 +33,7 @@ from .util import Denied, environment
 _LIMITS = defaultdict(deque)
 _LIMIT_LOCK = threading.Lock()
 RATE = {"pairing": 10, "enter": 20, "demo": 10, "register": 5, "confirm": 20, "code": 10, "affiliation": 10,
-        "upload": 12}
+        "upload": 12, "account_password": 15, "account_link": 20}
 
 
 def _client(h):
@@ -311,12 +312,16 @@ def _room_consent(r):
 def _consents(r):
     actor = r.actor()
     with r.sedens.db() as db:
+        # Every consent text is a customer's: a staff session (even of an account that
+        # was a customer's, docs/SEDENS_SECURITY_MODEL.md section 11.3) cannot read or record one.
+        passport.customer(r.sedens, db, actor)
         return {"texts": consent.texts(), "current": consent.current(db, actor.user_id)}
 
 
 def _consent_save(r):
     actor = r.actor()
     with r.sedens.db() as db:
+        passport.customer(r.sedens, db, actor)
         return {"current": consent.record(
             db, org_id=actor.org_id, user_id=actor.user_id, kind=r.body.get("kind"), granted=r.body.get("granted"),
             text_version=r.body.get("text_version"), channel="account", demo=actor.demo,
@@ -579,6 +584,8 @@ ROUTES = {
 ROUTES.update(course_http.ROUTES)
 ROUTES.update(passport_http.ROUTES)
 ROUTES.update(usage_http.ROUTES)
+ROUTES.update(accounts_http.ROUTES)
+ROUTES.update(data_requests_http.ROUTES)
 STREAMS = {**course_http.STREAMS, **passport_http.STREAMS, ("POST", "room/scan/image"): _scan_image}
 
 
@@ -619,7 +626,7 @@ def dispatch(h, method, route):
             cookies.append(_cookie(h, rooms.ROOM_COOKIE, "", "/sedens/", 0))
         _respond(h, payload, exc.status, cookies)
     except Refused as exc:
-        code = "sign_in_required" if exc.status == 401 else "refused"
+        code = "sign_in_required" if exc.status == 401 else getattr(exc, "code", None) or "refused"
         _respond(h, {"error": str(exc), "code": code}, exc.status, request.set_cookies)
     except Exception as exc:  # noqa: BLE001 - mapped to safe messages below
         from ..api import Refused as RequestRefused

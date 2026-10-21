@@ -7,6 +7,7 @@
 import { t, lang } from "./i18n.js";
 import { esc, date } from "./ui.js";
 import { PASSPORT_SECTIONS } from "./passport-routes.js";
+import { activitySection } from "./account-render.js";
 
 const number = (value) => (Number.isFinite(Number(value)) ? Number(value) : 0);
 const list = (value) => (Array.isArray(value) ? value : []);
@@ -509,7 +510,7 @@ function erasureBlock(requests) {
   const rows = list(requests);
   const open = rows.find((r) => r.state === "received");
   const history = rows
-    .map((r) => `<li>${esc(t("pp.req_state", { date: date(r.requested_at), state: requestState(r.state) }))}${r.state === "received" ? ` <button class="sd-ghost" data-withdraw-request="${esc(r.id)}">${esc(t("pp.erase_withdraw"))}</button>` : ""}</li>`)
+    .map((r) => `<li>${esc(t("pp.req_state", { date: date(r.requested_at), state: requestState(r.state) }))}${r.state === "received" ? ` <button class="sd-ghost" data-withdraw-request="${esc(r.id)}">${esc(t("pp.erase_withdraw"))}</button>` : ""}${r.note ? `<br><span class="pp-muted">${esc(t("pp.req_note", { text: r.note }))}</span>` : ""}</li>`)
     .join("");
   const form = open
     ? ""
@@ -519,7 +520,7 @@ function erasureBlock(requests) {
 
 export function privacyBody(data) {
   const stored = list(data.stored);
-  return `${section("pp-stored", t("pp.priv_stored"), `<ul class="pp-bullets">${stored.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>`)}${consentRows(data.consent)}${photosBlock(data.photos)}${erasureBlock(data.requests)}${section("pp-export", t("pp.export_title"), `<p>${esc(t("pp.export_body"))}</p><p class="pp-muted">${esc(t("pp.export_photos", { n: number(data.photos?.retained) }))}</p><a class="sd-button" href="/sedens/passport/export" download>${esc(t("pp.export_link"))}</a>`)}`;
+  return `${section("pp-stored", t("pp.priv_stored"), `<ul class="pp-bullets">${stored.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>`)}${consentRows(data.consent)}${"sign_in_activity" in data ? activitySection(data.sign_in_activity) : ""}${photosBlock(data.photos)}${erasureBlock(data.requests)}${section("pp-export", t("pp.export_title"), `<p>${esc(t("pp.export_body"))}</p><p class="pp-muted">${esc(t("pp.export_photos", { n: number(data.photos?.retained) }))}</p><a class="sd-button" href="/sedens/passport/export" download>${esc(t("pp.export_link"))}</a>`)}`;
 }
 
 export function privacyPage(data, { back = "" } = {}) {

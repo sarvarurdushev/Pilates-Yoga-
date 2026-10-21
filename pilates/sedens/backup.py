@@ -133,6 +133,8 @@ POLICIES: dict[str, Policy] = {
     "s_session_feedback": Policy(True, "customers' own effort and discomfort reports", json=()),
     "s_passport_preferences": Policy(True, "customers' own Passport preferences", json=()),
     "s_data_requests": Policy(True, "customers' Passport requests (such as erasure) and the facility's decision"),
+    "s_account_events": Policy(True, "customers' own sign-in activity (links created, passwords chosen, refused staff changes)",
+                               json=()),
     "s_demo_layers": Policy(False, "which demonstration content this server seeded"),
     "s_demo_activity": Policy(False, "when this server's demonstrations were created and last used"),
     "s_schema": Policy(False, "this server's migration ledger"),
@@ -142,13 +144,14 @@ POLICIES: dict[str, Policy] = {
     "s_affiliation_ledger": Policy(False, "this server's record of affiliation decisions, which restores are checked against"),
     "s_room_device_pairings": Policy(False, "short-lived pairing codes and secrets"),
     "s_room_access_codes": Policy(False, "single-use room access codes"),
+    "s_account_links": Policy(False, "one-time customer sign-in links (live credentials; a restored customer gets a new link)"),
 }
 INCLUDED = frozenset(t for t, p in POLICIES.items() if p.include)
 # Attribution columns: who did something. Emptied when that person is outside the archive.
 ATTRIBUTION = {
     "granted_by", "revoked_by", "verified_by", "requested_by", "decided_by",
     "created_by", "updated_by", "confirmed_by", "uploaded_by", "attested_by",
-    "reviewed_by", "reviewer_id", "submitted_by", "paused_by",
+    "reviewed_by", "reviewer_id", "submitted_by", "paused_by", "actor_id",
 }
 MEDIA_PREFIX = "sedens-media/"
 RESTORED_VERSION = "Restored from a backup: this version was published. Confirm it to publish it again."
@@ -630,6 +633,11 @@ def restore_row(ctx: RestoreContext, table, original, mapping):
     for column in _user_columns(ctx.meta, table) & ATTRIBUTION:
         if row.get(column) is not None and ("p_users", row[column]) not in mapping:
             row[column] = None
+    if (table == "s_account_events" and row.get("actor_id") == ctx.manifest["exporter_id"]
+            and ctx.manifest["exporter_id"] != ctx.actor.user_id):
+        # The exporter is restored as whoever restores; a customer's sign-in activity
+        # must not name that person for links or changes they never made.
+        row["actor_id"] = None
     external, conflict = set(), None
     if table == "s_org_profiles":
         conflict = "org_id"

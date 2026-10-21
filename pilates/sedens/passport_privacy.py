@@ -92,7 +92,8 @@ def _photo_views(db, me) -> list[dict]:
 
 def _requests(db, me) -> list[dict]:
     return [{"id": r["id"], "kind": r["kind"], "state": r["state"], "requested_at": r["requested_at"],
-             "decided_at": r["decided_at"], "message": decode(r["detail"], {}).get("message", "")}
+             "decided_at": r["decided_at"], "message": decode(r["detail"], {}).get("message", ""),
+             "note": r["note"] or ""}
             for r in db.execute("SELECT * FROM s_data_requests WHERE user_id=? AND org_id=? "
                                 "ORDER BY requested_at DESC, rowid DESC", (me["user_id"], me["org_id"]))]
 

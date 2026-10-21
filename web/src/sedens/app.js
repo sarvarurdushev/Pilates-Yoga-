@@ -31,6 +31,7 @@ const ROUTES = compile([
   ["facility", "facility"],
   ["facility/courses", "facility_courses"],
   ["facility/usage", "facility_usage"],
+  ["facility/requests", "facility_requests"],
   ["creator", "creator"],
   ["creator/courses/new", "course_new"],
   ["creator/courses/:course", "course_edit"],
@@ -42,6 +43,7 @@ const ROUTES = compile([
   ["courses/:course", "course_detail"],
   ["my", "my_courses"],
   ["account", "account"],
+  ["account/setup", "account_setup"],
   ...PASSPORT_ROUTES,
 ]);
 const MODULES = {
@@ -54,9 +56,11 @@ const MODULES = {
   review_course: ["./review.js", "reviewCourse"],
   facility_courses: ["./catalog.js", "facilityCourses"],
   facility_usage: ["./facility-usage.js", "facilityUsage"],
+  facility_requests: ["./facility-requests.js", "facilityRequests"],
   catalog: ["./catalog.js", "catalog"],
   course_detail: ["./catalog.js", "courseDetail"],
   my_courses: ["./catalog.js", "myCourses"],
+  account_setup: ["./account.js", "setupPage"],
   ...PASSPORT_MODULES,
 };
 
@@ -180,7 +184,7 @@ async function facilityView() {
     return;
   }
   const seq = state.seq;
-  page(`${backLink()}<h1>${esc(t("facility.title"))}</h1><p class="sd-muted">${esc(state.me.organization.display_name)}</p><p><a class="sd-button" href="#/facility/courses">${esc(t("facility.courses_link"))}</a> <a class="sd-button" href="#/facility/usage">${esc(t("usage.nav"))}</a></p><p class="sd-muted">${esc(t("usage.nav_hint"))}</p><div id="facility-body">${notice(t("common.loading"))}</div>`);
+  page(`${backLink()}<h1>${esc(t("facility.title"))}</h1><p class="sd-muted">${esc(state.me.organization.display_name)}</p><p><a class="sd-button" href="#/facility/courses">${esc(t("facility.courses_link"))}</a> <a class="sd-button" href="#/facility/usage">${esc(t("usage.nav"))}</a> <a class="sd-button" href="#/facility/requests">${esc(t("req.nav"))}</a></p><p class="sd-muted">${esc(t("usage.nav_hint"))} ${esc(t("req.nav_hint"))}</p><div id="facility-body">${notice(t("common.loading"))}</div>`);
   const [roomsData, crm, people, affiliations] = await Promise.all([
     sedens("facility/rooms"),
     sedens("facility/crm"),
@@ -216,7 +220,7 @@ async function facilityView() {
         })
         .join("")
     : `<li class="sd-muted">${esc(t("facility.no_affiliations"))}</li>`;
-  $("#facility-body").innerHTML = `<section class="sd-panel"><h2>${esc(t("facility.rooms"))}</h2><p class="sd-muted">${esc(t("facility.rooms_hint"))}</p>${roomList}${rooms.length ? `<form id="pair" class="sd-inline"><label class="sd-field"><span>${esc(t("facility.pair_code"))}</span><input name="code" required autocomplete="off" placeholder="ABCD-EFGH"></label><label class="sd-field"><span>${esc(t("facility.pair_room"))}</span><select name="room_id">${rooms.map((r) => `<option value="${esc(r.id)}">${esc(r.name)} · ${esc(r.location)}</option>`).join("")}</select></label><label class="sd-field"><span>${esc(t("facility.pair_name"))}</span><input name="name" maxlength="80"></label><button class="sd-primary">${esc(t("facility.pair"))}</button><p class="sd-error" role="alert"></p></form>` : ""}</section><section class="sd-panel"><h2>${esc(t("facility.crm"))}</h2><p>${esc(provider)}</p>${crm.simulated ? `<span class="sd-badge warn">${esc(t("common.simulated"))}</span>` : ""}${crm.booking_rules ? `<form id="crm" class="sd-inline"><label class="sd-check"><input type="checkbox" name="require_booking" ${crm.require_booking ? "checked" : ""}> ${esc(t("facility.require_booking"))}</label><label class="sd-field"><span>${esc(t("facility.grace"))}</span><input type="number" min="0" max="120" name="booking_grace_minutes" value="${esc(crm.booking_grace_minutes)}"></label><button>${esc(t("common.save"))}</button></form>` : `<p class="sd-muted">${esc(t("facility.no_booking_rules"))}</p>`}</section><section class="sd-panel"><h2>${esc(t("facility.creators"))}</h2><p class="sd-muted">${esc(t("facility.creators_hint"))}</p><ul class="sd-list">${creatorsList}</ul></section><section class="sd-panel"><h2>${esc(t("facility.affiliations"))}</h2><p class="sd-muted">${esc(t("facility.affiliations_hint"))}</p><p class="sd-muted">${esc(t("facility.aff_grants"))}</p><p>${esc(state.me.organization.demo ? t("facility.code_demo") : t("facility.code", { code: state.me.organization.id }))}</p><ul class="sd-list">${affList}</ul></section>`;
+  $("#facility-body").innerHTML = `<section class="sd-panel"><h2>${esc(t("facility.rooms"))}</h2><p class="sd-muted">${esc(t("facility.rooms_hint"))}</p>${roomList}${rooms.length ? `<form id="pair" class="sd-inline"><label class="sd-field"><span>${esc(t("facility.pair_code"))}</span><input name="code" required autocomplete="off" placeholder="ABCD-EFGH"></label><label class="sd-field"><span>${esc(t("facility.pair_room"))}</span><select name="room_id">${rooms.map((r) => `<option value="${esc(r.id)}">${esc(r.name)} · ${esc(r.location)}</option>`).join("")}</select></label><label class="sd-field"><span>${esc(t("facility.pair_name"))}</span><input name="name" maxlength="80"></label><button class="sd-primary">${esc(t("facility.pair"))}</button><p class="sd-error" role="alert"></p></form>` : ""}</section><section class="sd-panel"><h2>${esc(t("facility.crm"))}</h2><p>${esc(provider)}</p>${crm.simulated ? `<span class="sd-badge warn">${esc(t("common.simulated"))}</span>` : ""}${crm.booking_rules ? `<form id="crm" class="sd-inline"><label class="sd-check"><input type="checkbox" name="require_booking" ${crm.require_booking ? "checked" : ""}> ${esc(t("facility.require_booking"))}</label><label class="sd-field"><span>${esc(t("facility.grace"))}</span><input type="number" min="0" max="120" name="booking_grace_minutes" value="${esc(crm.booking_grace_minutes)}"></label><button>${esc(t("common.save"))}</button></form>` : `<p class="sd-muted">${esc(t("facility.no_booking_rules"))}</p>`}</section><section class="sd-panel"><h2>${esc(t("facility.creators"))}</h2><p class="sd-muted">${esc(t("facility.creators_hint"))}</p><ul class="sd-list">${creatorsList}</ul></section><section class="sd-panel" id="customer-signin" aria-labelledby="customer-signin-title"></section><section class="sd-panel"><h2>${esc(t("facility.affiliations"))}</h2><p class="sd-muted">${esc(t("facility.affiliations_hint"))}</p><p class="sd-muted">${esc(t("facility.aff_grants"))}</p><p>${esc(state.me.organization.demo ? t("facility.code_demo") : t("facility.code", { code: state.me.organization.id }))}</p><ul class="sd-list">${affList}</ul></section>`;
   const pair = $("#pair");
   if (pair)
     pair.onsubmit = async (event) => {
@@ -255,6 +259,9 @@ async function facilityView() {
   act("[data-grant]", (b) => sedens("facility/capabilities", { user_id: b.dataset.grant, capability: "creator", grant: b.dataset.on === "1" }));
   act("[data-decide]", (b) => sedens("facility/affiliations/decide", { id: b.dataset.decide, decision: b.dataset.decision }));
   act("[data-end-affiliation]", (b) => sedens("facility/affiliations/revoke", { id: b.dataset.endAffiliation }));
+  // Customers choose their own password: the administrator creates a one-time sign-in link (account.js).
+  const { customerSignIn } = await import("./account.js");
+  if (!stale(seq)) await customerSignIn($("#customer-signin"), () => stale(seq));
 }
 
 async function accountView() {

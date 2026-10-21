@@ -58,16 +58,22 @@ export async function edit(kind, id, copy = false) {
     save;
   if (kind === "student" || kind === "coach") {
     const role = item.roles || [kind];
+    // Customers choose their own password through a one-time sign-in link, and keep the
+    // email they sign in with (the server refuses both from staff; SEDENS_SECURITY_MODEL.md §11).
+    const emailLocked = role.includes("student") && item.has_password;
     html =
       field("Name", "name", item.name, "text", "required") +
-      field("Email", "email", item.email, "email") +
-      field(
+      field("Email", "email", item.email, "email", emailLocked ? 'readonly aria-describedby="email-locked"' : "") +
+      (emailLocked
+        ? `<p class="muted" id="email-locked">This customer signs in with this email, so it cannot be changed here.</p>`
+        : "") +
+      `<div data-staff-password>${field(
         "Set password · optional for an existing account",
         "password",
         "",
         "password",
         'minlength="10" autocomplete="new-password"',
-      ) +
+      )}</div><p class="muted" data-customer-password>Customers choose their own password. An administrator creates a one-time sign-in link for them in the SEDENS facility console (Customer sign-in) and gives it to them.</p>` +
       field("Date of birth", "born", item.born, "date") +
       area("Personal goal", "goal", item.goal) +
       checks("Locations", "location_ids", me.locations, item.location_ids) +
@@ -91,6 +97,8 @@ export async function edit(kind, id, copy = false) {
         coach_ids: f.getAll("coach_ids"),
       };
       delete body.password_hash;
+      delete body.has_password;
+      if (!body.password) delete body.password;
       await api("people/save", body);
     };
   } else if (kind === "locations") {
@@ -323,6 +331,19 @@ export async function edit(kind, id, copy = false) {
     ? (id ? "Edit coach feedback" : "New coach feedback")
     : (id ? "Edit " + kind : "New " + kind);
   const d = modal(title, html, save);
+  if (kind === "student" || kind === "coach") {
+    // The password field is for staff accounts only; an account with the client role gets a sign-in link.
+    const showPassword = () => {
+      const roles = me.role === "admin" ? [...d.querySelectorAll('[name="roles"]:checked')].map((b) => b.value) : ["student"];
+      const customer = roles.includes("student");
+      const box = d.querySelector("[data-staff-password]");
+      box.hidden = customer;
+      box.querySelector("input").disabled = customer;
+      d.querySelector("[data-customer-password]").hidden = !customer;
+    };
+    d.querySelectorAll('[name="roles"]').forEach((b) => b.addEventListener("change", showPassword));
+    showPassword();
+  }
   if (kind === "notes") {
     const c = state.client;
     const visit = d.querySelector('[name="session_id"]');

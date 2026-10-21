@@ -246,7 +246,8 @@ def dispatch(h, method, route):
                     raise Refused("This platform action is not available.", 404)
         h._json(result)
     except (Refused, RequestRefused) as exc:
-        h._json({"error": str(exc)}, exc.status)
+        code = getattr(exc, "code", None)
+        h._json({"error": str(exc), **({"code": code} if code else {})}, exc.status)
     except (ValueError, TypeError, KeyError) as exc:
         h._json(
             {"error": "Check the form values and required selections, then try again."},

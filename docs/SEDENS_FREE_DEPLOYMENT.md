@@ -65,7 +65,7 @@ Measured locally in `demo_free` mode with `web/test/sedens-room-performance.brow
 - The room screen loads in about 0.2 s (143 kB). The anatomy atlas is not loaded until the player opens: about 4 s and 5.5 MB from accepting a plan, then about 2.3 MB more while the plan is read for the atlas layers the first exercise uses (the viewer loads whole layers, not single structures).
 - A new visitor's demonstration entry takes several seconds while the server builds the fictional facility (slower on the free tier's CPU); it happens once per visitor.
 - The demonstration scan result is instant (precomputed, nothing uploaded).
-- In software WebGL each redraw of the anatomy viewer costs 200–300 ms on the page's thread, and every change the room sends asks for at least three redraws, so a step change took up to about a second (about 70 ms without the viewer); an idle viewer also redraws twice a second as a safeguard. Check this on the real room computer.
+- In software WebGL each redraw of the anatomy viewer costs 200–300 ms on the page's thread, and every change the room sends asks for at least three redraws, so a step change took up to about a second (about 70 ms without the viewer); an idle viewer also redraws twice a second as a safeguard (Phase 4: in the room, `room=1`, once every two seconds and not at all while the page is hidden; numbers in `docs/SEDENS_SESSION_PLAYER.md` §7). Check this on the real room computer.
 
 ## 5. Demonstrations on the free host
 
