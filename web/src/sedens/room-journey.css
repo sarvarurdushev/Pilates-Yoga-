@@ -252,6 +252,9 @@
 .rj-note { margin: 0; }
 .rj-note textarea { min-height: 120px; resize: vertical; font-size: 0.9em; }
 .rj-after p { margin: 0; }
+.rj-upcoming { display: grid; gap: 6px; }
+.rj-upcoming p { margin: 0; }
+.rj-next-time { font-weight: 600; }
 
 @media (prefers-reduced-motion: reduce) {
   .rj-progress > span { transition: none; }

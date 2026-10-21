@@ -216,3 +216,44 @@ body.sd-room-body { font-size: clamp(18px, 1.4vw, 24px); }
 .sd-cue .sd-field { margin: 0; }
 .sd-audio { width: 100%; max-width: 420px; margin-top: 6px; }
 @media (max-width: 640px) { .sd-cue { grid-template-columns: minmax(0, 1fr); align-items: stretch; } }
+
+/* Phase 4: one coherent customer product. A compact header on a phone, targets that stay usable. */
+.sd-header { position: relative; z-index: 10; }
+.sd-brand { min-height: 44px; }
+.sd-back { display: inline-flex; align-items: center; min-height: 44px; }
+/* The title is only a reading target after a route change, not a control: no box around it, even on a direct page load. */
+main h1[tabindex="-1"]:focus, .sd-main h1[tabindex="-1"]:focus { outline: none; }
+.sd-badge-short { display: none; }
+.sd-account { display: flex; align-items: center; gap: 10px; }
+.sd-account-toggle { display: none; }
+.sd-account-toggle svg { width: 22px; height: 22px; display: block; }
+@media (max-width: 640px) {
+  .sd-header { gap: 8px; padding: 8px 16px; }
+  .sd-header:not(.sd-room-header) { flex-wrap: nowrap; }
+  .sd-mark svg { width: 26px; height: 26px; }
+  .sd-word { letter-spacing: 0.2em; font-size: 0.95rem; }
+  .sd-header:not(.sd-room-header) .sd-header-right { flex-wrap: nowrap; gap: 6px; flex: none; }
+  /* The room screen's header carries more (room, simulated, end visit): it may take a second row, never widen the page. */
+  .sd-room-header { flex-wrap: wrap; }
+  .sd-room-header .sd-header-right { flex: 1 1 auto; min-width: 0; gap: 6px; justify-content: flex-end; }
+  .sd-room-header .sd-badge { padding: 2px 8px; font-size: 0.68rem; letter-spacing: 0.04em; }
+  .sd-room-header.rj-header .rj-header-button { min-height: 44px; padding: 0 12px; font-size: 0.8em; }
+  .sd-room-header.rj-header .sd-header-right { gap: 6px; }
+  .sd-header-right button { min-height: 44px; min-width: 44px; padding: 0 12px; }
+  .sd-badge-mode.warn .sd-badge-full, .sd-badge-mode:not(.warn) { display: none; }
+  .sd-badge-mode.warn .sd-badge-short { display: inline; }
+  .sd-badge-mode.warn ~ .sd-badge-org { display: none; }
+  .sd-account-toggle { display: inline-flex; padding: 0; }
+  .sd-account { display: none; }
+  .sd-account.open {
+    display: flex; flex-direction: column; align-items: stretch; gap: 8px; position: absolute; right: 16px; top: calc(100% - 4px);
+    min-width: 220px; max-width: calc(100vw - 32px); padding: 14px 16px; background: var(--sd-surface); border: 1px solid var(--sd-control-line);
+    border-radius: var(--sd-radius); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  }
+  .sd-account.open .sd-muted { overflow-wrap: anywhere; }
+  .sd-account-toggle[aria-expanded="true"] { border-color: var(--sd-accent); color: var(--sd-accent-strong); }
+  .sd-banner { font-size: 0.85rem; padding: 6px 16px; }
+  .sd-main { padding-top: 20px; }
+}
+.sd-consent-title { font-size: 1.05rem; margin: 0 0 6px; }
+.sd-consent .sd-muted { margin: 8px 0 12px; }

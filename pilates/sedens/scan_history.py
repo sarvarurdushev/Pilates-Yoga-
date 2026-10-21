@@ -11,7 +11,7 @@ simply not comparable.
 
 A comparison states measured values and their difference. It never calls a
 change better, worse or an improvement, and says the measurement's
-repeatability has not been established.
+repeatability is not known yet.
 """
 
 from __future__ import annotations
@@ -50,8 +50,8 @@ REASONS = {
 NOT_ENOUGH = {"en": "There isn't enough comparable information yet.",
               "ko": "아직 비교할 수 있는 정보가 충분하지 않아요."}
 NOT_ESTABLISHED = {
-    "en": "How repeatable this measurement is has not been established yet, so a small difference may be ordinary "
-          "variation. It does not mean better or worse.",
+    "en": "We don't know yet how much this measurement varies from one scan to the next, so a small difference may "
+          "be ordinary variation. It does not mean better or worse.",
     "ko": "이 측정이 얼마나 반복해서 같은 값을 보이는지는 아직 확인되지 않았어요. 작은 차이는 평소의 변동일 수 있고, "
           "좋아지거나 나빠졌다는 뜻이 아니에요."}
 

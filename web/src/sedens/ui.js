@@ -9,9 +9,18 @@ export const wordmark = () =>
 
 export function header({ me = null, config = null, onLang } = {}) {
   const mode = config?.mode;
-  const badge = mode ? `<span class="sd-badge ${mode.name === "demo_free" ? "warn" : ""}">${esc(t("mode." + mode.name))}</span>` : "";
-  const demo = me?.organization?.demo ? `<span class="sd-badge warn">${esc(t("common.demo"))}</span>` : "";
-  return `<header class="sd-header"><a class="sd-brand" href="/" aria-label="${esc(t("brand.product"))}">${wordmark()}</a><div class="sd-header-right">${badge}${demo}${me ? `<span class="sd-muted">${esc(t("auth.signed_in_as", { name: me.user.name }))}</span><button class="sd-ghost" data-signout>${esc(t("auth.signout"))}</button>` : ""}<button class="sd-ghost" data-lang>${esc(t("lang.toggle"))}</button></div></header>${
+  const demoMode = mode?.name === "demo_free";
+  // One short "Demo" pill on a phone (the full mode name beside it on a wide screen); the organisation's own demo badge
+  // would only repeat it there.
+  const badge = mode
+    ? `<span class="sd-badge sd-badge-mode ${demoMode ? "warn" : ""}"><span class="sd-badge-full">${esc(t("mode." + mode.name))}</span>${demoMode ? `<span class="sd-badge-short">${esc(t("common.demo"))}</span>` : ""}</span>`
+    : "";
+  const demo = me?.organization?.demo ? `<span class="sd-badge sd-badge-org warn">${esc(t("common.demo"))}</span>` : "";
+  // Signed in: the name and "Sign out" sit inline on a wide screen and behind one account button on a phone.
+  const account = me
+    ? `<button type="button" class="sd-ghost sd-account-toggle" data-account aria-expanded="false" aria-controls="sd-account" aria-label="${esc(t("auth.account"))}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21c1-5 4-7 8-7s7 2 8 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><div class="sd-account" id="sd-account"><span class="sd-muted">${esc(t("auth.signed_in_as", { name: me.user.name }))}</span><button class="sd-ghost" data-signout>${esc(t("auth.signout"))}</button></div>`
+    : "";
+  return `<header class="sd-header"><a class="sd-brand" href="/" aria-label="${esc(t("brand.product"))}">${wordmark()}</a><div class="sd-header-right">${badge}${demo}<button class="sd-ghost" data-lang>${esc(t("lang.toggle"))}</button>${account}</div></header>${
     mode && !mode.storage.persistent ? `<div class="sd-banner" role="note">${esc(t("mode.storage_warning"))}</div>` : ""
   }`;
 }
@@ -22,7 +31,36 @@ export function bindHeader(root, { onLang, onSignOut }) {
     onLang?.();
   });
   root.querySelector("[data-signout]")?.addEventListener("click", () => onSignOut?.());
+  // The account button only matters on a phone, where the name and "Sign out" are folded away; Escape or a click elsewhere closes it.
+  const toggle = root.querySelector("[data-account]");
+  const menu = root.querySelector("#sd-account");
+  if (!toggle || !menu) return;
+  const set = (open, refocus = false) => {
+    menu.classList.toggle("open", open);
+    toggle.setAttribute("aria-expanded", String(open));
+    if (!open && refocus) toggle.focus();
+  };
+  toggle.addEventListener("click", () => set(!menu.classList.contains("open")));
+  menu.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") set(false, true);
+  });
+  toggle.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && menu.classList.contains("open")) set(false, true);
+  });
+  // Keyboard focus leaving the menu (and its button) closes it, so it never stays drawn over the page.
+  const onFocusOut = (event) => {
+    const next = event.relatedTarget;
+    if (next && !menu.contains(next) && !toggle.contains(next)) set(false);
+  };
+  toggle.addEventListener("focusout", onFocusOut);
+  menu.addEventListener("focusout", onFocusOut);
+  if (outsideClick) document.removeEventListener("click", outsideClick);
+  outsideClick = (event) => {
+    if (menu.classList.contains("open") && !menu.contains(event.target) && !toggle.contains(event.target)) set(false);
+  };
+  document.addEventListener("click", outsideClick);
 }
+let outsideClick = null;
 
 export const footer = () => `<footer class="sd-footer"><p>${esc(t("notice.fitness"))}</p><p class="sd-muted">${esc(t("brand.company"))}</p></footer>`;
 

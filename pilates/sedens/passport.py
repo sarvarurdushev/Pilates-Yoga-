@@ -84,8 +84,19 @@ def active_courses(sedens, db, ctx) -> list[dict]:
         out.append({"course_id": item["id"], "title": progress["title"] if progress else item["title"],
                     "enrolled": True, "featured": item["featured"], "reason": item["reason"],
                     "progress": progress})
-    # A course the customer is already following comes first.
-    return sorted(out, key=lambda c: (not c["enrolled"], not c["featured"], c["title"]))
+    # A course the customer is already following comes first, the one most recently worked on first of those:
+    # the same rule the phone's Passport uses for its "current program" (overview), so both screens agree.
+    def recency(c):
+        if not c["enrolled"]:
+            return ""
+        enrollment = access.enrollment(db, ctx.student_id, c["course_id"])
+        last = db.execute("SELECT MAX(completed_at) FROM s_course_progress WHERE enrollment_id=? AND item_kind='session'",
+                          (enrollment["id"],)).fetchone()[0]
+        return last or enrollment["enrolled_at"] or ""
+
+    out.sort(key=lambda c: (not c["featured"], c["title"]))
+    out.sort(key=recency, reverse=True)
+    return sorted(out, key=lambda c: not c["enrolled"])
 
 
 # == the customer's own Passport (phone) ======================================================
@@ -251,7 +262,7 @@ def _workout_card(w, counts, fb, locale) -> dict:
         "status": status, "status_label": STATUS[status][locale], "title": title, "focus": focus,
         "workout_kind": w["kind"],
         "course": {"course_id": w["course_id"], "version": w["course_version"]} if w["kind"] == "course" else None,
-        "active_minutes": round(w["active_seconds"] / 60),
+        "active_minutes": round(w["active_seconds"] / 60), "active_seconds": int(w["active_seconds"] or 0),
         "exercises_completed": c.get("completed", 0), "exercises_skipped": c.get("skipped", 0),
         "exercises_total": sum(c.values()),
         "effort": _effort(fb.get(w["id"]), locale),
@@ -605,6 +616,7 @@ def overview(sedens, db, actor, locale) -> dict:
         "room_visits": sum(v["origin"] == "room" for v in visits),
         "workouts": {s: states.count(s) for s in ("completed", "stopped", "not_finished")},
         "active_minutes": round(sum(w["active_seconds"] for w in workouts) / 60),
+        "active_seconds": int(sum(w["active_seconds"] or 0 for w in workouts)),
         "studio_sessions": len(studio),
         "demo_seed": {"visits": sum(v["origin"] == "demo_seed" for v in visits),
                       "workouts": sum(w["origin"] == "demo_seed" for w in workouts),

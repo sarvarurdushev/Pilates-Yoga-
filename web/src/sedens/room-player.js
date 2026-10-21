@@ -444,6 +444,8 @@ class Player {
       note = t("rp.pace_note");
     } else if (p.kind === "hold") {
       big = t("rp.hold_seconds", { s: p.remaining_s });
+    } else if (p.kind === "timed") {
+      big = t("rp.timed_seconds", { s: p.remaining_s });
     } else if (p.kind === "rest") {
       big = t("rp.rest_seconds", { s: p.remaining_s });
     } else if (p.kind === "switch") {
@@ -680,7 +682,8 @@ class Player {
     const sel = this.sel;
     if (!this.expanded || !sel) {
       const state = this.stepState;
-      const keys = state ? this.drawable(state.mode === "isolate" ? state.structures : state.focus) : [];
+      // A structure's name is only shown in the viewer's language once the viewer has told it (never the raw key).
+      const keys = state ? this.drawable(state.mode === "isolate" ? state.structures : state.focus).filter((k) => this.names[k]) : [];
       line.textContent = keys.length
         ? t(state.mode === "isolate" ? "rp.anatomy_status_isolate" : "rp.anatomy_status_highlight", { name: keys.map((k) => this.nameOf(k)).join(", ") })
         : "";
@@ -963,7 +966,9 @@ class Player {
     box.innerHTML = html;
     box.hidden = !html;
     box.dataset.kind = kind;
-    box.querySelector("button")?.focus({ preventScroll: true });
+    // On the get-ready countdown, focus Pause (not "Start now"): Space then pauses instead of skipping the countdown.
+    const focusTarget = (kind === "transition" && box.querySelector('[data-act="pause"]')) || box.querySelector("button");
+    focusTarget?.focus({ preventScroll: true });
   }
 
   async onClick(event) {
@@ -1082,6 +1087,8 @@ class Player {
     }
     if (this.root.dataset.mode === "ready") return;
     if (event.key === " " || event.key === "Spacebar") {
+      // On a focused button, link or summary, Space does what that control does (and only that); elsewhere it pauses or resumes.
+      if (event.target.closest?.("button, a[href], summary, [role=button]")) return;
       event.preventDefault();
       if (this.root.dataset.mode === "paused") this.resume();
       else this.pause("customer");

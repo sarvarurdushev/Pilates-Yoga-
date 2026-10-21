@@ -118,7 +118,12 @@ function homeView() {
     me?.role === "student" && me.organization.kind === "facility"
       ? `<section class="sd-panel"><h2>${esc(t("home.code_title"))}</h2><p class="sd-muted">${esc(t("home.code_body"))}</p><div id="room-code"></div><button class="sd-primary" id="get-code">${esc(t("home.code_get"))}</button></section>`
       : "";
-  page(`<section class="sd-hero"><p class="sd-eyebrow">${esc(t("brand.product"))}</p><h1>${esc(t("home.title"))}</h1><p class="sd-lead">${esc(t("home.lead"))}</p><a class="sd-primary sd-large" href="/room.html">${esc(t("home.enter"))}</a><p class="sd-muted">${esc(t("home.enter_hint"))}</p></section>${roomCode}${signin}<h2 class="sd-section-title">${esc(t("home.cards"))}</h2><section class="sd-grid">${card(t("home.courses"), t("home.courses_body"), "#/courses")}${me ? card(t("home.my_courses"), t("home.my_courses_body"), "#/my") : ""}${card(t("home.passport"), t("home.passport_body"), "#/passport")}${card(t("home.creator"), t("home.creator_body"), "#/creator")}${card(t("home.facility"), t("home.facility_body"), "#/facility")}${me?.capabilities?.includes("sedens_reviewer") ? card(t("home.review"), t("home.review_body"), "#/review") : ""}${card(t("home.workspace"), t("home.workspace_body"), "/workspace.html")}</section>`);
+  // Customers see their own pages. The tools for coaches, creators and facility staff sit apart, below, and not at all for a signed-in customer.
+  const staffCards =
+    me?.role === "student"
+      ? ""
+      : `<h2 class="sd-section-title">${esc(t("home.staff_title"))}</h2><section class="sd-grid">${card(t("home.creator"), t("home.creator_body"), "#/creator")}${card(t("home.facility"), t("home.facility_body"), "#/facility")}${me?.capabilities?.includes("sedens_reviewer") ? card(t("home.review"), t("home.review_body"), "#/review") : ""}${card(t("home.workspace"), t("home.workspace_body"), "/workspace.html")}</section>`;
+  page(`<section class="sd-hero"><p class="sd-eyebrow">${esc(t("brand.product"))}</p><h1>${esc(t("home.title"))}</h1><p class="sd-lead">${esc(t("home.lead"))}</p><a class="sd-primary sd-large" href="/room.html">${esc(t("home.enter"))}</a><p class="sd-muted">${esc(t("home.enter_hint"))}</p></section>${roomCode}${signin}<h2 class="sd-section-title">${esc(t("home.cards"))}</h2><section class="sd-grid">${card(t("home.courses"), t("home.courses_body"), "#/courses")}${me ? card(t("home.my_courses"), t("home.my_courses_body"), "#/my") : ""}${card(t("home.passport"), t("home.passport_body"), "#/passport")}</section>${staffCards}`);
   $("#get-code")?.addEventListener("click", async () => {
     try {
       const issued = await sedens("access-code", {});
@@ -273,7 +278,8 @@ async function accountView() {
     .map(([kind, text]) => {
       const current = data.current[kind];
       const choice = current ? (current.granted ? t("account.agree") : t("account.disagree")) : t("account.none");
-      return `<li class="sd-consent"><p>${esc(text[lang()] || text.en)}</p><p class="sd-muted">${esc(t("account.current", { choice }))}</p><button data-consent="${kind}" data-version="${esc(text.version)}" data-granted="1">${esc(t("account.agree"))}</button> <button class="sd-ghost" data-consent="${kind}" data-version="${esc(text.version)}" data-granted="0">${esc(t("account.disagree"))}</button></li>`;
+      const label = t("pp.consent_" + kind);
+      return `<li class="sd-consent">${label !== "pp.consent_" + kind ? `<h2 class="sd-consent-title">${esc(label)}</h2>` : ""}<p>${esc(text[lang()] || text.en)}</p><p class="sd-muted">${esc(t("account.current", { choice }))}</p><button data-consent="${kind}" data-version="${esc(text.version)}" data-granted="1">${esc(t("account.agree"))}</button> <button class="sd-ghost" data-consent="${kind}" data-version="${esc(text.version)}" data-granted="0">${esc(t("account.disagree"))}</button></li>`;
     })
     .join("");
   page(`${backLink()}<h1>${esc(t("account.consents"))}</h1><ul class="sd-list">${rows}</ul>`);

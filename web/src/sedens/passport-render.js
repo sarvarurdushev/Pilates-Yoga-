@@ -17,7 +17,11 @@ const word = (prefix, code, fallback) => {
   const text = t(key);
   return text !== key ? text : fallback || String(code ?? "");
 };
-const minutes = (n) => t("pp.unit_minutes", { n: number(n) });
+/** Minutes as people read them. A workout of 1 to 59 seconds is "under a minute", not "0 min"; 0 stays 0 (nothing recorded). */
+const minutes = (n, seconds) => {
+  const s = Number(seconds);
+  return Number.isFinite(s) && s > 0 && s < 60 ? t("pp.under_minute") : t("pp.unit_minutes", { n: number(n) });
+};
 const badge = (text, kind = "") => `<span class="sd-badge ${kind}">${esc(text)}</span>`;
 const demoBadge = (origin) => (origin === "demo_seed" ? badge(t("pp.demo_badge"), "warn") : "");
 
@@ -82,7 +86,7 @@ function roomFacts(card, facility) {
     [t("pp.f_status"), statusLabel(card.status, card.status_label)],
     facility ? [t("pp.f_facility"), facility] : null,
     [t("pp.f_program"), [roomTitle(card), card.focus].filter(Boolean).join(" · ")],
-    [t("pp.f_duration"), minutes(card.active_minutes)],
+    [t("pp.f_duration"), minutes(card.active_minutes, card.active_seconds)],
     [t("pp.f_completed"), String(number(card.exercises_completed))],
     [t("pp.f_skipped"), String(number(card.exercises_skipped))],
     [t("pp.f_effort"), effortText(card.effort) || t("pp.effort_none")],
@@ -125,8 +129,8 @@ function latestWorkout(card, facility) {
   const when = date(card.date);
   const effort = effortText(card.effort);
   const counts = card.exercises_total
-    ? `${t("pp.unit_minutes", { n: number(card.active_minutes) })} · ${t("pp.card_exercises", { n: number(card.exercises_completed) })}`
-    : minutes(card.active_minutes);
+    ? `${minutes(card.active_minutes, card.active_seconds)} · ${t("pp.card_exercises", { n: number(card.exercises_completed) })}`
+    : minutes(card.active_minutes, card.active_seconds);
   return section(
     "pp-latest",
     t("pp.ov_latest"),
@@ -159,22 +163,26 @@ function stats(data) {
   const effort = data.last_effort;
   const items = [
     [t("pp.stat_visits"), String(number(totals.completed_visits))],
-    [t("pp.stat_minutes"), minutes(totals.active_minutes)],
+    [t("pp.stat_minutes"), minutes(totals.active_minutes, totals.active_seconds)],
     [t("pp.stat_effort"), effort ? t("pp.stat_effort_value", { n: number(effort.value) }) : t("pp.stat_effort_none"), !effort],
   ];
   return `<section class="pp-card" aria-labelledby="pp-stats"><h2 id="pp-stats" class="sd-visually-hidden">${esc(t("pp.ov_stats"))}</h2><dl class="pp-stats">${items.map(([k, v, none]) => `<div><dt>${esc(k)}</dt><dd${none ? ' class="pp-stat-none"' : ""}>${esc(v)}</dd></div>`).join("")}</dl></section>`;
 }
+
+/** The next session as the room names it: "<module> · <session>", then "Session n of total" on the next line. */
+const sessionLabel = (next) => [next?.module_title, next?.session_title].filter(Boolean).join(" · ");
+const sessionNumber = (sessions) => Math.min(sessions?.total || 0, (sessions?.done || 0) + 1);
 
 /** The program being followed with its next session, or null when there is none (nextAction takes its place). */
 function currentProgram(data) {
   const program = data.current_program;
   const next = data.next_session;
   if (!program || !next) return null;
-  const place = t("pp.ov_program_position", { m: number(next.module_number), s: number(next.session_number) });
+  const place = t("pp.session_of", { n: number(sessionNumber(program.sessions)), total: number(program.sessions?.total) });
   return section(
     "pp-program",
     t("pp.ov_program"),
-    `<p class="pp-hero-title">${esc(program.title || next.title)}</p>${progress(program.sessions?.done, program.sessions?.total)}<p class="pp-next-session"><strong>${esc(t("pp.ov_program_next"))}:</strong> ${esc(next.session_title || "")}</p><p class="pp-muted">${esc(place)}${next.estimated_minutes ? ` · ${esc(minutes(next.estimated_minutes))}` : ""}</p><p class="pp-room-only">${esc(t("pp.room_only"))}</p><a class="sd-primary pp-cta" href="#/passport/programs">${esc(t("pp.next_program_action"))}</a>`,
+    `<p class="pp-hero-title">${esc(program.title || next.title)}</p>${progress(program.sessions?.done, program.sessions?.total)}<p class="pp-next-session"><strong>${esc(t("pp.ov_program_next"))}:</strong> ${esc(sessionLabel(next))}</p><p class="pp-muted">${esc(place)}${next.estimated_minutes ? ` · ${esc(minutes(next.estimated_minutes))}` : ""}</p><p class="pp-room-only">${esc(t("pp.room_only"))}</p><a class="sd-primary pp-cta" href="#/passport/programs">${esc(t("pp.next_program_action"))}</a>`,
     "pp-next",
   );
 }
@@ -187,7 +195,7 @@ function recent(data) {
       if (c.kind === "studio") {
         return `<li><span class="pp-when">${esc(when)}</span><span>${esc(t("pp.card_studio"))} · ${esc(t("pp.card_exercises", { n: number(c.exercises_completed) }))} ${demoBadge(c.origin)}</span></li>`;
       }
-      return `<li><span class="pp-when">${esc(when)}</span><span>${esc(roomTitle(c))} · ${esc(statusLabel(c.status, c.status_label))} · ${esc(minutes(c.active_minutes))} ${demoBadge(c.origin)}</span></li>`;
+      return `<li><span class="pp-when">${esc(when)}</span><span>${esc(roomTitle(c))} · ${esc(statusLabel(c.status, c.status_label))} · ${esc(minutes(c.active_minutes, c.active_seconds))} ${demoBadge(c.origin)}</span></li>`;
     })
     .join("");
   return section(
@@ -277,7 +285,7 @@ export function workoutDetail(data, { back = "" } = {}) {
     [t("pp.f_facility"), where.facility],
     [t("pp.f_room"), [where.location, where.room].filter(Boolean).join(" · ")],
     [t("pp.f_program"), course ? course.title || w.title : [roomTitle(w), w.focus].filter(Boolean).join(" · ")],
-    [t("pp.f_duration"), `${minutes(w.active_minutes)}${w.planned_minutes ? ` (${t("pp.wk_planned", { n: number(w.planned_minutes) })})` : ""}`],
+    [t("pp.f_duration"), `${minutes(w.active_minutes, w.active_seconds)}${w.planned_minutes ? ` (${t("pp.wk_planned", { n: number(w.planned_minutes) })})` : ""}`],
     [t("pp.f_completed"), String(number(w.exercises_completed))],
     [t("pp.f_skipped"), String(number(w.exercises_skipped))],
     [t("pp.f_effort"), effortText(w.effort) || t("pp.effort_none")],
@@ -357,7 +365,7 @@ export function comparisonPanel(c) {
   return section(
     "pp-cmp",
     t("pp.cmp_title"),
-    `${c.demo ? `<p>${badge(t("pp.cmp_demo"), "warn")}</p>` : ""}<p>${esc(t("pp.cmp_neutral"))}</p><h3>${esc(t("pp.cmp_measured"))}</h3><p>${esc(t("pp.cmp_measured_value", { heading: c.measured?.heading || "", views: viewsText(c.measured?.views) }))}</p><table class="pp-table"><caption class="sd-visually-hidden">${esc(t("pp.cmp_title"))}</caption><thead><tr><td></td><th scope="col">${esc(t("pp.cmp_earlier"))}<small class="pp-muted">${esc(date(c.earlier_date))}</small></th><th scope="col">${esc(t("pp.cmp_later"))}<small class="pp-muted">${esc(date(c.later_date))}</small></th></tr></thead><tbody><tr><th scope="row">${esc(t("pp.cmp_value"))}</th><td>${valueCell(c.earlier_values, u)}</td><td>${valueCell(c.later_values, u)}</td></tr><tr><th scope="row">${esc(t("pp.cmp_difference"))}</th><td colspan="2"><strong>${esc(signed(c.difference, u))}</strong><small class="pp-muted">${esc(t("pp.cmp_difference_note"))}</small></td></tr></tbody></table><p class="pp-muted">${esc(t("pp.cmp_sign"))}</p><h3>${esc(t("pp.cmp_limits"))}</h3><ul class="pp-plain">${limits.map((l) => `<li>${esc(l)}</li>`).join("")}${limits.length < 2 ? `<li>${esc(t("pp.cmp_repeat"))}</li>` : ""}</ul><p class="pp-small">${esc(t("pp.cmp_versions", { m: v.measurement || "", r: v.feedback_rules || "", p: v.protocol || "" }))}</p>`,
+    `${c.demo ? `<p>${badge(t("pp.cmp_demo"), "warn")}</p>` : ""}<p>${esc(t("pp.cmp_neutral"))}</p><h3>${esc(t("pp.cmp_measured"))}</h3><p>${esc(t("pp.cmp_measured_value", { heading: c.measured?.heading || "", views: viewsText(c.measured?.views) }))}</p><table class="pp-table"><caption class="sd-visually-hidden">${esc(t("pp.cmp_title"))}</caption><thead><tr><td></td><th scope="col">${esc(t("pp.cmp_earlier"))}<small class="pp-muted">${esc(date(c.earlier_date))}</small></th><th scope="col">${esc(t("pp.cmp_later"))}<small class="pp-muted">${esc(date(c.later_date))}</small></th></tr></thead><tbody><tr><th scope="row">${esc(t("pp.cmp_value"))}</th><td>${valueCell(c.earlier_values, u)}</td><td>${valueCell(c.later_values, u)}</td></tr><tr class="pp-sign-row"><td colspan="3"><small class="pp-muted">${esc(t("pp.cmp_sign"))}</small></td></tr><tr><th scope="row">${esc(t("pp.cmp_difference"))}</th><td colspan="2"><strong>${esc(signed(c.difference, u))}</strong><small class="pp-muted">${esc(t("pp.cmp_difference_note"))}</small></td></tr></tbody></table><h3>${esc(t("pp.cmp_limits"))}</h3><ul class="pp-plain">${limits.map((l) => `<li>${esc(l)}</li>`).join("")}${limits.length < 2 ? `<li>${esc(t("pp.cmp_repeat"))}</li>` : ""}</ul><details class="pp-why pp-tech"><summary>${esc(t("pp.tech_details"))}</summary><p class="pp-small">${esc(t("pp.cmp_versions", { m: v.measurement || "", r: v.feedback_rules || "", p: v.protocol || "" }))}</p></details>`,
   );
 }
 
@@ -379,7 +387,7 @@ export function scanCard(scan) {
       ? `<p class="pp-muted">${esc(t("pp.scan_compare_ok"))}</p>`
       : "";
   const reliability = word("pp.rel_", scan.reliability, scan.reliability);
-  return `<article class="pp-item pp-scan" id="scan-${esc(scan.id)}" tabindex="-1"><header><h3>${esc(date(scan.date))}</h3>${badge(scanOrigin(scan), scan.origin === "demo_seed" || scan.source === "demo_precomputed" ? "warn" : "info")}</header>${text}${shown.meaning ? `<p class="pp-muted">${esc(shown.meaning)}</p>` : ""}${why}<p class="pp-small">${esc(t("pp.scan_reliability", { value: reliability }))} · ${esc(scan.photos_kept ? t("pp.scan_photos_kept") : t("pp.scan_photos_gone"))}<br>${esc(t("pp.scan_versions", { m: scan.measurement_version || "", r: scan.feedback_rules_version || "" }))}</p></article>`;
+  return `<article class="pp-item pp-scan" id="scan-${esc(scan.id)}" tabindex="-1"><header><h3>${esc(date(scan.date))}</h3>${badge(scanOrigin(scan), scan.origin === "demo_seed" || scan.source === "demo_precomputed" ? "warn" : "info")}</header>${text}${shown.meaning ? `<p class="pp-muted">${esc(shown.meaning)}</p>` : ""}${why}<p class="pp-small">${esc(t("pp.scan_reliability", { value: reliability }))} · ${esc(scan.photos_kept ? t("pp.scan_photos_kept") : t("pp.scan_photos_gone"))}</p><details class="pp-why pp-tech"><summary>${esc(t("pp.tech_details"))}</summary><p class="pp-small">${esc(t("pp.scan_versions", { m: scan.measurement_version || "", r: scan.feedback_rules_version || "" }))}</p></details></article>`;
 }
 
 export function scansPage(scansData, comparison, { back = "" } = {}) {
@@ -400,8 +408,12 @@ export function creatorLine(creator) {
 
 /** One enrolled course. There is no play control: a session is available in the room. */
 export function programCard(p) {
-  const length = p.weeks ? (p.sessions_per_week ? t("pp.prog_length", { weeks: number(p.weeks), per: number(p.sessions_per_week) }) : t("pp.prog_length_weeks", { weeks: number(p.weeks) })) : "";
   const s = p.sessions || {};
+  // The real number of sessions the customer's version holds, with the creator's suggested pace; the declared number of
+  // weeks is not shown, because it need not match the sessions that were actually published.
+  const length = s.total
+    ? p.sessions_per_week ? t("pp.prog_length", { total: number(s.total), per: number(p.sessions_per_week) }) : t("pp.prog_length_total", { total: number(s.total) })
+    : p.weeks ? t("pp.prog_length_weeks", { weeks: number(p.weeks) }) : "";
   const last = p.last_completed
     ? p.last_completed.title
       ? t("pp.prog_last", { title: p.last_completed.title, date: date(p.last_completed.completed_at) })
@@ -411,7 +423,7 @@ export function programCard(p) {
   if (p.completed_at) next = `<p>${esc(t("pp.prog_done", { date: date(p.completed_at) }))}</p>`;
   else if (p.next_session) {
     const n = p.next_session;
-    next = `<p class="pp-next-session"><strong>${esc(t("pp.prog_next"))}:</strong> ${esc(n.session_title || "")}</p><p class="pp-muted">${esc(t("pp.ov_program_position", { m: number(n.module_number), s: number(n.session_number) }))}${n.estimated_minutes ? ` · ${esc(minutes(n.estimated_minutes))}` : ""}</p>${p.next_eligible ? `<p class="pp-room-only">${esc(t("pp.room_only"))}</p>` : ""}`;
+    next = `<p class="pp-next-session"><strong>${esc(t("pp.prog_next"))}:</strong> ${esc(sessionLabel(n))}</p><p class="pp-muted">${esc(t("pp.session_of", { n: number(sessionNumber(s)), total: number(s.total) }))}${n.estimated_minutes ? ` · ${esc(minutes(n.estimated_minutes))}` : ""}</p>${p.next_eligible ? `<p class="pp-room-only">${esc(t("pp.room_only"))}</p>` : ""}`;
   }
   const status =
     p.entitlement && p.entitlement.status !== "active"

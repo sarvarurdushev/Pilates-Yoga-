@@ -2,6 +2,7 @@
 // presence check. Time is passed in, so pause/resume/repeat/refresh are just values.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { segments, workMs, positionAt, afterWork, presenceTracker, SIDE_SWITCH_SECONDS } from "../src/sedens/room-player-clock.js";
 
 test("reps on each side: work per side with a switch between, set rest between sets", () => {
@@ -58,4 +59,27 @@ test("presence check after three automatic advances without a touch", () => {
 test("odd doses are safe", () => {
   assert.ok(workMs({}) >= 1000);
   assert.equal(positionAt(null, 5000).done, true);
+});
+
+test("a step saved with work_seconds and no reps is timed, never 'Rep 1 of 0'", () => {
+  for (const dose of [
+    { mode: "reps", sets: 1, work_seconds: 40, sides: "none" },
+    { mode: "reps", sets: 1, reps: 0, work_seconds: 40, sides: "none" },
+    { sets: 1, reps: null, work_seconds: 40 },
+  ]) {
+    assert.equal(workMs(dose), 40000);
+    const p = positionAt(dose, 10000);
+    assert.equal(p.kind, "timed");
+    assert.equal(p.remaining_s, 30);
+    assert.equal(p.rep, undefined, "no repetition to point at");
+    assert.equal(p.reps, undefined);
+  }
+  // Two sets with a rest keep their shape; a rep-based step with work_seconds still paces reps.
+  assert.deepEqual(segments({ sets: 2, work_seconds: 20, set_rest: 10 }).map((s) => s.kind), ["timed", "rest", "timed"]);
+  assert.equal(positionAt({ mode: "reps", sets: 1, reps: 8, work_seconds: 40 }, 0).kind, "reps");
+});
+
+test("the player draws a timed form whenever reps are 0 or missing", () => {
+  const source = readFileSync(new URL("../src/sedens/room-player.js", import.meta.url), "utf8");
+  assert.match(source, /p\.kind === "timed"[\s\S]{0,80}rp\.timed_seconds/);
 });

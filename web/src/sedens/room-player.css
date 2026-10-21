@@ -41,6 +41,13 @@
 .rp-steps-phase:first-child { padding-top: 0; }
 .rp-steps-item { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; border-bottom: 1px solid var(--sd-line); }
 .rp-steps-item:last-child { border-bottom: 0; }
+/* A room display is wide and not touch: the plan runs in two columns so "Start" stays on the first screen. */
+@media (min-width: 1200px) {
+  .rp-steps { display: block; column-count: 2; column-gap: clamp(32px, 4vw, 64px); }
+  .rp-steps-item, .rp-steps-phase { break-inside: avoid; }
+  .rp-steps-phase { break-after: avoid; }
+  .rp-steps-phase:first-child { padding-top: 0; }
+}
 .rp-steps-min { color: var(--sd-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* Stage: counter, progress, media, caption */
@@ -59,10 +66,11 @@
 .rp-figure figcaption:empty { display: none; }
 .rp-media-label { margin: -6px 0 0; font-size: 0.75em; color: var(--sd-muted); }
 .rp-media-label:empty { display: none; }
+/* A step with an instruction card and no film: a quiet label above the card, not an apology and not a tall box. */
 .rp-nomedia {
-  margin: 0; padding: 18px 22px; border-radius: var(--rp-radius); background: var(--sd-surface-2);
-  color: var(--sd-muted); border-left: 3px solid var(--sd-accent);
+  margin: 0; padding: 0; color: var(--sd-muted); font-size: 0.8em; font-weight: 650; letter-spacing: 0.04em;
 }
+.rp-media:has(.rp-nomedia) { min-height: 0; gap: 10px; }
 .rp-card {
   background: var(--sd-surface); border: 1px solid var(--sd-line); border-radius: var(--rp-radius);
   padding: clamp(16px, 2vw, 26px); display: flex; flex-direction: column; gap: 10px;
@@ -162,6 +170,20 @@ body:has(.rp-expanded) { overflow: hidden; }
 /* Always findable, never alarming: an outlined button set apart from the rest. */
 .rp-unwell { border: 2px solid var(--sd-accent-strong); }
 .rp-controls-more .rp-unwell { margin-left: auto; }
+
+/* A wide room display (1920x1080): the instruction card, the subtitle line and the anatomy panel are a little tighter, so
+   the controls (including "I don't feel well") and the anatomy caption are all on the first screen. */
+@media (min-width: 1200px) {
+  .rp { gap: clamp(14px, 1.2vw, 22px); }
+  .rp-stage { gap: 10px; }
+  .rp-card { padding: 16px 24px; gap: 6px; font-size: 0.92em; }
+  .rp-instructions { gap: 3px; }
+  .rp-caption { min-height: 2.2em; padding: 10px 20px; font-size: clamp(1.2em, 1.9vw, 1.7em); }
+  .rp-controls { gap: 10px; }
+  .rp-controls-main, .rp-controls-more { gap: 10px; }
+  .rp-controls-more button { min-height: 56px; padding: 0 20px; }
+  :root { --rp-anatomy-h: clamp(260px, 36vh, 560px); }
+}
 
 /* Sound and settings */
 .rp-sound { background: var(--sd-surface); border: 1px solid var(--sd-line); border-radius: var(--rp-radius); }

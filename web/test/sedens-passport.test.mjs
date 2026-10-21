@@ -49,7 +49,7 @@ const comparison = {
   comparable: true, earlier: "sc1", later: "sc2", earlier_date: "2026-09-18T09:00:00+00:00", later_date: "2026-10-18T09:00:00+00:00",
   measured: { id: "shoulder_line", heading: "Shoulder line", metric: "shoulder_tilt", views: ["front", "back"], unit: "deg" },
   earlier_values: { views: { front: 1.1, back: 1.3 }, mean: 1.2, unit: "deg" }, later_values: { views: { front: 1.5, back: 1.7 }, mean: 1.6, unit: "deg" },
-  difference: 0.4, text: "x", limitations: ["Measured from estimated keypoints in two still photos.", "How repeatable this measurement is has not been established yet."],
+  difference: 0.4, text: "x", limitations: ["Measured from estimated keypoints in two still photos.", "We don't know yet how much this measurement varies from one scan to the next."],
   versions: { measurement: "2.1", feedback_rules: "sedens-feedback-1.0.0", protocol: "four_view_v1" }, demo: true,
 };
 const REASONS = ["different_customer", "low_quality", "demo_vs_real", "different_protocol", "different_measurement_version", "different_model", "different_rules_version", "observation_withheld"];
@@ -196,7 +196,7 @@ for (const lang of ["en", "ko"]) {
     assert.match(html, /\+0\.40°/);
     assert.match(html, /2\.1/, "versions are shown");
     assert.match(html, /scan-sc2/);
-    assert.match(html, /not been established|확인되지 않았어요/);
+    assert.match(html, /know yet how much this measurement varies|확인되지 않았어요/);
     assert.match(html, /not better or worse|더 낫거나 나쁜 것은 아니에요/);
     assert.doesNotMatch(html, /class="[^"]*(good|bad|better|worse|ok|danger|warn)[^"]*"[^>]*>[^<]*[+−]\d/, "a value is never coloured");
     assert.doesNotMatch(html.replace(/<[^>]+>/g, " "), FORBIDDEN);
@@ -333,3 +333,32 @@ test("the accent has enough contrast: 4.5:1 for text and 3:1 for controls", () =
   for (const s of surfaces.slice(0, 3)) assert.ok(ratio("#6b7480", s) >= 3, `control line on ${s}`);
   assert.ok(ratio("#0b0c0e", "#5dbdb1") >= 4.5, "dark text on the accent");
 });
+
+for (const lang of ["en", "ko"]) {
+  test(`[${lang}] a workout shorter than a minute reads "under a minute"; only a workout with nothing recorded reads 0`, () => {
+    setLang(lang);
+    const under = /under a minute|1분 미만/;
+    const zero = lang === "en" ? /\b0 min\b/ : /(^|[^\d])0분/;
+    const short = { ...completed, active_minutes: 0, active_seconds: 40 };
+    for (const html of [view.historyCard(short), view.workoutDetail({ ...frame, workout: { ...short, steps: [], feedback: null, where: {} } })]) {
+      assert.match(html, under);
+      assert.doesNotMatch(html.replace(/<[^>]+>/g, " "), zero);
+    }
+    const nothing = view.historyCard({ ...completed, active_minutes: 0, active_seconds: 0, exercises_total: 0 });
+    assert.doesNotMatch(nothing, under);
+    assert.match(nothing.replace(/<[^>]+>/g, " "), zero);
+    const noSeconds = view.historyCard({ ...completed, active_minutes: 0, exercises_total: 0 });
+    assert.match(noSeconds.replace(/<[^>]+>/g, " "), zero, "an older server without seconds keeps the minutes it sent");
+    const totals = view.overview({ ...overviewData, totals: { ...overviewData.totals, active_minutes: 0, active_seconds: 25 } }, {});
+    assert.match(totals, under);
+    assert.match(view.overview({ ...overviewData, totals: { ...overviewData.totals, active_minutes: 140, active_seconds: 8400 } }, {}), lang === "en" ? /140 min/ : /140분/);
+  });
+
+  test(`[${lang}] scan version strings are behind a details control, not in the default text`, () => {
+    setLang(lang);
+    const html = view.scanCard(scan("sc1"));
+    const [, visible] = html.split(/<details class="pp-why pp-tech">/);
+    assert.ok(visible, "a details control holds the versions");
+    assert.doesNotMatch(html.split("<details")[0].replace(/<[^>]+>/g, " "), /sedens-feedback|2\.1/);
+  });
+}

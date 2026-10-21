@@ -335,6 +335,7 @@ def test_totals_count_what_was_completed_and_nothing_else(world):
     assert totals["completed_visits"] == 3
     assert totals["workouts"] == {"completed": 4, "stopped": 1, "not_finished": 1}
     assert totals["active_minutes"] == round((600 + 120 + 60 + 300 + 200 + 900) / 60)
+    assert totals["active_seconds"] == 600 + 120 + 60 + 300 + 200 + 900, "seconds are sent so a short workout can read 'under a minute'"
     assert totals["studio_sessions"] == 1
     assert totals["demo_seed"] == {"visits": 1, "workouts": 1, "scans": 1, "studio_sessions": 0}
     assert o["demo"] is False and o["deployment"]["demo_free"] is False and o["deployment"]["notice"] is None
@@ -376,6 +377,7 @@ def test_history_cards_use_the_defined_statuses_and_never_show_drafts(world):
     assert (w1["exercises_completed"], w1["exercises_skipped"], w1["exercises_total"]) == (3, 1, 4)
     assert (w2["exercises_completed"], w2["exercises_skipped"], w2["exercises_total"]) == (1, 0, 3)
     assert w3["exercises_completed"] == 0 and w3["active_minutes"] == 1
+    assert w3["active_seconds"] == 60 and w1["active_seconds"] == 600
     assert w1["active_minutes"] == 10 and w1["effort"] == {"value": 6, "text": "You rated it 6/10"}
     assert w2["effort"] is None and rooms_[world.ids["w5"]]["origin"] == "demo_seed"
     assert w1["origin"] == "room" and w1["title"] == "SEDENS Standard session"

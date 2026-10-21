@@ -719,6 +719,16 @@ def view_part(sedens, db, ctx, journey_row, locale) -> dict:
         if w["safety_category"]:
             out["safety"] = (_urgent(copy, locale) if w["safety_category"] == "urgent"
                              else {"title": None, "body": readiness.unwell_copy(locale)["guidance"]})
+        if given is not None and not w["safety_category"]:
+            # What comes next time: the program being followed (the one the Passport calls current) and its next session.
+            from . import passport
+
+            follow = next((c for c in passport.active_courses(sedens, db, ctx)
+                           if c["enrolled"] and c["progress"] and c["progress"]["next"]), None)
+            if follow is not None:
+                upcoming = follow["progress"]["next"]
+                out["next_up"] = {"course_id": follow["course_id"], "program": follow["progress"]["title"],
+                                  "session": " · ".join(x for x in (upcoming["module_title"], upcoming["session_title"]) if x)}
         if given is not None:
             out["after_feedback"] = (_urgent(copy, locale)["body"] if given["discomfort_urgent"] else
                                      _t(copy["discomfort"]["closing"], locale) if given["discomfort"] == "yes" else

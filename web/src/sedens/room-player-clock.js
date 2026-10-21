@@ -18,6 +18,8 @@ export function segments(dose) {
   const d = dose || {};
   const sets = Math.max(1, d.sets || 1);
   const isHold = d.mode === "hold" || (!!d.hold_seconds && !d.reps);
+  // Work with no repetitions to pace (a step saved with work_seconds only) is timed, whatever the exercise's usual form.
+  const timed = !isHold && !(d.reps > 0);
   const spr = d.seconds_per_rep || DEFAULT_SECONDS_PER_REP;
   const sides = SIDES[d.sides] || SIDES.none;
   const setRest = d.set_rest ?? d.rest_seconds ?? 0;
@@ -29,8 +31,8 @@ export function segments(dose) {
       if (d.work_seconds) seconds = d.work_seconds * (d.sides === "alternate" ? 2 : 1);
       else if (isHold) seconds = (d.hold_seconds || 0) * (d.sides === "alternate" ? 2 : 1);
       else seconds = (d.reps || 0) * spr * (d.sides === "alternate" ? 2 : 1);
-      out.push({ kind: isHold ? "hold" : "reps", set, side, seconds: Math.max(1, Math.round(seconds)),
-                 reps: isHold ? 0 : (d.reps || 0) * (d.sides === "alternate" ? 2 : 1), seconds_per_rep: spr });
+      out.push({ kind: isHold ? "hold" : timed ? "timed" : "reps", set, side, seconds: Math.max(1, Math.round(seconds)),
+                 reps: isHold || timed ? 0 : (d.reps || 0) * (d.sides === "alternate" ? 2 : 1), seconds_per_rep: spr });
     });
     if (set < sets && setRest > 0) out.push({ kind: "rest", set, side: null, seconds: setRest });
   }

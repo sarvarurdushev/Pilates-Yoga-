@@ -52,7 +52,7 @@ test("a comparison is never called better or worse except to say it is neither",
 });
 
 test("repeatability is stated as not established, and the not-enough-information sentence is exact", () => {
-  assert.match(PASSPORT.en["pp.cmp_repeat"], /has not been established/);
+  assert.match(PASSPORT.en["pp.cmp_repeat"], /don't know yet how much this measurement varies/);
   assert.match(PASSPORT.ko["pp.cmp_repeat"], /확인되지 않았어요/);
   assert.equal(PASSPORT.en["pp.not_enough"], "There isn't enough comparable information yet.");
 });

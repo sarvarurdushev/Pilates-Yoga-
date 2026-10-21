@@ -2,7 +2,7 @@
 // never an invoice. Totals only: the server sends no customer names, ids, scans or answers,
 // and this page shows no revenue or sales figures. Rendering is pure (usageHtml) so it can be tested.
 import { sedens, ApiError } from "./api.js";
-import { t } from "./i18n.js";
+import { t, lang } from "./i18n.js";
 import { esc, money, problem } from "./ui.js";
 
 const MONTH = /^(\d{4})-(0[1-9]|1[0-2])$/;
@@ -119,5 +119,5 @@ export async function facilityUsage(ctx) {
     return ctx.page(`${head}${ctx.notice(text, "error")}`);
   }
   if (ctx.stale()) return;
-  ctx.page(`${head}<p class="sd-muted">${esc(ctx.me.organization.display_name)}</p>${usageHtml(data, document.documentElement.lang === "ko" ? "ko" : "en")}`);
+  ctx.page(`${head}<p class="sd-muted">${esc(ctx.me.organization.display_name)}</p>${usageHtml(data, lang() === "ko" ? "ko" : "en")}`);
 }

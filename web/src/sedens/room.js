@@ -913,6 +913,11 @@ function completeScreen(j) {
   if (!pending) state.fb = null;
   else if (state.fb?.id !== w.id) state.fb = { id: w.id, step: "effort", effort: null, discomfort: null, urgent: null, regions: [], when: null, strength: null, still: null, note: "" };
   const after = w.feedback_saved && w.after_feedback && !urgentAfter ? `<section class="rj-card rj-after"><p class="sd-lead">${esc(w.after_feedback)}</p></section>` : "";
+  // What happens next time, once the answers are saved: the program being followed and its next session; a personalized
+  // session says plainly that it is kept in the Passport and does not move a program.
+  const upcoming = w.feedback_saved && !urgentAfter && !J.safetyStopped(w)
+    ? `${w.next_up ? `<p class="rj-next-time">${esc(t("rj.next_time", { program: w.next_up.program, session: w.next_up.session }))}</p>` : ""}${w.kind === "standard" ? `<p class="sd-muted rj-personal-note">${esc(t("rj.personal_note"))}</p>` : ""}`
+    : "";
   // The server refuses another session after a safety stop; an early end is not one.
   const another = !urgentAfter && !J.safetyStopped(w);
   const actions = pending ? "" : `<div class="rj-actions rj-complete-actions">${endButton(true)}${another ? `<button class="sd-large" data-act="workout/another">${esc(t("rj.another"))}</button>` : ""}</div>`;
@@ -926,7 +931,7 @@ function completeScreen(j) {
     <dl class="rj-summary">${rows.map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join("")}</dl>
     <p class="sd-muted rj-saved">${esc(t(stopped ? "rj.saved_incomplete" : "rj.saved"))}</p>
     ${pending ? `<section class="rj-card rj-feedback" id="rj-feedback" aria-live="polite"></section>` : ""}
-    ${after}${actions}
+    ${after}${upcoming ? `<section class="rj-card rj-upcoming">${upcoming}</section>` : ""}${actions}
   </section>`);
   if (pending) feedbackStep(w, m.querySelector("#rj-feedback"), false);
 }
