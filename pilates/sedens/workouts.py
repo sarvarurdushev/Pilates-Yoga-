@@ -22,7 +22,7 @@ import json
 from pathlib import Path
 import re
 
-from . import access, analytics, courses, journey, marketplace, plans, readiness, standard
+from . import access, analytics, courses, journey, marketplace, plans, readiness, standard, video_providers
 from .util import Denied, decode, encode, now, uid
 
 DATA = Path(__file__).resolve().parents[2] / "data"
@@ -114,15 +114,8 @@ def create_standard(sedens, db, ctx, rec) -> str:
 
 
 def _course_step_seconds(step, timing, previous_phase) -> int:
-    dose = {"sides": step.get("sides"), "work_seconds": step.get("work_seconds"), "hold_seconds": step.get("hold_seconds"),
-            "reps": step.get("reps"), "mode": "hold" if step.get("hold_seconds") and not step.get("reps") else "reps"}
-    spr = None
-    ex = step.get("exercise") or {}
-    if ex.get("source") == "standard" and standard.get(ex.get("ref")):
-        spr = standard.get(ex["ref"]).get("seconds_per_rep")
-    sets = max(1, step.get("sets") or 1)
-    return (timing["transition_floor"] + timing["first_demo"] + sets * plans.set_seconds(dose, spr, timing)
-            + sets * (step.get("rest_seconds") or 0))
+    # One formula for the room plan and the creator's narration cue bound.
+    return courses.step_seconds(step)
 
 
 def _next_course_session(db, course, enrollment, snapshot) -> str | None:
@@ -519,7 +512,45 @@ def _lines(text, limit=6) -> list[str]:
     return parts[:limit]
 
 
-def _standard_step(entry, locale, *, sets, rest_between) -> dict:
+# SEDENS Standard narration: the first line is spoken as the step starts, later lines
+# every 8 seconds, at most three spoken lines a step and none after its planned time;
+# every other line is a subtitle only. Nobody is talked at for the whole step.
+STANDARD_SPOKEN_EVERY, STANDARD_MAX_SPOKEN = 8, 3
+
+
+def _narration(lines, *, mode, cues=None, audio=None) -> dict:
+    """The narration part of a step's content.
+
+    ``narration`` keeps its old meaning (lines spoken in order when the step starts);
+    ``narration_cues`` are every line with its time on the step clock and whether it is
+    spoken, so subtitles are all cues; ``narration_audio`` is the creator's recording."""
+    cues = cues if cues is not None else [{"text": line, "at_ms": 0, "speak": True} for line in lines]
+    return {"narration": [c["text"] for c in cues if c["speak"]] if mode == "timed" else lines,
+            "narration_mode": mode, "narration_cues": cues, "narration_audio": audio}
+
+
+def _standard_cues(lines, planned_seconds) -> list[dict]:
+    cues = []
+    for index, line in enumerate(lines):
+        at = index * STANDARD_SPOKEN_EVERY
+        speak = index < STANDARD_MAX_SPOKEN and (not planned_seconds or index == 0 or at <= planned_seconds)
+        cues.append({"text": line, "at_ms": at * 1000, "speak": speak})
+    return cues
+
+
+def _course_narration(s, locale) -> dict:
+    """A course step's narration from the enrolled version: the creator's timed cues and
+    recording, or, for a step without cues, its narration text exactly as before."""
+    audio = _media(s.get("narration_audio"), s.get("narration_audio_media_id"), locale)
+    cues = [c for c in s.get("narration_cues") or [] if isinstance(c, dict) and c.get("text")]
+    if cues:
+        timed = [{"text": c["text"], "at_ms": int(round(float(c.get("at_seconds") or 0) * 1000)),
+                  "speak": bool(c.get("speak"))} for c in cues]
+        return _narration([], mode="timed", cues=timed, audio=audio)
+    return _narration(_lines(s.get("narration") or s.get("customer_cue") or ""), mode="sequence", audio=audio)
+
+
+def _standard_step(entry, locale, *, sets, rest_between, planned=None) -> dict:
     media = []
     sources = {a["id"]: a for a in _content_assets()}
     for asset_id in entry.get("media") or []:
@@ -529,13 +560,14 @@ def _standard_step(entry, locale, *, sets, rest_between) -> dict:
                           "label": _t(a.get("label"), locale), "description": _t(a.get("description"), locale)})
     dose = dict(entry["dose"])
     dose.update(sets=sets, seconds_per_rep=entry.get("seconds_per_rep"), set_rest=rest_between)
+    lines = [_t(n, locale) for n in (entry.get("narration") or [])] or [_t(entry["steps"][0], locale),
+                                                                       _t(entry["cue"], locale)]
     return {
         "source": "standard", "ref": entry["id"], "catalog_key": entry["catalog_key"],
         "title": _t(entry["title"], locale), "setup": _t(entry.get("setup") or entry["steps"][0], locale),
         "instructions": [_t(s, locale) for s in entry["steps"]], "cue": _t(entry["cue"], locale),
         "breath": _t(entry.get("breath"), locale), "stop_if": _t(entry.get("stop_if"), locale),
-        "narration": [_t(n, locale) for n in (entry.get("narration") or [])] or [_t(entry["steps"][0], locale),
-                                                                                 _t(entry["cue"], locale)],
+        **_narration(lines, mode="timed", cues=_standard_cues(lines, planned)),
         "dose": dose, "equipment": entry.get("equipment") or [], "position": entry.get("position"),
         "video": next((m for m in media if m["kind"] == "video"), None),
         "image": next((m for m in media if m["kind"] == "image"), None),
@@ -561,9 +593,11 @@ def _media(summary, media_id, locale) -> dict | None:
     if not media_id:
         return None
     s = summary or {}
+    label = video_providers.label_for(s.get("source"), s.get("licence_type"), None, s.get("sha256"))
     return {"kind": s.get("kind") or "", "url": f"/sedens/media/file?id={media_id}", "mime": s.get("mime"),
             "source": s.get("source"), "title": s.get("title"), "licence_type": s.get("licence_type"),
-            "original_creator": s.get("original_creator"), "identifiable_person": s.get("identifiable_person")}
+            "original_creator": s.get("original_creator"), "identifiable_person": s.get("identifiable_person"),
+            "label": _t(label, locale)}
 
 
 def _library_text(step) -> dict | None:
@@ -589,7 +623,7 @@ def _course_step(s, locale) -> dict:
         "title": title, "setup": _t(lib.get("setup"), locale) or "",
         "instructions": steps or _lines(s.get("narration") or ""), "cue": s.get("customer_cue") or "",
         "breath": _t(lib.get("breath"), locale) or "", "stop_if": _t(lib.get("stop_if"), locale) or "",
-        "narration": _lines(s.get("narration") or s.get("customer_cue") or ""),
+        **_course_narration(s, locale),
         "dose": {"mode": "hold" if s.get("hold_seconds") and not s.get("reps") else "reps", "sets": s.get("sets") or 1,
                  "reps": s.get("reps") or 0, "hold_seconds": s.get("hold_seconds") or 0,
                  "work_seconds": s.get("work_seconds") or 0, "rest_seconds": s.get("rest_seconds") or 0,
@@ -614,8 +648,10 @@ def player_steps(w, rows, locale) -> list[dict]:
         if w["kind"] == "standard":
             base = standard.get(row["step_ref"])
             sets = next((s["sets"] for s in plan["steps"] if s["position"] == row["position"]), 1)
-            item = _standard_step(base, locale, sets=sets, rest_between=plan.get("rest_between_sets"))
-            variants = {k: _standard_step(standard.get(v), locale, sets=sets, rest_between=plan.get("rest_between_sets"))
+            item = _standard_step(base, locale, sets=sets, rest_between=plan.get("rest_between_sets"),
+                                  planned=row["planned_seconds"])
+            variants = {k: _standard_step(standard.get(v), locale, sets=sets, rest_between=plan.get("rest_between_sets"),
+                                          planned=row["planned_seconds"])
                         for k, v in options.items() if v and standard.get(v)}
         else:
             frozen = next(s for s in plan["steps"] if s["id"] == row["step_ref"])

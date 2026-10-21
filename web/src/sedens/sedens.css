@@ -209,3 +209,10 @@ body.sd-room-body { font-size: clamp(18px, 1.4vw, 24px); }
 .sd-sim-table td { text-align: right; white-space: nowrap; }
 .sd-sim-total th, .sd-sim-total td { font-weight: 700; color: var(--sd-text); }
 @media (max-width: 520px) { .sd-bars li { grid-template-columns: 1fr auto; } .sd-bar { grid-column: 1 / -1; order: 3; } }
+/* Timed narration lines of a step: words, time, "speak aloud", remove */
+.sd-cues { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 12px; }
+.sd-cue { display: grid; gap: 8px 14px; grid-template-columns: minmax(0, 3fr) minmax(110px, 1fr) auto auto; align-items: end; border: 1px solid var(--sd-line); border-radius: 10px; padding: 10px 14px; background: var(--sd-bg); }
+.sd-cue-n { grid-column: 1 / -1; color: var(--sd-muted); font-size: 0.85rem; }
+.sd-cue .sd-field { margin: 0; }
+.sd-audio { width: 100%; max-width: 420px; margin-top: 6px; }
+@media (max-width: 640px) { .sd-cue { grid-template-columns: minmax(0, 1fr); align-items: stretch; } }

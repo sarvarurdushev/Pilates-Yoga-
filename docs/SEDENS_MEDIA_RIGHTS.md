@@ -1,10 +1,10 @@
 # SEDENS media rights
 
-Scope: the files a course uses (videos, photos, PDFs), the rights information each one carries, how files are checked, stored and served, and where they may come from. Everything here is enforced on the server in `pilates/sedens/course_media.py`, `media_store.py`, `access.py`, `video_providers.py`, `course_export.py` and `backup.py`, with the schema in `pilates/sedens/migrations/0009_course_media.sql`. Pages only show what the server returns.
+Scope: the files a course uses (videos, photos, PDFs, narration recordings), the rights information each one carries, how files are checked, stored and served, and where they may come from. Everything here is enforced on the server in `pilates/sedens/course_media.py`, `media_store.py`, `access.py`, `video_providers.py`, `course_export.py` and `backup.py`, with the schema in `pilates/sedens/migrations/0009_course_media.sql` (the `audio` kind and step narration columns: `0022_media_narration.sql`). Pages only show what the server returns.
 
 What is **not** built or is demonstration only, stated once here and again where it matters:
 
-- No stock clip has been curated: the import manifest in `data/content_sources.json` is empty.
+- No stock clip has been curated: the import manifest in `data/content_sources.json` is empty. The research that found nothing licence-clean, and the list of the 26 videos that are missing, are in `docs/SEDENS_CONTENT_VIDEO_PLAN.md`; the import command (section 10) is built and tested but has nothing to import.
 - Higgsfield is an inactive provider. Nothing is generated, and no generated output is stored.
 - No file has been reviewed for its movement by an expert. The repository illustrations are AI-generated. In a demonstration, the fictional "Demo Reviewer (fictional)" accepts the **rights** of the one illustration a demonstration course uses, so that course can be approved; that is a demonstration step about permission to distribute, not a review of the movement.
 - Guided-training media plays only in an authorized room. Home playback is off (`access.HOME_PLAYBACK = False`), and the synchronized room player is Phase 3.
@@ -12,13 +12,16 @@ What is **not** built or is demonstration only, stated once here and again where
 
 ## 1. What a creator can upload
 
-Course media has three kinds (`media_store.KINDS`). The server decides the type from the bytes, never from the file name or the type the browser claims.
+Course media has four kinds (`media_store.KINDS`). The server decides the type from the bytes, never from the file name or the type the browser claims.
 
 | Kind | Accepted formats | Used for |
 |---|---|---|
 | `video` | MP4, WebM | a guided-training step's video; a professional-education video lesson |
 | `image` (a photo) | JPEG, PNG, WebP (re-encoded on upload) | a course cover; a step's picture; an image lesson |
 | `pdf` | PDF without active content | a PDF lesson; a supporting document for creator verification |
+| `audio` (a recording) | MP3, M4A (AAC), WebM (Opus or Vorbis), Ogg (Opus or Vorbis) | a guided-training step's recorded narration (`s_course_steps.narration_audio_media_id`) |
+
+Recordings are accepted in all four formats, but a browser built without proprietary codecs cannot play AAC: the open-source Chromium used for this repository's browser tests plays MP3, WebM (Opus) and Ogg (Vorbis, Opus) and cannot play M4A (it also cannot play H.264 MP4 video, while VP8/VP9 WebM plays). MP3 or WebM is the safer choice for a room screen.
 
 A **supporting document** is uploaded the same way (usually as a PDF) and then attached to a verification evidence record with `POST /sedens/creator/evidence` (`course_media.add_evidence`). The evidence record may only point at the creator's own file. See `docs/SEDENS_CONTENT_GOVERNANCE.md` for verification.
 
@@ -95,7 +98,7 @@ Nothing is read from the request body until the person is authorized and the rig
 3. **Sign-in.** A valid platform session (401 otherwise).
 4. **Rights present.** The `rights` query value must be JSON (`rights_required` otherwise).
 5. **Creator, then rights.** The `creator` capability and a creator profile (`course_media._creator`; `no_profile` otherwise), then the rights are validated: attestation and version, licence, original creator, identifiable person, required links (`course_media.rights_from`).
-6. **Kind and size.** The kind is `video`, `image` or `pdf`, and the declared `Content-Length` is above zero and within this deployment's limit for that kind (`media_store._capped`; `invalid_media_kind` 400, `media_too_large` 413).
+6. **Kind and size.** The kind is `video`, `image`, `pdf` or `audio`, and the declared `Content-Length` is above zero and within this deployment's limit for that kind (`media_store._capped`; `invalid_media_kind` 400, `media_too_large` 413).
 7. **Upload slot.** At most two uploads are received at once on the server (`uploads_busy`, 429).
 8. **Streaming.** The body is written to `incoming/` in 64 KB blocks while its SHA-256 is computed. A body shorter than declared is refused (`upload_interrupted`) and the partial file is removed (`tests/test_sedens_media_store.py::test_an_interrupted_upload_leaves_nothing_behind`).
 9. **Byte checks** (below). Any failure removes the file.
@@ -108,15 +111,16 @@ Nothing is read from the request body until the person is authorized and the rig
 | video | MP4: an `ftyp` box with a known brand (`isom`, `iso2`, `iso4`, `iso5`, `iso6`, `mp41`, `mp42`, `avc1`, `dash`, `M4V `, `MSNV`). WebM: the EBML header and the `webm` document type in the first 64 bytes. Only the header is checked; the video is not decoded or transcoded. | `media_type_mismatch` (415) |
 | image | Must open and verify in Pillow as JPEG, PNG or WebP, at most 16 megapixels. It is then **re-encoded**: camera and location metadata (EXIF) and any bytes hidden after the image are dropped, and the SHA-256 is computed again over the stored bytes. SVG and other formats are refused. | `media_type_mismatch` (415), `media_too_large` (413) |
 | pdf | Must start with `%PDF-`. Refused if the raw bytes contain `/JavaScript`, `/JS`, `/Launch`, `/EmbeddedFile` or `/RichMedia`. This sees uncompressed markers only, which is why every PDF is also served as a sandboxed download (section 7). | `media_type_mismatch`, `pdf_active_content` (415) |
+| audio | MP3: three consecutive MPEG audio frame headers of one stream, after an ID3 tag if there is one, with only zero padding before the first frame (an HTML or PDF header followed by MP3 data is refused). M4A: an `ftyp` box with an audio brand (`M4A `, `M4B `, `F4A `, `isom`, `iso2`, `iso4`-`iso6`, `mp41`, `mp42`, `dash`) and a `moov` box whose tracks include sound and no video; boxes nested deeper than a real file are refused. WebM: the EBML header, the `webm` document type, an `A_OPUS` or `A_VORBIS` track and no video codec in the first 64 KB. Ogg: every stream the file begins is Opus or Vorbis (a Theora or other stream is refused). Each container is decided by its own rules and never re-read as MP3, so an MP4 with a video brand (`avc1`, `M4V `), a QuickTime `.mov`, Matroska, WAV or AVI is refused even when its audio is MP3. A video, a picture or a PDF renamed `.mp3` is refused. Only the headers are checked; audio is not decoded or transcoded. | `media_type_mismatch` (415) |
 
 Tests: `tests/test_sedens_media_store.py::test_videos_are_recognised_by_their_bytes`, `test_images_are_re_encoded_without_location_data`, `test_pdfs_with_active_content_are_refused`; over HTTP, `tests/test_sedens_course_http.py::test_uploads_check_rights_before_the_file_and_the_bytes_after`.
 
 ### Size limits per deployment mode (`media_store.LIMITS`)
 
-| Mode | Video | Image | PDF |
-|---|---|---|---|
-| `local_room` | 300 MB | 12 MB | 25 MB |
-| `demo_free` | 25 MB | 8 MB | 10 MB |
+| Mode | Video | Image | PDF | Audio |
+|---|---|---|---|---|
+| `local_room` | 300 MB | 12 MB | 25 MB | 30 MB |
+| `demo_free` | 25 MB | 8 MB | 10 MB | 8 MB |
 
 Any other mode name falls back to the `demo_free` limits (`media_store.limit`). The free demonstration keeps files small because its storage can be erased on any restart (`modes.Mode.storage`, `docs/SEDENS_DEPLOYMENT_MODES.md`). Tested by `tests/test_sedens_media_store.py::test_size_limits_follow_the_deployment_mode`.
 
@@ -159,6 +163,8 @@ It honours one byte range per request (`bytes=a-b`, `bytes=a-`, `bytes=-n`) with
 3. **Anyone who may see the course's description**, for the **cover picture** of the published version.
 4. **An authorized room** where the course may be played (`access.can_play_in_room`: the facility enabled it there and the customer is entitled or it is free there), for a file of the **published** version or of the version the room's customer is enrolled in (an older, superseded version keeps its files: `tests/test_sedens_courses.py::test_a_customer_on_an_older_version_still_sees_its_pictures_in_the_room`).
 5. **An enrolled customer** of a **professional-education** course with a standing entitlement (`access.can_download_resource`), for a file of the version they use (their enrolled version, or the published one). Guided-training media is never downloadable outside a room, even when the customer owns the course.
+
+A step's **narration recording** (kind `audio`) follows the step's video: rule 4 only (an authorized room, for the published or the customer's enrolled version), plus its creator and reviewers (rules 1 and 2). `media_access` never serves a recording through rule 5, so a customer's phone never plays it (`tests/test_sedens_narration.py::test_recorded_narration_plays_only_in_an_authorized_room`). A recording is part of the version that uses it (`s_course_version_media`), so its rights must be `approved` before that version is approved, like any other file.
 
 A file that is in no submitted version (a draft's file) is readable only by its creator.
 
@@ -204,16 +210,25 @@ The registry allows two stock sources, both `enabled` with `auto_download: false
 | Pexels | `https://www.pexels.com/license/` | reference only (the licence allows use, not redistribution as a library) | People shown must not appear to endorse SEDENS; review each clip before use. |
 | Pixabay | `https://pixabay.com/service/license-summary/` | reference only | Review each clip before use. |
 
-The registry's rules: nothing is downloaded automatically; a stock clip is added only after a person watched it, checked the movement and the licence page, and recorded both; stock and generated media always show the stock label, which only an expert review of the movement (not built) could remove; social media, video sites and search results are never sources.
+The registry's rules: nothing is downloaded automatically; a stock clip is added only after a person watched it, checked the movement and the licence page, and recorded both; every file shows a label saying its movement is not yet expert reviewed (a registered clip "Stock footage", a Pexels or Pixabay upload "Demo media", any other upload "Creator-uploaded media"), and only an expert review of the movement (not built) could remove it; social media, video sites and search results are never sources.
 
 **The import manifest is empty** (`"status": "empty"`, `"entries": []`). Its recorded reason: "No stock clip has been watched and checked by a person yet, so none is listed. Demonstrations use the repository illustrations above." An entry, once added, must record `id`, `source`, `page_url`, `file_url`, `licence_url`, `original_creator`, `retrieved_at`, `sha256`, `shows_exercise`, `checked_by`, `checked_at`, `movement_notes` and `identifiable_person`; `video_providers.problems()` reports any entry without who checked it, when, its licence page and its checksum. The test asserts the manifest is empty and that no source downloads automatically.
 
-No code imports manifest entries into courses yet. `LicensedStockVideoProvider` only reads the manifest, and nothing writes a file record with source `stock`. Today a creator who uses a Pexels or Pixabay clip uploads it themselves with licence `pexels` or `pixabay` (both links required). `course_media.describe` then attaches the stock label to that file:
+**The import command** (`pilates/sedens/media_import.py`, tests in `tests/test_sedens_media_import.py`, how-to in `docs/SEDENS_CONTENT_VIDEO_PLAN.md` section 7): `python -m pilates.sedens.media_import --check` validates every manifest entry, and `--register <entry id> <local file>` registers one. It fetches nothing; a person gets the file. An entry is refused, with a plain message and no change to any file, unless it has every field of `entry_fields` plus `licence` (and a `model_release_note` when `identifiable_person` is `yes`); `https` links, the page and licence links on the source's own site and no link to YouTube, Vimeo or another video site; a licence SEDENS knows; real dates not in the future; a checker's name that does not look automated (any word such as `AI`, `agent`, `claude`, `gpt`, `opus` or `sonnet` is refused; the command cannot verify that a person really watched the clip); a Standard exercise id; an enabled **stock** source (never YouTube, TikTok, Instagram, Facebook or Higgsfield, in the source or in any link); and a local file that is an MP4 or WebM (by its bytes), at most 25 MB, whose SHA-256 equals the entry's. `--register` copies the file to `web/assets/stock/<entry id>.<ext>`, adds a registry asset labelled "Stock footage — movement not yet expert reviewed" ("스톡 영상 — 동작은 아직 전문가 검토 전") with `review_status: unreviewed`, and adds the asset id to the exercise's `media` list, so the room shows it with that label. Because `web/assets/` is public, a person must first confirm that the licence allows serving the file from the app. A registered stock clip is a public site asset: it is served by `/assets/stock/<file>` (with byte-range support, so Safari can play and seek it) and is not behind the room-only gate that creator uploads use. A registered asset can also be added to a creator's media like the illustrations (`POST /sedens/creator/media/repo-asset`).
+
+The repository's manifest stays empty because nothing passed. Apart from the command, a creator who uses a Pexels or Pixabay clip uploads it themselves with licence `pexels` or `pixabay` (both links required). `course_media.describe` then attaches the stock label to that file:
 
 - en: "Demo media — movement not yet expert reviewed"
 - ko: "데모 미디어 — 동작은 아직 전문가 검토 전"
 
 There is no movement-review state for files yet, so this label stays on every `pexels` or `pixabay` file whatever its rights review says. Rights approval is about permission to distribute, not about the movement.
+
+**Every file in a course step carries a label.** `video_providers.label_for` gives: a repository asset its registry label; a `pexels` or `pixabay` upload the stock label above; any other creator upload the creator label,
+
+- en: "Creator-uploaded media — movement not yet expert reviewed"
+- ko: "제작자가 올린 미디어 — 동작은 아직 전문가 검토 전"
+
+`course_media.describe` returns it with the file (the Creator Studio shows it), and the room's step content carries it (`workouts._media`), so the player prints it under the video and under the picture. No label says or implies that an expert approved the movement, and rights approval changes none of them (`web/test/sedens-room-media.browser.mjs` checks the screen).
 
 ## 11. Generated video (Higgsfield)
 
@@ -232,7 +247,7 @@ Tested by `tests/test_sedens_media_store.py::test_content_sources_and_providers`
 A creator retires one of their own files with `POST /sedens/creator/media/retire` (`course_media.retire`). Only the file's own creator in the owner organization can; anyone else gets 404.
 
 - The file's state becomes `retired`: it leaves the media library and can no longer be attached (`_own_media` requires `ready`).
-- It is removed from every draft that used it (step video and picture, lesson file, course cover).
+- It is removed from every draft that used it (step video, picture and narration recording, lesson file, course cover).
 - A submitted or published version that already uses it **keeps it**: `s_course_version_media` still links it, so customers of that version are not affected.
 - The bytes are not deleted, and the file stays in organization backups. There is no deletion of a file's bytes today.
 
@@ -245,7 +260,7 @@ A creator retires one of their own files with `POST /sedens/creator/media/retire
 - every rights **approval** returns to `unreviewed` with the note "Restored from a backup. Waiting for SEDENS to review the rights again."; a rejection stays; the reviewer's name is left out, as is any uploader or attester outside the archive;
 - the restore result counts `course_files` and `media_rights_to_review` (`test_creator_studio_courses_and_files_survive_backup_and_restore`).
 
-**Course exports** (`GET /sedens/creator/course/export?id=`, `course_export.export`) are for the course's own creator only. The ZIP holds `course.json`, one `versions/<n>.json` per version, `media.json` (each file's kind, type, title, size, SHA-256 and rights) and the uploaded files the draft or any version uses, under `media/<id>.<ext>`. `manifest.json` lists every other member with its SHA-256 and carries the labels "Educational anatomy — not measured muscle activation." and "General fitness content. Not medical advice." Repository illustrations are listed but not included. Files are taken only from the course's owner organization; a colleague's or an unused file is never included (`tests/test_sedens_phase2_security.py::test_11_an_export_carries_only_the_course_s_own_files`). A missing file stops the export (`media_missing`, 409).
+**Course exports** (`GET /sedens/creator/course/export?id=`, `course_export.export`) are for the course's own creator only. The ZIP holds `course.json`, one `versions/<n>.json` per version, `media.json` (each file's kind, type, title, size, SHA-256 and rights) and the uploaded files the draft or any version uses (narration recordings included, as `.mp3`, `.m4a`, `.weba` or `.ogg`), under `media/<id>.<ext>`. Each step carries its `narration_cues` and its recording, which an import re-uploads under the importer's attestation. `manifest.json` lists every other member with its SHA-256 and carries the labels "Educational anatomy — not measured muscle activation." and "General fitness content. Not medical advice." Repository illustrations are listed but not included. Files are taken only from the course's owner organization; a colleague's or an unused file is never included (`tests/test_sedens_phase2_security.py::test_11_an_export_carries_only_the_course_s_own_files`). A missing file stops the export (`media_missing`, 409).
 
 **Course imports** (`POST /sedens/creator/course/import`) check every member against the manifest (`checksum_mismatch` on any change), refuse unexpected member names, and need the importer's attestation when the export contains files. Each file then goes through the normal upload function with the rights fields from the export: the same rights validation, byte checks and size limits, recorded with the importer's attestation and `unreviewed`. Repository illustrations are re-linked from the registry. The result is a new draft offered to nobody (`tests/test_sedens_course_http.py::test_course_export_and_import`).
 
@@ -253,7 +268,7 @@ A creator retires one of their own files with `POST /sedens/creator/media/retire
 
 | Item | State |
 |---|---|
-| Curated stock clips | none; the import manifest is empty and no import code exists |
+| Curated stock clips | none; the import manifest is empty. The import command exists and is tested; the 26 missing videos are listed in `docs/SEDENS_CONTENT_VIDEO_PLAN.md` |
 | Movement review of media (stock, AI-generated, uploaded) | no field or workflow; labels stay |
 | Higgsfield or any generator | inactive interface only |
 | Deleting a file's bytes | not built; files can only be retired |

@@ -171,8 +171,17 @@ function readMetadata(form) {
   };
 }
 
-const kindOf = (mime) =>
-  ({ "video/mp4": "video", "video/webm": "video", "image/jpeg": "image", "image/png": "image", "image/webp": "image", "application/pdf": "pdf" })[mime] || null;
+const MIME_KIND = {
+  "video/mp4": "video", "video/webm": "video", "image/jpeg": "image", "image/png": "image", "image/webp": "image", "application/pdf": "pdf",
+  "audio/mpeg": "audio", "audio/mp3": "audio", "audio/mp4": "audio", "audio/x-m4a": "audio", "audio/m4a": "audio", "audio/webm": "audio",
+  "audio/ogg": "audio", "audio/opus": "audio", "application/ogg": "audio",
+};
+// A browser that cannot name an audio file's type is still told by its extension; the server decides by the bytes.
+const kindOf = (mime, name = "") => MIME_KIND[mime] || (!mime && /\.(mp3|m4a|weba|ogg|opus)$/i.test(name) ? "audio" : null);
+const AUDIO_ACCEPT = "audio/mpeg,audio/mp4,audio/webm,audio/ogg,.mp3,.m4a,.weba,.ogg,.opus";
+const MAX_CUES = 12;
+const MIN_SPOKEN_GAP = 4;
+let cueSeq = 0;
 const ready = (media, kind) => media.filter((m) => m.state === "ready" && (!kind || m.kind === kind));
 
 function mediaInfo(m) {
@@ -187,6 +196,70 @@ function mediaSelect(name, kind, chosen, media, label) {
   const found = media.find((m) => m.id === chosen);
   return `${field(label, select(name, pairs, chosen || "", `data-media-kind="${kind}"`))}<p class="sd-muted" data-media-info="${name}">${mediaInfo(found)}</p>`;
 }
+
+/** The recording of a step, to listen to before saving. */
+function audioPreview(id) {
+  return id ? `<audio class="sd-audio" controls preload="none" src="${fileUrl(id)}" aria-label="${esc(T("audio_listen"))}"></audio>` : "";
+}
+
+// -- timed narration of a step: a list of lines, each with a time and "speak aloud" -----------
+
+const cueRow = (cue, index) => {
+  const uid = cue.uid || "c" + ++cueSeq;
+  // Each field is described by its row's "Line N", so a screen reader says which line it belongs to.
+  const focus = (name) => `data-focus="${name}:${uid}" aria-describedby="sd-cue-n-${uid}"`;
+  return `<li class="sd-cue" data-cue data-uid="${uid}"><span class="sd-cue-n" id="sd-cue-n-${uid}">${esc(T("cue_n", { n: index + 1 }))}</span>` +
+    `<label class="sd-field"><span>${esc(T("cue_text"))}</span><input data-cue-text maxlength="160" value="${esc(cue.text)}" ${focus("cue-text")}></label>` +
+    `<label class="sd-field"><span>${esc(T("cue_at"))}</span><input type="number" min="0" step="0.1" inputmode="decimal" data-cue-at value="${esc(cue.at_seconds ?? "")}" ${focus("cue-at")}></label>` +
+    `<label class="sd-check"><input type="checkbox" data-cue-speak ${cue.speak ? "checked" : ""} ${focus("cue-speak")}> ${esc(T("cue_speak"))}</label>` +
+    `<button type="button" class="sd-ghost" data-act="cue-remove" data-uid="${uid}" ${focus("cue-remove")} aria-label="${esc(T("cue_remove_named", { n: index + 1 }))}">${esc(T("remove"))}</button></li>`;
+};
+
+const cueList = (cues) =>
+  cues.length ? `<ol class="sd-cues">${cues.map(cueRow).join("")}</ol>` : `<p class="sd-muted">${esc(T("cue_none"))}</p>`;
+
+/** The lines typed so far, in the order shown. */
+function readCues(form) {
+  return [...form.querySelectorAll("[data-cue]")].map((row) => ({
+    uid: row.dataset.uid,
+    text: row.querySelector("[data-cue-text]").value,
+    at_seconds: row.querySelector("[data-cue-at]").value.trim() === "" ? NaN : Number.parseFloat(row.querySelector("[data-cue-at]").value),
+    speak: row.querySelector("[data-cue-speak]").checked,
+  }));
+}
+
+const byTime = (cues) => [...cues].sort((a, b) => (Number.isNaN(a.at_seconds) ? Infinity : a.at_seconds) - (Number.isNaN(b.at_seconds) ? Infinity : b.at_seconds));
+
+/** A problem a creator can fix before saving (the server checks again, and knows the step's length). */
+class NarrationProblem extends Error {}
+
+function checkCues(cues) {
+  if (cues.length > MAX_CUES) throw new NarrationProblem(T("cue_max", { n: MAX_CUES }));
+  cues.forEach((c, i) => {
+    if (!c.text.trim()) throw new NarrationProblem(T("cue_text_needed", { n: i + 1 }));
+    if (!(c.at_seconds >= 0)) throw new NarrationProblem(T("cue_time_bad", { n: i + 1 }));
+  });
+  const sorted = byTime(cues);
+  let last = null;
+  sorted.forEach((c, i) => {
+    if (!c.speak) return;
+    if (last && c.at_seconds - last.at < MIN_SPOKEN_GAP) throw new NarrationProblem(T("cue_too_close", { n: MIN_SPOKEN_GAP, a: last.i + 1, b: i + 1 }));
+    last = { at: c.at_seconds, i };
+  });
+}
+
+/** The server's refusal of the narration, in the person's words. English keeps the server's own sentence
+ * (it says what is wrong and the step's length); Korean maps the known sentences. */
+function narrationProblem(error) {
+  if (error instanceof NarrationProblem) return error.message;
+  if (lang() === "en") return error.message;
+  const msg = String(error?.message || "");
+  const range = /between 0 and ([\d.]+) seconds/.exec(msg);
+  if (range) return T("cue_time_range", { max: range[1] });
+  if (error?.code === "narration_too_close") return T("cue_too_close_any", { n: MIN_SPOKEN_GAP });
+  return T("cue_generic");
+}
+const NARRATION_CODES = ["invalid_narration", "narration_too_close"];
 
 function exerciseList(items, label, act) {
   if (!items.length) return `<p class="sd-muted">${esc(T("no_exercises"))}</p>`;
@@ -829,7 +902,8 @@ export async function sessionEdit(ctx) {
   if (!loaded || ctx.stale()) return;
   let [view, studio] = loaded;
   const vocab = studio.vocabulary;
-  const media = studio.media || [];
+  let media = studio.media || [];
+  const limits = studio.limits || vocab.limits || {};
   const back = href("creator", "courses", view.course.id) + "?tab=structure";
   const findSession = () => {
     for (const m of view.modules) for (const s of m.sessions || []) if (s.id === ctx.params.session) return { module: m, session: s };
@@ -866,6 +940,22 @@ export async function sessionEdit(ctx) {
     $("#session-meta").textContent = T("session_page_meta", { module: found.module.title, steps: steps().length, minutes: found.session.estimated_minutes || 0 });
   };
 
+  const narrationFields = (step) => {
+    const cues = byTime((step.narration_cues || []).map((c) => ({ text: c.text, at_seconds: c.at_seconds, speak: !!c.speak })));
+    return `<fieldset data-narration><legend>${esc(T("narration_cues_title"))}</legend><p class="sd-muted">${esc(T("narration_cues_hint"))}</p><p class="sd-muted">${esc(T("narration_cues_replace"))}</p>` +
+      `<div data-cue-list>${cueList(cues)}</div><p><button type="button" data-act="cue-add" data-focus="cue-add" ${cues.length >= MAX_CUES ? "disabled" : ""}>${esc(T("cue_add"))}</button></p><p class="sd-error" role="alert" data-narration-error></p>` +
+      `<div data-audio-box>${mediaSelect("narration_audio_media_id", "audio", step.narration_audio_media_id, media, T("narration_audio"))}<div data-audio-preview>${audioPreview(step.narration_audio_media_id)}</div></div>` +
+      `<p class="sd-muted">${esc(T("narration_audio_hint"))}</p></fieldset>`;
+  };
+
+  const audioUpload = (step) =>
+    `<details class="sd-advanced" data-open="audio:${esc(step.id)}" ${open.has("audio:" + step.id) ? "open" : ""}><summary>${esc(T("audio_upload_summary"))}</summary>` +
+    `<form data-form="audio-upload" data-id="${esc(step.id)}"><p class="sd-muted">${esc(T("audio_upload_hint", { audio: mb(limits.audio || 0) }))}</p>` +
+    `${field(T("audio_file"), `<input type="file" name="file" accept="${AUDIO_ACCEPT}">`)}${field(T("upload_name"), text("title", "", 'maxlength="120"'), T("upload_name_hint"))}` +
+    rightsGroup(vocab, { licences: vocab.licences.filter((l) => !["pexels", "pixabay"].includes(l)) }) +
+    `<label class="sd-check"><input type="checkbox" name="attest" data-attest> ${esc(pick(vocab.attestation))}</label><progress max="1" value="0" hidden aria-label="${esc(T("uploading"))}"></progress>` +
+    `<div class="sd-actions"><button class="sd-primary" disabled data-needs-attest>${esc(T("audio_upload_button"))}</button></div><p class="sd-muted" role="status" data-status></p>${errorLine()}</form></details>`;
+
   const stepForm = (step) => {
     const others = steps().filter((s) => s.id !== step.id && !s.variant_of);
     const ex = step.exercise;
@@ -876,6 +966,7 @@ export async function sessionEdit(ctx) {
       `<fieldset><legend>${esc(T("fs.options"))}</legend><div class="sd-grid-2">${field(T("regression"), area("regression", step.regression, 'maxlength="600"'))}${field(T("progression"), area("progression", step.progression, 'maxlength="600"'))}</div></fieldset>` +
       `<fieldset><legend>${esc(T("fs.variant"))}</legend><div class="sd-grid-2">${field(T("variant"), select("variant", words("variant", ["standard", "easier", "harder"]), step.variant))}${field(T("variant_of"), select("variant_of", [["", T("variant_none")], ...others.map((s) => [s.id, T("step_n", { n: s.position + 1, name: stepName(s) })])], step.variant_of || ""))}</div><p class="sd-muted">${esc(T("variant_hint"))}</p></fieldset>` +
       `<fieldset><legend>${esc(T("fs.words"))}</legend>${field(T("customer_cue"), text("customer_cue", step.customer_cue, 'maxlength="280"'), T("customer_cue_hint"))}${field(T("narration"), area("narration", step.narration, 'rows="4" maxlength="2000"'), T("narration_hint"))}</fieldset>` +
+      narrationFields(step) +
       `<fieldset><legend>${esc(T("fs.media"))}</legend><div class="sd-grid-2"><div>${mediaSelect("video_media_id", "video", step.video_media_id, media, T("demo_video"))}</div><div>${mediaSelect("image_media_id", "image", step.image_media_id, media, T("demo_picture"))}</div></div><p><a href="#/creator/media">${esc(T("media_library"))}</a></p></fieldset>` +
       `<fieldset><legend>${esc(T("fs.equipment"))}</legend><div class="sd-grid-4">${vocab.equipment.map((e) => `<label class="sd-check"><input type="checkbox" name="equipment" value="${esc(e)}" data-list ${step.equipment.includes(e) ? "checked" : ""}> ${esc(T("equipment." + e))}</label>`).join("")}</div></fieldset>` +
       `<fieldset><legend>${esc(T("fs.flow"))}</legend><div class="sd-grid-2">${field(T("advance"), select("advance", words("advance", ["manual", "auto"]), step.advance))}${field(T("atlas_depth"), select("atlas_depth", words("depth", ["taught", "complete"]), step.atlas_depth))}</div></fieldset>` +
@@ -908,7 +999,7 @@ export async function sessionEdit(ctx) {
     return `<article class="sd-step" id="step-${esc(step.id)}" data-step="${esc(step.id)}" data-scope><div class="sd-spread"><h2 tabindex="-1">${esc(T("step_n", { n: i + 1, name }))}</h2><div class="sd-row">` +
       `<button type="button" class="sd-ghost" data-act="move" data-id="${esc(step.id)}" data-pos="${i - 1}" ${i === 0 ? "disabled" : ""} aria-label="${esc(T("move_up_named", { name }))}">${esc(T("move_up"))}</button><button type="button" class="sd-ghost" data-act="move" data-id="${esc(step.id)}" data-pos="${i + 1}" ${i === count - 1 ? "disabled" : ""} aria-label="${esc(T("move_down_named", { name }))}">${esc(T("move_down"))}</button><button type="button" class="sd-ghost" data-act="remove" data-id="${esc(step.id)}" data-name="${esc(name)}" aria-label="${esc(T("remove_named", { name }))}">${esc(T("remove"))}</button></div></div>` +
       `<p class="sd-muted">${esc(T("phase." + step.phase))} · ${esc(dose(step))}${variant ? " · " + esc(T("variant_line", { kind: T("variant." + step.variant), name: stepName(variant) })) : ""}</p>${step.customer_cue ? `<p>“${esc(step.customer_cue)}”</p>` : ""}` +
-      `<details data-open="edit:${esc(step.id)}" ${open.has("edit:" + step.id) ? "open" : ""}><summary>${esc(T("edit_step"))}</summary>${stepForm(step)}</details>` +
+      `<details data-open="edit:${esc(step.id)}" ${open.has("edit:" + step.id) ? "open" : ""}><summary>${esc(T("edit_step"))}</summary>${stepForm(step)}${audioUpload(step)}</details>` +
       `<details data-open="anatomy:${esc(step.id)}" ${open.has("anatomy:" + step.id) ? "open" : ""}><summary>${esc(T("anatomy_summary", { n: local(step).structures.length }))}</summary><section data-anatomy="${esc(step.id)}" data-scope>${anatomyPanel(step)}</section></details>${errorLine()}</article>`;
   };
 
@@ -1043,6 +1134,11 @@ export async function sessionEdit(ctx) {
   }, true);
 
   main.addEventListener("keydown", (event) => {
+    // Enter in a narration line must not save the whole step.
+    if (event.key === "Enter" && (event.target.dataset?.cueText !== undefined || event.target.dataset?.cueAt !== undefined)) {
+      event.preventDefault();
+      return;
+    }
     const kind = event.target.dataset?.search;
     if (event.key !== "Enter" || !kind) return;
     event.preventDefault();
@@ -1052,16 +1148,64 @@ export async function sessionEdit(ctx) {
 
   main.addEventListener("change", (event) => {
     const el = event.target;
+    if (el.dataset.attest !== undefined) el.closest("form").querySelector("[data-needs-attest]").disabled = !el.checked;
+    if (el.name === "file" && el.closest("form")?.dataset.form === "audio-upload") {
+      const file = el.files[0];
+      const form = el.closest("form");
+      if (file && !form.elements.title.value) form.elements.title.value = file.name.replace(/\.[^.]+$/, "").slice(0, 120);
+    }
     if (el.dataset.mediaKind) el.closest("form").querySelector(`[data-media-info="${el.name}"]`).innerHTML = mediaInfo(media.find((m) => m.id === el.value));
+    if (el.name === "narration_audio_media_id") el.closest("[data-audio-box]").querySelector("[data-audio-preview]").innerHTML = audioPreview(el.value);
+    if (el.dataset.cueAt !== undefined) {
+      // Lines are kept in time order: a changed time moves its line to its place.
+      const form = el.closest("form");
+      const cues = readCues(form);
+      const sorted = byTime(cues);
+      if (sorted.some((c, i) => c !== cues[i])) keepFocus(form, () => (form.querySelector("[data-cue-list]").innerHTML = cueList(sorted)));
+    }
     if (el.dataset.role !== undefined) {
       const id = el.closest("[data-anatomy]").dataset.anatomy;
       anatomy.get(id).structures[Number(el.dataset.role)].role = el.value;
     }
   });
 
+  // A narration recording added from the step editor: the same rights questions as any upload.
+  const uploadAudio = (form) =>
+    attempt(ctx, form, async () => {
+      const file = form.elements.file.files[0];
+      if (!file) throw new Error(T("upload_choose"));
+      if (kindOf(file.type, file.name) !== "audio") throw new Error(T("error.media_type_mismatch"));
+      if (limits.audio && file.size > limits.audio) throw new Error(T("upload_too_large", { size: mb(limits.audio) }));
+      const v = values(form);
+      const rights = readRights(v, vocab);
+      const progress = form.querySelector("progress");
+      progress.hidden = false;
+      progress.value = 0;
+      let saved;
+      try {
+        saved = await upload("creator/media/upload", file, { kind: "audio", filename: file.name, title: v.title.trim(), rights: JSON.stringify(rights) }, (p) => (progress.value = p));
+      } finally {
+        progress.hidden = true;
+      }
+      const fresh = await sedens("creator/studio");
+      if (ctx.stale()) return;
+      media = fresh.media || [];
+      // Every recording list gains the new file; the step it was added to has it chosen (saved with the step).
+      const own = form.closest("details[data-open^='edit:']")?.querySelector("select[name='narration_audio_media_id']");
+      for (const select of main.querySelectorAll("select[name='narration_audio_media_id']")) {
+        const chosen = select === own ? saved.id : select.value;
+        select.innerHTML = options([["", T("no_file")], ...ready(media, "audio").map((m) => [m.id, m.title || m.filename || T("kind.audio")])], chosen);
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      form.reset();
+      form.querySelector("[data-needs-attest]").disabled = true;
+      form.querySelector("[data-status]").textContent = T("audio_uploaded", { name: saved.title || saved.filename });
+    });
+
   main.addEventListener("submit", (event) => {
     event.preventDefault();
     const form = event.target;
+    if (form.dataset.form === "audio-upload") return uploadAudio(form);
     if (form.dataset.form !== "step") return;
     attempt(ctx, form, async () => {
       const v = values(form);
@@ -1069,7 +1213,31 @@ export async function sessionEdit(ctx) {
       if (v.variant !== "standard" && !v.variant_of) throw new Error(T("variant_needs_step"));
       if (v.variant === "standard") v.variant_of = "";
       const id = form.dataset.id;
-      if (!(await edit("step", { session_id: found.session.id, id, ...v, video_media_id: v.video_media_id || null, image_media_id: v.image_media_id || null, variant_of: v.variant_of || null }))) return;
+      const narrationError = form.querySelector("[data-narration-error]");
+      narrationError.textContent = "";
+      const cues = byTime(readCues(form));
+      try {
+        checkCues(cues);
+      } catch (error) {
+        narrationError.textContent = narrationProblem(error);
+        form.querySelector("[data-cue-list]").innerHTML = cueList(cues);
+        return;
+      }
+      let saved;
+      try {
+        saved = await edit("step", {
+          session_id: found.session.id, id, ...v, video_media_id: v.video_media_id || null, image_media_id: v.image_media_id || null, variant_of: v.variant_of || null,
+          narration_cues: cues.map((c) => ({ text: c.text.trim(), at_seconds: c.at_seconds, speak: c.speak })),
+          narration_audio_media_id: v.narration_audio_media_id || null,
+        });
+      } catch (error) {
+        // A refusal about the narration is shown by the narration itself.
+        if (!NARRATION_CODES.includes(error?.code) || ctx.stale()) throw error;
+        narrationError.textContent = narrationProblem(error);
+        narrationError.scrollIntoView({ block: "nearest" });
+        return;
+      }
+      if (!saved) return;
       card(id);
       const status = $("#step-" + CSS.escape(id))?.querySelector("form [data-status]");
       if (status) status.textContent = T("saved");
@@ -1085,6 +1253,27 @@ export async function sessionEdit(ctx) {
     const step = stepEl ? stepById(stepEl.dataset.step) : null;
     const anatomyScope = button.closest("[data-anatomy]");
 
+    if (act === "cue-add" || act === "cue-remove") {
+      const form = button.closest("form");
+      const box = form.querySelector("[data-cue-list]");
+      let cues = readCues(form);
+      if (act === "cue-remove") cues = cues.filter((c) => c.uid !== button.dataset.uid);
+      else {
+        if (cues.length >= MAX_CUES) return;
+        const latest = cues.reduce((end, c) => Math.max(end, Number.isNaN(c.at_seconds) ? 0 : c.at_seconds), 0);
+        // The first line is spoken; later ones start as subtitles, because spoken lines should be few.
+        cues.push({ uid: "", text: "", at_seconds: cues.length ? latest + 10 : 0, speak: !cues.some((c) => c.speak) });
+      }
+      cues = byTime(cues);
+      const where = act === "cue-remove" ? [...form.querySelectorAll("[data-cue]")].findIndex((r) => r.dataset.uid === button.dataset.uid) : -1;
+      box.innerHTML = cueList(cues);
+      const add = form.querySelector('[data-act="cue-add"]');
+      add.disabled = cues.length >= MAX_CUES;
+      const rows = [...box.querySelectorAll("[data-cue]")];
+      // Focus stays in the list: the new line's words, the line that took the removed one's place, or the add button.
+      (act === "cue-add" ? rows.at(-1)?.querySelector("[data-cue-text]") : rows[Math.min(where, rows.length - 1)]?.querySelector("[data-cue-text]") || add)?.focus();
+      return;
+    }
     if (act === "add-search" || act === "step-search")
       attempt(ctx, scope, async () => {
         const box = act === "add-search" ? $("#add-step") : scope;
@@ -1193,8 +1382,28 @@ const LAYER_WORDS = ["skeleton", "muscles_superficial", "muscles_deep", "organs"
 
 // -- #/creator/media --------------------------------------------------------------------------
 
-const ACCEPT = "video/mp4,video/webm,image/jpeg,image/png,image/webp,application/pdf";
+const ACCEPT = "video/mp4,video/webm,image/jpeg,image/png,image/webp,application/pdf," + AUDIO_ACCEPT;
 const NEEDS_SOURCE = ["pexels", "pixabay", "cc0", "cc_by", "cc_by_sa", "other"];
+
+/** The rights questions of an upload: the same wherever a file is added. */
+function rightsGroup(vocab, { stock = "", licences = vocab.licences } = {}) {
+  return group(
+    T("rights_title"),
+    `${field(T("licence_label"), select("licence_type", words("licence", licences), "own_work"))}<p class="sd-demo-label" data-stock hidden>${stock ? esc(T("stock_note", { label: stock })) : ""}</p>${field(T("original_creator"), text("original_creator", "", 'maxlength="160"'), T("original_creator_hint"))}${field(T("source_url"), text("source_url", "", 'type="url" inputmode="url" placeholder="https://" maxlength="500"'), T("source_url_hint"))}${field(T("licence_url"), text("licence_url", "", 'type="url" inputmode="url" placeholder="https://" maxlength="500"'), T("licence_url_hint"))}${field(T("restrictions"), area("restrictions", "", 'maxlength="1000"'), T("restrictions_hint"))}${field(T("person_label"), select("identifiable_person", words("person", ["none", "consented", "unknown"]), "none"))}`,
+  );
+}
+
+/** What the rights questions said, or the sentence that says what is missing. */
+function readRights(v, vocab) {
+  if (!v.original_creator.trim()) throw new Error(T("need_original_creator"));
+  if (NEEDS_SOURCE.includes(v.licence_type) && !v.source_url.trim()) throw new Error(T("need_source_url"));
+  if (NEEDS_SOURCE.includes(v.licence_type) && v.licence_type !== "other" && !v.licence_url.trim()) throw new Error(T("need_licence_url"));
+  return {
+    attest: v.attest === true, attestation_version: vocab.attestation_version, licence_type: v.licence_type,
+    original_creator: v.original_creator.trim(), source_url: v.source_url.trim(), licence_url: v.licence_url.trim(),
+    restrictions: v.restrictions, identifiable_person: v.identifiable_person,
+  };
+}
 
 export async function mediaLibrary(ctx) {
   if (!ctx.me) return signedOut(ctx);
@@ -1232,12 +1441,9 @@ export async function mediaLibrary(ctx) {
   const uploadView = () => {
     const stock = pick(sources.stock_label);
     $("#media-upload").innerHTML =
-      `<h2>${esc(T("upload_title"))}</h2><p class="sd-muted">${esc(T("upload_limits", { video: mb(limits.video), image: mb(limits.image), pdf: mb(limits.pdf) }))}</p>` +
+      `<h2>${esc(T("upload_title"))}</h2><p class="sd-muted">${esc(T("upload_limits", { video: mb(limits.video), image: mb(limits.image), audio: mb(limits.audio || 0), pdf: mb(limits.pdf) }))}</p>` +
       `<form id="upload-form">${field(T("upload_file"), `<input type="file" name="file" accept="${ACCEPT}">`)}<p class="sd-muted" role="status" data-kind></p>${field(T("upload_name"), text("title", "", 'maxlength="120"'), T("upload_name_hint"))}` +
-      group(
-        T("rights_title"),
-        `${field(T("licence_label"), select("licence_type", words("licence", vocab.licences), "own_work"))}<p class="sd-demo-label" data-stock hidden>${esc(T("stock_note", { label: stock }))}</p>${field(T("original_creator"), text("original_creator", "", 'maxlength="160"'), T("original_creator_hint"))}${field(T("source_url"), text("source_url", "", 'type="url" inputmode="url" placeholder="https://" maxlength="500"'), T("source_url_hint"))}${field(T("licence_url"), text("licence_url", "", 'type="url" inputmode="url" placeholder="https://" maxlength="500"'), T("licence_url_hint"))}${field(T("restrictions"), area("restrictions", "", 'maxlength="1000"'), T("restrictions_hint"))}${field(T("person_label"), select("identifiable_person", words("person", ["none", "consented", "unknown"]), "none"))}`,
-      ) +
+      rightsGroup(vocab, { stock }) +
       `<label class="sd-check"><input type="checkbox" name="attest" data-attest> ${esc(pick(vocab.attestation))}</label><progress max="1" value="0" hidden aria-label="${esc(T("uploading"))}"></progress><div class="sd-actions"><button class="sd-primary" disabled data-needs-attest>${esc(T("upload_button"))}</button></div><p class="sd-muted" role="status" data-status></p>${errorLine()}</form>`;
   };
 
@@ -1250,7 +1456,11 @@ export async function mediaLibrary(ctx) {
         ? `<div class="sd-grid">${assets
             .map((a) => {
               const added = have.has(String(a.description?.en || "").slice(0, 120));
-              return `<article class="sd-card"><img class="sd-cover" src="/${esc(a.path.replace(/^web\//, ""))}" alt="${esc(pick(a.description))}" loading="lazy"><p>${esc(pick(a.description))}</p><span class="sd-demo-label">${esc(pick(a.label))}</span>${added ? `<span class="sd-badge ok">${esc(T("in_library"))}</span>` : `<button type="button" data-act="repo-add" data-id="${esc(a.id)}" aria-label="${esc(T("repo_add_named", { name: pick(a.description) }))}">${esc(T("repo_add"))}</button>`}</article>`;
+              const src = `/${esc(a.path.replace(/^web\//, ""))}`;
+              const preview = a.kind === "video"
+                ? `<video class="sd-cover" src="${src}" preload="metadata" controls aria-label="${esc(pick(a.description))}"></video>`
+                : `<img class="sd-cover" src="${src}" alt="${esc(pick(a.description))}" loading="lazy">`;
+              return `<article class="sd-card">${preview}<p>${esc(pick(a.description))}</p><span class="sd-demo-label">${esc(pick(a.label))}</span>${added ? `<span class="sd-badge ok">${esc(T("in_library"))}</span>` : `<button type="button" data-act="repo-add" data-id="${esc(a.id)}" aria-label="${esc(T("repo_add_named", { name: pick(a.description) }))}">${esc(T("repo_add"))}</button>`}</article>`;
             })
             .join("")}</div>`
         : `<p class="sd-muted">${esc(T("repo_none"))}</p>`) +
@@ -1287,8 +1497,8 @@ export async function mediaLibrary(ctx) {
     if (el.name === "licence_type") form.querySelector("[data-stock]").hidden = !["pexels", "pixabay"].includes(el.value);
     if (el.name === "file") {
       const file = el.files[0];
-      const kind = file ? kindOf(file.type) : null;
-      form.querySelector("[data-kind]").textContent = !file ? "" : kind ? T("upload_kind", { kind: T("kind." + kind), size: mb(file.size) }) : t("error.media_type_mismatch");
+      const kind = file ? kindOf(file.type, file.name) : null;
+      form.querySelector("[data-kind]").textContent = !file ? "" : kind ? T("upload_kind", { kind: T("kind." + kind), size: mb(file.size) }) : T("error.media_type_mismatch");
       if (file && !form.elements.title.value) form.elements.title.value = file.name.replace(/\.[^.]+$/, "").slice(0, 120);
     }
   });
@@ -1300,18 +1510,11 @@ export async function mediaLibrary(ctx) {
     attempt(ctx, form, async () => {
       const file = form.elements.file.files[0];
       if (!file) throw new Error(T("upload_choose"));
-      const kind = kindOf(file.type);
-      if (!kind) throw new Error(t("error.media_type_mismatch"));
+      const kind = kindOf(file.type, file.name);
+      if (!kind) throw new Error(T("error.media_type_mismatch"));
       if (file.size > limits[kind]) throw new Error(T("upload_too_large", { size: mb(limits[kind]) }));
       const v = values(form);
-      if (!v.original_creator.trim()) throw new Error(T("need_original_creator"));
-      if (NEEDS_SOURCE.includes(v.licence_type) && !v.source_url.trim()) throw new Error(T("need_source_url"));
-      if (NEEDS_SOURCE.includes(v.licence_type) && v.licence_type !== "other" && !v.licence_url.trim()) throw new Error(T("need_licence_url"));
-      const rights = {
-        attest: v.attest === true, attestation_version: vocab.attestation_version, licence_type: v.licence_type,
-        original_creator: v.original_creator.trim(), source_url: v.source_url.trim(), licence_url: v.licence_url.trim(),
-        restrictions: v.restrictions, identifiable_person: v.identifiable_person,
-      };
+      const rights = readRights(v, vocab);
       const progress = form.querySelector("progress");
       progress.hidden = false;
       progress.value = 0;

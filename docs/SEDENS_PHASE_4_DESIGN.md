@@ -295,6 +295,14 @@ audio, then browser speech synthesis, then subtitles only. Subtitles render as c
 step clock. The player gains independent voice and music volume, mute, and language selection.
 No speech API is bought.
 
+*As built (deviation).* A cue is `{text, at_seconds, speak}` with one `text`, not `text_en`/`text_ko`.
+A course is written in one language (`s_courses.language`), so a bilingual cue would leave one side
+empty or machine-translated. The voice follows the script of each line, and the room shows "Narration
+is in the course's language." The narration-language selector is offered only for SEDENS Standard,
+which has both languages. Bilingual fields could be added later inside the JSON without a migration.
+0022 also accepts `audio/ogg` (Opus or Vorbis), because some recorders save it. The rules are in
+`docs/SEDENS_SESSION_PLAYER.md` §5 and the byte checks in `docs/SEDENS_MEDIA_RIGHTS.md`.
+
 **Anatomy.** The room toolbar distinguishes *Highlight* (structures tinted in the full body) from
 *Isolate* (only the selected structure), keeps click-to-select, rotate, skeleton-only, select another
 structure and return to the workout, all synchronized with the current step. Room-only performance mode

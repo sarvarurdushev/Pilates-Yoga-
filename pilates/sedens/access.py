@@ -328,7 +328,9 @@ def media_access(sedens, db, actor, room, object_id) -> dict:
     """The stored file a person may read, or Denied 404 (existence is not revealed).
 
     Course media is reachable only here: never through /platform/media, and
-    never by building an Actor for another organization."""
+    never by building an Actor for another organization. A step's recorded
+    narration (kind 'audio') plays like the step's video: only in an authorized
+    room, never as a download outside it (apart from its creator and reviewers)."""
     hidden = Denied("This file is not available.", 404, "media_not_found")
     found = db.execute("SELECT * FROM s_media_objects WHERE id=?", (object_id,)).fetchone() if object_id else None
     if found is None:
@@ -365,7 +367,7 @@ def media_access(sedens, db, actor, room, object_id) -> dict:
                 for person in {actor.user_id if actor is not None else None, room.student_id if room else None} - {None}):
             if room is not None and can_play_in_room(sedens, db, room, c)["ok"]:
                 allowed = True
-            elif actor is not None and can_download_resource(sedens, db, actor, c, object_id):
+            elif actor is not None and found["kind"] != "audio" and can_download_resource(sedens, db, actor, c, object_id):
                 allowed = True
     if not allowed:
         raise hidden

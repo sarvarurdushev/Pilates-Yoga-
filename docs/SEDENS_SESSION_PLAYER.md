@@ -18,7 +18,7 @@ shows it and asks for changes.
 
 ## 1. What is on screen
 
-- **Main area.** The step's video when the step has one: creator-uploaded course video, played from this server. When there is no video, the step's picture with its label (for example "AI-generated illustration — not a real instructor"). When there is neither, a static instruction card (setup and steps). An unrelated video is never inserted.
+- **Main area.** The step's video when the step has one: creator-uploaded course video, played from this server. When there is no video, the step's picture with its label (for example "AI-generated illustration — not a real instructor"). When there is neither, a static instruction card (setup and steps). An unrelated video is never inserted. The label of the file is printed under the video as well as under a picture ("Creator-uploaded media — movement not yet expert reviewed", the stock label, or the repository illustration's label); nothing on the screen says a movement is expert approved. Proof that real local files play: `web/test/sedens-room-media.browser.mjs` uploads an H.264 MP4, a VP9 MP4 and a VP9 WebM through the Creator Studio and plays the VP9 MP4 and the VP9 WebM in the room (the H.264 MP4 is verified on the server side only, because the test Chromium has no H.264 decoder) (readyState, advancing clock, no media error, automatic next step, refusal outside the room); the test clips and the one H.264 limit of the test browser are in `tests/data/media/README.md`.
 - **Session information.**
   - exercise name and part of the session (warm-up, main, cool-down);
   - "Exercise n of N";
@@ -75,17 +75,29 @@ The buttons appear only when the step has an approved option:
 
 **Nothing is invented algorithmically.** After a discomfort report the next SEDENS Standard plan offers no harder option. Choosing a variant (`workout/variant`) swaps the content shown and the exercise recorded for that step.
 
-## 5. Narration (`room-narration.js`)
+## 5. Narration (`room-cues.js`, `room-sound.js`, `room-narration.js`)
 
-**Providers, in order:**
-1. Recorded audio, when a step line carries an audio URL. The hook exists; no recordings exist yet.
-2. The browser's own SpeechSynthesis. It picks a `ko-KR` or `en-US` voice, waits for voices to load, rate 0.95.
-3. Captions only.
+Narration is short and chosen by the creator. Nobody is talked at for the whole step, and no speech service is bought.
 
-**Behaviour.**
-- Lines are short: the step's two or three narration cues at the start of a step, and "Next: …" during a transition.
-- Narration has its own on/off and volume. Music dips while it speaks.
-- If speech is missing or fails, the session works fully with captions; nothing throws.
+**What a step carries** (`workouts._narration`). `narration_mode` is `timed` or `sequence`. `narration_cues` lists every line as `{text, at_ms, speak}` on the step clock. `narration_audio` is the creator's recording, or null.
+- **Course step with cues** (timed). The creator writes up to 12 lines in the Studio, each with its time (0 to the step's planned length) and a *Speak aloud* box. Spoken lines are at least 4 s apart. Lines that are not spoken are subtitles only. The enrolled version's cues and recording are played (§3a).
+- **Course step without cues** (sequence). Its narration text plays exactly as before Phase 4: its lines are said one after another from the start of the step.
+- **SEDENS Standard** (timed). The first line is spoken as the step starts and later lines every 8 s. At most 3 lines a step are spoken, and none after the step's planned time. Every other line is a subtitle only.
+
+**Scheduling rules** (`room-cues.js`, pure and unit-tested in `web/test/sedens-room-cues.test.mjs`).
+- Every cue is a subtitle. It appears when the step clock reaches its time. It stays until the next cue replaces it or its display time (`holdMs`, 4 to 12 s) ends.
+- Only cues with `speak` are spoken. Nothing is spoken while the workout is paused.
+- At most one utterance at a time, and nothing is queued. A spoken cue more than 1.5 s late is skipped, never said late: for example after a pause, a seek, or while another line is still being said.
+- Going back (repeat, previous) makes the later cues due again.
+
+**Providers, in order.**
+1. **The creator's recording.** One file per step. It starts at the step's first spoken cue and follows the step clock. It pauses with the clock and is seeked when it drifts by more than 0.6 s. When it starts or restarts, it is put in step once more closely (0.15 s), so a slow start does not leave it behind. While a recording plays, the browser's speech says nothing. A recording the browser cannot decode falls back to speech. Example: AAC (`.m4a`) in Chromium builds without proprietary codecs, such as this container's test Chromium. There, `canPlayType` answers "probably" for MP3 and Opus, and "" for AAC.
+2. **The browser's own SpeechSynthesis.** It uses a `ko-KR` or `en-US` voice at rate 0.95. A creator's course is written in one language, so the voice follows the script of each line (`textLanguage`). A watchdog stops waiting for an engine that never reports the end of a line.
+3. **Subtitles only.**
+
+**Settings** (`room-sound.js`). The settings are voice volume, music volume, one *Mute all* (also the M key), spoken guidance on or off, and subtitles on or off. SEDENS Standard also has a narration-language choice: the room's language, 한국어 or English. A course has no such choice ("Narration is in the course's language."). A muted recording keeps running silently so that it stays in step. The settings are kept in this tab's session storage for the room visit, so a new step, a language change or a reload keeps them. Music dips while the voice speaks or the recording plays. The get-ready screen says "Next: …".
+
+If speech is missing or fails, the session works fully with subtitles; nothing throws.
 
 ## 6. Music (`room-music.js`)
 

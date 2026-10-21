@@ -147,12 +147,7 @@ def describe(db, object_id) -> dict:
                    (object_id,)).fetchone()
     if o is None:
         raise Denied("This file does not exist.", 404, "media_not_found")
-    label = None
-    if o["source"] == "repo":
-        asset = video_providers.repo_asset(o["repo_asset"])
-        label = asset["label"] if asset else None
-    elif o["licence_type"] in ("pexels", "pixabay"):
-        label = video_providers.STOCK_LABEL
+    label = video_providers.label_for(o["source"], o["licence_type"], o["repo_asset"], o["sha256"])
     return {
         "id": o["id"], "kind": o["kind"], "mime": o["mime"], "size": o["size"], "title": o["title"],
         "filename": o["original_filename"], "source": o["source"], "state": o["state"], "created_at": o["created_at"],
@@ -178,7 +173,7 @@ def retire(sedens, db, actor, object_id) -> dict:
                          (object_id, actor.org_id, profile["id"])).rowcount
     if not changed:
         raise Denied("This file does not exist.", 404, "media_not_found")
-    for column in ("video_media_id", "image_media_id"):
+    for column in ("video_media_id", "image_media_id", "narration_audio_media_id"):
         db.execute(f"UPDATE s_course_steps SET {column}=NULL WHERE {column}=?", (object_id,))
     db.execute("UPDATE s_course_lessons SET media_id=NULL WHERE media_id=?", (object_id,))
     db.execute("UPDATE s_courses SET cover_media_id=NULL WHERE cover_media_id=?", (object_id,))

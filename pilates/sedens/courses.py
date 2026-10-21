@@ -27,6 +27,7 @@ facilities, the creator's approved facility network, or the marketplace),
 from __future__ import annotations
 
 import hashlib
+import re
 
 from . import atlas, capabilities, creators, sales, standard, wording
 from .util import Denied, decode, encode, now, text, uid
@@ -48,6 +49,9 @@ LESSON_KINDS = ("video", "pdf", "article", "image", "anatomy_task", "quiz", "cas
 LAYERS = ("", "skeleton", "muscles_superficial", "muscles_deep", "organs", "bones_full", "muscles_full", "organs_full")
 SNAPSHOT_SCHEMA = 1
 MAX_MODULES, MAX_SESSIONS, MAX_STEPS, MAX_LESSONS, MAX_SEGMENTS = 52, 60, 40, 80, 24
+# Timed narration of a step (0022): few, short lines, and spoken ones never crowd each other.
+MAX_CUES, MAX_CUE_TEXT, MIN_SPOKEN_GAP = 12, 160, 4
+KIND_NAMES = {"video": "a video", "image": "a picture", "pdf": "a PDF", "audio": "an audio recording"}
 
 
 # -- reading -------------------------------------------------------------------------
@@ -129,6 +133,7 @@ def _step(db, s) -> dict:
         "sets": s["sets"], "reps": s["reps"], "hold_seconds": s["hold_seconds"], "work_seconds": s["work_seconds"],
         "rest_seconds": s["rest_seconds"], "sides": s["sides"], "regression": s["regression"],
         "progression": s["progression"], "customer_cue": s["customer_cue"], "narration": s["narration"],
+        "narration_cues": decode(s["narration_cues"], []), "narration_audio_media_id": s["narration_audio_media_id"],
         "video_media_id": s["video_media_id"], "image_media_id": s["image_media_id"],
         "equipment": decode(s["equipment"], []), "advance": s["advance"], "variant_of": s["variant_of"],
         "variant": s["variant"], "atlas_depth": s["atlas_depth"], "anatomy": anatomy, "timeline": timeline,
@@ -392,7 +397,7 @@ def _own_media(db, course, media_id, kind):
             or found["state"] != "ready":
         raise Denied("Choose a file from your course media.", 404, "unknown_media")
     if found["kind"] != kind:
-        raise Denied(f"Choose a {kind} file here.", 400, "wrong_media_kind")
+        raise Denied(f"Choose {KIND_NAMES.get(kind, 'a file')} here.", 400, "wrong_media_kind")
     if found["rights"] is None:
         raise Denied("This file has no rights information yet.", 400, "rights_required")
 
@@ -505,14 +510,86 @@ def _step_values(course, data, session_id):
     return values
 
 
+def step_seconds(step) -> int:
+    """A step's planned time in the room: transition, first demonstration, then every
+    set's work (both sides, side switch) and rest. The room plans a course session
+    with this, and a narration cue must fall inside it."""
+    from . import plans
+
+    timing = plans.rules()["timing"]
+    dose = {"sides": step.get("sides"), "work_seconds": step.get("work_seconds"), "hold_seconds": step.get("hold_seconds"),
+            "reps": step.get("reps"), "mode": "hold" if step.get("hold_seconds") and not step.get("reps") else "reps"}
+    spr = None
+    ex = step.get("exercise") or {}
+    if ex.get("source") == "standard" and standard.get(ex.get("ref")):
+        spr = standard.get(ex["ref"]).get("seconds_per_rep")
+    sets = max(1, step.get("sets") or 1)
+    return (timing["transition_floor"] + timing["first_demo"] + sets * plans.set_seconds(dose, spr, timing)
+            + sets * (step.get("rest_seconds") or 0))
+
+
+def narration_cues(course_type, raw, bound) -> list[dict]:
+    """Validated narration cues of a step, sorted by time: [{'text', 'at_seconds', 'speak'}].
+    ``bound`` is the step's planned seconds. The creator decides which lines are spoken
+    (``speak``) and when; the rest are subtitles only."""
+    if raw in (None, ""):
+        return []
+    if not isinstance(raw, list) or len(raw) > MAX_CUES:
+        raise Denied(f"Narration: add up to {MAX_CUES} lines.", 400, "invalid_narration")
+    cues = []
+    for item in raw:
+        if not isinstance(item, dict):
+            raise Denied("Each narration line needs its words, its time and whether it is spoken.", 400,
+                         "invalid_narration")
+        if not isinstance(item.get("text"), (str, type(None))):
+            raise Denied("Each narration line needs its words.", 400, "invalid_narration")
+        # One line of plain words: line breaks, tabs and other control characters become spaces.
+        words = " ".join(re.sub(r"[\x00-\x1f\x7f]", " ", item.get("text") or "").split())
+        if not words:
+            raise Denied("Each narration line needs its words.", 400, "invalid_narration")
+        if len(words) > MAX_CUE_TEXT:
+            raise Denied(f"Keep each narration line to {MAX_CUE_TEXT} characters.", 400, "invalid_narration")
+        at = item.get("at_seconds")
+        if isinstance(at, bool):
+            at = None
+        try:
+            at = round(float(at), 1)
+        except (TypeError, ValueError):
+            at = None
+        if at is None or at != at or not 0 <= at <= bound:
+            raise Denied(f"Set each narration line's time between 0 and {bound} seconds, the length of this step.",
+                         400, "invalid_narration")
+        if not isinstance(item.get("speak"), bool):
+            raise Denied("Choose whether each narration line is spoken or shown only as a subtitle.", 400,
+                         "invalid_narration")
+        cues.append({"text": words, "at_seconds": int(at) if at == int(at) else at, "speak": item["speak"]})
+    cues.sort(key=lambda c: c["at_seconds"])
+    spoken = [c["at_seconds"] for c in cues if c["speak"]]
+    if any(later - earlier < MIN_SPOKEN_GAP for earlier, later in zip(spoken, spoken[1:])):
+        raise Denied(f"Leave at least {MIN_SPOKEN_GAP} seconds between spoken lines, or show one as a subtitle only.",
+                     400, "narration_too_close")
+    _guard_wording(course_type, *(c["text"] for c in cues))
+    return cues
+
+
 def save_step(sedens, db, actor, data) -> dict:
     course = editable(sedens, db, actor, data.get("course_id"), data.get("revision"))
     if course["course_type"] != "guided_training":
         raise Denied("Steps belong to guided training sessions.", 400, "wrong_course_type")
     session = _owned(db, "s_course_sessions", data.get("session_id"), course["id"], "session")
     values = _step_values(course, data, session["id"])
-    for column, kind in (("video_media_id", "video"), ("image_media_id", "image")):
-        if values[column]:
+    existing = _owned(db, "s_course_steps", data["id"], course["id"], "step") if data.get("id") else None
+    # Timed narration and its recording: an editor that does not send them keeps them. Kept cues are
+    # checked again, since the step's new length may now be shorter than a line's time.
+    kept = decode(existing["narration_cues"], []) if existing is not None else None
+    raw_cues = data.get("narration_cues") if "narration_cues" in data else kept
+    bound = step_seconds({**values, "exercise": {"source": values["exercise_source"], "ref": values["exercise_ref"]}})
+    values["narration_cues"] = encode(narration_cues(course["course_type"], raw_cues, bound))
+    if "narration_audio_media_id" in data or existing is None:
+        values["narration_audio_media_id"] = data.get("narration_audio_media_id") or None
+    for column, kind in (("video_media_id", "video"), ("image_media_id", "image"),
+                         ("narration_audio_media_id", "audio")):
+        if values.get(column):
             _own_media(db, course, values[column], kind)
     if values["variant_of"]:
         parent = _owned(db, "s_course_steps", values["variant_of"], course["id"], "step")
@@ -682,9 +759,10 @@ def snapshot(sedens, db, course) -> dict:
     for m in modules:
         for s in m.get("sessions", []):
             for step in s["steps"]:
-                media_ids |= {step["video_media_id"], step["image_media_id"]} - {None}
+                media_ids |= {step["video_media_id"], step["image_media_id"], step["narration_audio_media_id"]} - {None}
                 step["video"] = _media_summary(db, step["video_media_id"])
                 step["image"] = _media_summary(db, step["image_media_id"])
+                step["narration_audio"] = _media_summary(db, step["narration_audio_media_id"])
         for lesson in m.get("lessons", []):
             media_ids |= {lesson["media_id"]} - {None}
             lesson["media"] = _media_summary(db, lesson["media_id"])

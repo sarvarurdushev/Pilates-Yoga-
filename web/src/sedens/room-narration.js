@@ -1,9 +1,10 @@
 // Narration for the room player, with no paid speech service (brief §25).
 //
-// Providers, in order: (a) recorded audio when a line carries an `audio` URL
-// (authored recordings; none exist yet, the hook is kept), (b) the browser's own
-// SpeechSynthesis, (c) captions only. Captions are ALWAYS shown, so the session
-// works fully with no speech at all; nothing here ever throws.
+// Providers, in order: (a) the creator's recording (a step's narration audio, played by the
+// player along the step clock; see room-cues.js), (b) the browser's own SpeechSynthesis,
+// (c) subtitles only. Subtitles are ALWAYS available, so the session works fully with no
+// speech at all; nothing here ever throws. Timed cues are spoken one at a time with
+// speakCue(): it never queues, a new cue replaces the one still being said.
 
 const VOICE_LANG = { ko: "ko-KR", en: "en-US" };
 
@@ -26,6 +27,10 @@ export function createNarrator({ lang = "ko", win = globalThis, onCaption = () =
   let voice = null;
   let token = 0;
   let audio = null;
+  let muted = false;
+  let speaking = false;
+  let utterance = null; // held so the engine's onend is not lost to garbage collection
+  const audible = () => enabled && !muted && volume > 0;
 
   const refreshVoice = () => {
     try {
@@ -43,6 +48,7 @@ export function createNarrator({ lang = "ko", win = globalThis, onCaption = () =
 
   function stopSound() {
     token += 1;
+    speaking = false;
     try {
       if (speechAvailable) synth.cancel();
     } catch {
@@ -59,11 +65,23 @@ export function createNarrator({ lang = "ko", win = globalThis, onCaption = () =
     onSpeaking(false);
   }
 
-  function sayOne(line, mine) {
+  function voiceFor(l) {
+    if (!l || l === current) {
+      if (!voice) refreshVoice();
+      return voice;
+    }
+    try {
+      return speechAvailable ? pickVoice(synth.getVoices(), l) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function sayOne(line, mine, { caption = true, lang: spoken } = {}) {
     return new Promise((resolve) => {
       const text = typeof line === "string" ? line : line?.text || "";
-      onCaption(text);
-      if (!enabled || mine !== token) return resolve();
+      if (caption) onCaption(text);
+      if (!audible() || mine !== token) return resolve();
       if (line && typeof line === "object" && line.audio && typeof win.Audio === "function") {
         try {
           audio = new win.Audio(line.audio);
@@ -79,12 +97,17 @@ export function createNarrator({ lang = "ko", win = globalThis, onCaption = () =
       if (!speechAvailable || !text) return resolve();
       try {
         const u = new Utterance(text);
-        u.lang = VOICE_LANG[current] || current;
-        if (!voice) refreshVoice();
-        if (voice) u.voice = voice;
+        const l = spoken || current;
+        u.lang = VOICE_LANG[l] || l;
+        const v = voiceFor(l);
+        if (v) u.voice = v;
         u.volume = volume;
         u.rate = 0.95;
-        u.onend = u.onerror = () => resolve();
+        u.onend = u.onerror = () => {
+          if (utterance === u) utterance = null;
+          resolve();
+        };
+        utterance = u;
         onSpeaking(true);
         synth.speak(u);
         // Some engines never fire onend; never block the player on narration.
@@ -102,6 +125,10 @@ export function createNarrator({ lang = "ko", win = globalThis, onCaption = () =
     get enabled() {
       return enabled;
     },
+    /** True while an utterance is being said. */
+    get speaking() {
+      return speaking;
+    },
     /** Speak short lines in order (captions follow along). Interrupts what was playing. */
     async speak(lines) {
       stopSound();
@@ -112,7 +139,24 @@ export function createNarrator({ lang = "ko", win = globalThis, onCaption = () =
       }
       if (mine === token) onSpeaking(false);
     },
+    /** Say one timed cue (the player decided it is due). Replaces anything still being said, so
+     * there is never more than one utterance. Resolves when it ends. No caption is written:
+     * subtitles follow the step clock, not the voice. */
+    async speakCue(text, { lang: spoken } = {}) {
+      stopSound();
+      const mine = token;
+      speaking = true;
+      await sayOne(String(text || ""), mine, { caption: false, lang: spoken });
+      if (mine === token) {
+        speaking = false;
+        onSpeaking(false);
+      }
+    },
     stop: stopSound,
+    setMuted(on) {
+      muted = !!on;
+      if (muted) stopSound();
+    },
     setEnabled(on) {
       enabled = !!on;
       if (!enabled) stopSound();

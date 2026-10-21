@@ -36,7 +36,7 @@ VERSION = 1
 ARCHIVE_LIMITS = {"local_room": 400 * 1024 * 1024, "demo_free": 60 * 1024 * 1024}
 MAX_ARCHIVE = ARCHIVE_LIMITS["local_room"]
 MAX_JSON = 8 * 1024 * 1024
-_NAME = re.compile(r"^(course\.json|media\.json|versions/[0-9]{1,4}\.json|media/[A-Za-z0-9_-]{1,64}\.(mp4|webm|jpg|png|webp|pdf))$")
+_NAME = re.compile(r"^(course\.json|media\.json|versions/[0-9]{1,4}\.json|media/[A-Za-z0-9_-]{1,64}\.(mp4|webm|jpg|png|webp|pdf|mp3|m4a|weba|ogg))$")
 
 
 def _media_ids(view) -> set:
@@ -44,7 +44,7 @@ def _media_ids(view) -> set:
     for m in view["modules"]:
         for s in m.get("sessions", []):
             for step in s["steps"]:
-                ids |= {step["video_media_id"], step["image_media_id"]} - {None}
+                ids |= {step["video_media_id"], step["image_media_id"], step.get("narration_audio_media_id")} - {None}
         for lesson in m.get("lessons", []):
             ids |= {lesson["media_id"]} - {None}
     return ids
@@ -263,6 +263,8 @@ def _build(sedens, db, actor, body, new_media):
                     "exercise_source": exercise.get("source"), "exercise_ref": exercise.get("ref"),
                     "video_media_id": media(step.get("video_media_id")),
                     "image_media_id": media(step.get("image_media_id")),
+                    "narration_cues": step.get("narration_cues") or [],
+                    "narration_audio_media_id": media(step.get("narration_audio_media_id")),
                     "variant_of": steps.get(step.get("variant_of")) if step.get("variant_of") else None})
                 steps[step.get("id")] = view["saved_step_id"]
                 view = courses.save_anatomy(sedens, db, actor, {

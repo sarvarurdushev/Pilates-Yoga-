@@ -9,7 +9,10 @@
 // judges how an exercise was done.
 import { esc } from "./ui.js";
 import { anatomyStateAt, AnatomyPanel, stepStructures } from "./room-anatomy.js";
+import { sedens } from "./api.js";
 import { createNarrator } from "./room-narration.js";
+import { cuesOf, subtitleAt, dueCue, hasSpoken, recordingStartMs, recordingSync, pickProvider } from "./room-cues.js";
+import { effectiveVolume, narrationLanguage, textLanguage, loadSound, saveSound, soundKey } from "./room-sound.js";
 import { createMusic, MODES as MUSIC_MODES } from "./room-music.js";
 import { positionAt, workMs, afterWork, presenceTracker, TRANSITION_SECONDS } from "./room-player-clock.js";
 
@@ -42,15 +45,26 @@ class Player {
     this.asked = new Set(); // keys whose name has been asked for in this language
     this.absent = new Set(); // keys this atlas does not draw (selecting one would show nothing)
     this.stepState = null;
-    this.lastSpoken = null;
     this.presence = presenceTracker();
     this.timer = null;
-    this.narrationOn = true;
-    this.narrationVolume = 0.9;
-    this.musicVolume = 0.5;
+    // Sound settings live for the room visit (session storage keyed by it), so a step, a language
+    // change or a page reload keeps them.
+    this.soundKey = soundKey(ctx.session && ctx.session.expires_at);
+    this.sound = loadSound(browserStorage(), this.soundKey);
+    // Timed narration of the current step (room-cues.js).
+    this.cues = [];
+    this.handled = new Set();
+    this.shownCue = -2;
+    this.recStart = 0;
+    this.recordingFailed = false;
+    this.audioBlockedUntil = 0;
+    this.recSettled = false;
+    this.alt = {}; // narration language -> that language's steps (SEDENS Standard only)
+    this.altAsked = new Set();
+    this.altWorkout = null;
     this.music = createMusic();
     this.narrator = createNarrator({
-      lang: this.lang,
+      lang: narrationLanguage(this.sound.lang, this.lang),
       onCaption: (text) => this.caption(text),
       onSpeaking: (on) => this.music.duck(on),
     });
@@ -80,7 +94,13 @@ class Player {
       <div class="rp-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" data-progress-bar><span data-progress></span></div>
     </div>
     <div class="rp-media" data-media></div>
-    <p class="rp-caption" aria-live="polite" data-caption></p>
+    <p class="rp-caption" aria-live="polite" aria-atomic="true" data-caption></p>
+    <div class="rp-soundbar" role="group" data-soundbar>
+      <button type="button" class="rp-small" data-act="mute-all" aria-pressed="false"></button>
+      <button type="button" class="rp-small" data-act="subtitles" aria-pressed="true"></button>
+      <span class="rp-sound-status" role="status" data-sound-status></span>
+    </div>
+    <audio class="rp-narration-audio" data-narration-audio preload="auto"></audio>
     <div class="rp-overlay" data-overlay hidden></div>
   </section>
   <aside class="rp-side">
@@ -152,6 +172,18 @@ class Player {
     this.root.addEventListener("click", (event) => this.onClick(event));
     this.root.addEventListener("change", (event) => this.onChange(event));
     this.root.addEventListener("input", (event) => this.onInput(event));
+    // The creator's recording follows the step clock; the ducking and a failed file are noticed here.
+    const recording = this.audioEl();
+    recording.addEventListener("playing", () => this.music.duck(true));
+    recording.addEventListener("pause", () => this.music.duck(false));
+    recording.addEventListener("ended", () => this.music.duck(false));
+    recording.addEventListener("error", () => {
+      // A recording the browser cannot decode (for example AAC in some builds): speech or subtitles take over.
+      this.recordingFailed = true;
+      this.music.duck(false);
+      this.renderVoiceSource();
+    });
+    this.applySound(false);
   }
 
   // -- server state -> screen ----------------------------------------------------------
@@ -163,13 +195,18 @@ class Player {
     const w = j && j.workout;
     if (!w || !this.root) return;
     this.workout = w;
+    if (this.altWorkout !== w.id) {
+      this.altWorkout = w.id;
+      this.alt = {};
+      this.altAsked.clear();
+    }
     this.journeyState = j.state;
     const lang = String(ctx.lang);
     const langChanged = lang !== this.lang;
     if (langChanged) {
       this.lang = lang;
       this.anatomy.setLang(lang);
-      this.narrator.setLang(lang);
+      this.narrator.setLang(this.narrLang());
       // The previous names stay until the viewer's reply replaces them, so the list does not blink out.
       this.asked.clear();
       this.requestNames();
@@ -197,10 +234,12 @@ class Player {
       this.elapsed = j.state === "exercise_paused" || this.firstPaint === undefined ? w.position_ms || 0 : 0;
       this.firstPaint = false;
       this.phase = "work";
+      this.resetNarration();
       this.renderStep(true);
     } else if (langChanged) {
       this.content = (step.variant !== "standard" && step.variants[step.variant]) || step.content;
       this.step = step;
+      this.rebuildCues();
       this.renderStep(false);
     }
     this.renderControls();
@@ -209,7 +248,7 @@ class Player {
       this.stopClock();
       this.media("pause");
       this.music.pause();
-      this.narrator.stop();
+      this.silence();
       if (this.phase !== "presence") this.overlay("paused");
     } else {
       if (this.phase === "presence") this.phase = "work";
@@ -217,7 +256,6 @@ class Player {
       if (this.phase === "work" || shown === "paused" || shown === "presence") this.overlay(null);
       this.music.resume();
       this.startClock();
-      if (fresh) this.speakStep();
     }
   }
 
@@ -246,6 +284,7 @@ class Player {
     tools.querySelector('[data-zoom="1.25"]').setAttribute("aria-label", t("rp.zoom_in"));
     tools.querySelector('[data-zoom="0.8"]').setAttribute("aria-label", t("rp.zoom_out"));
     this.renderAnatomyTools();
+    this.renderSoundBar();
   }
 
   renderReady() {
@@ -292,6 +331,7 @@ class Player {
     const next = w.steps[step.position + 1];
     this.$("[data-next]").textContent = next ? t("rp.next", { title: next.content.title }) : t("rp.last");
     this.$("[data-anatomy-label]").textContent = c.anatomy?.label || w.anatomy_label || "";
+    this.renderVoiceSource();
     if (restart) {
       this.renderMedia();
       this.lastAnatomy = null;
@@ -328,9 +368,11 @@ class Player {
       const existing = box.querySelector("video");
       if (keepVideo && existing && existing.dataset.src === c.video.url) {
         box.querySelector(".rp-card")?.replaceWith(fragment(details));
+        const caption = box.querySelector("[data-media-label]");
+        if (caption) caption.textContent = c.video.label || "";
         return;
       }
-      box.innerHTML = `<video class="rp-video" playsinline loop preload="auto" data-src="${esc(c.video.url)}" src="${esc(c.video.url)}"></video>${details}`;
+      box.innerHTML = `<video class="rp-video" playsinline loop preload="auto" data-src="${esc(c.video.url)}" src="${esc(c.video.url)}"></video><p class="rp-media-label" data-media-label>${esc(c.video.label || "")}</p>${details}`;
       const video = box.querySelector("video");
       video.addEventListener("seeked", () => this.syncAnatomy());
       video.addEventListener("timeupdate", () => this.syncAnatomy());
@@ -370,6 +412,7 @@ class Player {
     this.media("play");
     clearInterval(this.timer);
     this.timer = setInterval(() => this.tick(), TICK_MS);
+    this.tick();
   }
 
   stopClock() {
@@ -377,6 +420,8 @@ class Player {
     this.started = null;
     clearInterval(this.timer);
     this.timer = null;
+    // A stopped clock never speaks: no voice, no recording.
+    this.silence();
   }
 
   ms() {
@@ -411,11 +456,173 @@ class Player {
     this.$("[data-progress]").style.width = `${overall.toFixed(1)}%`;
     this.$("[data-progress-bar]").setAttribute("aria-valuenow", String(Math.round(overall)));
     if (!this.video()) this.syncAnatomy();
+    if (this.phase === "work") this.narrationTick(at);
     if (this.phase === "work" && this.running() && at >= workMs(dose)) this.workDone();
   }
 
+  // -- narration: subtitles, voice and the creator's recording, all by the step clock -----------
+
+  audioEl() {
+    return this.root ? this.root.querySelector("[data-narration-audio]") : null;
+  }
+
+  narrLang() {
+    return narrationLanguage(this.sound.lang, this.lang);
+  }
+
+  /** The content whose narration is used: the chosen narration language's text for SEDENS Standard
+   *  (read once from the server in that language), otherwise the step's own. */
+  narrationContent() {
+    const l = this.narrLang();
+    const w = this.workout;
+    if (w && w.kind === "standard" && this.step && l !== this.lang) {
+      const alt = this.alt[l] && this.alt[l][this.step.position];
+      if (alt) return (this.step.variant !== "standard" && alt.variants && alt.variants[this.step.variant]) || alt.content;
+      this.askAlt(l);
+    }
+    return this.content;
+  }
+
+  askAlt(l) {
+    if (this.altAsked.has(l)) return;
+    this.altAsked.add(l);
+    const workout = this.altWorkout;
+    sedens("room/journey?lang=" + l)
+      .then((result) => {
+        const steps = result && result.journey && result.journey.workout && result.journey.workout.steps;
+        if (!steps || !this.root || workout !== this.altWorkout) return;
+        this.alt[l] = steps;
+        this.rebuildCues();
+      })
+      .catch(() => {
+        // The step keeps its text in the room language; subtitles and voice still work.
+      });
+  }
+
+  /** Cues of the current step. A language change keeps what was already said. */
+  rebuildCues() {
+    if (!this.content) return;
+    const { cues } = cuesOf(this.narrationContent());
+    this.cues = cues;
+    this.recStart = recordingStartMs(cues);
+    this.shownCue = -2;
+    this.renderVoiceSource();
+  }
+
+  /** A new step (or Repeat): the cues, the recording and what was said start over. */
+  resetNarration() {
+    this.silence();
+    this.recordingFailed = false;
+    this.rebuildCues();
+    // Lines before the position this step resumes from (a reloaded, paused workout) are not said again.
+    this.handled = new Set(this.cues.flatMap((c, i) => (c.at_ms < this.elapsed ? [i] : [])));
+    const a = this.audioEl();
+    const url = (this.content && this.content.narration_audio && this.content.narration_audio.url) || "";
+    if (!a) return;
+    if (url) {
+      if (a.dataset.src !== url) {
+        a.dataset.src = url;
+        a.src = url;
+      } else {
+        try {
+          a.currentTime = 0;
+        } catch {
+          // Not loaded yet: it starts at the beginning anyway.
+        }
+      }
+    } else if (a.dataset.src) {
+      delete a.dataset.src;
+      a.removeAttribute("src");
+      a.load();
+    }
+  }
+
+  /** No voice and no recording (the clock stopped, or narration was turned off or muted). */
+  silence() {
+    this.narrator.stop();
+    const a = this.audioEl();
+    if (a && !a.paused) a.pause();
+  }
+
+  usesRecording() {
+    const a = this.audioEl();
+    return !!(a && a.dataset.src && !this.recordingFailed && this.sound.narration && hasSpoken(this.cues));
+  }
+
+  narrationTick(ms) {
+    const cues = this.cues;
+    this.showSubtitle(subtitleAt(cues, ms));
+    const running = this.running();
+    if (this.usesRecording()) {
+      this.syncRecording(ms, running);
+      return;
+    }
+    const a = this.audioEl();
+    if (a && !a.paused) a.pause();
+    const plan = dueCue({ cues, ms, paused: !running, busy: this.narrator.speaking, handled: this.handled });
+    this.handled = plan.handled;
+    if (plan.speak !== null) this.sayCue(cues[plan.speak]);
+  }
+
+  showSubtitle(index) {
+    if (index === this.shownCue) return;
+    this.shownCue = index;
+    const box = this.$("[data-caption]");
+    if (box) box.textContent = index >= 0 ? this.cues[index].text : "";
+  }
+
+  sayCue(cue) {
+    const provider = pickProvider({
+      speak: cue.speak, hasRecording: false, speechAvailable: this.narrator.available,
+      enabled: this.sound.narration, muted: this.sound.muted, volume: this.sound.voice,
+    });
+    if (provider !== "speech") return;
+    // A creator's course is written in one language; the voice follows the text.
+    this.narrator.speakCue(cue.text, { lang: textLanguage(cue.text, this.narrLang()) });
+  }
+
+  syncRecording(ms, running) {
+    const a = this.audioEl();
+    if (!a) return;
+    a.volume = effectiveVolume(this.sound.voice, false);
+    a.muted = this.sound.muted;
+    // The first tick on which a started recording is really moving: put it in step closely, once.
+    const settling = !this.recSettled && !a.paused && a.currentTime > 0;
+    if (settling) this.recSettled = true;
+    const sync = recordingSync({ ms, startMs: this.recStart, duration: a.duration, current: a.currentTime, running, settling });
+    if (sync.seekTo !== null) {
+      try {
+        a.currentTime = sync.seekTo;
+      } catch {
+        // Metadata not loaded yet; the next tick tries again.
+      }
+    }
+    if (sync.play) {
+      if (a.paused && now() >= this.audioBlockedUntil) {
+        this.recSettled = false;
+        const played = a.play();
+        if (played && played.catch) played.catch(() => (this.audioBlockedUntil = now() + 2000));
+      }
+    } else if (!a.paused) a.pause();
+  }
+
+  /** Which voice this step has, in words: the recording, the screen's speech, or subtitles only. */
+  renderVoiceSource() {
+    const line = this.root && this.root.querySelector("[data-voice-source]");
+    if (!line) return;
+    let key = "rp.voice_none";
+    if (!this.sound.narration) key = "rp.voice_off";
+    else if (this.content && hasSpoken(this.cues)) {
+      const a = this.audioEl();
+      if (a && a.dataset.src && !this.recordingFailed) key = "rp.voice_recording";
+      else if (this.narrator.available) key = "rp.voice_speech";
+    }
+    line.textContent = this.t(key);
+  }
+
   syncAnatomy(force = false) {
-    if (!this.content || this.expanded) return;
+    // A video's last "timeupdate" arrives after the player was destroyed (pausing it fires one).
+    if (!this.root || !this.content || this.expanded) return;
     const video = this.video();
     const ms = video ? video.currentTime * 1000 : this.ms();
     const state = anatomyStateAt(this.content, ms);
@@ -531,13 +738,6 @@ class Player {
   selectAnatomy(keys, { skeleton = false } = {}) {
     this.sel = { ...(this.sel || { mode: "highlight" }), keys, skeleton };
     this.applyAnatomySelection();
-  }
-
-  speakStep() {
-    if (!this.content || this.lastSpoken === this.key) return;
-    this.lastSpoken = this.key;
-    const lines = this.content.narration && this.content.narration.length ? this.content.narration : [this.content.setup || this.content.title];
-    this.narrator.speak(lines.filter(Boolean));
   }
 
   caption(text) {
@@ -668,15 +868,68 @@ class Player {
       <div class="rp-sound-grid">
         <label class="rp-toggle"><input type="checkbox" data-setting="auto_next" ${w.auto_next ? "checked" : ""}> <span>${esc(t("rp.auto_next"))}</span></label>
         <p class="rp-hint">${esc(t("rp.auto_next_hint"))}</p>
-        <label class="rp-toggle"><input type="checkbox" data-setting="narration" ${this.narrationOn ? "checked" : ""}> <span>${esc(t("rp.narration"))}</span></label>
+        <label class="rp-toggle"><input type="checkbox" data-setting="muted" ${this.sound.muted ? "checked" : ""}> <span>${esc(t("rp.mute_all"))}</span></label>
+        <p class="rp-hint">${esc(t("rp.mute_hint"))}</p>
+        <label class="rp-toggle"><input type="checkbox" data-setting="narration" ${this.sound.narration ? "checked" : ""}> <span>${esc(t("rp.narration"))}</span></label>
+        <p class="rp-hint" data-voice-source></p>
         ${this.narrator.available ? "" : `<p class="rp-hint">${esc(t("rp.narration_unavailable"))}</p>`}
-        <label class="rp-range"><span>${esc(t("rp.volume_narration"))}</span><input type="range" min="0" max="1" step="0.05" value="${this.narrationVolume}" data-volume="narration"></label>
+        <label class="rp-toggle"><input type="checkbox" data-setting="subtitles" ${this.sound.subtitles ? "checked" : ""}> <span>${esc(t("rp.subtitles"))}</span></label>
+        ${w.kind === "standard"
+    ? `<label class="rp-select"><span>${esc(t("rp.narration_lang"))}</span><select data-setting="narration_lang">${["auto", "ko", "en"].map((l) => `<option value="${l}" ${this.sound.lang === l ? "selected" : ""}>${esc(t(`rp.lang_${l}`))}</option>`).join("")}</select></label>`
+    : `<p class="rp-hint">${esc(t("rp.lang_course"))}</p>`}
+        <label class="rp-range"><span>${esc(t("rp.volume_narration"))}</span><input type="range" min="0" max="1" step="0.05" value="${this.sound.voice}" data-volume="narration"></label>
         <label class="rp-select"><span>${esc(t("rp.music"))}</span><select data-setting="music" ${this.music.available ? "" : "disabled"}>${musicOptions}</select></label>
         ${this.music.available ? "" : `<p class="rp-hint">${esc(t("rp.music_unavailable"))}</p>`}
         <label class="rp-file" ${this.music.mode === "own" ? "" : "hidden"} data-own-file><span>${esc(t("rp.music_own_hint"))}</span><input type="file" accept="audio/*" data-setting="music_file"></label>
-        <label class="rp-range"><span>${esc(t("rp.volume_music"))}</span><input type="range" min="0" max="1" step="0.05" value="${this.musicVolume}" data-volume="music"></label>
+        <label class="rp-range"><span>${esc(t("rp.volume_music"))}</span><input type="range" min="0" max="1" step="0.05" value="${this.sound.music}" data-volume="music"></label>
       </div>
     </details>`;
+    this.renderVoiceSource();
+  }
+
+  // -- sound settings: one place that applies them and keeps them -------------------------------
+
+  /** Apply this.sound to the voice, the recording, the music and the screen; keep it for the visit. */
+  applySound(save = true) {
+    const s = this.sound;
+    this.narrator.setEnabled(s.narration);
+    this.narrator.setMuted(s.muted);
+    this.narrator.setVolume(s.voice);
+    this.narrator.setLang(this.narrLang());
+    this.music.setVolume(effectiveVolume(s.music, s.muted));
+    const a = this.audioEl();
+    if (a) {
+      a.volume = effectiveVolume(s.voice, false);
+      a.muted = s.muted;
+    }
+    const caption = this.$("[data-caption]");
+    if (caption) caption.hidden = !s.subtitles;
+    this.renderSoundBar();
+    if (save) saveSound(browserStorage(), this.soundKey, s);
+    if (this.root && this.content && this.step && this.phase === "work") this.narrationTick(this.ms());
+  }
+
+  renderSoundBar() {
+    if (!this.root) return;
+    const t = this.t;
+    const mute = this.$('[data-act="mute-all"]');
+    const subtitles = this.$('[data-act="subtitles"]');
+    mute.textContent = t("rp.mute_all_short");
+    mute.setAttribute("aria-pressed", String(this.sound.muted));
+    mute.setAttribute("aria-keyshortcuts", "M");
+    subtitles.textContent = t("rp.subtitles");
+    subtitles.setAttribute("aria-pressed", String(this.sound.subtitles));
+    this.$("[data-soundbar]").setAttribute("aria-label", t("rp.sound_bar"));
+    this.$("[data-sound-status]").textContent = this.sound.muted ? t("rp.muted_status") : "";
+    for (const box of this.root.querySelectorAll("[data-setting]")) {
+      if (box.dataset.setting === "muted") box.checked = this.sound.muted;
+      if (box.dataset.setting === "subtitles") box.checked = this.sound.subtitles;
+    }
+  }
+
+  setSound(change) {
+    this.sound = { ...this.sound, ...change };
+    this.applySound();
   }
 
   overlay(kind) {
@@ -737,6 +990,10 @@ class Player {
         // The Start tap is the user gesture that lets sound play.
         if (this.music.mode !== "off") this.music.setMode(this.music.mode);
         return this.request("workout/start");
+      case "mute-all":
+        return this.setSound({ muted: !this.sound.muted });
+      case "subtitles":
+        return this.setSound({ subtitles: !this.sound.subtitles });
       case "cancel":
         return this.request("workout/cancel");
       case "pause":
@@ -766,8 +1023,7 @@ class Player {
         this.phase = "work";
         this.overlay(null);
         this.media("restart");
-        this.lastSpoken = null;
-        this.speakStep();
+        this.resetNarration();
         this.syncAnatomy(true);
         if (this.root.dataset.mode === "exercise") this.startClock();
         return;
@@ -789,9 +1045,16 @@ class Player {
     if (setting === "auto_next") {
       this.request("workout/settings", { auto_next: input.checked });
     } else if (setting === "narration") {
-      this.narrationOn = input.checked;
-      this.narrator.setEnabled(input.checked);
+      this.setSound({ narration: input.checked });
+      this.renderVoiceSource();
       this.ctx.event?.("narration_toggled", { on: input.checked });
+    } else if (setting === "muted") {
+      this.setSound({ muted: input.checked });
+    } else if (setting === "subtitles") {
+      this.setSound({ subtitles: input.checked });
+    } else if (setting === "narration_lang") {
+      this.setSound({ lang: input.value });
+      this.rebuildCues();
     } else if (setting === "music") {
       const mode = this.music.setMode(input.value);
       this.root.querySelector("[data-own-file]").hidden = mode !== "own";
@@ -805,18 +1068,19 @@ class Player {
 
   onInput(event) {
     const kind = event.target.dataset.volume;
-    if (kind === "narration") {
-      this.narrationVolume = Number(event.target.value);
-      this.narrator.setVolume(this.narrationVolume);
-    } else if (kind === "music") {
-      this.musicVolume = Number(event.target.value);
-      this.music.setVolume(this.musicVolume);
-    }
+    if (kind === "narration") this.setSound({ voice: Number(event.target.value) });
+    else if (kind === "music") this.setSound({ music: Number(event.target.value) });
   }
 
   onKey(event) {
-    if (!this.root || this.root.dataset.mode === "ready") return;
+    if (!this.root) return;
     if (event.target.closest?.("input, select, textarea, dialog")) return;
+    // M mutes and unmutes everything (voice, recording and music) from anywhere on the page.
+    if ((event.key === "m" || event.key === "M") && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      this.setSound({ muted: !this.sound.muted });
+      return;
+    }
+    if (this.root.dataset.mode === "ready") return;
     if (event.key === " " || event.key === "Spacebar") {
       event.preventDefault();
       if (this.root.dataset.mode === "paused") this.resume();
@@ -962,11 +1226,21 @@ class Player {
     document.removeEventListener("pointerdown", this.touch);
     document.removeEventListener("keydown", this.touch);
     document.removeEventListener("keydown", this.keys);
-    this.narrator.stop();
+    this.silence();
+    const recording = this.audioEl();
+    if (recording) recording.removeAttribute("src");
     this.music.destroy();
     this.anatomy.destroy();
     this.media("pause");
     this.root = null;
+  }
+}
+
+function browserStorage() {
+  try {
+    return globalThis.sessionStorage || null;
+  } catch {
+    return null;
   }
 }
 
