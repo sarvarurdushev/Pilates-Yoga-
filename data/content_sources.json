@@ -155,6 +155,7 @@
    "page_url",
    "file_url",
    "licence_url",
+   "licence",
    "original_creator",
    "retrieved_at",
    "sha256",
@@ -164,6 +165,10 @@
    "movement_notes",
    "identifiable_person"
   ],
+  "conditional_fields": {
+   "model_release_note": "required when identifiable_person is yes"
+  },
+  "workflow": "python -m pilates.sedens.media_import --check, then --register <entry id> <local file>. See docs/SEDENS_CONTENT_VIDEO_PLAN.md.",
   "entries": []
  }
 }

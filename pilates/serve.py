@@ -372,8 +372,29 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     # -- routes -----------------------------------------------------------
+    def _stock_clip(self, route) -> None:
+        """A registered stock clip, with byte ranges.
+
+        The base class ignores ``Range``, and Safari will not play a video that cannot be
+        asked for in pieces. Only video files of the stock folder are served here; anything
+        else is a plain 404. Stock clips are public site assets: they are not behind the
+        room-only gate that creator uploads use."""
+        from urllib.parse import unquote
+
+        from .sedens import media_store
+        folder = (WEB / "assets" / "stock").resolve()
+        target = (folder / unquote(route.path[len("/assets/stock/"):])).resolve()
+        mime = {".mp4": "video/mp4", ".webm": "video/webm"}.get(target.suffix.lower())
+        if mime is None or not target.is_file() or not target.is_relative_to(folder):
+            self.send_error(404)
+            return
+        media_store.stream_file(self, target, mime, cache="no-cache")
+
     def do_GET(self):  # noqa: N802 - the base class names it
         route = urlparse(self.path)
+        if route.path.startswith("/assets/stock/"):
+            self._stock_clip(route)
+            return
         if route.path.startswith("/sedens/"):
             from .sedens.http import dispatch as sedens_dispatch
             sedens_dispatch(self, self.command, route)

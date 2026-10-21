@@ -20,6 +20,10 @@ from .util import Denied
 SOURCES = Path(__file__).resolve().parents[2] / "data" / "content_sources.json"
 REPO = Path(__file__).resolve().parents[2]
 STOCK_LABEL = {"en": "Demo media — movement not yet expert reviewed", "ko": "데모 미디어 — 동작은 아직 전문가 검토 전"}
+# What a creator's upload shows: the creator uploaded it (it need not be their own work), nobody at SEDENS
+# has reviewed the movement.
+CREATOR_LABEL = {"en": "Creator-uploaded media — movement not yet expert reviewed",
+                 "ko": "제작자가 올린 미디어 — 동작은 아직 전문가 검토 전"}
 GENERATION_WORKFLOW = ("approved_reference", "generation", "comparison", "expert_review", "publish")
 
 
@@ -30,6 +34,26 @@ def registry() -> dict:
 
 def repo_asset(asset_id: str) -> dict | None:
     return next((a for a in registry()["assets"] if a["id"] == asset_id), None)
+
+
+def label_for(source, licence_type, repo_asset=None, sha256=None) -> dict:
+    """The label shown with any course file: never an endorsement, never an expert claim.
+
+    A repository asset shows its own registry label, a stock clip the stock label, and a
+    creator's upload the creator label. Rights approval does not change any of them."""
+    if source == "repo":
+        asset = repo_asset_by(repo_asset, sha256)
+        if asset and asset.get("label"):
+            return asset["label"]
+        return STOCK_LABEL
+    if licence_type in ("pexels", "pixabay"):
+        return STOCK_LABEL
+    return CREATOR_LABEL
+
+
+def repo_asset_by(asset_id=None, sha256=None) -> dict | None:
+    return next((a for a in registry()["assets"] if (asset_id and a["id"] == asset_id)
+                 or (not asset_id and sha256 and a["sha256"] == sha256)), None)
 
 
 class VideoProvider:
